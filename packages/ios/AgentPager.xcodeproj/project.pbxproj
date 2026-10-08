@@ -13,6 +13,7 @@
 		451488794A4E27E84515ED9C /* AgentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BC23C86FC7A43D775629F19 /* AgentView.swift */; };
 		5C7A268057B477EB532A8908 /* Keychain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78E73231572661B6E2EE463F /* Keychain.swift */; };
 		60B6A80E03538535F102F484 /* AgentPagerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BBA529C5DA5D28180A8B4FE /* AgentPagerApp.swift */; };
+		70BFBD2E5191D0A402206B10 /* DriverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4201AE0E7919CEB179790B7E /* DriverTests.swift */; };
 		7197B88CC291C4521A5CFF40 /* ConnectSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B616C7FA810C63150805C23 /* ConnectSheet.swift */; };
 		B046AD611FE5C412661A5399 /* Previews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FA71DC2065059897B5BE3C7 /* Previews.swift */; };
 		DC666BE4FC8C2BB3330578F0 /* FlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C28C78D36D8223DDE88ADE4 /* FlowTests.swift */; };
@@ -36,6 +37,7 @@
 /* Begin PBXFileReference section */
 		1B616C7FA810C63150805C23 /* ConnectSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectSheet.swift; sourceTree = "<group>"; };
 		3BC23C86FC7A43D775629F19 /* AgentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentView.swift; sourceTree = "<group>"; };
+		4201AE0E7919CEB179790B7E /* DriverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverTests.swift; sourceTree = "<group>"; };
 		4CB2BAD2A168DD9A326F8B9D /* AgentsListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentsListView.swift; sourceTree = "<group>"; };
 		5FA71DC2065059897B5BE3C7 /* Previews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Previews.swift; sourceTree = "<group>"; };
 		61CEF972485C3A4967C99E99 /* API.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = API.swift; sourceTree = "<group>"; };
@@ -66,6 +68,7 @@
 			isa = PBXGroup;
 			children = (
 				DD4C535AB23CF5192F290774 /* AgentHarness.swift */,
+				4201AE0E7919CEB179790B7E /* DriverTests.swift */,
 				8C28C78D36D8223DDE88ADE4 /* FlowTests.swift */,
 			);
 			path = AgentPagerUITests;
@@ -174,11 +177,11 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					7FFF8B6D1F639290C74B8166 = {
-						DevelopmentTeam = "";
+						DevelopmentTeam = X3M532E87A;
 						ProvisioningStyle = Automatic;
 					};
 					F3051C40EF05BCC6CF6A7B05 = {
-						DevelopmentTeam = "";
+						DevelopmentTeam = X3M532E87A;
 						ProvisioningStyle = Automatic;
 						TestTargetID = 7FFF8B6D1F639290C74B8166;
 					};
@@ -239,6 +242,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				DD3DFD921630978FF1CEB7C8 /* AgentHarness.swift in Sources */,
+				70BFBD2E5191D0A402206B10 /* DriverTests.swift in Sources */,
 				DC666BE4FC8C2BB3330578F0 /* FlowTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -292,7 +296,7 @@
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = X3M532E87A;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
@@ -371,7 +375,7 @@
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = X3M532E87A;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;

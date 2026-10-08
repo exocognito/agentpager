@@ -28,3 +28,23 @@ TEST_RUNNER_AGENTPAGER_SERVER_URL=http://<mac-ip>:8787 TEST_RUNNER_SCREENSHOT_DI
 ```
 
 `-failSends N` (launch argument) makes the next N answer attempts fail, to show the "Answer Not Confirmed" alert.
+
+## Driving the app by hand (agents playing the owner)
+
+`DriverTests/testDrive` launches the app and waits for commands, so an agent can dogfood interactively against
+real agents. Start it in the background, then send one command at a time:
+
+```sh
+export AGENTPAGER_DRIVE_DIR=/tmp/agentpager-drive   # any folder; mkdir it first
+TEST_RUNNER_AGENTPAGER_DRIVE_DIR=$AGENTPAGER_DRIVE_DIR TEST_RUNNER_AGENTPAGER_SERVER_URL=http://<mac-ip>:8787 \
+  xcodebuild test -project AgentPager.xcodeproj -scheme AgentPager -destination 'platform=iOS Simulator,name=iPhone 17' \
+  -only-testing:AgentPagerUITests/DriverTests/testDrive &
+node drive.mjs tree                      # what is on screen, with accessibility ids
+node drive.mjs tap id=connect-button     # or label=..., contains=...; app=safari to act on Safari
+node drive.mjs keys "text=Hello"         # type into the focused field
+node drive.mjs shot name=connect         # screenshot into the drive folder
+node drive.mjs quit
+```
+
+Add `TEST_RUNNER_AGENTPAGER_DRIVE_RESET=1` to start with no pagers. Open AgentPager links as a phone would with
+`xcrun simctl openurl booted <link>`. The command channel is a folder on the Mac, so this runs in the Simulator only.

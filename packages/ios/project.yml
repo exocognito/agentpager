@@ -10,7 +10,8 @@ settings:
     MARKETING_VERSION: "0.1"
     CURRENT_PROJECT_VERSION: "1"
     CODE_SIGN_STYLE: Automatic
-    DEVELOPMENT_TEAM: ""
+    # Sam's Personal Team, set in Xcode; kept here so xcodegen does not drop it.
+    DEVELOPMENT_TEAM: X3M532E87A
     # The dogfood server. Change it here, or in the app's Server screen, or with the launch argument
     # -AgentPagerServerURL http://host:8787
     AGENTPAGER_SERVER_URL: "http://192.168.4.99:8787"

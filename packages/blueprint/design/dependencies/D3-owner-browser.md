@@ -7,7 +7,7 @@ caveats:
   - Chromium at two widths stands for every phone and desktop browser. The loop samples no other engine and no real handset.
 ---
 
-Deprecated. Succeeded by D6::iphone-app: the owner's side is a native iPhone app, and the web app is parked (SP2).
+Deprecated. Succeeded by D6::iphone-app: the owner's side is a native iPhone app (SP2), and the web app is parked (ROADMAP).
 
 Must supply: a real browser engine that the tests drive and that a role uses when it plays the owner.
 

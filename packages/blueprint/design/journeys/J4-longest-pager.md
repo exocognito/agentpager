@@ -7,8 +7,9 @@ for:
   - C22::change-or-end-a-pager
   - C5::review-and-answer-cards
   - C6::send-feedback
+  - C7::revisit-decisions
   - C23::agents-list
-  - I3::independent-decisions
+  - I18::independent-cards
   - I6::send-and-acknowledgement
   - I16::one-agent-one-phone
   - I17::ended-pagers-refuse-and-forget
@@ -28,6 +29,8 @@ On the local product, in real time, with one app install. Keep all state through
    - The agent asks three cards.
    - The owner answers the third, then the second by asking for changes. The owner undoes one send, then sends again.
    - The agent acknowledges the second card, then the third.
+   - The owner reopens the second card and reads the conversation.
+   - The owner returns to the Agents list and reopens the agent.
 3. **Survive a restart.**
    - The owner closes and reopens the app.
    - The service is stopped, its exit recorded, and restarted on unchanged storage.

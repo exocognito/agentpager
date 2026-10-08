@@ -9,4 +9,4 @@ caveats:
   - An acknowledgement proves the agent read the answer, not that it did the work or is still running.
 ---
 
-Undo cancels the send and reopens the card with the choice kept. Leaving the app during the Undo window sends at once. A pager that ends inside the window stores nothing. A send with no reply retries a few times before the phone says it failed. A refusal never retries, and Retry resends the same answer. Reads never reset a draft. Breaking this looks like an option that sends on tap, an answer stored after Undo, or the phone marking the answer confirmed straight after Send.
+The Undo window lasts five seconds. Undo cancels the send and reopens the card with the choice kept. Leaving the app during the Undo window sends at once. A pager that ends inside the window stores nothing. A send with no reply retries a few times before the phone says it failed. A refusal never retries, and Retry resends the same answer. Reads never reset a draft. Breaking this looks like an option that sends on tap, an answer stored after Undo, or the phone marking the answer confirmed straight after Send.

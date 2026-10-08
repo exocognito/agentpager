@@ -18,6 +18,7 @@ caveats:
 3. Tapping an active row opens that agent's screen, with its open decisions, each marked unread, kept apart from the answered ones. Tapping a row that is not yet paired opens pairing.
 4. An ended row keeps only the agent's name and why and when the pager ended. It stays for 7 days after the end, then disappears. Tapping it opens the ended screen (C22).
 5. While open, the list stays current without the owner refreshing it.
+6. The list is what the service reports for the pagers whose keys this phone holds. The phone keeps no list of its own, and drops a pager the service no longer knows.
 
 ## Never
 

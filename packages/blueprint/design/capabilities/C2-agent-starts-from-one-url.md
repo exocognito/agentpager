@@ -18,6 +18,6 @@ caveats:
 2. An agent that can send requests uses HTTPS. One that cannot asks the owner to add the MCP server to its app, once.
 3. The agent names its pager. It either starts one and shows the link, QR code and code, or joins the owner's link and shows the code (C20). The owner pairs (C21).
 4. The agent asks cards, waits for each answer, acknowledges with its next steps, and finishes when its work is done, which ends the pager (C22).
-5. A pager holds at most 10 open cards. An agent that asks for an eleventh is refused and told to wait for answers. Starting or joining pagers is limited per network address, and a refused agent is told when to try again.
+5. A pager holds at most 10 open cards. An agent that asks for an eleventh is refused and told to wait for answers. Making pagers is limited per network address, whether an agent or a phone makes them, and a refused agent is told when to try again.
 
 Everything the agent needs is on that one page. A fresh agent in a client D2 names completes pairing, one card, the exact answer and a visible acknowledgement within ten minutes of the owner's first prompt.

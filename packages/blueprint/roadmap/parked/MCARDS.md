@@ -25,7 +25,7 @@ deliverables:
   - J2::longest-session
 ---
 
-Parked: the web app is parked (SP2). Several of its deliverables are deprecated, and each names its successor. MAPP carries the product forward on the iPhone.
+Parked: the web app is parked (ROADMAP). Several of its deliverables are deprecated, and each names its successor. MAPP carries the product forward on the iPhone.
 
 # MCARDS · Guest decision cards on agentpager.me
 

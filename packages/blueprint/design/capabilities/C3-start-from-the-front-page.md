@@ -9,7 +9,7 @@ caveats:
   - The clipboard copy is proved in a browser the test controls; a phone browser may refuse it, and the text stays selectable.
 ---
 
-Deprecated. Succeeded by C18::website-points-to-the-app: the web app is parked (SP2), and the website now points people to the app.
+Deprecated. Succeeded by C18::website-points-to-the-app: the web app is parked (ROADMAP), and the website now points people to the app.
 
 ## Behaviors
 

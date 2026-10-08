@@ -5,7 +5,7 @@ serves:
   - SC2
 statement: Try AgentPager without an agent of your own; a demo agent pairs with your phone, asks a sample decision and acknowledges your answer.
 caveats:
-  - The demo agent is a script run by the service, not an AI. It shows the exchange, not an agent's judgement.
+  - The demo shows the exchange, not an agent's judgement.
 ---
 
 ## Behaviors

@@ -10,7 +10,7 @@ deliverables:
   - C21::pair-by-entering-the-agents-code
   - C22::change-or-end-a-pager
   - C23::agents-list
-  - I3::independent-decisions
+  - I18::independent-cards
   - I4::payloads-refused-whole
   - I5::answers-never-change
   - I6::send-and-acknowledgement

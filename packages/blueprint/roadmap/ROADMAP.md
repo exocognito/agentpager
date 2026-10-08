@@ -11,4 +11,4 @@ MPRORESEARCH defines the $2.99/month research offer and consented survey, not a 
 
 Review what works with users at each stage. The owner's side is the iPhone app (SP2). Android follows with the same behaviour, data and words; the web app (MCARDS, parked before it closed) stays as history. Community-contributed cards and Pro general availability remain draft direction. Contribution trust and compatibility, and real payment, support and reliability need their own designs. Research signals guide those choices; no stage promises revenue or organic growth.
 
-Other deferred candidates: Alchemy when the owner sets its date, answering from an alert, recovery for a lost phone key, a real deployed end-time wait, and SG1/SG2/SG3 outcome metrics once they have bars.
+Other deferred candidates: Alchemy when the owner sets its date, recovery for a lost phone key, a real deployed end-time wait, and SG1/SG2/SG3 outcome metrics once they have bars.

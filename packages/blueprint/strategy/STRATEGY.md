@@ -20,7 +20,7 @@ Accounts should let me return across devices without making a pager public.
 
 ### SC2 · Get paged when my agent needs me
 
-When my agent asks, my phone alerts me with the agent's name and its question, even when AgentPager is closed and a Focus mode is on. Opening the alert takes me to that decision.
+When my agent asks, my phone alerts me with the agent's name and its question, even when AgentPager is closed and, if I let its alerts through, a Focus mode is on. Opening the alert takes me to that decision.
 
 ## Strategic invariants
 
@@ -82,7 +82,7 @@ Use plain language I can understand without specialist knowledge. Always offer a
 
 ### SP2 · Keep the first version focused and its foundations explicit
 
-Serve one agent and one phone per pager. My side is a native iPhone app. Android follows with the same behaviour, data and words, drawn the Android way; the web app is parked. Accounts, community cards and paid plans need their own design and user learning. Run on a Cloudflare Worker at agentpager.me, with one SQLite-backed Durable Object per pager. Agents reach one service by plain HTTPS or a remote MCP server. Defer Alchemy until a date the owner sets.
+Serve one agent and one phone per pager. My side is a native phone app for iPhone and Android, with the same behaviour, data and words on each, drawn each platform's way. Accounts, community cards and paid plans need their own design and user learning. Run on a Cloudflare Worker at agentpager.me, with one SQLite-backed Durable Object per pager. Agents reach one service by plain HTTPS or a remote MCP server. Defer Alchemy until a date the owner sets.
 
 ### SP3 · Agents choose the options; AgentPager keeps them easy to answer
 

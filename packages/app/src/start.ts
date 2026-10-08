@@ -33,7 +33,11 @@ In one message to your owner, show:
 1. if you started the pager: \`link.qrText\` in a fenced code block (your owner scans it with the iPhone Camera), then the full \`link.url\` as text,
 2. \`pairingCode.text\` exactly as given, as plain text.
 
-Your owner taps those 3 emojis, in order, in the AgentPager app. They have 3 tries within the pager's first 15 minutes; a third wrong try ends the pager.
+Write these in your own message, not only in a command's output: your owner's app may fold command output away, and they will be looking for the link. \`link.url\` is for your owner's phone; never join it yourself.
+
+Your owner taps those 3 emojis, in order, in the AgentPager app. They have 3 tries within the pager's first 15 minutes; a third wrong try ends the pager. Until it pairs, \`session.endsAt\` is that pairing deadline; once paired, it is the pager's end time. To show the code again later, take a fresh \`pairingCode.text\` from the status route below, so the minutes left are right.
+
+Your owner can't approve prompts in your terminal from the phone. Before they leave, make sure you can make every call below without asking them for permission; if you can't, sort it out while they are still there.
 
 ## 2. Keep your key
 
@@ -52,21 +56,25 @@ A question: \`${example}\`
 
 The reply: \`{"decisionId":"…"}\`
 
-2 to 5 options numbered 1..n, each with a distinct emoji and an action you will carry out. \`recommended\` and \`detail\` are optional. Titles hold up to 280 characters, question detail up to 1000. Markdown stays literal; HTML is refused. A pager holds at most ${MAX_OPEN_DECISIONS} open decisions. Your owner's app says pager, never session, so say pager in what you write.
+Make the title a short question, about 100 characters, and put context in \`detail\`. 2 to 5 options numbered 1..n, each with a distinct emoji and an action you will carry out, its title also about 100 characters. \`recommended\` and \`detail\` are optional. Titles, option detail and \`nextSteps\` hold up to 280 characters, question detail up to 1000. Markdown stays literal; HTML is refused. A pager holds at most ${MAX_OPEN_DECISIONS} open decisions. Your owner's app says pager, never session, so say pager in what you write.
 
 ## 4. Wait for the answer
 
   \`curl -s "${origin}/api/sessions/<sessionId>/cards/<decisionId>/answer?wait=${ANSWER_WAIT_MAX_SECONDS}" -H "authorization: Bearer $AGENT_KEY"\`
   MCP: \`wait_for_card_answer {sessionId, agentKey, decisionId, waitSeconds?}\`
 
-Each read holds up to ${ANSWER_WAIT_MAX_SECONDS} seconds, then replies with one of:
+Each read holds up to \`wait\` seconds (at most ${ANSWER_WAIT_MAX_SECONDS}; without \`wait\` it answers at once), then replies with one of:
 - \`{"status":"pending"}\`: read again.
 - \`{"status":"answered","answer":{"answerId":"…","decisionId":"…","choice":…,"sentAt":"…"}}\`
 - an error (below): stop reading and handle it.
 
 \`choice\` is \`{"kind":"option","number":n}\`, or \`{"kind":"feedback","text":"…"}\` when your owner wrote a note instead of choosing an option: follow the note, and ask a new card only if you still need a decision.
 
-Keep reading while you have nothing better to do. If your turn has to end first, the answer waits: read it again in your next turn.
+Keep reading while you have nothing better to do. Your owner answers from their phone and can't wake you, so before your turn ends:
+- if you can run a command in the background and be woken when it finishes, keep the read going there;
+- otherwise tell your owner, in your last message, to send you a message once they have answered.
+
+The answer waits either way: read it again in your next turn.
 
 ## 5. Acknowledge
 
@@ -77,7 +85,7 @@ The reply: \`{"decisionId":"…","answerId":"…","nextSteps":"…","acknowledge
 
 ## Status, times and ending
 
-- \`GET ${origin}/api/sessions/<sessionId>\` with your key replies \`{"session":{"status":"…","pairedAt":…,"endsAt":"…",…},"pairingCode":…}\`. \`status\` is \`unpaired\` until your owner pairs, then \`active\`.
+- \`GET ${origin}/api/sessions/<sessionId>\` with your key replies \`{"session":{"status":"…","pairedAt":…,"endsAt":"…",…},"pairingCode":…}\`. \`status\` is \`unpaired\` until your owner pairs, then \`active\`. If it is still \`unpaired\` a few minutes after you showed the code, show the link and a fresh \`pairingCode.text\` again.
 - Times are UTC (ISO 8601). Tell your owner times in their local time, or as "in 5 minutes".
 - Keep the pager while you may still need your owner. When your work is done, end it: \`POST ${origin}/api/sessions/<sessionId>/finish\` with your key and no body, which replies \`{"endedAt":"…"}\` (MCP: \`finish_session\`). For a connection test, let your owner choose in the test card's options: keep the pager, or end it.
 - A pager also ends when your owner ends it, when it reaches its end time, or when pairing fails. After that every call answers \`PagerEnded\` with \`endReason\` and a \`message\`: stop paging, and start a new pager only if your owner asks.
@@ -117,7 +125,7 @@ Join it once, now:
 
 The reply is \`{"session":{"sessionId":"…",…},"agentKey":"…","pairingCode":{…,"text":"…"}}\`. \`agentKey\` is a secret: never print the whole reply or show the key to your owner, and keep \`sessionId\` and \`agentKey\` for later turns.
 
-Print \`pairingCode.text\` to your owner exactly as given, as plain text. It reads like:
+Print \`pairingCode.text\` to your owner exactly as given, as plain text, in your own message rather than only in a command's output. It reads like:
 
     To finish pairing, tap these 3 emojis on your phone, in this order:
     🦊 🌵 🦊

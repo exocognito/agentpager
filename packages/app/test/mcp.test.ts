@@ -49,6 +49,9 @@ test('official MCP SDK: start, show code, ask, wait, acknowledge, finish; join a
     assert.equal(answered.status, 'answered');
     if (answered.status !== 'answered') throw new Error('unanswered');
     assert.equal(answered.answer.answerId, receipt.answerId);
+    // A refusal names the field and its limit, never the schema's dump.
+    const long = await fails('acknowledge_card', { ...agent, decisionId: asked.decisionId, acknowledgement: { answerId: receipt.answerId, nextSteps: 'x'.repeat(281) } }, 'InvalidInput');
+    assert.equal(long.message, 'The request was refused: acknowledgement.nextSteps: text may not exceed 280 characters');
     const ack = await call('acknowledge_card', { ...agent, decisionId: asked.decisionId, acknowledgement: { answerId: receipt.answerId, nextSteps: 'Going with the second plan.' } }, C.Acknowledgement);
     assert.equal((await f.inbox(s.session.sessionId, phone)).answered[0].acknowledgement?.acknowledgedAt, ack.acknowledgedAt);
     await fails('ask_card', { ...agent, question: { ...question(), surprise: true } }, 'InvalidInput');

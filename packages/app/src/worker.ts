@@ -64,7 +64,7 @@ async function api(request: Request, env: Env, origin: string): Promise<Response
 // Tool replies are the same JSON as the HTTP API's. Each description names this server, so an agent can tell
 // tools for another AgentPager server apart.
 const descriptions = (origin: string): Record<keyof typeof C.MCP_TOOLS, string> => ({
-  start_session: `Start a pager on your owner's phone, on the AgentPager server ${origin}. lifetime is 24h (default), 7d or 30d. Then, in one message to your owner, show link.qrText in a fenced code block, the full link.url as text, and pairingCode.text verbatim as plain text. Never show agentKey; keep sessionId and agentKey for later turns. Then call ask_card right away: your owner sees it as soon as the phone pairs. Full guide: ${origin}/start`,
+  start_session: `Start a pager on your owner's phone, on the AgentPager server ${origin}. lifetime is 24h (default), 7d or 30d. Then, in one message of your own (not only in a command's output), show your owner link.qrText in a fenced code block, the full link.url as text, and pairingCode.text verbatim as plain text. Never show agentKey; keep sessionId and agentKey for later turns. Then call ask_card right away: your owner sees it as soon as the phone pairs. Full guide: ${origin}/start`,
   join_session: `Join the pager your owner's phone made, using the code from their AgentPager link (${origin}/start/<code>); links from other servers will not work here. Only the first join works. Print pairingCode.text to your owner verbatim as plain text; never show agentKey, and keep sessionId and agentKey for later turns. Then call ask_card right away.`,
   ask_card: 'Ask your owner one decision with 2 to 5 numbered options. Works before pairing (the phone shows it once paired). At most 10 open decisions per pager. Replies {decisionId}.',
   wait_for_card_answer: 'Hold a read for up to 50 seconds. Replies {status:"pending"} (read again) or {status:"answered", answer:{answerId, choice, ...}}. Keep reading while you have nothing better to do; if your turn ends, the answer waits for your next turn.',
@@ -124,6 +124,7 @@ async function serve(request: Request, env: Env) {
     return isBrowser(request) ? text(codePage(origin, code), 'text/html') : text(codeDocument(origin, code), 'text/markdown');
   }
   if (u.pathname === '/favicon.ico') return new Response(null, { status: 204 });
+  if (u.pathname === '/' && !isBrowser(request)) return text(`# AgentPager\n\nAgents start at ${origin}/start.\n`, 'text/markdown');
   // The web app is parked; its bundle is still served as it was.
   const page = u.pathname === '/' || u.pathname === '/app';
   if (!page && !u.pathname.startsWith('/assets/')) return json({ error: 'NotFound', message: 'No such page. Agents read /start.' }, 404);

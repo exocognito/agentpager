@@ -1,10 +1,14 @@
-import { Schema } from 'effect';
+import { Either, ParseResult, Schema } from 'effect';
 import { Refusal, refuse, STATUS, type Token } from './contract.ts';
 
 export const strict = { onExcessProperty: 'error' } as const;
+// A refusal names each field and what is wrong with it ("nextSteps: text may not exceed 280 characters"),
+// never the schema's own dump, so an agent can fix its request.
 export function decode<A, I>(schema: Schema.Schema<A, I>, value: unknown): A {
-  try { return Schema.decodeUnknownSync(schema, strict)(value); }
-  catch (error) { throw refuse.invalid(String(error)); }
+  const result = Schema.decodeUnknownEither(schema, strict)(value);
+  if (Either.isRight(result)) return result.right;
+  const issues = ParseResult.ArrayFormatter.formatErrorSync(result.left);
+  throw refuse.invalid(issues.map(i => (i.path.length ? `${i.path.map(String).join('.')}: ` : '') + i.message).join('; '));
 }
 export function token(): Token {
   return btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(24)))).replaceAll('+', '-').replaceAll('/', '_');

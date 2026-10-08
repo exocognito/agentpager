@@ -29,7 +29,7 @@ deliverables:
 ## Objective
 
 I install AgentPager on my iPhone from Xcode. To connect, either:
-- my agent shows me an AgentPager link, a QR code and three emoji, and opening the link opens the app to pairing; or
+- my agent shows me an AgentPager link, a QR code and three emoji, and opening the link shows its page, whose Open in AgentPager button opens the app to pairing; or
 - I tap + and give my agent the link my phone makes, and it shows me the three emoji.
 
 I tap the three emoji in order and press Pair. From then on my agent asks me decisions. With the app open I see each one within seconds. I choose an option or ask for changes, press Send, and have a few seconds to undo. The row waits for my agent, then shows that it confirmed. I can reopen any answered decision while the pager lasts.

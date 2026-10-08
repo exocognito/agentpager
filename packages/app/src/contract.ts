@@ -73,7 +73,7 @@ export const MCP_TOOLS = {
   start_session: { input: CreateInput, result: Created },
   join_session: { input: Schema.Struct({ code: Token, name: SessionName }).annotations(strict), result: Joined },
   ask_card: { input: Schema.Struct({ ...AgentCall, question: QuestionInput }).annotations(strict), result: Asked },
-  wait_for_card_answer: { input: Schema.Struct({ ...AgentCall, decisionId: Token, waitSeconds: Schema.optional(Schema.Number.pipe(Schema.int(), Schema.between(1, ANSWER_WAIT_MAX_SECONDS))) }).annotations(strict), result: Schema.Struct({ answer: AnswerStatus }) },
+  wait_for_card_answer: { input: Schema.Struct({ ...AgentCall, decisionId: Token, waitSeconds: Schema.optional(Schema.Number.pipe(Schema.int(), Schema.between(1, ANSWER_WAIT_MAX_SECONDS))) }).annotations(strict), result: AnswerStatus },
   acknowledge_card: { input: Schema.Struct({ ...AgentCall, decisionId: Token, acknowledgement: AcknowledgementInput }).annotations(strict), result: Acknowledgement },
   finish_session: { input: Schema.Struct(AgentCall).annotations(strict), result: Finished },
 } as const;

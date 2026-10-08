@@ -96,8 +96,7 @@ final class AgentHarness {
         args["decisionId"] = decisionId
         args["waitSeconds"] = seconds
         let r = try tool("wait_for_card_answer", args)
-        let a = r["answer"] as! [String: Any]
-        return a["status"] as? String == "answered" ? a["answer"] as? [String: Any] : nil
+        return r["status"] as? String == "answered" ? r["answer"] as? [String: Any] : nil
     }
 
     func acknowledge(_ decisionId: String, answerId: String, nextSteps: String) throws {

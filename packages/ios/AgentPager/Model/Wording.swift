@@ -43,7 +43,12 @@ enum Wording {
         name.components(separatedBy: " · ").first ?? name
     }
 
-    static let pairingHint = "Pair within 15 minutes, or this pager ends."
+    // The pairing window is the pager's first 15 minutes, so a phone-made link has less left by the time its agent joins.
+    static func pairingHint(until end: Date?, now: Date) -> String {
+        guard let end else { return "Pair within 15 minutes, or this pager ends." }
+        let minutes = max(1, Int((end.timeIntervalSince(now) / 60).rounded(.up)))
+        return "Pair within \(minutes) minute\(minutes == 1 ? "" : "s"), or this pager ends."
+    }
     static let lastTry = "Last try. If it’s wrong, this pager ends."
     static func wrong(_ triesLeft: Int) -> String {
         triesLeft == 1 ? lastTry : "Those don’t match. \(triesLeft) tries left."

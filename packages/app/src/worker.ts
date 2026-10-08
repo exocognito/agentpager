@@ -61,30 +61,32 @@ async function api(request: Request, env: Env, origin: string): Promise<Response
   throw C.refuse.notFound();
 }
 
-const descriptions: Record<keyof typeof C.MCP_TOOLS, string> = {
-  start_session: 'Start a pager on your owner\'s phone. lifetime is 24h (default), 7d or 30d. Then, in one message to your owner, show link.qrText in a fenced code block, the full link.url as text, and pairingCode.text verbatim as plain text. Then call ask_card right away: your owner sees it as soon as the phone pairs.',
-  join_session: 'Join the pager your owner\'s phone made, using the code from their AgentPager link (…/start/<code>). Only the first join works. Print pairingCode.text to your owner verbatim as plain text, then call ask_card right away.',
-  ask_card: 'Ask your owner one decision with 2 to 5 numbered options. Works before pairing (the phone shows it once paired). At most 10 open decisions per pager.',
-  wait_for_card_answer: 'Hold a read for up to 50 seconds. Repeat while pending; keep your turn open until you have the answer.',
-  acknowledge_card: 'Acknowledge the exact answerId with your next steps; your owner sees them. Only the first acknowledgement counts.',
+// Tool replies are the same JSON as the HTTP API's. Each description names this server, so an agent can tell
+// tools for another AgentPager server apart.
+const descriptions = (origin: string): Record<keyof typeof C.MCP_TOOLS, string> => ({
+  start_session: `Start a pager on your owner's phone, on the AgentPager server ${origin}. lifetime is 24h (default), 7d or 30d. Then, in one message to your owner, show link.qrText in a fenced code block, the full link.url as text, and pairingCode.text verbatim as plain text. Never show agentKey; keep sessionId and agentKey for later turns. Then call ask_card right away: your owner sees it as soon as the phone pairs. Full guide: ${origin}/start`,
+  join_session: `Join the pager your owner's phone made, using the code from their AgentPager link (${origin}/start/<code>); links from other servers will not work here. Only the first join works. Print pairingCode.text to your owner verbatim as plain text; never show agentKey, and keep sessionId and agentKey for later turns. Then call ask_card right away.`,
+  ask_card: 'Ask your owner one decision with 2 to 5 numbered options. Works before pairing (the phone shows it once paired). At most 10 open decisions per pager. Replies {decisionId}.',
+  wait_for_card_answer: 'Hold a read for up to 50 seconds. Replies {status:"pending"} (read again) or {status:"answered", answer:{answerId, choice, ...}}. Keep reading while you have nothing better to do; if your turn ends, the answer waits for your next turn.',
+  acknowledge_card: 'Acknowledge the exact answerId with your next steps; your owner sees them with a green tick. Only the first acknowledgement counts.',
   finish_session: 'End the pager when your work is done. Your key stops working.',
-};
+});
 async function mcp(request: Request, env: Env, origin: string) {
   // Stateless JSON replies only: never let the SDK open a GET event stream.
   if (request.method !== 'POST') {
     return new Response(JSON.stringify({ jsonrpc: '2.0', id: null, error: { code: -32000, message: 'Method not allowed. Use POST.' } }), { status: 405, headers: { 'content-type': 'application/json', allow: 'POST' } });
   }
   const server = new Server({ name: 'AgentPager', version: BUILD }, { capabilities: { tools: {} } });
-  server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: Object.entries(C.MCP_TOOLS).map(([name, tool]) => ({ name, description: Object.entries(descriptions).find(([key]) => key === name)?.[1], inputSchema: { ...JSONSchema.fromAST(tool.input.ast, { definitions: {} }), type: 'object' } })) }));
+  server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: Object.entries(C.MCP_TOOLS).map(([name, tool]) => ({ name, description: Object.entries(descriptions(origin)).find(([key]) => key === name)?.[1], inputSchema: { ...JSONSchema.fromAST(tool.input.ast, { definitions: {} }), type: 'object' } })) }));
   server.setRequestHandler(CallToolRequestSchema, async (call) => {
     const raw = call.params.arguments;
     try {
-      let path: string, method = 'POST', data: unknown, agentKey: string | undefined, wrap = false;
+      let path: string, method = 'POST', data: unknown, agentKey: string | undefined;
       switch (call.params.name) {
         case 'start_session': { data = decode(C.MCP_TOOLS.start_session.input, raw); path = '/api/sessions'; break; }
         case 'join_session': { const p = decode(C.MCP_TOOLS.join_session.input, raw); path = `/api/start/${p.code}/join`; data = { name: p.name }; break; }
         case 'ask_card': { const p = decode(C.MCP_TOOLS.ask_card.input, raw); path = `/api/sessions/${p.sessionId}/cards`; data = p.question; agentKey = p.agentKey; break; }
-        case 'wait_for_card_answer': { const p = decode(C.MCP_TOOLS.wait_for_card_answer.input, raw); path = `/api/sessions/${p.sessionId}/cards/${p.decisionId}/answer?wait=${p.waitSeconds ?? C.ANSWER_WAIT_MAX_SECONDS}`; method = 'GET'; agentKey = p.agentKey; wrap = true; break; }
+        case 'wait_for_card_answer': { const p = decode(C.MCP_TOOLS.wait_for_card_answer.input, raw); path = `/api/sessions/${p.sessionId}/cards/${p.decisionId}/answer?wait=${p.waitSeconds ?? C.ANSWER_WAIT_MAX_SECONDS}`; method = 'GET'; agentKey = p.agentKey; break; }
         case 'acknowledge_card': { const p = decode(C.MCP_TOOLS.acknowledge_card.input, raw); path = `/api/sessions/${p.sessionId}/cards/${p.decisionId}/acknowledge`; data = p.acknowledgement; agentKey = p.agentKey; break; }
         case 'finish_session': { const p = decode(C.MCP_TOOLS.finish_session.input, raw); path = `/api/sessions/${p.sessionId}/finish`; agentKey = p.agentKey; break; }
         default: throw C.refuse.invalid('Unknown tool. Read /start.');
@@ -93,7 +95,7 @@ async function mcp(request: Request, env: Env, origin: string) {
       try { response = await api(new Request(origin + path, { method, headers: { ...(agentKey ? { authorization: `Bearer ${agentKey}` } : {}), 'content-type': 'application/json' }, body: data === undefined ? undefined : JSON.stringify(data) }), env, origin); }
       catch (error) { response = refusal(error); }
       const result: unknown = await response.json();
-      return { ...(response.ok ? {} : { isError: true }), content: [{ type: 'text', text: JSON.stringify(wrap && response.ok ? { answer: result } : result) }] };
+      return { ...(response.ok ? {} : { isError: true }), content: [{ type: 'text', text: JSON.stringify(result) }] };
     } catch (error) { return { isError: true, content: [{ type: 'text', text: await refusal(error).text() }] }; }
   });
   const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
@@ -121,6 +123,7 @@ async function serve(request: Request, env: Env) {
     if (start[2]) return text(await QRCode.toString(`${origin}/start/${code}`, { type: 'svg', errorCorrectionLevel: 'M' }), 'image/svg+xml');
     return isBrowser(request) ? text(codePage(origin, code), 'text/html') : text(codeDocument(origin, code), 'text/markdown');
   }
+  if (u.pathname === '/favicon.ico') return new Response(null, { status: 204 });
   // The web app is parked; its bundle is still served as it was.
   const page = u.pathname === '/' || u.pathname === '/app';
   if (!page && !u.pathname.startsWith('/assets/')) return json({ error: 'NotFound', message: 'No such page. Agents read /start.' }, 404);

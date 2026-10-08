@@ -198,10 +198,7 @@ struct ThreadContent: View {
                         if let ack = decision.acknowledgement {
                             Bubble(text: ack.nextSteps, mine: false, caption: "Your agent confirmed · " + Wording.time(ack.acknowledgedAt))
                         } else {
-                            HStack(spacing: 7) {
-                                ProgressView().controlSize(.mini)
-                                Text(row.state == .sending ? "Sending…" : "Waiting for your agent…")
-                            }
+                            SendStatusLine(row: row)
                             .font(.subheadline).foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity, alignment: .leading)
                         }

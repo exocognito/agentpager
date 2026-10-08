@@ -79,13 +79,13 @@ final class FlowTests: XCTestCase {
         shot("05-decision")
         app.buttons["option-2"].tap()
         shot("06-decision-selected")
+        let sentAt = Date()
         app.buttons["send-button"].tap()
         wait(app.buttons["undo-button"], 3)
         shot("07-undo-window")
 
-        let sentAt = Date()
         guard let answer = try agent.waitForAnswer(maya, seconds: 20) else { return XCTFail("no answer") }
-        XCTAssertGreaterThan(Date().timeIntervalSince(sentAt), 3.5, "the answer waited out the Undo window")
+        XCTAssertGreaterThan(Date().timeIntervalSince(sentAt), 4.5, "the answer waited out the Undo window")
         let choice = answer["choice"] as! [String: Any]
         XCTAssertEqual(choice["kind"] as? String, "option")
         XCTAssertEqual(choice["number"] as? Int, 2)

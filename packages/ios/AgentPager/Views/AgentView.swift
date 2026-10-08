@@ -109,6 +109,25 @@ struct OpenRow: View {
     }
 }
 
+// Before the agent confirms: a countdown while Undo is open, then sending, then waiting for the agent.
+struct SendStatusLine: View {
+    var row: AnsweredRow
+
+    var body: some View {
+        HStack(spacing: 7) {
+            if let sendsAt = row.sendsAt {
+                Image(systemName: "clock")
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    Text("Sending in \(max(1, Int(sendsAt.timeIntervalSince(context.date).rounded(.up))))s").monospacedDigit()
+                }
+            } else {
+                ProgressView().controlSize(.mini)
+                Text(row.state == .sending ? "Sending…" : "Waiting for your agent…")
+            }
+        }
+    }
+}
+
 struct AnsweredRowView: View {
     var row: AnsweredRow
 
@@ -137,10 +156,7 @@ struct AnsweredRowView: View {
                 }
                 .font(.subheadline).foregroundStyle(.secondary)
                 if row.state != .confirmed {
-                    HStack(spacing: 7) {
-                        ProgressView().controlSize(.mini)
-                        Text(row.state == .sending ? "Sending…" : "Waiting for your agent…")
-                    }
+                    SendStatusLine(row: row)
                     .font(.subheadline).foregroundStyle(.secondary).padding(.top, 4)
                 }
             }

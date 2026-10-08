@@ -14,6 +14,7 @@ final class PairingFlow {
     var entered: [String?] = [nil, nil, nil]
     var focus: Int? = 0
     var triesLeft = 3
+    var windowEndsAt: Date?
     var phase: Phase = .loading
     var note: String?
 
@@ -25,7 +26,7 @@ final class PairingFlow {
     var full: Bool { entered.allSatisfy { $0 != nil } }
     func label(_ emoji: String) -> String { palette.first { $0.emoji == emoji }?.name ?? emoji }
 
-    var statusText: String {
+    func statusText(now: Date) -> String {
         if let note { return note }
         switch phase {
         case .checking: return "Checking…"
@@ -33,7 +34,7 @@ final class PairingFlow {
         default:
             if triesLeft == 1 { return Wording.lastTry }
             if triesLeft < 3 { return "\(triesLeft) tries left." }
-            return Wording.pairingHint
+            return Wording.pairingHint(until: windowEndsAt, now: now)
         }
     }
     var statusIsAlarm: Bool { note == nil && (phase == .wrong || triesLeft == 1) && phase != .checking }
@@ -65,6 +66,7 @@ final class PairingFlow {
             name = info.name
             palette = info.palette
             triesLeft = info.triesLeft
+            windowEndsAt = info.status == .unpaired ? info.endsAt : nil
             switch info.status {
             case .waiting: phase = .unavailable("Waiting for Your Agent", "Give your agent this AgentPager link first. Pairing opens once it connects.")
             case .active: phase = .unavailable("Already Paired", "This agent is already paired with a phone.")
@@ -165,12 +167,14 @@ struct PairingSheet: View {
                 ForEach(0..<3, id: \.self) { i in slot(i) }
             }
             .padding(.top, 20)
-            Text(flow.statusText)
-                .font(.subheadline)
-                .foregroundStyle(flow.statusIsAlarm ? Color.red : Color.secondary)
-                .frame(minHeight: 20)
-                .padding(.top, 12)
-                .accessibilityIdentifier("pairing-status")
+            TimelineView(.periodic(from: .now, by: 10)) { context in
+                Text(flow.statusText(now: context.date))
+                    .font(.subheadline)
+                    .foregroundStyle(flow.statusIsAlarm ? Color.red : Color.secondary)
+                    .frame(minHeight: 20)
+                    .accessibilityIdentifier("pairing-status")
+            }
+            .padding(.top, 12)
             LazyVGrid(columns: Array(repeating: GridItem(.fixed(56), spacing: 10), count: 5), spacing: 10) {
                 ForEach(flow.palette, id: \.emoji) { e in
                     Button { flow.tapEmoji(e.emoji) } label: {

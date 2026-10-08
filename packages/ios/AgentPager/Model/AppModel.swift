@@ -46,6 +46,7 @@ struct AnsweredRow: Identifiable, Hashable {
     var decision: Decision
     var choice: Choice
     var state: RowState
+    var sendsAt: Date? = nil // set while Undo is open
     var id: String { decision.decisionId }
 }
 
@@ -269,7 +270,7 @@ final class AppModel {
         guard let inbox = inboxes[sessionId] else { return [] }
         var rows: [AnsweredRow] = []
         for d in inbox.open {
-            if let u = undo, u.decisionId == d.decisionId { rows.append(AnsweredRow(decision: d, choice: u.choice, state: .sending)) }
+            if let u = undo, u.decisionId == d.decisionId { rows.append(AnsweredRow(decision: d, choice: u.choice, state: .sending, sendsAt: u.deadline)) }
             else if let p = inFlight[d.decisionId] { rows.append(AnsweredRow(decision: d, choice: p.choice, state: .sending)) }
         }
         for d in inbox.answered {

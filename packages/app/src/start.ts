@@ -9,46 +9,82 @@ export function startDocument(origin: string) {
 
 AgentPager sends your questions to your owner's iPhone as decision cards and brings their answers back to you.
 
-## Two ways to connect
+This server is \`${origin}\`. Use its HTTP API below, or its MCP server at \`${origin}/mcp\` (each step names its MCP tool). AgentPager tools set up for another server can't see pagers or links made here; if you can't tell which server your tools use, use the HTTP API.
 
-- Your owner gave you an AgentPager link (\`${origin}/start/<code>\`): read it, then join once with \`join_session {code, name}\` or \`POST ${origin}/api/start/<code>/join\`, and print \`pairingCode.text\` to your owner. Reading the link uses nothing up.
-- Otherwise start a pager yourself: \`start_session\` over MCP, or HTTPS:
-  \`curl -s -X POST ${origin}/api/sessions -H 'content-type: application/json' -d '{"name":"Claude Code · my-project","lifetime":"24h"}'\`
+## 1. Connect
 
-Name the pager after your app, then the project (\`Claude Code · blueprint\`), at most 60 characters. \`lifetime\` is \`24h\` (default), \`7d\` or \`30d\`, counted from pairing.
+- Your owner gave you an AgentPager link (\`${origin}/start/<code>\`): join it once. Reading the link uses nothing up.
+  \`curl -s -X POST ${origin}/api/start/<code>/join -H 'content-type: application/json' -d '{"name":"<your app> · <project>"}'\`
+  MCP: \`join_session {code, name}\`
+- Otherwise start a pager yourself:
+  \`curl -s -X POST ${origin}/api/sessions -H 'content-type: application/json' -d '{"name":"<your app> · <project>","lifetime":"24h"}'\`
+  MCP: \`start_session {name, lifetime}\`
 
-The reply has \`session.sessionId\`, \`agentKey\`, \`link\` and \`pairingCode\`. In one message to your owner, show:
-1. \`link.qrText\` in a fenced code block (your owner scans it with the iPhone Camera),
-2. the full \`link.url\` as text,
-3. \`pairingCode.text\` exactly as given, as plain text.
+\`name\` is your app, then the project or folder you are working in, such as \`Codex · trip-planner\`, at most 60 characters. \`lifetime\` is \`24h\` (default), \`7d\` or \`30d\`, counted from pairing.
+
+The reply (\`link\` comes only when you start the pager):
+
+    {"session":{"sessionId":"…","status":"unpaired","endsAt":"…",…},
+     "agentKey":"…",
+     "pairingCode":{"emojis":[…],"names":[…],"text":"…"},
+     "link":{"url":"…","qrText":"…",…}}
+
+In one message to your owner, show:
+1. if you started the pager: \`link.qrText\` in a fenced code block (your owner scans it with the iPhone Camera), then the full \`link.url\` as text,
+2. \`pairingCode.text\` exactly as given, as plain text.
 
 Your owner taps those 3 emojis, in order, in the AgentPager app. They have 3 tries within the pager's first 15 minutes; a third wrong try ends the pager.
 
-## Ask
+## 2. Keep your key
 
-Ask right away; your owner sees your cards as soon as the phone pairs. Over HTTPS, every call after the first carries \`authorization: Bearer <agentKey>\`.
+\`agentKey\` is a secret that controls this pager. Never print the whole reply or show the key to your owner; print only the fields above.
 
-- MCP: \`ask_card {sessionId, agentKey, question}\`
-- HTTPS: \`POST ${origin}/api/sessions/<sessionId>/cards\` with the question as the body
+You need \`session.sessionId\` and \`agentKey\` for every later call, in this turn and in later ones, so keep them somewhere that lasts as long as the pager: a file only you can read that is never committed. If you lose the key, the pager can never page your owner again: tell them to end it in the app (⋯, End Pager), and start a new one.
+
+## 3. Ask
+
+Ask right away; cards wait until the phone pairs. Every call from here on carries \`authorization: Bearer <agentKey>\`.
+
+  \`curl -s -X POST ${origin}/api/sessions/<sessionId>/cards -H "authorization: Bearer $AGENT_KEY" -H 'content-type: application/json' -d '<question>'\`
+  MCP: \`ask_card {sessionId, agentKey, question}\`
 
 A question: \`${example}\`
 
-2 to 5 options numbered 1..n, each with a distinct emoji and an action you will carry out. \`recommended\` and \`detail\` are optional. Titles hold up to 280 characters, question detail up to 1000. Markdown stays literal; HTML is refused. A pager holds at most ${MAX_OPEN_DECISIONS} open decisions.
+The reply: \`{"decisionId":"…"}\`
 
-## Wait, then acknowledge
+2 to 5 options numbered 1..n, each with a distinct emoji and an action you will carry out. \`recommended\` and \`detail\` are optional. Titles hold up to 280 characters, question detail up to 1000. Markdown stays literal; HTML is refused. A pager holds at most ${MAX_OPEN_DECISIONS} open decisions. Your owner's app says pager, never session, so say pager in what you write.
 
-- MCP: \`wait_for_card_answer {sessionId, agentKey, decisionId, waitSeconds?}\`
-- HTTPS: \`GET ${origin}/api/sessions/<sessionId>/cards/<decisionId>/answer?wait=${ANSWER_WAIT_MAX_SECONDS}\`
+## 4. Wait for the answer
 
-Each read holds up to ${ANSWER_WAIT_MAX_SECONDS} seconds. Repeat while it says \`pending\`, and keep your turn open while you wait. The answer's \`choice\` is \`{"kind":"option","number":n}\` or \`{"kind":"feedback","text":"..."}\` (your owner asked for changes: revise, then ask a new card).
+  \`curl -s "${origin}/api/sessions/<sessionId>/cards/<decisionId>/answer?wait=${ANSWER_WAIT_MAX_SECONDS}" -H "authorization: Bearer $AGENT_KEY"\`
+  MCP: \`wait_for_card_answer {sessionId, agentKey, decisionId, waitSeconds?}\`
 
-Then acknowledge with what you will do next; your owner sees it with a green tick:
-- MCP: \`acknowledge_card {sessionId, agentKey, decisionId, acknowledgement: {answerId, nextSteps}}\`
-- HTTPS: \`POST ${origin}/api/sessions/<sessionId>/cards/<decisionId>/acknowledge\` with \`{"answerId":"...","nextSteps":"..."}\`
+Each read holds up to ${ANSWER_WAIT_MAX_SECONDS} seconds, then replies with one of:
+- \`{"status":"pending"}\`: read again.
+- \`{"status":"answered","answer":{"answerId":"…","decisionId":"…","choice":…,"sentAt":"…"}}\`
+- an error (below): stop reading and handle it.
 
-## Ending
+\`choice\` is \`{"kind":"option","number":n}\`, or \`{"kind":"feedback","text":"…"}\` when your owner wrote a note instead of choosing an option: follow the note, and ask a new card only if you still need a decision.
 
-\`finish_session\` (or \`POST ${origin}/api/sessions/<sessionId>/finish\`) ends the pager when your work is done. A pager also ends when your owner ends it, when it reaches its end time, or when pairing fails. After that every call answers \`PagerEnded\` with \`endReason\` and a \`message\`: stop paging, and start a new pager only if your owner asks.
+Keep reading while you have nothing better to do. If your turn has to end first, the answer waits: read it again in your next turn.
+
+## 5. Acknowledge
+
+  \`curl -s -X POST ${origin}/api/sessions/<sessionId>/cards/<decisionId>/acknowledge -H "authorization: Bearer $AGENT_KEY" -H 'content-type: application/json' -d '{"answerId":"…","nextSteps":"…"}'\`
+  MCP: \`acknowledge_card {sessionId, agentKey, decisionId, acknowledgement: {answerId, nextSteps}}\`
+
+The reply: \`{"decisionId":"…","answerId":"…","nextSteps":"…","acknowledgedAt":"…"}\`. Your owner sees \`nextSteps\` with a green tick. Only the first acknowledgement counts.
+
+## Status, times and ending
+
+- \`GET ${origin}/api/sessions/<sessionId>\` with your key replies \`{"session":{"status":"…","pairedAt":…,"endsAt":"…",…},"pairingCode":…}\`. \`status\` is \`unpaired\` until your owner pairs, then \`active\`.
+- Times are UTC (ISO 8601). Tell your owner times in their local time, or as "in 5 minutes".
+- Keep the pager while you may still need your owner. When your work is done, end it: \`POST ${origin}/api/sessions/<sessionId>/finish\` with your key and no body, which replies \`{"endedAt":"…"}\` (MCP: \`finish_session\`). For a connection test, let your owner choose in the test card's options: keep the pager, or end it.
+- A pager also ends when your owner ends it, when it reaches its end time, or when pairing fails. After that every call answers \`PagerEnded\` with \`endReason\` and a \`message\`: stop paging, and start a new pager only if your owner asks.
+
+## If your scripts can't reach this server
+
+Some sandboxes block the network for scripts but not for a browser. Then open \`${origin}/start\` in your browser and make the same requests as \`fetch()\` calls from that page. Keep \`sessionId\` and \`agentKey\` in a page variable, return only the fields you need, and keep the browser session open while the pager lives.
 
 ## Errors
 
@@ -64,28 +100,30 @@ ${errors()}
 - Codex: \`codex mcp add agentpager --url "${origin}/mcp"\`
 - Any other MCP client: \`${origin}/mcp\`, streamable HTTP, no login.
 
-If you have no AgentPager tools, use HTTPS; do not wait for your owner to add them.
+If you have no AgentPager tools for this server, use the HTTP API; do not wait for your owner to add them.
 `;
 }
 
 export function codeDocument(origin: string, code: string) {
   return `# AgentPager link
 
-Your owner's phone made this AgentPager link for you. Reading this page uses nothing up.
+Your owner's phone made this AgentPager link for you on \`${origin}\`. Reading this page uses nothing up.
 
 Join it once, now:
-- MCP: \`join_session {"code":"${code}","name":"Claude Code · my-project"}\`
-- HTTPS: \`curl -s -X POST ${origin}/api/start/${code}/join -H 'content-type: application/json' -d '{"name":"Claude Code · my-project"}'\`
+- HTTP: \`curl -s -X POST ${origin}/api/start/${code}/join -H 'content-type: application/json' -d '{"name":"<your app> · <project>"}'\`
+- MCP, only if your AgentPager tools use \`${origin}/mcp\`: \`join_session {"code":"${code}","name":"<your app> · <project>"}\`
 
-Use your own name: your app, then the project, at most 60 characters. If you have no AgentPager tools, use HTTPS.
+\`name\` is your app, then the project or folder you are working in, such as \`Codex · trip-planner\`, at most 60 characters.
 
-The reply has \`session.sessionId\`, \`agentKey\` and \`pairingCode\`. Print \`pairingCode.text\` to your owner exactly as given, as plain text. It reads like:
+The reply is \`{"session":{"sessionId":"…",…},"agentKey":"…","pairingCode":{…,"text":"…"}}\`. \`agentKey\` is a secret: never print the whole reply or show the key to your owner, and keep \`sessionId\` and \`agentKey\` for later turns.
+
+Print \`pairingCode.text\` to your owner exactly as given, as plain text. It reads like:
 
     To finish pairing, tap these 3 emojis on your phone, in this order:
     🦊 🌵 🦊
     (1. fox    2. cactus    3. fox)
 
-Your owner enters them in the AgentPager app. Then ask your cards right away; they reach the phone once it pairs. How to ask, wait and acknowledge: ${origin}/start
+Your owner enters them in the AgentPager app. Then ask your cards right away; they reach the phone once it pairs. How to keep your key, ask, wait, acknowledge and end: ${origin}/start
 
 Only one agent can join a link; another join answers \`AlreadyJoined\`. The link works only during the pager's first 15 minutes; after that it answers \`LinkInvalid\`.
 `;
@@ -102,7 +140,7 @@ details{margin-top:32px}pre{white-space:pre-wrap;word-break:break-word;font:13px
 <body><main><h1>AgentPager link</h1><p>Open this link in the AgentPager app on your iPhone to pair with your agent.</p>
 <a class="button" href="${escape(open)}">Open in AgentPager</a>
 <p>Don't have the app? AgentPager for iPhone is in testing and is not in the App Store yet.</p>
-<details><summary>Are you an agent?</summary><pre>${escape(codeDocument(origin, code))}</pre></details></main></body></html>`;
+<details open><summary>Are you an agent?</summary><pre>${escape(codeDocument(origin, code))}</pre></details></main></body></html>`;
 }
 
 export const OLD_CONNECT = 'Old AgentPager connect links no longer work. Ask your owner for a new AgentPager link.\n';

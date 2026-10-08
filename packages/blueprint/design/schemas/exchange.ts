@@ -139,8 +139,14 @@ export type SessionCreated = typeof SessionCreated.Type;
 // when the id stops working if no agent has used it (C9::connect-an-agent-from-the-phone).
 export const ConnectOpened = Schema.Struct({ phoneKey: Token, expiresAt: Timestamp });
 export type ConnectOpened = typeof ConnectOpened.Type;
-// Which session an agent made with a registered connect id: null until one joins.
-export const ConnectStatus = Schema.Struct({ sessionId: Schema.NullOr(Token) });
+// Discovery carries the real name in the same response as membership, never a placeholder.
+export const ClaimedSession = Schema.Struct({ sessionId: Token, phoneKey: Token, name: SessionName });
+export type ClaimedSession = typeof ClaimedSession.Type;
+// Null until one joins. Terminal discovery is a refusal with the owner's name/time receipt.
+export const ConnectStatus = Schema.Union(
+  Schema.Struct({ sessionId: Schema.Null }),
+  Schema.Struct({ sessionId: Token, name: SessionName }),
+);
 export type ConnectStatus = typeof ConnectStatus.Type;
 // What an agent receives on joining a phone: like SessionCreated, with no pairing link because the phone already holds the session.
 export const PhoneJoined = Schema.Struct({ session: SessionSummary, agentKey: Token, pairingDecisionId: Token, pairingTarget: Option });

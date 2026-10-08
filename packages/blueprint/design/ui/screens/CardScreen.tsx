@@ -410,7 +410,7 @@ function DecisionTray({
             {d.card.options.map((o) => {
               const selected = chosen?.kind === "option" && chosen.number === o.number,
                 detailId = `${d.decisionId}-${o.number}-detail`,
-                showDetail = selected && !!o.detail;
+                showDetail = (selected || history || finished) && !!o.detail;
               return (
                 <button
                   key={`${d.decisionId}:${o.number}`}
@@ -424,7 +424,7 @@ function DecisionTray({
                   <span className="ap-option-emoji" aria-hidden="true">{o.emoji}</span>
                   <span className="ap-option-copy">
                     <strong>{o.title}</strong>
-                    {/* Choosing an option is how its detail opens; there is no second control. */}
+                    {/* Read-only cards expose the complete proposal, including unchosen detail (C4/C7). */}
                     {showDetail && <span className="ap-option-detail" id={detailId}>{o.detail}</span>}
                   </span>
                 </button>
@@ -532,7 +532,7 @@ export function CardScreen({
             </a>
           </div>
           <div className="ap-nav-center">
-            {c.inbox && <h1>{c.inbox.session.name}</h1>}
+            {c.inbox && <h1 className="ap-session-name" tabIndex={0}>{c.inbox.session.name}</h1>}
           </div>
           <div className="ap-nav-right">
             {!(live && c.inbox && !c.inbox.session.paired) && <button

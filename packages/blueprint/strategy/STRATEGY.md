@@ -42,7 +42,7 @@ When my agent finishes, I can still read the session until it ends. Once a sessi
 
 ### SI6 · UTF-8 with Markdown is allowed; invalid or over-limit text is refused, never truncated
 
-Card titles, option labels, option detail and agent acknowledgements allow 280 visible characters; question detail and my written feedback allow 1,000. Count spaces and Markdown punctuation. Text is valid UTF-8 with Markdown and no HTML. Anything else is refused whole, with an error that tells the agent what to fix. Nothing is truncated or silently cleaned. On screen, titles, option labels and session names show each run of spaces and line breaks as one space; detail text shows them as sent.
+Card titles, option labels, option detail and agent acknowledgements allow 280 visible characters; question detail and my written feedback allow 1,000. Count spaces and Markdown punctuation. Text is valid UTF-8 with Markdown and no HTML. Anything else is refused whole, with an error that tells the agent what to fix. Nothing is truncated or silently cleaned.
 
 ### SI7 · Cards are independent
 

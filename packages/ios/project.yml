@@ -1,0 +1,76 @@
+name: AgentPager
+options:
+  bundleIdPrefix: me.agentpager
+  deploymentTarget:
+    iOS: "26.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+settings:
+  base:
+    MARKETING_VERSION: "0.1"
+    CURRENT_PROJECT_VERSION: "1"
+    CODE_SIGN_STYLE: Automatic
+    DEVELOPMENT_TEAM: ""
+    # The dogfood server. Change it here, or in the app's Server screen, or with the launch argument
+    # -AgentPagerServerURL http://host:8787
+    AGENTPAGER_SERVER_URL: "http://192.168.4.99:8787"
+targets:
+  AgentPager:
+    type: application
+    platform: iOS
+    sources:
+      - path: AgentPager
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: me.agentpager.app.dev
+        PRODUCT_NAME: AgentPager
+        SWIFT_VERSION: "6.0"
+        SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+        SWIFT_APPROACHABLE_CONCURRENCY: YES
+        TARGETED_DEVICE_FAMILY: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ENABLE_PREVIEWS: YES
+    info:
+      path: AgentPager/Info.plist
+      properties:
+        CFBundleDisplayName: AgentPager
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UILaunchScreen: {}
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        CFBundleURLTypes:
+          - CFBundleURLName: me.agentpager.app.start
+            CFBundleURLSchemes:
+              - agentpager
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        NSLocalNetworkUsageDescription: AgentPager connects to your AgentPager server on this network.
+        AgentPagerServerURL: $(AGENTPAGER_SERVER_URL)
+  AgentPagerUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: AgentPagerUITests
+    dependencies:
+      - target: AgentPager
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: me.agentpager.app.dev.uitests
+        SWIFT_VERSION: "5.0"
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: AgentPager
+schemes:
+  AgentPager:
+    build:
+      targets:
+        AgentPager: all
+        AgentPagerUITests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - AgentPagerUITests

@@ -14,5 +14,5 @@ caveats:
 
 1. The owner closes the tab. Later, in the same browser, the link, the session page or the home screen leads back to the session and its history.
 2. The owner ends the session and confirms. From then on both sides are refused, and its cards, answers and acknowledgements are deleted.
-3. When the agent finishes, its key is refused. The owner can still read the session but can no longer answer its open cards; their options show no detail, since detail shows only while an option is chosen (SP4). An agent that finishes before pairing ends the session instead.
+3. When the agent finishes, its key is refused. The owner can still read the session but can no longer answer its open cards. An agent that finishes before pairing ends the session instead.
 4. The same browser can claim more sessions; each gets its own row on the home screen.

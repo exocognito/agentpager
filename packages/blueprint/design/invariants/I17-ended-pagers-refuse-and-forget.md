@@ -14,7 +14,7 @@ caveats:
 **Every way a pager ends.** A pager ends when it times out, when the owner ends it, when the agent finishes, or when pairing fails. In each case:
 - every call by either side is refused with that reason;
 - storage holds no cards, answers, acknowledgements or link, even after the service restarts;
-- the link registry forgets the link, which it also does when the pairing window closes.
+- the link registry forgets the link, and the pager clears its copy; both also happen when the pairing window closes, whether or not the pager paired.
 
 **After 7 days.** The service forgets the pager entirely, and the phone drops its row.
 

@@ -13,7 +13,7 @@ caveats:
 ## Behaviors
 
 1. The agent shows the code as three emoji in order, with each emoji's name in words, so it reads the same in any terminal or chat. An emoji may repeat.
-2. Pairing shows three slots and a palette of 25 distinct emoji drawn for this pager. The palette always holds the code's emoji, and nothing on the phone marks which they are. The palette has no skin-tone, flag or other variants.
+2. Pairing shows three slots and a palette of 25 visually distinct emoji drawn for this pager. The palette always holds the code's emoji, and nothing on the phone marks which they are. The palette has no skin-tone, flag or other variants.
 3. Tapping an emoji fills the focused slot. Tapping a slot focuses it, and the next emoji replaces what is there. Pair becomes available once all three slots are filled. Nothing is checked until the owner presses Pair.
 4. A right code pairs the pager. The phone shows Paired, then opens that agent's screen on its own. The agent learns it is paired on its next call or wait.
 5. A wrong code is refused with how many tries are left, and before the last try the phone warns that a wrong code ends the pager. The palette and the code stay the same between tries.

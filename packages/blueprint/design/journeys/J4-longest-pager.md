@@ -39,4 +39,5 @@ On the local product, in real time, with one app install. Keep all state through
 5. **Every other ending.**
    - From an agent's link, three wrong codes end a second pager as pairing failed.
    - A third pager pairs, then its agent finishes, and the ended row says so.
+   - A fourth pager pairs, and the owner ends it. The agent's next call is refused with that reason, and the ended row says so.
 6. **Forget.** The ended-record lifetime passes, and the ended rows disappear.

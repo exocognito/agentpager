@@ -44,6 +44,7 @@ Sam accepted these defaults, which settle the holes the review found:
 6. A pager holds at most 10 open cards, and starting pagers is limited per network address.
 7. The privacy page says that alert text passes through Apple.
 8. Only the service keeps the clock.
+9. A link the phone made is not listed under Agents until an agent joins it; until then it lives in the Connect sheet. Once an agent joins, the pager is listed as not paired and pairing opens.
 
 This decision rewrites the strategy (SC1, SC2, SI1, SI2, SI5, SP1 to SP6) and parks MCARDS. It adds two milestones:
 - MAPP: the app on Sam's iPhone, without alerts.

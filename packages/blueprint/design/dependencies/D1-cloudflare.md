@@ -14,6 +14,6 @@ Must never do: serve a build other than the candidate commit, which is why every
 
 Local runs stand on the wrangler the toy root `package.json` pins, with `--persist-to` outside the worktree and local lifetimes set per instance in the way the builder names in its handoff (recipe environment). Where the local host differs from the zone is the recipe's business, not this dependency's.
 
-Proof runs on: the local candidate and https://agentpager.me, through public product paths with real services and persistence. Each local instance runs the shortest local lifetimes its case allows and waits in real time; deployed checks use the production lifetimes. Storage probes and session-expiry crossings run locally only; there is no 24-hour deployed wait.
+Proof runs on: the local candidate and https://agentpager.me, through public product paths with real services and persistence. Each local instance runs the shortest local lifetimes its case allows and waits in real time; deployed checks use the production lifetimes. Storage probes and end-time crossings run locally only; there is no deployed wait for a real lifetime.
 
 On the deployed product, after deploying the candidate: every response surface, across repeated session requests, carries the candidate's build; a paired pager's end time is exactly its chosen lifetime after pairing; a link older than the local unpaired lifetime still works; plain HTTP redirects and HTTPS carries Strict-Transport-Security. The Worker's namespace, classes and SQLite placement are inspected apart from what the product shows.

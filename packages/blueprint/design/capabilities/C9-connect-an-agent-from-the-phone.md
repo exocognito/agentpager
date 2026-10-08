@@ -10,6 +10,8 @@ caveats:
   - Only the browser that registered a connect id lists the session made with it. If that browser loses its stored phone key, nobody can pair that session.
 ---
 
+Deprecated. Succeeded by C20::connect-with-an-agentpager-link: the phone and the agent make the same kind of link (SC1).
+
 ## Behaviors
 
 1. The owner asks the home screen for a link to give an agent, and copies it. The link shows only once the service has registered it, and works for as long as an unpaired session lasts.

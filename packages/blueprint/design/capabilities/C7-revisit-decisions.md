@@ -6,10 +6,11 @@ serves:
   - SI4
 statement: Reopen any sent card to read it, your answer and the agent's acknowledgement, with nothing to edit.
 caveats:
-  - History is read in the browser that holds the session; nothing proves it on another device.
+  - History is read on the phone that holds the pager; nothing proves it on another device.
 ---
 
 ## Behaviors
 
-1. A session shows its open cards apart from its history. Each history row shows the emoji chosen, or a mark for feedback, and says when the agent has not yet acknowledged.
-2. A history card shows the card, the answer and the acknowledgement, with nothing to choose or send. Only the chosen option shows its detail (SP4).
+1. An agent's screen shows open cards apart from answered ones. Each answered row shows the answer and whether the agent has acknowledged it yet.
+2. Reopening an answered card shows the question, the owner's answer and the agent's acknowledgement as a conversation, with the options below. There is nothing to choose or send.
+3. History lasts as long as the pager (SI5).

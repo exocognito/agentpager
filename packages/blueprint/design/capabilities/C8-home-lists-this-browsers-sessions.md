@@ -10,6 +10,8 @@ caveats:
   - An ended or expired row is a label this browser keeps; the service has already forgotten that session's cards.
 ---
 
+Deprecated. Succeeded by C23::agents-list: the list lives in the app, and the service keeps the ended rows (SP2).
+
 ## Behaviors
 
 1. The agent names each session when it creates it. The name shows on the home screen and at the top of the session.

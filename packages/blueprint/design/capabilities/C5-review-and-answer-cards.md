@@ -12,6 +12,7 @@ caveats:
 
 ## Behaviors
 
-1. Open a paired session to see its open cards, and open one.
-2. Choose one of the agent's options, or ask for changes instead (C6), then press Send.
-3. The card shows the answer, then the agent's acknowledgement and next steps. The owner closes it to go back; nothing opens on its own.
+1. Open an agent's screen to see its open cards, and open one. It shows the question, its detail and every option with its emoji, title and detail. The option the agent recommends is tagged.
+2. Choose one option, which is marked as chosen, or ask for changes instead (C6), then press Send. Send closes the card and offers Undo for a few seconds (I6).
+3. The card moves to answered, showing the answer while it waits for the agent. When the agent acknowledges, the row marks the answer confirmed.
+4. If the service does not confirm that it stored the answer, the phone says so and offers Retry, which sends the same answer.

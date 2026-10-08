@@ -1,0 +1,27 @@
+{
+  "name": "agentpager",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.7.0",
+  "engines": {
+    "node": ">=22.19"
+  },
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "pnpm --filter @agentpager/blueprint --filter @agentpager/storybook test",
+    "test:unit": "pnpm --filter @agentpager/blueprint test",
+    "storybook": "pnpm --filter @agentpager/storybook storybook",
+    "build:storybook": "pnpm --filter @agentpager/storybook build:storybook",
+    "diagram": "pnpm --filter @agentpager/blueprint diagram",
+    "diagram:check": "pnpm --filter @agentpager/blueprint diagram:check",
+    "build:app": "pnpm --filter @agentpager/app build",
+    "start:app": "pnpm --filter @agentpager/app start",
+    "deploy:app": "pnpm --filter @agentpager/app run deploy",
+    "test:dogfood": "pnpm --filter @agentpager/app test:dogfood"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.3",
+    "typescript": "5.9.3",
+    "wrangler": "4.134.0"
+  }
+}

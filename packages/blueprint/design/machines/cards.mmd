@@ -1,0 +1,65 @@
+stateDiagram-v2
+  direction TB
+  [*] --> cards_loading
+  state "loading" as cards_loading
+  state "failed" as cards_failed
+  state "live" as cards_live {
+    state "screen" as cards_live_screen {
+      [*] --> cards_live_screen_queue
+      state "queue" as cards_live_screen_queue
+      state "view" as cards_live_screen_view
+      state "undoing" as cards_live_screen_undoing
+      state "sending" as cards_live_screen_sending
+      state "sent" as cards_live_screen_sent
+      state "sendFailed" as cards_live_screen_sendFailed
+      state "confirmEnd" as cards_live_screen_confirmEnd
+      state "ending" as cards_live_screen_ending
+    }
+    state "clock" as cards_live_clock {
+      [*] --> cards_live_clock_unpaired
+      state "unpaired" as cards_live_clock_unpaired
+      state "verifying" as cards_live_clock_verifying
+      state "counting" as cards_live_clock_counting
+    }
+  }
+  state "expired" as cards_expired
+  state "ended" as cards_ended
+  cards_loading --> cards_live_clock_counting : done [loadedPaired]
+  cards_loading --> cards_live_screen_view : done
+  cards_loading --> cards_failed : error
+  cards_loading : invokes load
+  cards_failed --> cards_loading : RETRY
+  cards_live --> cards_live : REFRESH (internal)
+  cards_live --> cards_live : SYNC (internal)
+  cards_live --> cards_live : FAIL (internal)
+  cards_live : invokes poll
+  cards_live_screen_queue --> cards_live_screen_view : OPEN [exists]
+  cards_live_screen_queue --> cards_live_screen_confirmEnd : END
+  cards_live_screen_view --> cards_live_screen_queue : BACK
+  cards_live_screen_view --> cards_live_screen_view : SELECT [option] (internal)
+  cards_live_screen_view --> cards_live_screen_view : FEEDBACK [feedback] (internal)
+  cards_live_screen_view --> cards_live_screen_view : EDIT [drafting] (internal)
+  cards_live_screen_view --> cards_live_screen_undoing : SEND [valid]
+  cards_live_screen_undoing --> cards_live_screen_view : UNDO
+  cards_live_screen_undoing --> cards_live_screen_queue : BACK
+  cards_live_screen_undoing --> cards_live_screen_sending : after undo
+  cards_live_screen_sending --> cards_live_screen_sent : done
+  cards_live_screen_sending --> cards_live_screen_sent : error: AlreadyAnswered
+  cards_live_screen_sending --> cards_live_screen_view : error [pairingRefused]
+  cards_live_screen_sending --> cards_live_screen_view : error: AgentFinished
+  cards_live_screen_sending --> cards_live_screen_sendFailed : error
+  cards_live_screen_sending : invokes answer
+  cards_live_screen_sent --> cards_live_screen_queue : BACK
+  cards_live_screen_sendFailed --> cards_live_screen_sending : RETRY
+  cards_live_screen_sendFailed --> cards_live_screen_queue : BACK
+  cards_live_screen_confirmEnd --> cards_live_screen_queue : BACK
+  cards_live_screen_confirmEnd --> cards_live_screen_ending : CONFIRM_END
+  cards_live_screen_ending --> cards_ended : done
+  cards_live_screen_ending --> cards_live_screen_confirmEnd : error
+  cards_live_screen_ending : invokes end
+  cards_live_clock_unpaired --> cards_live_clock_counting : SYNC [syncPaired]
+  cards_live_clock_unpaired --> cards_live_clock_verifying : after deadline
+  cards_live_clock_verifying --> cards_live_clock_counting : SYNC [syncPaired]
+  cards_live_clock_counting --> cards_expired : after deadline
+  note left of cards_expired : Any call answering SessionExpired comes here, from loading, live, sending, ending
+  note left of cards_ended : Any call answering SessionEnded comes here, from loading, live, sending, ending

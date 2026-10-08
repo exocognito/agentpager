@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "roles": {
+    "builder": { "provider": "exe-dev-openai", "model": "gpt-6-astra@llm", "thinking": "high" },
+    "reviewer": { "provider": "exe-dev-openai", "model": "gpt-6-astra@llm", "thinking": "high" }
+  },
+  "sessionMinutes": 90,
+  "environment": "The cleanroom VM on exe.dev (src/process/cleanroom.md): one root commit of the pinned tree, no history and no other files. Models come through the VM's LLM integration with no key on the box: pi uses provider exe-dev-openai with model ids ending in @llm, and codex reaches the same host through its config; claude and gemini cannot run here. So the clients this host supplies for D2::agent-clients are pi and codex. Use the prompt and owner-step rules in D2::agent-clients under Cold arrival; PROMPT and ANSWER below denote those values; SESSION_ID is the thread_id emitted by the fetch-only start’s thread.started JSON event. Resume that exact conversation ID. MCP_SERVER_URL is the server URL the start document tells the owner to add: https://agentpager.me/mcp. Client invocations use an empty temporary working directory, closed stdin and streamed output; the caller bounds each command. pi HTTPS start: pi --provider exe-dev-openai --model gpt-5.6-terra@llm --mode json -p \"PROMPT\" < /dev/null; resume in the same directory: pi -c -p \"ANSWER\" < /dev/null. Codex HTTPS start: codex exec --skip-git-repo-check -s workspace-write -c sandbox_workspace_write.network_access=true \"PROMPT\" < /dev/null; resume in the same directory: codex exec resume --last --skip-git-repo-check -c 'sandbox_mode=\"workspace-write\"' -c sandbox_workspace_write.network_access=true \"ANSWER\" < /dev/null. Codex fetch-only start: codex --no-daemon --disable shell_tool --disable unified_exec --disable browser_use --disable browser_use_external --disable computer_use --disable multi_agent --disable apps --disable plugins --disable remote_plugin --disable skill_mcp_dependency_install --disable view_image --disable image_generation --disable skill_search exec --skip-git-repo-check --json -s read-only -c 'web_search=\"disabled\"' -c 'mcp_servers.fetch={command=\"uv\",args=[\"tool\",\"run\",\"--exclude-newer\",\"2026-09-23\",\"--from\",\"mcp-server-fetch==2026.8.18\",\"mcp-server-fetch\"],enabled_tools=[\"fetch\"],default_tools_approval_mode=\"approve\",required=true}' \"PROMPT\" < /dev/null; resume after the owner adds AgentPager for this session, in the same directory: codex --no-daemon --disable shell_tool --disable unified_exec --disable browser_use --disable browser_use_external --disable computer_use --disable multi_agent --disable apps --disable plugins --disable remote_plugin --disable skill_mcp_dependency_install --disable view_image --disable image_generation --disable skill_search exec resume SESSION_ID --skip-git-repo-check --json -c 'sandbox_mode=\"read-only\"' -c 'web_search=\"disabled\"' -c 'mcp_servers.fetch={command=\"uv\",args=[\"tool\",\"run\",\"--exclude-newer\",\"2026-09-23\",\"--from\",\"mcp-server-fetch==2026.8.18\",\"mcp-server-fetch\"],enabled_tools=[\"fetch\"],default_tools_approval_mode=\"approve\",required=true}' -c 'mcp_servers.agentpager={url=\"MCP_SERVER_URL\",default_tools_approval_mode=\"approve\",required=true}' \"ANSWER\" < /dev/null. The upstream mcp-server-fetch is a GET-only host facility, not the AgentPager connector: no AgentPager server is configured at start. The read-only sandbox and disabled shell, browser, apps and plugin execution paths must remain on resume; network_access=false by itself does not supply fetch-only access. Keep default_tools_approval_mode=approve scoped to these command invocations, so noninteractive MCP calls can run without changing global client configuration. required=true makes Codex wait for each MCP server before its first turn and exit with an error if one cannot start; keep it on every server in these invocations. Start each cold client with only HOME, PATH, USER, LOGNAME, LANG, SHELL and TERM from the parent environment; do not inherit BLUEPRINT_CONTEXT or agent session pointers. Claude Code is unavailable on this host. The op CLI reads the Yolo Sam vault with the service-account token at ~/Agents/.secrets/op-service-account.token; D1::cloudflare names the item and the fields. Chromium for Playwright is installed under ~/.cache/ms-playwright; playwright is a devDependency of packages/storybook, so a script elsewhere resolves it from that package. The pinned local workerd supports compatibility dates through 2026-09-24; use 2026-09-24 for the scaffold so it starts locally (2026-09-29 was rejected on this host). Local instances run on the wrangler the root package.json pins, persisting to the directory AGENTPAGER_PERSIST names, with local lifetimes: each test file starts its own instance, on its own port, inspector port and persistence directory, with the shortest lifetimes its case allows between the design's LOCAL_LIFETIME_FLOOR_MS and LOCAL_LIFETIMES; the builder names the setting in its handoff and a deployed build never uses it. The test command runs four test files at a time, so no test depends on another's instance, storage or order, or on an idle host: waits are for conditions, sized for four files sharing two cores. For cold arrivals (D2::agent-clients) this host supplies the pi HTTPS start for the HTTPS journey, the Codex fetch-only start for the MCP journey, and Chromium for the owner's 390 px page; D2::agent-clients says who performs them, when, and how many tries. The test command keeps the SDK and scripted callers. Under wrangler dev the request host is the production host, so a local proof maps a returned link's path and token to its own origin and says so in its artifact. Acceptance tests take their target from AGENTPAGER_URL when set and start a local instance from the checkout otherwise; for the final proof, the reviewer deploys exactly the candidate with deploy:app and reruns with AGENTPAGER_URL=https://agentpager.me; during the loop either role may deploy to check a change that only shows there.",
+  "setup": [
+    {
+      "command": [
+        "uv",
+        "tool",
+        "run",
+        "--exclude-newer",
+        "2026-09-23",
+        "--from",
+        "mcp-server-fetch==2026.8.18",
+        "mcp-server-fetch",
+        "--help"
+      ],
+      "cwd": "toy-examples/agentpager"
+    },
+    {
+      "command": [
+        "pnpm",
+        "install",
+        "--frozen-lockfile"
+      ],
+      "cwd": "toy-examples/agentpager"
+    },
+    {
+      "command": [
+        "pnpm",
+        "check"
+      ],
+      "cwd": "toy-examples/agentpager"
+    },
+    {
+      "command": [
+        "pnpm",
+        "test"
+      ],
+      "cwd": "toy-examples/agentpager"
+    },
+    {
+      "command": [
+        "pnpm",
+        "diagram:check"
+      ],
+      "cwd": "toy-examples/agentpager"
+    },
+    {
+      "command": [
+        "pnpm",
+        "build:storybook"
+      ],
+      "cwd": "toy-examples/agentpager"
+    }
+  ],
+  "test": {
+    "cwd": "toy-examples/agentpager",
+    "command": [
+      "node",
+      "--test",
+      "--experimental-strip-types",
+      "--test-concurrency=4",
+      "packages/app/test/**/*.test.ts"
+    ]
+  },
+  "serve": {
+    "cwd": "toy-examples/agentpager",
+    "command": [
+      "pnpm",
+      "start:app"
+    ],
+    "env": {
+      "PORT": "${port}",
+      "AGENTPAGER_PERSIST": "${dogfoodDir}/persist"
+    }
+  }
+}

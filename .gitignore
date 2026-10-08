@@ -1,0 +1,14 @@
+node_modules/
+packages/app/dist/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+storybook-static/
+coverage/
+test-results/
+playwright-report/
+packages/blueprint/runs/
+.env
+.env.*
+.dev.vars
+.wrangler/

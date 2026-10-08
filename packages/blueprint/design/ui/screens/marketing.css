@@ -1,0 +1,537 @@
+.mk {
+  --mk-bg: #f8f8f4;
+  --mk-ink: #1c1c1e;
+  --mk-soft: #4a4a4f;
+  --mk-faint: #8e8e93;
+  --mk-line: #e3e3de;
+  --mk-card: #ffffff;
+  --mk-well: #f0f0eb;
+  --mk-serif: ui-serif, "New York", "Iowan Old Style", Georgia, serif;
+  min-height: 100vh;
+  margin: 0;
+  background: var(--mk-bg);
+  color: var(--mk-ink);
+  font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+}
+.mk * {
+  box-sizing: border-box;
+}
+.mk a {
+  color: inherit;
+}
+.mk a:focus-visible,
+.mk button:focus-visible {
+  outline: 3px solid #0a63e0;
+  outline-offset: 3px;
+}
+.mk :is(h1, h2):not(.ap-rich *) {
+  margin: 0;
+  font-family: var(--mk-serif);
+  font-weight: 400;
+  letter-spacing: -0.02em;
+}
+.mk h3,
+.mk p,
+.mk dl,
+.mk dd {
+  margin: 0;
+}
+.mk .ap-logo {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  background: var(--mk-ink);
+}
+
+.mk-nav,
+.mk-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 40px;
+}
+.mk-brand,
+.mk-footer-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.mk-footer {
+  padding-top: 120px;
+  padding-bottom: 40px;
+  color: var(--mk-soft);
+  font-size: 13px;
+}
+.mk-footer-brand {
+  font-weight: 400;
+}
+
+.mk > main {
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 0 40px;
+}
+.mk-hero {
+  padding-top: 48px;
+  text-align: center;
+}
+.mk-hero h1 {
+  max-width: 780px;
+  margin: 0 auto;
+  font-size: 64px;
+  line-height: 1.05;
+}
+.mk .mk-lead {
+  max-width: 560px;
+  margin: 24px auto 0;
+  color: var(--mk-soft);
+  font-size: 17px;
+}
+
+/* Three steps, each a picture over a caption, joined by arrows. The row is wider than the column below it. */
+.mk-how {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 40px;
+  margin: 80px calc(50% - min(564px, 50vw - 40px)) 0;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+}
+.mk-how li {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--mk-line);
+  border-radius: 18px;
+  background: var(--mk-card);
+  box-shadow: 0 18px 40px #0000000f;
+}
+.mk-how li + li::before {
+  content: "→";
+  position: absolute;
+  top: 178px;
+  left: -37px;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--mk-line);
+  border-radius: 50%;
+  background: var(--mk-card);
+  color: var(--mk-soft);
+  font-size: 14px;
+  box-shadow: 0 2px 6px #0000000f;
+}
+.mk-panel {
+  height: 357px;
+  overflow: hidden;
+  border-radius: 17px 17px 0 0;
+}
+.mk-dark {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background: #18191b;
+  color: #c9c9c9;
+  font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.mk-panel-scan {
+  align-items: center;
+  gap: 14px;
+  color: #f2f2f2;
+}
+.mk-qr {
+  width: 155px;
+  height: 155px;
+  padding: 10px;
+  border-radius: 10px;
+  background: white;
+  fill: #1c1c1e;
+}
+.mk-panel-ask {
+  gap: 16px;
+}
+.mk-panel-ask p {
+  display: grid;
+  grid-template-columns: 16px 1fr;
+  padding: 0 28px 0 24px;
+}
+.mk-asked {
+  padding-top: 8px !important;
+  padding-bottom: 8px !important;
+  background: #252b3b;
+  color: #a9c4ff;
+}
+.mk-asked span {
+  font-size: 10px;
+}
+.mk .mk-waiting {
+  display: block;
+  padding-left: 40px;
+  color: #8e8e93;
+}
+.mk-dim {
+  color: #8e8e93;
+}
+.mk-green {
+  color: #5ed47a;
+}
+.mk-cursor {
+  display: inline-block;
+  width: 8px;
+  height: 15px;
+  margin-left: 6px;
+  vertical-align: -3px;
+  background: #a9c4ff;
+}
+.mk-panel-phone {
+  display: flex;
+  justify-content: center;
+  padding-top: 34px;
+  background: #e8e7e2;
+}
+.mk-caption {
+  padding: 26px 24px 28px;
+}
+.mk-step {
+  display: block;
+  color: var(--mk-faint);
+  font-size: 13px;
+  font-weight: 600;
+}
+.mk .mk-caption h2 {
+  margin: 4px 0 2px;
+  font: 600 18px/1.35 -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  letter-spacing: -0.01em;
+}
+.mk-caption p {
+  color: var(--mk-soft);
+}
+
+/* A small phone screen, 280 CSS pixels wide, drawn at 0.8 scale and cropped by the panel. The app inside is the real card screen, showing only its open sheet. */
+.mk-phone {
+  --mk-scale: 0.8;
+  flex-shrink: 0;
+  width: calc(280px * var(--mk-scale) + 20px);
+  height: calc(600px * var(--mk-scale) + 20px);
+  padding: 10px;
+  border-radius: 40px;
+  background: #111;
+}
+.mk-phone-screen {
+  position: relative;
+  width: 280px;
+  height: 600px;
+  border-radius: 36px;
+  overflow: hidden;
+  background: #fff;
+  transform: scale(var(--mk-scale));
+  transform-origin: 0 0;
+}
+.mk-island {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  z-index: 2;
+  width: 90px;
+  height: 26px;
+  margin-left: -45px;
+  border-radius: 13px;
+  background: #111;
+}
+.mk-phone-app {
+  position: absolute;
+  inset: 46px 0 0;
+}
+.mk .mk-phone-app .ap-app.ap-rich {
+  height: 100%;
+  min-height: 0;
+  background: var(--ap-card);
+}
+.mk .mk-phone-app .ap-rich :is(.ap-base, .ap-backdrop, .ap-grabber) {
+  visibility: hidden;
+}
+.mk .mk-phone-app .ap-rich .ap-overlay {
+  align-items: start;
+}
+.mk .mk-phone-app .ap-rich .ap-tray {
+  height: 100%;
+  max-height: 100%;
+  border-radius: 0;
+  box-shadow: none;
+  animation: none;
+}
+
+.mk-section {
+  padding-top: 112px;
+  text-align: center;
+}
+.mk-section h2,
+.mk-cta h2 {
+  font-size: 40px;
+  line-height: 1.15;
+}
+/* Get started: three rows, each step's action at its right. */
+.mk-steps {
+  max-width: 760px;
+  margin: 32px auto 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--mk-line);
+  border-radius: 16px;
+  background: var(--mk-card);
+  text-align: left;
+}
+.mk-steps li {
+  display: grid;
+  grid-template-columns: 24px 1fr auto;
+  align-items: center;
+  column-gap: 16px;
+  row-gap: 12px;
+  padding: 20px 24px;
+}
+.mk-steps li + li {
+  border-top: 1px solid var(--mk-line);
+}
+.mk-steps h3,
+.mk-features h3,
+.mk-faq dt {
+  font-size: 15px;
+  font-weight: 600;
+}
+.mk-steps p,
+.mk-features p,
+.mk-faq dd {
+  color: var(--mk-soft);
+}
+.mk-n {
+  display: inline-grid;
+  place-items: center;
+  align-self: start;
+  width: 24px;
+  height: 24px;
+  margin-top: 1px;
+  border-radius: 50%;
+  background: var(--mk-ink);
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+}
+.mk-action {
+  padding: 8px 14px;
+  border: 1px solid var(--mk-line);
+  border-radius: 9px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.mk-copy {
+  grid-column: 2 / -1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 4px 4px 14px;
+  border-radius: 10px;
+  background: var(--mk-well);
+}
+.mk-copy code {
+  flex: 1;
+  font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: nowrap;
+  user-select: all;
+}
+.mk-copy button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--mk-ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.mk-copy button:hover {
+  background: var(--mk-card);
+}
+.mk-copy svg {
+  width: 15px;
+  height: 15px;
+}
+.mk-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.mk-features {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 32px;
+  margin: 72px 0 0;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+}
+.mk-features li {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  padding-top: 14px;
+  border-top: 1px solid var(--mk-line);
+}
+
+.mk-faq {
+  max-width: 600px;
+  margin: 0 auto;
+  text-align: left;
+}
+.mk-faq dl {
+  margin-top: 20px;
+}
+.mk-faq dl > div {
+  display: grid;
+  gap: 6px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--mk-line);
+}
+.mk-faq dl > div:first-child {
+  padding-top: 0;
+}
+
+.mk-cta {
+  display: grid;
+  justify-items: center;
+  gap: 16px;
+  margin-top: 96px;
+  padding: 56px 24px;
+  border-radius: 20px;
+  background: var(--mk-well);
+  text-align: center;
+}
+.mk-cta p {
+  color: var(--mk-soft);
+}
+.mk-button {
+  padding: 12px 22px;
+  border-radius: 10px;
+  background: var(--mk-ink);
+  color: white !important;
+  font-weight: 600;
+  text-decoration: none;
+}
+.mk-cta small {
+  color: var(--mk-soft);
+  font-size: 12px;
+}
+
+@media (max-width: 720px) {
+  .mk-nav,
+  .mk-footer,
+  .mk > main {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .mk-footer {
+    padding-top: 80px;
+  }
+  .mk-hero {
+    padding-top: 24px;
+  }
+  .mk-hero h1 {
+    font-size: 44px;
+  }
+  .mk-how {
+    grid-template-columns: 1fr;
+    gap: 44px;
+    margin: 40px 0 0;
+  }
+  .mk-how li + li::before {
+    content: "↓";
+    top: -34px;
+    left: calc(50% - 16px);
+    border: 0;
+    background: none;
+    box-shadow: none;
+    color: var(--mk-faint);
+  }
+  .mk-panel {
+    height: 237px;
+  }
+  .mk-dark {
+    font-size: 11px;
+  }
+  .mk-panel-scan {
+    gap: 10px;
+  }
+  .mk-qr {
+    width: 124px;
+    height: 124px;
+    padding: 8px;
+  }
+  .mk-panel-ask p {
+    padding: 0 18px 0 22px;
+  }
+  .mk .mk-waiting {
+    padding-left: 38px;
+  }
+  .mk-panel-phone {
+    padding-top: 26px;
+  }
+  .mk-phone {
+    --mk-scale: 0.68;
+    padding: 9px;
+    border-radius: 36px;
+  }
+  .mk-caption {
+    padding: 18px 18px 20px;
+  }
+  .mk-section {
+    padding-top: 80px;
+    text-align: left;
+  }
+  .mk-section h2,
+  .mk-cta h2 {
+    font-size: 34px;
+  }
+  .mk .mk-lead {
+    font-size: 16px;
+  }
+  .mk-steps li {
+    grid-template-columns: 24px 1fr;
+    padding: 18px 16px;
+  }
+  .mk-action {
+    grid-column: 2;
+    justify-self: start;
+  }
+  .mk-copy code {
+    white-space: normal;
+  }
+  .mk-features {
+    grid-template-columns: 1fr;
+  }
+  .mk-features {
+    margin-top: 40px;
+    gap: 24px;
+  }
+  .mk-cta {
+    margin-top: 72px;
+    padding: 40px 20px;
+  }
+}

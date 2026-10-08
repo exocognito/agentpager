@@ -1,0 +1,1068 @@
+/* The phone app: home, a session's queue and its sheets. Scoped to .ap-rich so the front page can embed it. */
+.ap-app.ap-rich {
+  --ap-bg: #f2f2f7;
+  --ap-card: #fff;
+  --ap-ink: #000;
+  --ap-muted: #6c6c70;
+  --ap-line: #d1d1d6;
+  --ap-softline: #e5e5ea;
+  --ap-blue: #0063d1;
+  --ap-control: #f2f2f7;
+  --ap-red: #d70015;
+  --ap-green: #1f7a35;
+  --ap-tint: color-mix(in srgb, var(--ap-blue) 8%, var(--ap-card));
+  --ap-shadow: 0 1px 2px #0000000a, 0 2px 12px #0000000a;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  min-height: 620px;
+  overflow: hidden;
+  container-type: inline-size;
+  background: var(--ap-bg);
+  color: var(--ap-ink);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+  font-size: 16px;
+  line-height: normal;
+  -webkit-font-smoothing: antialiased;
+}
+@media (prefers-color-scheme: dark) {
+  .ap-app.ap-rich[data-theme="system"] {
+    --ap-bg: #000;
+    --ap-card: #1c1c1e;
+    --ap-ink: #fff;
+    --ap-muted: #aeaeb2;
+    --ap-line: #48484a;
+    --ap-softline: #38383a;
+    --ap-blue: #0a84ff;
+    --ap-control: #2c2c2e;
+    --ap-red: #ff6961;
+    --ap-green: #72dd8c;
+    --ap-shadow: none;
+  }
+}
+.ap-app.ap-rich * {
+  box-sizing: border-box;
+}
+.ap-app.ap-rich :is(button, input, textarea, select) {
+  font-family: inherit;
+}
+.ap-app.ap-rich button {
+  cursor: pointer;
+  color: inherit;
+}
+.ap-app.ap-rich button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+.ap-app.ap-rich :is(button, a, input, textarea, select, summary):focus-visible {
+  outline: 2px solid var(--ap-blue);
+  outline-offset: 2px;
+}
+.ap-app.ap-rich :is([role="dialog"], h2[tabindex="-1"]):focus {
+  outline: none;
+}
+.ap-app.ap-rich a {
+  color: var(--ap-blue);
+}
+.ap-app.ap-rich :is(h1, h2, h3, p, blockquote) {
+  margin: 0;
+}
+.ap-rich .ap-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* I4/SI6: detail text keeps its spaces and line breaks. Titles, names and row lines show each run of
+   spaces and line breaks as one space, and wrap in full rather than cut. */
+.ap-rich :is(.ap-option-detail, .ap-about p, .ap-ack blockquote, .ap-history-detail blockquote) {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ap-rich :is(.ap-sheet-head h2, .ap-pick strong, .ap-option-copy strong, .ap-outcome > strong,
+  .ap-row-text strong, .ap-row-text small, .ap-nav h1, .ap-receipt h2) {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* Frame */
+.ap-rich .ap-base {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.ap-rich .ap-nav {
+  min-height: 44px;
+  flex-shrink: 0;
+  padding: 0 4px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  background: var(--ap-card);
+  border-bottom: 0.5px solid var(--ap-line);
+}
+.ap-rich .ap-nav h1 {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  min-width: 0;
+}
+.ap-rich .ap-nav-left {
+  justify-self: start;
+  display: flex;
+  align-items: center;
+}
+.ap-rich .ap-nav-center {
+  min-width: 0;
+  display: flex;
+  justify-content: center;
+}
+.ap-rich .ap-nav-right {
+  justify-self: end;
+}
+.ap-rich .ap-back {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  color: var(--ap-blue);
+}
+.ap-rich .ap-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ap-rich .ap-logo {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  background: #0a63e0;
+}
+.ap-rich .ap-session-status {
+  height: 30px;
+  margin-right: 8px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 15px;
+  background: color-mix(in srgb, #34c759 16%, var(--ap-card));
+  color: var(--ap-green) !important;
+  font-size: 15px;
+  font-weight: 600;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.ap-rich .ap-session-status span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #34c759;
+}
+.ap-rich .ap-session-status.ap-inactive {
+  background: var(--ap-softline);
+  color: var(--ap-muted) !important;
+}
+.ap-rich .ap-inactive span {
+  background: #8e8e93;
+}
+/* Finished still offers End, so its text needs full contrast. */
+.ap-rich .ap-session-status.ap-inactive:enabled {
+  color: var(--ap-ink) !important;
+}
+.ap-rich .ap-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.ap-rich .ap-column {
+  max-width: 512px;
+  margin: 0 auto;
+  min-height: 100%;
+  padding: 20px 16px 120px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+/* Lists */
+.ap-rich .ap-section-label {
+  margin: 0 0 8px 16px !important;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--ap-muted);
+}
+.ap-rich .ap-section-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-right: 16px;
+}
+.ap-rich .ap-section-heading > span {
+  font-size: 12px;
+  color: var(--ap-muted);
+}
+.ap-rich .ap-group {
+  background: var(--ap-card);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: var(--ap-shadow);
+}
+.ap-rich .ap-row {
+  position: relative;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: inherit !important;
+  text-decoration: none;
+}
+.ap-rich .ap-row > svg {
+  flex-shrink: 0;
+  color: #c7c7cc;
+}
+.ap-rich .ap-row + .ap-row::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 38px;
+  height: 0.5px;
+  background: var(--ap-softline);
+}
+.ap-rich .ap-row-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ap-rich .ap-row-text :is(strong, small) {
+  min-width: 0;
+}
+.ap-rich .ap-row-text strong {
+  font-size: 17px;
+  font-weight: 400;
+}
+.ap-rich .ap-row-text small {
+  font-size: 12px;
+  color: var(--ap-muted);
+}
+.ap-rich .ap-decision-row {
+  min-height: 64px;
+  padding: 11px 14px 11px 16px;
+}
+.ap-rich .ap-decision-row + .ap-decision-row::before {
+  left: 54px;
+}
+.ap-rich .ap-decision-row .ap-row-text strong {
+  font-size: 15px;
+  font-weight: 600;
+}
+.ap-rich .ap-history {
+  display: flex;
+  flex-direction: column;
+}
+.ap-rich .ap-history-row {
+  min-height: 52px;
+  padding: 9px 16px;
+}
+.ap-rich .ap-history-row + .ap-history-row::before {
+  left: 54px;
+  right: 16px;
+  background: var(--ap-line);
+}
+.ap-rich .ap-history-row .ap-row-text strong {
+  font-size: 15px;
+  color: var(--ap-muted);
+}
+.ap-rich .ap-mark {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--ap-softline);
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--ap-muted);
+}
+.ap-rich .ap-mark-open {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--ap-line);
+}
+.ap-rich .ap-mark svg {
+  width: 14px;
+  height: 14px;
+}
+.ap-rich .ap-session-row {
+  min-height: 62px;
+  padding: 10px 14px 10px 16px;
+}
+.ap-rich .ap-dot {
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: #34c759;
+}
+.ap-rich .ap-dot-waiting {
+  background: #ff9f0a;
+}
+.ap-rich .ap-dot-ended,
+.ap-rich .ap-dot-finished {
+  background: #c7c7cc;
+}
+.ap-rich .ap-badge {
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 11px;
+  background: var(--ap-red);
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.ap-rich .ap-empty {
+  padding: 20px 16px;
+  font-size: 15px;
+  text-align: center;
+  color: var(--ap-muted);
+}
+.ap-rich .ap-empty-state {
+  margin-top: 72px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  font-size: 15px;
+  line-height: 20px;
+  text-align: center;
+  color: var(--ap-muted);
+}
+.ap-rich .ap-empty-state p {
+  max-width: 260px;
+}
+.ap-rich .ap-warning {
+  padding: 0 16px;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ap-red);
+}
+.ap-rich .ap-finished {
+  padding: 0 16px;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ap-muted);
+}
+/* End and the expiry sit at the foot of the screen, apart from the decisions. */
+.ap-rich .ap-session-footer {
+  margin-top: auto;
+  padding-top: 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  line-height: 16px;
+  text-align: center;
+  color: var(--ap-muted);
+}
+.ap-rich .ap-loading,
+.ap-rich .ap-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ap-muted);
+}
+.ap-rich .ap-loading {
+  justify-content: center;
+  padding-top: 64px;
+  font-size: 15px;
+}
+.ap-rich .ap-spinner {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 2px solid var(--ap-line);
+  border-top-color: var(--ap-blue);
+  animation: ap-spin 0.8s linear infinite;
+}
+.ap-rich .ap-primary .ap-spinner {
+  border-color: #ffffff55;
+  border-top-color: white;
+}
+.ap-rich .ap-panel {
+  padding: 28px 24px 24px;
+  border-radius: 16px;
+  background: var(--ap-card);
+  box-shadow: var(--ap-shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-size: 15px;
+  line-height: 21px;
+  text-align: center;
+  color: var(--ap-muted);
+}
+.ap-rich .ap-panel h2 {
+  font-size: 20px;
+  line-height: 25px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ap-ink);
+}
+.ap-rich .ap-panel blockquote {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--ap-control);
+  color: var(--ap-ink);
+  text-align: left;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ap-rich .ap-panel .ap-primary {
+  margin-top: 8px;
+  flex: none;
+}
+
+/* Buttons */
+.ap-rich .ap-primary,
+.ap-rich .ap-secondary {
+  flex: 1;
+  min-height: 50px;
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 14px;
+  font-size: 17px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-decoration: none;
+}
+.ap-rich .ap-primary {
+  background: var(--ap-blue);
+  color: white !important;
+}
+.ap-rich .ap-primary.ap-danger {
+  background: var(--ap-red);
+}
+.ap-app.ap-rich .ap-primary:disabled {
+  opacity: 0.4;
+}
+.ap-app.ap-rich .ap-primary.ap-busy {
+  opacity: 1;
+}
+.ap-rich .ap-secondary {
+  background: var(--ap-control);
+  color: var(--ap-blue) !important;
+}
+.ap-rich .ap-text-button {
+  min-height: 44px;
+  padding: 8px 0;
+  border: 0;
+  background: transparent;
+  font-size: 15px;
+  color: var(--ap-blue) !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.ap-rich .ap-text-button.ap-destructive {
+  color: var(--ap-red) !important;
+}
+.ap-rich .ap-round {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--ap-control);
+  display: grid;
+  place-items: center;
+  color: var(--ap-muted) !important;
+}
+/* A 44 px target around the 30 px circle. */
+.ap-rich .ap-round::after {
+  content: "";
+  position: absolute;
+  inset: -7px;
+}
+.ap-rich .ap-fab {
+  position: absolute;
+  right: 20px;
+  bottom: 32px;
+  width: 56px;
+  height: 56px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--ap-blue);
+  color: white !important;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 6px 18px #0063d159, 0 2px 4px #0000001f;
+}
+.ap-rich .ap-fab:disabled {
+  opacity: 0.4;
+  box-shadow: none;
+}
+
+/* Sheets */
+.ap-rich .ap-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: end;
+  justify-content: center;
+}
+.ap-rich .ap-backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: #0006;
+  cursor: default !important;
+  animation: ap-fade 0.2s ease-out;
+}
+.ap-rich .ap-tray {
+  position: relative;
+  width: 100%;
+  max-height: 90%;
+  padding-bottom: 22px;
+  border-radius: 16px 16px 0 0;
+  background: var(--ap-card);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 12px 48px #00000038;
+  animation: ap-up 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.ap-rich .ap-grabber {
+  width: 36px;
+  height: 5px;
+  margin: 6px auto 0;
+  flex-shrink: 0;
+  border-radius: 3px;
+  background: #c7c7cc;
+}
+.ap-rich .ap-sheet-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.ap-rich .ap-sheet-head h2 {
+  flex: 1;
+  min-width: 0;
+  padding-top: 2px;
+  font-size: 20px;
+  line-height: 25px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+.ap-rich .ap-pick {
+  margin-top: -6px !important;
+  font-size: 15px;
+  line-height: 20px;
+}
+.ap-rich .ap-about {
+  margin-top: -6px !important;
+}
+.ap-rich .ap-pick + .ap-about {
+  margin-top: -10px !important;
+}
+.ap-rich .ap-about {
+  font-size: 15px;
+  line-height: 20px;
+  color: var(--ap-muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ap-rich .ap-about .ap-clamp {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  overflow: hidden;
+}
+.ap-rich .ap-more {
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: var(--ap-blue);
+  font: inherit;
+  cursor: pointer;
+}
+.ap-rich .ap-answer-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 14px 20px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.ap-rich .ap-answer-scroll:focus {
+  outline: none;
+}
+.ap-rich .ap-options {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+/* The emoji is the selector: no radio, check or number. */
+.ap-rich .ap-option {
+  min-width: 0;
+  width: 100%;
+  min-height: 60px;
+  padding: 10px 14px 10px 10px;
+  border: 1.5px solid transparent;
+  border-radius: 14px;
+  background: var(--ap-control);
+  text-align: left;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.ap-rich .ap-option[aria-pressed="true"] {
+  background: var(--ap-tint);
+  border-color: var(--ap-blue);
+}
+.ap-app.ap-rich .ap-option:disabled {
+  opacity: 1;
+}
+.ap-app.ap-rich .ap-option:disabled:not([aria-pressed="true"]) {
+  opacity: 0.45;
+}
+.ap-rich .ap-option-emoji {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--ap-card);
+  font-size: 22px;
+  line-height: 1;
+}
+.ap-rich .ap-option[aria-pressed="true"] .ap-option-emoji {
+  box-shadow: 0 0 0 2px var(--ap-blue);
+}
+.ap-rich .ap-option-copy {
+  flex: 1;
+  min-width: 0;
+  min-height: 40px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  overflow-wrap: anywhere;
+}
+.ap-rich .ap-option strong {
+  display: block;
+  font-size: 16px;
+  line-height: 21px;
+  font-weight: 400;
+}
+.ap-rich .ap-option[aria-pressed="true"] strong {
+  font-weight: 600;
+}
+.ap-rich .ap-option-detail {
+  display: block;
+  font-size: 15px;
+  line-height: 20px;
+  color: var(--ap-ink);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ap-rich .ap-history-detail h3,
+.ap-rich .ap-ack h3 {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--ap-muted);
+}
+.ap-rich .ap-feedback {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ap-rich .ap-feedback label {
+  padding-left: 4px;
+  font-size: 13px;
+  color: var(--ap-muted);
+}
+.ap-rich .ap-feedback small,
+.ap-rich .ap-feedback p {
+  padding-left: 4px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--ap-muted);
+}
+.ap-app.ap-rich textarea {
+  width: 100%;
+  min-height: 96px;
+  max-height: 180px;
+  padding: 12px 14px;
+  border: 1px solid var(--ap-line);
+  border-radius: 12px;
+  background: var(--ap-control);
+  font-size: 15px;
+  line-height: 20px;
+  color: var(--ap-ink);
+  resize: vertical;
+}
+.ap-app.ap-rich textarea:focus-visible {
+  outline: none;
+  border-color: var(--ap-blue);
+  box-shadow: 0 0 0 1px var(--ap-blue);
+}
+.ap-rich .ap-history-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 15px;
+  line-height: 20px;
+}
+.ap-rich .ap-history-detail blockquote {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ap-rich .ap-meta {
+  font-size: 13px;
+}
+.ap-rich .ap-ack {
+  margin-top: 4px;
+  padding: 14px;
+  border-radius: 12px;
+  background: var(--ap-control);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ap-rich .ap-ack time {
+  margin-top: -4px;
+  color: var(--ap-muted);
+}
+/* The answer once Send is pressed: the Undo window, sending, then the agent's confirmation. */
+.ap-rich .ap-outcome {
+  flex-shrink: 0;
+  padding: 12px 0 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+}
+.ap-rich .ap-outcome-mark {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: #34c759;
+  color: white;
+  display: grid;
+  place-items: center;
+  animation: ap-pop 0.2s ease-out;
+}
+.ap-rich .ap-outcome-feedback {
+  background: var(--ap-blue);
+}
+.ap-rich .ap-outcome-mark svg {
+  width: 28px;
+  height: 28px;
+}
+.ap-rich .ap-outcome strong {
+  font-size: 20px;
+  line-height: 25px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+.ap-rich .ap-outcome-status {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+}
+/* Once the agent confirms, its reply box says so; the status row only announces it and takes no space. */
+.ap-rich .ap-outcome-status:empty {
+  display: none;
+}
+.ap-rich .ap-outcome-status.ap-quiet {
+  min-height: 0;
+}
+.ap-rich .ap-undo {
+  min-height: 44px;
+  padding: 0 16px;
+  border: 0;
+  background: transparent;
+  font-size: 17px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ap-blue) !important;
+}
+.ap-app.ap-rich .ap-undo:focus-visible {
+  border-radius: 12px;
+  outline-offset: 0;
+}
+.ap-rich .ap-confirmed {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: var(--ap-green);
+}
+.ap-rich .ap-outcome-status .ap-meta {
+  font-size: 15px;
+}
+.ap-rich .ap-card-actions {
+  flex-shrink: 0;
+  padding: 12px 20px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ap-rich .ap-card-actions > * {
+  flex-shrink: 0;
+}
+.ap-rich .ap-card-actions p {
+  padding-bottom: 6px;
+  font-size: 13px;
+  line-height: 18px;
+}
+.ap-rich .ap-receipt {
+  padding: 16px 20px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-align: center;
+  overflow: auto;
+}
+.ap-rich .ap-receipt h2 {
+  font-size: 20px;
+  line-height: 25px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.ap-rich .ap-receipt p {
+  margin-bottom: 8px;
+  font-size: 15px;
+  line-height: 20px;
+  color: var(--ap-muted);
+}
+.ap-rich .ap-receipt :is(.ap-primary, .ap-secondary) {
+  width: 100%;
+  flex: none;
+}
+
+/* Connect sheet */
+.ap-rich .ap-connect {
+  padding: 14px 20px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow: auto;
+}
+.ap-rich .ap-lead {
+  margin-top: -8px !important;
+  font-size: 15px;
+  line-height: 20px;
+  color: var(--ap-muted);
+}
+.ap-rich .ap-scan {
+  position: relative;
+  align-self: center;
+  width: 200px;
+  height: 200px;
+  border-radius: 20px;
+  background: var(--ap-control);
+  display: grid;
+  place-items: center;
+}
+/* Scanner corners, as a phone camera frames a code. */
+.ap-rich .ap-scan::before {
+  content: "";
+  position: absolute;
+  inset: 14px;
+  --c: var(--ap-blue);
+  background:
+    linear-gradient(var(--c) 0 0) top left / 26px 3px, linear-gradient(var(--c) 0 0) top left / 3px 26px,
+    linear-gradient(var(--c) 0 0) top right / 26px 3px, linear-gradient(var(--c) 0 0) top right / 3px 26px,
+    linear-gradient(var(--c) 0 0) bottom left / 26px 3px, linear-gradient(var(--c) 0 0) bottom left / 3px 26px,
+    linear-gradient(var(--c) 0 0) bottom right / 26px 3px, linear-gradient(var(--c) 0 0) bottom right / 3px 26px;
+  background-repeat: no-repeat;
+}
+.ap-rich .ap-scan-code {
+  width: 124px;
+  height: 124px;
+  border-radius: 10px;
+  background: white;
+  fill: #1c1c1e;
+  box-shadow: 0 1px 3px #0000001a;
+}
+.ap-rich .ap-scan-line {
+  position: absolute;
+  top: 50%;
+  right: 30px;
+  left: 30px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--ap-blue);
+  box-shadow: 0 0 8px var(--ap-blue);
+  opacity: 0.7;
+  animation: ap-scan 2.6s ease-in-out infinite;
+}
+.ap-rich .ap-give-link {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+  font-size: 13px;
+  color: var(--ap-muted);
+}
+.ap-rich .ap-give-link > span {
+  padding-left: 4px;
+}
+.ap-rich .ap-link-field {
+  min-height: 46px;
+  padding: 0 4px 0 14px;
+  border: 1px solid var(--ap-line);
+  border-radius: 12px;
+  background: var(--ap-control);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ap-ink);
+}
+.ap-rich .ap-link-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 15px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  user-select: all;
+}
+.ap-rich .ap-link-copy {
+  flex: none;
+  min-height: 44px;
+  padding: 0 10px;
+  border: 0;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ap-blue);
+}
+.ap-rich .ap-link-copy:disabled {
+  color: var(--ap-muted);
+}
+
+/* Wide: sheets become centred dialogs. */
+@container (min-width: 700px) {
+  .ap-rich .ap-nav {
+    min-height: 56px;
+    padding: 0 16px;
+  }
+  .ap-rich .ap-column {
+    padding: 32px 24px 120px;
+  }
+  .ap-rich .ap-overlay {
+    padding: 40px;
+    align-items: center;
+  }
+  .ap-rich .ap-tray {
+    width: 480px;
+    max-height: 100%;
+    padding-bottom: 16px;
+    border-radius: 16px;
+    animation: ap-pop 0.2s ease-out;
+  }
+  .ap-rich .ap-grabber {
+    display: none;
+  }
+  .ap-rich .ap-answer-scroll,
+  .ap-rich .ap-receipt,
+  .ap-rich .ap-connect {
+    padding-top: 20px;
+  }
+}
+
+@keyframes ap-up {
+  from {
+    transform: translateY(24px);
+    opacity: 0.5;
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+@keyframes ap-pop {
+  from {
+    transform: scale(0.97);
+    opacity: 0.5;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+@keyframes ap-fade {
+  from {
+    opacity: 0.5;
+  }
+}
+@keyframes ap-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes ap-scan {
+  0%,
+  100% {
+    top: 22%;
+  }
+  50% {
+    top: 78%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ap-app.ap-rich * {
+    animation: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* The session screen has no floating button to clear, so its footer sits near the bottom edge. */
+.ap-rich .ap-column.ap-session-column {
+  padding-bottom: calc(24px + env(safe-area-inset-bottom));
+}

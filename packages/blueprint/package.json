@@ -1,0 +1,36 @@
+{
+  "name": "@agentpager/blueprint",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./schemas": "./design/schemas/exchange.ts",
+    "./effects/session": "./design/effects/session.ts",
+    "./effects/routes": "./design/effects/routes.ts",
+    "./effects/cards": "./design/effects/cards.ts",
+    "./machine": "./design/machines/cards.ts",
+    "./home-machine": "./design/machines/home.ts",
+    "./screen": "./design/ui/screens/CardScreen.tsx",
+    "./home": "./design/ui/screens/HomeScreen.tsx",
+    "./marketing": "./design/ui/screens/MarketingScreen.tsx",
+    "./start": "./design/ui/screens/StartScreen.tsx"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "diagram": "node --experimental-strip-types scripts/statechart.ts",
+    "diagram:check": "node --experimental-strip-types scripts/statechart.ts --check"
+  },
+  "dependencies": {
+    "effect": "3.22.1",
+    "xstate": "5.32.5",
+    "@xstate/react": "6.1.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "@storybook/react-vite": "10.5.10",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.5",
+    "storybook": "10.5.10",
+    "vitest": "4.1.11"
+  }
+}

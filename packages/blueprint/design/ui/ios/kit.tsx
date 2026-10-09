@@ -174,10 +174,6 @@ export const BubbleIcon = () => (
 export const ArrowUpIcon = () => (
   <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 15V3M3.5 8.5 9 3l5.5 5.5" /></svg>
 );
-// clock.badge.xmark, an ended pager
-export const EndedIcon = () => (
-  <svg className="icon" width="60" height="60" viewBox="0 0 60 60" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M44 26a20 20 0 1 0-18 26" /><path d="M28 18v12l7 5" /><path d="m40 40 12 12M52 40 40 52" /></svg>
-);
 // xmark.circle, pairing failed
 export const FailedIcon = () => (
   <svg className="icon red" width="60" height="60" viewBox="0 0 60 60" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" aria-hidden="true"><circle cx="30" cy="30" r="22" /><path d="m22 22 16 16M38 22 22 38" /></svg>

@@ -3,9 +3,10 @@ import type { Pager } from "./fixtures.ts";
 import { Chevron, GearIcon, GlassButton, NavBar, Phone, PlusIcon, Section, Unavailable } from "./kit.tsx";
 import { WORDS, subtitle } from "./words.ts";
 
-// Agents: every pager this phone holds, active ones first. A row that is not paired yet opens pairing; the
-// others open the agent. The status line says when the list last updated; + connects another agent.
-export function AgentsScreen({ agents, status = WORDS.updatedJustNow, now, dark }: { agents: Pager[]; status?: string; now: Date; dark?: boolean }) {
+// Agents: every pager this phone holds, active ones first, then those ended in the last 24 hours. A row that is
+// not paired yet opens pairing; the others open the agent. A status pill shows only while the server can't be
+// reached (trouble); + connects another agent.
+export function AgentsScreen({ agents, trouble, now, dark }: { agents: Pager[]; trouble?: string; now: Date; dark?: boolean }) {
   const active = agents.filter((p) => p.status !== "ended");
   const ended = agents.filter((p) => p.status === "ended");
   return (
@@ -26,11 +27,11 @@ export function AgentsScreen({ agents, status = WORDS.updatedJustNow, now, dark 
         <>
           <div className="list">
             {active.length > 0 && <Section header={WORDS.activePagers} sep="dot">{active.map((p) => <AgentRow key={p.sessionId} pager={p} now={now} />)}</Section>}
-            {ended.length > 0 && <Section header={WORDS.endedPagers} sep="dot">{ended.map((p) => <AgentRow key={p.sessionId} pager={p} now={now} />)}</Section>}
+            {ended.length > 0 && <Section header={WORDS.endedPagers} footer={WORDS.endedFooter} sep="dot">{ended.map((p) => <AgentRow key={p.sessionId} pager={p} now={now} />)}</Section>}
           </div>
           <div className="toolbar">
             <span className="toolbar-spacer" />
-            <div className="glass-pill status" role="status">{status}</div>
+            {trouble ? <div className="glass-pill status" role="status">{trouble}</div> : <span />}
             <GlassButton label={WORDS.connectAgent} tinted round><PlusIcon /></GlassButton>
           </div>
         </>

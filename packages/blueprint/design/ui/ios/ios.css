@@ -149,7 +149,7 @@
 .ios .toolbar.center { justify-content: center; }
 .ios .toolbar-spacer { width: 56px; flex-shrink: 0; }
 .ios .glass-pill { min-height: 48px; padding: 6px 8px 6px 20px; border-radius: 24px; display: inline-flex; align-items: center; gap: 14px; background: var(--glass); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12), inset 0 0 0 0.5px var(--glass-line); backdrop-filter: blur(20px); font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.ios .glass-pill.status { padding: 6px 20px; justify-content: center; text-align: center; font-size: 13px; line-height: 16px; }
+.ios .glass-pill.status { padding: 6px 20px; justify-content: center; text-align: center; font-size: 13px; line-height: 16px; white-space: nowrap; }
 .ios .pill-btn { height: 36px; padding: 0 16px; border-radius: 18px; border: 0; background: var(--tint-fill); color: var(--on-tint); font-size: 15px; font-weight: 600; }
 
 /* Pull-down menu */

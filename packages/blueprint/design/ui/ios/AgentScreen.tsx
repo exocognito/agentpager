@@ -1,12 +1,13 @@
 import type { Answered, Decision, Pager, SendState } from "./fixtures.ts";
-import { ActionSheet, Alert, BackButton, CheckIcon, Chevron, ClockIcon, EndedIcon, GlassButton, MoreIcon, NavBar, NoteIcon, Phone, Section, Spinner, Unavailable, XCircleIcon } from "./kit.tsx";
-import { END_REASON, LIFETIME, LIFETIMES, WORDS, endConfirmTitle, endedText, exactEnd, remaining, sendingIn, subtitle } from "./words.ts";
+import { ActionSheet, Alert, BackButton, CheckIcon, Chevron, ClockIcon, GlassButton, MoreIcon, NavBar, NoteIcon, Phone, Section, Spinner, XCircleIcon } from "./kit.tsx";
+import { END_REASON, KEEP_ENDED_MS, LIFETIME, LIFETIMES, WORDS, endConfirmTitle, exactEnd, remaining, removedIn, sendingIn, subtitle } from "./words.ts";
 
 export type AgentOverlay = "menu" | "endsMenu" | "endConfirm" | "notConfirmed";
 type Props = { pager: Pager; open?: Decision[]; answered?: Answered[]; now: Date; timeZone?: string; overlay?: AgentOverlay; undoSeconds?: number; dark?: boolean };
 
 // One agent's pager: its open decisions, then the ones answered, each showing where its answer is until the
-// agent confirms it. The ⋯ menu changes when the pager ends, or ends it. An ended pager says only why.
+// agent confirms it. The ⋯ menu changes when the pager ends, or ends it. An ended pager says why, and shows the
+// phone's read-only copy of its decisions until it is removed, 24 hours after the end.
 export function AgentScreen({ pager, open = [], answered = [], now, timeZone, overlay, undoSeconds, dark }: Props) {
   const ended = pager.status === "ended";
   return (
@@ -14,10 +15,23 @@ export function AgentScreen({ pager, open = [], answered = [], now, timeZone, ov
       <div className="safe-top" />
       <NavBar leading={<BackButton />} title={pager.name} subtitle={subtitle(pager, now)} trailing={ended ? undefined : <GlassButton label={WORDS.more}><MoreIcon /></GlassButton>} />
       {ended ? (
-        <Unavailable icon={<EndedIcon />} title={WORDS.ended} lead={END_REASON[pager.endReason ?? "timedOut"]}>
-          <p>{endedText(pager.name)}</p>
-          <button type="button" className="btn-gray">{WORDS.backToAgents}</button>
-        </Unavailable>
+        <div className="list">
+          <Section footer={removedIn(remaining(new Date((pager.endedAt ?? now).getTime() + KEEP_ENDED_MS), now))}>
+            <div className="cell">
+              <span className="cell-text">
+                <span className="cell-title strong">{WORDS.ended}</span>
+                <span className="cell-sub">{END_REASON[pager.endReason ?? "timedOut"]}</span>
+              </span>
+            </div>
+          </Section>
+          {open.length === 0 && answered.length === 0 && (
+            <Section>
+              <p className="cell note-row">{WORDS.noDecisionsOnPhone}</p>
+            </Section>
+          )}
+          {open.length > 0 && <Section header={WORDS.notAnswered} sep="dot">{open.map((d) => <OpenRow key={d.decisionId} decision={d} answerable={false} />)}</Section>}
+          {answered.length > 0 && <Section header={WORDS.answered} sep="emoji">{answered.map((a) => <AnsweredRow key={a.decision.decisionId} answered={a} />)}</Section>}
+        </div>
       ) : (
         <div className={overlay === "menu" || overlay === "endsMenu" ? "list blurred" : "list"}>
           {open.length === 0 && answered.length === 0 && (
@@ -27,16 +41,7 @@ export function AgentScreen({ pager, open = [], answered = [], now, timeZone, ov
           )}
           {open.length > 0 && (
             <Section header={WORDS.open} sep="dot">
-              {open.map((d) => (
-                <button key={d.decisionId} type="button" className="cell top">
-                  <span className="dot blue" />
-                  <span className="cell-text">
-                    <span className="cell-title strong">{d.title}</span>
-                    {d.detail && <span className="cell-sub">{d.detail}</span>}
-                  </span>
-                  <Chevron />
-                </button>
-              ))}
+              {open.map((d) => <OpenRow key={d.decisionId} decision={d} answerable />)}
             </Section>
           )}
           {answered.length > 0 && (
@@ -83,6 +88,21 @@ export function AgentScreen({ pager, open = [], answered = [], now, timeZone, ov
       {overlay === "notConfirmed" && <Alert title={WORDS.notConfirmed} text={WORDS.notConfirmedText} cancel={WORDS.cancel} action={WORDS.retry} />}
     </Phone>
   );
+}
+
+// An open decision. On an ended pager it is the phone's read-only copy: gray, and it opens nothing.
+function OpenRow({ decision, answerable }: { decision: Decision; answerable: boolean }) {
+  const content = (
+    <>
+      <span className={answerable ? "dot blue" : "dot gray"} />
+      <span className="cell-text">
+        <span className="cell-title strong">{decision.title}</span>
+        {decision.detail && <span className="cell-sub">{decision.detail}</span>}
+      </span>
+    </>
+  );
+  if (!answerable) return <div className="cell top">{content}</div>;
+  return <button type="button" className="cell top">{content}<Chevron /></button>;
 }
 
 export function answerText(a: Answered): string {

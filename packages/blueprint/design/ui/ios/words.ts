@@ -24,7 +24,8 @@ export const END_REASON: Record<EndReason, string> = {
 export const WORDS = {
   agents: "Agents",
   activePagers: "Active pagers",
-  endedPagers: "Ended pagers",
+  endedPagers: "Ended in the last 24 hours",
+  endedFooter: "Read only. Each one is removed from this phone 24 hours after it ends.",
   noAgents: "No Agents connected",
   noAgentsText: "Connect an agent to get its decisions on this phone.",
   connectAgent: "Connect an agent",
@@ -65,12 +66,13 @@ export const WORDS = {
   ends: "Ends",
   endPager: "End Pager",
   cancel: "Cancel",
-  endConfirmText: "Your agent keeps running, but it can’t page you anymore. Open decisions are cleared.",
+  endConfirmText: "Your agent keeps running, but it can’t page you anymore. Its decisions stay here, read only, for 24 hours.",
   agentConfirmed: "Agent confirmed",
   sending: "Sending…",
   waitingForAgent: "Waiting for your agent…",
   ended: "This pager has ended",
-  backToAgents: "Back to Agents",
+  notAnswered: "Not answered",
+  noDecisionsOnPhone: "No decisions on this phone.",
 
   chooseOne: "Choose one",
   recommended: "Recommended",
@@ -164,7 +166,10 @@ export function time(date: Date, timeZone?: string): string {
 export const shortName = (name: string) => name.split(" · ")[0] ?? name;
 
 export const endConfirmTitle = (name: string) => `End ${shortName(name)}’s pager?`;
-export const endedText = (name: string) => `${shortName(name)} can’t page you anymore, and its decisions have been cleared.`;
+// An ended pager stays on the phone, read only, for 24 hours after it ends (DEC-2026-10-08-ended-pagers-readable).
+export const KEEP_ENDED_MS = 24 * HOUR;
+export const removedIn = (left: string) => `Read only. Removed from this phone in ${left}.`;
+export const cantReachUpdated = (since: string) => `${WORDS.cantReach} · Updated ${since}`;
 export const pairedText = (name: string, ends: string) => `${name} can now page you. Pager ends in ${ends}.`;
 export const sendingIn = (seconds: number) => `Sending in ${seconds}s`;
 export const youAt = (at: string) => `You · ${at}`;

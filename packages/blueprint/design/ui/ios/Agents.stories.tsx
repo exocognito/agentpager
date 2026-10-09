@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect } from "storybook/test";
 import { AgentsScreen } from "./AgentsScreen.tsx";
 import { AGENTS, NOW, claude, codex, pi } from "./fixtures.ts";
-import { WORDS, subtitle } from "./words.ts";
+import { WORDS, cantReachUpdated, subtitle } from "./words.ts";
 
 const meta = {
   title: "iPhone/Agents",
@@ -13,6 +13,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 // Active pagers first, with their open decisions counted; one not paired yet says how long pairing stays open.
+// Ended pagers stay listed, read only, for 24 hours. No status pill while the server answers.
 export const ActiveAndEnded: Story = {
   name: "Active and ended",
   play: async ({ canvas }) => {
@@ -20,7 +21,9 @@ export const ActiveAndEnded: Story = {
     await expect(canvas.getByRole("button", { name: new RegExp(claude.name) })).toHaveTextContent(`${subtitle(claude, NOW)}3`);
     await expect(canvas.getByRole("button", { name: new RegExp(codex.name) })).toHaveTextContent("Pager not paired · Ends in 14m");
     await expect(canvas.getByRole("button", { name: new RegExp(pi.name) })).toHaveTextContent("Pager ended · 40m ago");
-    await expect(canvas.getByRole("status")).toHaveTextContent(WORDS.updatedJustNow);
+    await expect(canvas.getByRole("heading", { name: WORDS.endedPagers })).toBeVisible();
+    await expect(canvas.getByText(WORDS.endedFooter)).toBeVisible();
+    await expect(canvas.queryByRole("status")).toBeNull();
     await expect(canvas.getByRole("button", { name: WORDS.settings })).toBeVisible();
   },
 };
@@ -35,8 +38,8 @@ export const Empty: Story = {
 };
 export const CantReachServer: Story = {
   name: "Can’t reach server",
-  args: { status: WORDS.cantReach },
+  args: { trouble: cantReachUpdated("5m ago") },
   play: async ({ canvas }) => {
-    await expect(canvas.getByRole("status")).toHaveTextContent(WORDS.cantReach);
+    await expect(canvas.getByRole("status")).toHaveTextContent("Can’t Reach Server · Updated 5m ago");
   },
 };

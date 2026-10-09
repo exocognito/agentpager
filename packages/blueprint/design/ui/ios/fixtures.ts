@@ -18,8 +18,8 @@ export type Answered = { decision: Decision; choice: Choice; sentAt: Date; state
 export const claude: Pager = { sessionId: "p1", name: "Claude Code · blueprint", status: "active", lifetime: "24h", endsAt: minutes(24 * 60), openCount: 3 };
 export const codex: Pager = { sessionId: "p2", name: "Codex · agentpager", status: "unpaired", lifetime: "24h", endsAt: minutes(14) };
 export const pi: Pager = { sessionId: "p3", name: "Pi · release notes", status: "ended", lifetime: "24h", endedAt: minutes(-40), endReason: "agentFinished" };
-export const trip: Pager = { sessionId: "p4", name: "Claude · trip planner", status: "ended", lifetime: "7d", endedAt: minutes(-24 * 60), endReason: "timedOut" };
-export const research: Pager = { sessionId: "p5", name: "Research agent", status: "ended", lifetime: "24h", endedAt: minutes(-3 * 24 * 60), endReason: "ownerEnded" };
+export const trip: Pager = { sessionId: "p4", name: "Claude · trip planner", status: "ended", lifetime: "7d", endedAt: minutes(-5 * 60), endReason: "timedOut" };
+export const research: Pager = { sessionId: "p5", name: "Research agent", status: "ended", lifetime: "24h", endedAt: minutes(-20 * 60), endReason: "ownerEnded" };
 export const AGENTS: Pager[] = [claude, codex, pi, trip, research];
 
 export const aim: Decision = {

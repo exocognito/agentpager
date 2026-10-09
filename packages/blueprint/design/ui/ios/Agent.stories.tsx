@@ -1,8 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, within } from "storybook/test";
 import { AgentScreen } from "./AgentScreen.tsx";
-import { NOW, OPEN, TIME_ZONE, claude, confirmedFirst, pi, research, trip, codex } from "./fixtures.ts";
-import { END_REASON, WORDS, endConfirmTitle, endedText } from "./words.ts";
+import { NOW, OPEN, TIME_ZONE, claude, codex, confirmedFirst, merge, pi, research, trip } from "./fixtures.ts";
+import { END_REASON, WORDS, endConfirmTitle, removedIn } from "./words.ts";
 
 const meta = {
   title: "iPhone/Agent",
@@ -56,17 +56,29 @@ export const EndConfirm: Story = {
     await expect(within(dialog).getByRole("button", { name: WORDS.endPager })).toBeVisible();
   },
 };
-// However a pager ends, its decisions are gone and the screen says why.
+// However a pager ends, the screen says why. The phone keeps its own read-only copy of the decisions for 24 hours
+// after the end: unanswered ones can't be opened to answer, answered ones still open as threads.
 export const EndedAgentFinished: Story = {
   name: "Ended: agent finished",
-  args: { pager: pi },
+  args: { pager: pi, open: [merge], answered: [confirmedFirst] },
   play: async ({ canvas }) => {
-    await expect(canvas.getByRole("heading", { name: WORDS.ended })).toBeVisible();
+    await expect(canvas.getByText(WORDS.ended)).toBeVisible();
     await expect(canvas.getByText(END_REASON.agentFinished)).toBeVisible();
-    await expect(canvas.getByText(endedText(pi.name))).toBeVisible();
+    await expect(canvas.getByText(removedIn("23h"))).toBeVisible();
+    await expect(canvas.getByRole("heading", { name: WORDS.notAnswered })).toBeVisible();
+    await expect(canvas.getByText(merge.title)).toBeVisible();
+    await expect(canvas.queryByRole("button", { name: new RegExp(merge.title.replace("?", "\\?")) })).toBeNull();
+    await expect(canvas.getByRole("button", { name: /Which should I do first\?/ })).toBeVisible();
     await expect(canvas.queryByRole("button", { name: WORDS.more })).toBeNull();
   },
 };
-export const EndedTimedOut: Story = { name: "Ended: timed out", args: { pager: trip } };
-export const EndedByYou: Story = { name: "Ended: you ended it", args: { pager: research } };
-export const EndedPairingFailed: Story = { name: "Ended: pairing failed", args: { pager: { ...codex, status: "ended", endedAt: NOW, endReason: "pairingFailed" } } };
+export const EndedTimedOut: Story = {
+  name: "Ended: timed out, nothing kept",
+  args: { pager: trip, open: [], answered: [] },
+  play: async ({ canvas }) => {
+    await expect(canvas.getByText(WORDS.noDecisionsOnPhone)).toBeVisible();
+    await expect(canvas.getByText(removedIn("19h"))).toBeVisible();
+  },
+};
+export const EndedByYou: Story = { name: "Ended: you ended it", args: { pager: research, open: [], answered: [confirmedFirst] } };
+export const EndedPairingFailed: Story = { name: "Ended: pairing failed", args: { pager: { ...codex, status: "ended", endedAt: NOW, endReason: "pairingFailed" }, open: [], answered: [] } };

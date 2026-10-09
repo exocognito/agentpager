@@ -10,6 +10,7 @@ deliverables:
   - C21::pair-by-entering-the-agents-code
   - C22::change-or-end-a-pager
   - C23::agents-list
+  - C25::page-by-pager-number
   - I18::independent-cards
   - I4::payloads-refused-whole
   - I5::answers-never-change
@@ -28,13 +29,14 @@ deliverables:
 
 ## Objective
 
-I install AgentPager on my iPhone from Xcode. To connect, either:
-- my agent shows me an AgentPager link, a QR code and three emoji, and opening the link shows its page, whose Open in AgentPager button opens the app to pairing; or
-- I tap + and give my agent the link my phone makes, and it shows me the three emoji.
+I install AgentPager on my iPhone from Xcode. My agents reach me in one of three ways:
+- my agent shows me an AgentPager link, a QR code and three emoji, and opening the link shows its page, whose Open in AgentPager button opens the app to pairing;
+- I tap + and give my agent the link my phone makes, and it shows me the three emoji;
+- I paste the line with my pager number into the instructions my agents read, such as AGENTS.md, and each agent opens its own pager on my phone, already paired.
 
-I tap the three emoji in order and press Pair. From then on my agent asks me decisions. With the app open I see each one within seconds. I choose an option or ask for changes, press Send, and have a few seconds to undo. The row waits for my agent, then shows that it confirmed. I can reopen any answered decision while the pager lasts.
+Through a link, I tap the three emoji in order and press Pair. From then on my agent asks me decisions. With the app open I see each one within seconds. I choose an option or ask for changes, press Send, and have a few seconds to undo. The row waits for my agent, then shows that it confirmed. I can reopen any answered decision while the pager lasts.
 
-A pager lasts 24 hours from pairing unless I chose 7 or 30 days. I can change that or end the pager from the agent's menu. However it ends, its decisions are gone and its row says why. My agent learns all of this from agentpager.me/start or the link alone, over HTTPS or MCP, with nothing to install and no account.
+A pager lasts 24 hours from pairing unless I chose 7 or 30 days. I can change that or end the pager from the agent's menu. However it ends, its decisions are gone and its row says why. My agent learns all of this from agentpager.me/start, the link or the pager number line alone, over HTTPS or MCP, with nothing to install and no account.
 
 ## Out of scope
 
@@ -44,4 +46,3 @@ A pager lasts 24 hours from pairing unless I chose 7 or 30 days. I can change th
 - Answering from the Lock Screen, and Live Activities.
 - Android, the web app, accounts, Pro, and product cards. Every card is `generic` ([DEC-2026-10-02-generic-cards-first](../../records/decisions/DEC-2026-10-02-generic-cards-first.md)).
 - Carrying out approved actions: the owner's agent does that.
-- Pager numbers. The dogfood build has them as Sam's exception to SI2 and I16 ([DEC-2026-10-08-pager-number-dogfood](../../records/decisions/DEC-2026-10-08-pager-number-dogfood.md)). MAPP closes only once they are removed or promised.

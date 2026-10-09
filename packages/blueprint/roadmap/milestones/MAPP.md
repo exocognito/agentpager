@@ -36,7 +36,7 @@ I install AgentPager on my iPhone from Xcode. My agents reach me in one of three
 
 Through a link, I tap the three emoji in order and press Pair. From then on my agent asks me decisions. With the app open I see each one within seconds. I choose an option or ask for changes, press Send, and have a few seconds to undo. The row waits for my agent, then shows that it confirmed. I can reopen any answered decision while the pager lasts.
 
-A pager lasts 24 hours from pairing unless I chose 7 or 30 days. I can change that or end the pager from the agent's menu. However it ends, its decisions are gone and its row says why. My agent learns all of this from agentpager.me/start, the link or the pager number line alone, over HTTPS or MCP, with nothing to install and no account.
+A pager lasts 24 hours from pairing unless I chose 7 or 30 days. I can change that or end the pager from the agent's menu. However it ends, its decisions are gone and its row says why. My agent learns all of this from agentpager.me/start or the link alone, over HTTPS or MCP, with nothing to install and no account.
 
 ## Out of scope
 

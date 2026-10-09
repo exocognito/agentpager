@@ -13,7 +13,7 @@ caveats:
 
 ## Behaviors
 
-1. The Agents list shows active pagers apart from ended ones. Each row names the agent and gives its status and time, worded like "Pager active · Ends in 24h", "Pager not paired · Ends in 14m" or "Pager ended · 1d ago". Active rows show how many decisions are open. A link the phone made is not listed until an agent joins it; until then it lives in Connect an Agent (C20). A pager an agent opened with the phone's pager number is listed as active as soon as it opens (C25).
+1. The Agents list shows active pagers apart from ended ones. Each row names the agent and gives its status and time, worded like "Pager active · Ends in 24h", "Pager not paired · Ends in 14m" or "Pager ended · 1d ago". Active rows show how many decisions are open. A link the phone made is not listed until an agent joins it; until then it lives in Connect an Agent (C20). A pager an agent opened with a pager number belonging to this phone is listed as active as soon as it opens (C25).
 2. With no pagers, the list says how to connect an agent. A + button on the list opens Connect an Agent (C20).
 3. Tapping an active row opens that agent's screen, with its open decisions, each marked unread, kept apart from the answered ones. Tapping a row that is not yet paired opens pairing.
 4. An ended row keeps only the agent's name and why and when the pager ended. It stays for 7 days after the end, then disappears. Tapping it opens the ended screen (C22).
@@ -22,4 +22,4 @@ caveats:
 
 ## Never
 
-- A pager that this phone did not make, pair or have opened with its pager number shows in its list.
+- A pager this phone did not make or pair, and that was not opened with a pager number belonging to this phone, shows in its list.

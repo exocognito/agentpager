@@ -5,7 +5,7 @@ decidedBy: Sam
 basis:
   - Sam in Claude Code, 2026-10-09: "Whats the reason we don't include push notifications in the dogfooded version btw? I feel like that's a kinda important feature but it's pushed to the next milestone - what would be required to pull it into the current dogfooding version"
   - Sam's answers the same day: start building now, and test whether a deployed Worker reaches Apple's push service
-  - exocognito/agentpager PR for spike/push
+  - exocognito/agentpager PR #8
 ---
 
 # Alerts come with MAPP

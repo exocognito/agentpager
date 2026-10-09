@@ -19,8 +19,12 @@ struct AgentsListView: View {
                         }
                     }
                     if !model.ended.isEmpty {
-                        Section("Ended pagers") {
+                        Section {
                             ForEach(model.ended, id: \.sessionId) { s in row(s) }
+                        } header: {
+                            Text("Ended in the last 24 hours")
+                        } footer: {
+                            Text("Read only. Each one is removed from this phone 24 hours after it ends.")
                         }
                     }
                 }
@@ -36,7 +40,7 @@ struct AgentsListView: View {
                     .accessibilityIdentifier("settings-button")
             }
             ToolbarSpacer(.flexible, placement: .bottomBar)
-            if !model.listed.isEmpty {
+            if model.serverTrouble {
                 ToolbarItem(placement: .bottomBar) {
                     Text(model.statusLine).font(.footnote.weight(.semibold)).fixedSize().padding(.horizontal, 6)
                         .accessibilityIdentifier("status-line")

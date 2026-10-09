@@ -106,6 +106,10 @@ final class FlowTests: XCTestCase {
         try agent.finish()
         wait(app.staticTexts["This pager has ended"], 8)
         XCTAssertEqual(app.staticTexts["end-reason"].label, "Your agent finished and ended it.")
+        // The server deleted the decisions; the phone keeps its copy, read only, for 24 hours.
+        wait(app.buttons["answered-Send Maya the update?"], 5)
+        wait(app.descendants(matching: .any).matching(identifier: "unanswered-What should we aim for first?").firstMatch, 5)
+        XCTAssertFalse(app.buttons["open-What should we aim for first?"].exists, "an ended pager's cards can't be answered")
         shot("11-ended-agent-finished")
         XCTAssertThrowsError(try agent.ask("Again?", options: [("1️⃣", "One", nil), ("2️⃣", "Two", nil)])) { e in
             XCTAssertEqual((e as? ToolError)?.tag, "PagerEnded")
@@ -161,6 +165,7 @@ final class FlowTests: XCTestCase {
         app.buttons["Close"].firstMatch.tap()
         let row = app.buttons["agent-Claude Code · numbered"]
         wait(row, 10)
+        XCTAssertFalse(app.staticTexts["status-line"].exists, "no status pill while the server is reachable")
         shot("61-agents-numbered")
 
         let ship = try agent.ask("Ship it?", options: [("🚀", "Ship", nil), ("🛑", "Hold", nil)])
@@ -308,7 +313,7 @@ final class FlowTests: XCTestCase {
         wait(app.staticTexts["End Claude’s pager?"], 5)
         shot("46-end-confirm")
         app.buttons.matching(identifier: "End Pager").allElementsBoundByIndex.last!.tap()
-        wait(app.staticTexts["Ended pagers"], 8)
+        wait(app.staticTexts["Ended in the last 24 hours"], 8)
         shot("47-agents-ended")
         XCTAssertThrowsError(try agent.ask("Still there?", options: [("1️⃣", "One", nil), ("2️⃣", "Two", nil)])) { e in
             XCTAssertEqual((e as? ToolError)?.body["endReason"] as? String, "ownerEnded")
@@ -316,6 +321,7 @@ final class FlowTests: XCTestCase {
         app.buttons["agent-Claude · trip planner"].tap()
         wait(app.staticTexts["This pager has ended"])
         XCTAssertEqual(app.staticTexts["end-reason"].label, "You ended it.")
+        wait(app.buttons["answered-Dinner on Friday?"], 5) // the phone keeps its copy when the owner ends it, too
         shot("48-ended-by-you")
     }
 

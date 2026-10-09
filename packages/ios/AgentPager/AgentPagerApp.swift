@@ -5,10 +5,6 @@ struct AgentPagerApp: App {
     @State private var model = Sample.demo(UserDefaults.standard.string(forKey: "demo")) ?? AppModel()
     @Environment(\.scenePhase) private var scenePhase
 
-    init() {
-        if ProcessInfo.processInfo.arguments.contains("-resetKeys") { Keychain.deleteAll() }
-    }
-
     var body: some Scene {
         WindowGroup {
             RootView()

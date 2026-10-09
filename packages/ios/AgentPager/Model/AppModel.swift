@@ -58,7 +58,8 @@ final class AppModel {
 
     var server: URL
     var keys: [PagerKey] = []
-    var inboxes: [String: Inbox] = [:]
+    // Saved on every change, so an ended pager's decisions stay readable (see InboxCache).
+    var inboxes: [String: Inbox] = [:] { didSet { if live { InboxCache.save(inboxes) } } }
     var now = Date()
     var lastSuccess: Date?
     var lastFailure: String?
@@ -83,7 +84,13 @@ final class AppModel {
     init(live: Bool = true) {
         self.live = live
         self.server = Self.configuredServer()
-        if live { keys = Keychain.all(); pagerNumber = Keychain.number(server: server.absoluteString) }
+        if live {
+            // Here, not in the App's init: its @State model is built before that init's body runs.
+            if ProcessInfo.processInfo.arguments.contains("-resetKeys") { Keychain.deleteAll(); InboxCache.deleteAll() }
+            keys = Keychain.all()
+            pagerNumber = Keychain.number(server: server.absoluteString)
+            inboxes = InboxCache.load()
+        }
     }
 
     static func configuredServer() -> URL {
@@ -102,7 +109,6 @@ final class AppModel {
         server = url
         pagerNumber = Keychain.number(server: url.absoluteString)
         numberError = nil
-        inboxes = [:]
         lastSuccess = nil
         lastFailure = nil
         Task { await refreshAll() }
@@ -124,8 +130,11 @@ final class AppModel {
     var ended: [PagerSummary] { listed.filter { $0.status == .ended }.sorted { ($0.endedAt ?? .distantPast) > ($1.endedAt ?? .distantPast) } }
     var loadedOnce: Bool { lastSuccess != nil || myKeys.isEmpty || !live }
 
+    // True only while polls are failing; the Agents list shows its status pill only then.
+    var serverTrouble: Bool { lastFailure != nil && (lastSuccess.map { now.timeIntervalSince($0) > 10 } ?? true) }
+
     var statusLine: String {
-        if lastFailure != nil, lastSuccess.map({ now.timeIntervalSince($0) > 10 }) ?? true { return "Can’t Reach Server" }
+        if serverTrouble { return lastSuccess.map { "Can’t Reach Server · Updated " + Wording.ago($0, now: now) } ?? "Can’t Reach Server" }
         guard let last = lastSuccess else { return "Updating…" }
         let age = now.timeIntervalSince(last)
         if age < 60 { return "Updated Just Now" }
@@ -162,6 +171,12 @@ final class AppModel {
         var failed = numberFailure
         for (key, result) in results { if let f = apply(key, result) { failed = f } }
         now = Date()
+        // An ended pager stays on this phone, read only, for 24 hours after it ended.
+        for key in myKeys {
+            if let s = inboxes[key.sessionId]?.session, s.status == .ended, let ended = s.endedAt, now.timeIntervalSince(ended) >= InboxCache.keepEnded {
+                drop(key.sessionId)
+            }
+        }
         if failed == nil { lastSuccess = now; if lastFailure != nil { lastFailure = nil } } else { lastFailure = failed }
     }
 
@@ -195,7 +210,12 @@ final class AppModel {
     // Returns a failure description for transport problems; drops keys the server no longer knows.
     private func apply(_ key: PagerKey, _ result: Result<Inbox, APIError>) -> String? {
         switch result {
-        case .success(let inbox):
+        case .success(var inbox):
+            // The server deleted an ended pager's decisions; keep the phone's last copy of them, unchanged.
+            if inbox.session.status == .ended, inbox.open.isEmpty, inbox.answered.isEmpty, let last = inboxes[key.sessionId] {
+                inbox.open = last.open
+                inbox.answered = last.answered
+            }
             // Assign only on change: every assignment re-renders, which would disturb an open menu.
             if inboxes[key.sessionId] != inbox { inboxes[key.sessionId] = inbox }
             for (decisionId, p) in inFlight where p.sessionId == key.sessionId {
@@ -366,7 +386,9 @@ final class AppModel {
         if undo?.sessionId == sessionId { undo = nil }
         do throws(APIError) {
             let env = try await client.end(key)
-            inboxes[sessionId] = Inbox(session: env.session, open: [], answered: [])
+            // The reply carries only the ended session; keep the phone's copy of the decisions (see InboxCache).
+            let last = inboxes[sessionId]
+            inboxes[sessionId] = Inbox(session: env.session, open: last?.open ?? [], answered: last?.answered ?? [])
             path = []
         } catch {
             await refresh(sessionId)

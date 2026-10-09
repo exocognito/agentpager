@@ -1,0 +1,124 @@
+import { test } from 'node:test';
+import { createServer } from 'node:http';
+import { generateKeyPairSync, verify } from 'node:crypto';
+import { Schema } from 'effect';
+import { fixture, assert, token, C, until, decode } from './support.ts';
+
+// A stand-in for Apple's push service: it records each alert, checks the provider token, and answers each device
+// token as `replies` says (200 unless set).
+const Payload = Schema.Struct({
+  aps: Schema.Struct({
+    alert: Schema.Struct({ title: Schema.String, body: Schema.String }), sound: Schema.Literal('default'), 'thread-id': Schema.String,
+    'content-available': Schema.Literal(1), 'interruption-level': Schema.Literal('time-sensitive', 'active'),
+  }),
+  kind: Schema.Literal('decision', 'acknowledgement'), sessionId: Schema.String, decisionId: Schema.String,
+});
+type Delivery = { device: string; headers: Record<string, string>; payload: typeof Payload.Type };
+const Ok = Schema.Struct({ ok: Schema.Literal(true) });
+
+test('alerts: a paired phone that gave its token is alerted when its agent asks and acknowledges', { timeout: 180_000 }, async () => {
+  const { privateKey, publicKey } = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+  const deliveries: Delivery[] = [], replies = new Map<string, { status: number; reason: string }>();
+  const apple = createServer((req, res) => {
+    let raw = '';
+    req.on('data', chunk => { raw += chunk; });
+    req.on('end', () => {
+      const [head, claims, signature] = (req.headers.authorization ?? '').replace(/^bearer /, '').split('.');
+      const genuine = !!signature && verify('sha256', Buffer.from(`${head}.${claims}`), { key: publicKey, dsaEncoding: 'ieee-p1363' }, Buffer.from(signature, 'base64url'));
+      const header = JSON.parse(Buffer.from(head ?? '', 'base64url').toString() || '{}'), claim = JSON.parse(Buffer.from(claims ?? '', 'base64url').toString() || '{}');
+      if (!genuine || header.alg !== 'ES256' || header.kid !== 'KEY1234567' || claim.iss !== 'TEAM123456') { res.writeHead(403); res.end(JSON.stringify({ reason: 'InvalidProviderToken' })); return; }
+      const device = (req.url ?? '').replace('/3/device/', '');
+      deliveries.push({ device, headers: Object.fromEntries(Object.entries(req.headers).map(([k, v]) => [k, String(v)])), payload: decode(Payload, JSON.parse(raw)) });
+      const reply = replies.get(device) ?? { status: 200, reason: '' };
+      res.writeHead(reply.status); res.end(reply.status === 200 ? '' : JSON.stringify({ reason: reply.reason }));
+    });
+  });
+  await new Promise<void>(r => apple.listen(0, '127.0.0.1', r));
+  const address = apple.address(); if (!address || typeof address === 'string') throw new Error('port');
+  // The key as it sits in the vault: one line, its breaks turned to spaces.
+  process.env.APNS_KEY_P8 = privateKey.export({ type: 'pkcs8', format: 'pem' }).toString().replace(/\n/g, ' ');
+  process.env.APNS_KEY_ID = 'KEY1234567'; process.env.APNS_TEAM_ID = 'TEAM123456'; process.env.APNS_TOPIC = 'me.agentpager.app.dev';
+  process.env.APNS_ORIGIN = `http://127.0.0.1:${address.port}`;
+  const f = await fixture('push');
+  const device = () => Array.from({ length: 64 }, () => '0123456789abcdef'[Math.floor(Math.random() * 16)]).join('');
+  const register = (sessionId: string, phone: string, deviceToken: string) => f.ok(Ok, `/api/sessions/${sessionId}/push`, { phone, data: { token: deviceToken, environment: 'sandbox' } });
+  const sent = (to: string) => deliveries.filter(d => d.device === to);
+  try {
+    const { s, phone, session } = await f.paired('Claude Code · alerts');
+    const mine = device();
+    await f.refused(401, 'Unauthorized', `/api/sessions/${session.sessionId}/push`, { phone: token(), data: { token: mine, environment: 'sandbox' } });
+    await f.refused(400, 'InvalidInput', `/api/sessions/${session.sessionId}/push`, { phone, data: { token: 'not-hex', environment: 'sandbox' } });
+    await f.refused(400, 'InvalidInput', `/api/sessions/${session.sessionId}/push`, { phone, data: { token: mine, environment: 'staging' } });
+    await register(session.sessionId, phone, mine);
+
+    // A decision: time sensitive, titled with the agent's name, the question first, collapsing on the decision.
+    const asked = await f.ask(s, 'Ship it?');
+    const [decisionAlert] = await until(async () => sent(mine), d => d.length === 1);
+    const aps = decisionAlert.payload.aps;
+    assert.deepEqual(aps.alert, { title: 'Claude Code · alerts', body: 'Ship it?\nRecommended: 🛠️ Second plan' });
+    assert.equal(aps['interruption-level'], 'time-sensitive');
+    assert.equal(aps['thread-id'], session.sessionId);
+    assert.deepEqual([decisionAlert.payload.kind, decisionAlert.payload.sessionId, decisionAlert.payload.decisionId], ['decision', session.sessionId, asked.decisionId]);
+    assert.equal(decisionAlert.headers['apns-topic'], 'me.agentpager.app.dev');
+    assert.equal(decisionAlert.headers['apns-push-type'], 'alert');
+    assert.equal(decisionAlert.headers['apns-collapse-id'], asked.decisionId);
+    const status = await f.ok(C.AgentStatus, `/api/sessions/${session.sessionId}`, { agent: s.agentKey });
+    assert.equal(Number(decisionAlert.headers['apns-expiration']), Math.floor(Date.parse(status.session.endsAt) / 1000), 'never delivered after the pager ends');
+
+    // The agent's acknowledgement carries its words and is not time sensitive.
+    const receipt = await f.answer(session.sessionId, phone, asked.decisionId);
+    await f.ack(s, asked.decisionId, receipt.answerId, 'Shipping now.');
+    const ackAlert = (await until(async () => sent(mine), d => d.length === 2))[1];
+    assert.deepEqual(ackAlert.payload.aps.alert, { title: 'Claude Code · alerts', body: 'Shipping now.' });
+    assert.equal(ackAlert.payload.aps['interruption-level'], 'active');
+    assert.equal(ackAlert.payload.kind, 'acknowledgement');
+
+    // Apple failing an alert never refuses the agent.
+    replies.set(mine, { status: 500, reason: 'InternalServerError' });
+    await f.ask(s, 'Still there?');
+    await until(async () => sent(mine), d => d.length === 3);
+
+    // A token Apple says is gone is dropped: no more alerts until the phone gives one again.
+    replies.set(mine, { status: 410, reason: 'Unregistered' });
+    await f.ask(s, 'Gone?');
+    await until(async () => sent(mine), d => d.length === 4);
+    await f.ask(s, 'Anyone?');
+    assert.equal(sent(mine).length, 4, 'no alert after Apple said the token is gone');
+    const fresh = device();
+    await register(session.sessionId, phone, fresh);
+    await f.ask(s, 'Back?');
+    await until(async () => sent(fresh), d => d.length === 1);
+
+    // A phone-made link: the phone may give its token before an agent joins, but alerts start only once paired.
+    const early = device(), owner = token();
+    const made = await f.phoneCreate(owner);
+    await register(made.session.sessionId, owner, early);
+    const joined = await f.join(made.link.code, 'Codex · early');
+    const agent = { session: joined.session, agentKey: joined.agentKey };
+    await f.ask(agent, 'Before pairing?');
+    if (!joined.pairingCode) throw new Error('no pairing code');
+    await f.pair(made.link.code, owner, joined.pairingCode.emojis);
+    await f.ask(agent, 'After pairing?');
+    const earlyAlerts = await until(async () => sent(early), d => d.length === 1);
+    assert.equal(earlyAlerts[0].payload.aps.alert.body.split('\n')[0], 'After pairing?');
+
+    // The pager number: the phone gives its token once, and every pager an agent opens with the number alerts on
+    // its first question, before the phone has seen that pager.
+    const numberKey = token(), viaNumber = device();
+    await f.refused(401, 'Unauthorized', '/api/numbers/push', { phone: numberKey, data: { token: viaNumber, environment: 'sandbox' } });
+    const { number } = await f.ok(C.NumberMade, '/api/numbers', { method: 'POST', phone: numberKey });
+    await f.ok(Ok, '/api/numbers/push', { phone: numberKey, data: { token: viaNumber, environment: 'sandbox' } });
+    const opened = await f.ok(C.Paged, `/api/numbers/${number}/pagers`, { data: { name: 'Pi · by number' } });
+    await f.ask(opened, 'First question?');
+    const numbered = await until(async () => sent(viaNumber), d => d.length === 1);
+    assert.equal(numbered[0].payload.sessionId, opened.session.sessionId);
+    assert.equal(numbered[0].payload.aps.alert.title, 'Pi · by number');
+
+    // Ending a pager forgets its token with everything else.
+    await f.ok(C.SessionReply, `/api/sessions/${session.sessionId}/end`, { method: 'POST', phone });
+    await f.refused(410, 'PagerEnded', `/api/sessions/${session.sessionId}/push`, { phone, data: { token: fresh, environment: 'sandbox' } });
+  } finally {
+    await f.stop();
+    apple.close();
+  }
+});

@@ -16,6 +16,7 @@
 		70BFBD2E5191D0A402206B10 /* DriverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4201AE0E7919CEB179790B7E /* DriverTests.swift */; };
 		7197B88CC291C4521A5CFF40 /* ConnectSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B616C7FA810C63150805C23 /* ConnectSheet.swift */; };
 		7F5E0495F402C7A78CC3E56C /* InboxCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = E31CF340E88CC54075AE9B7D /* InboxCache.swift */; };
+		93E933C10C46E875C6789870 /* Alerts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35980E9CEB116C7C6CB88011 /* Alerts.swift */; };
 		B046AD611FE5C412661A5399 /* Previews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FA71DC2065059897B5BE3C7 /* Previews.swift */; };
 		C9B12D4D5A91B2871DFD039E /* SettingsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBB5067282C525F5B688ABF2 /* SettingsSheet.swift */; };
 		DC666BE4FC8C2BB3330578F0 /* FlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C28C78D36D8223DDE88ADE4 /* FlowTests.swift */; };
@@ -37,7 +38,9 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		13A6CC9EE49B28DEF16144E7 /* AgentPager.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = AgentPager.entitlements; sourceTree = "<group>"; };
 		1B616C7FA810C63150805C23 /* ConnectSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectSheet.swift; sourceTree = "<group>"; };
+		35980E9CEB116C7C6CB88011 /* Alerts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Alerts.swift; sourceTree = "<group>"; };
 		3BC23C86FC7A43D775629F19 /* AgentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentView.swift; sourceTree = "<group>"; };
 		4201AE0E7919CEB179790B7E /* DriverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverTests.swift; sourceTree = "<group>"; };
 		4CB2BAD2A168DD9A326F8B9D /* AgentsListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentsListView.swift; sourceTree = "<group>"; };
@@ -81,6 +84,7 @@
 		6949BCE7829675AA1341F87A /* Model */ = {
 			isa = PBXGroup;
 			children = (
+				35980E9CEB116C7C6CB88011 /* Alerts.swift */,
 				61CEF972485C3A4967C99E99 /* API.swift */,
 				A27A68C79B4A7080DFE2CB13 /* AppModel.swift */,
 				E31CF340E88CC54075AE9B7D /* InboxCache.swift */,
@@ -93,6 +97,7 @@
 		701AB16F79F9376A907BA52C /* AgentPager */ = {
 			isa = PBXGroup;
 			children = (
+				13A6CC9EE49B28DEF16144E7 /* AgentPager.entitlements */,
 				9BBA529C5DA5D28180A8B4FE /* AgentPagerApp.swift */,
 				83DEE6CF5EAF6D4642D1EAB5 /* Assets.xcassets */,
 				CD4EDD3C2F1BF6179A574EFE /* Info.plist */,
@@ -233,6 +238,7 @@
 				60B6A80E03538535F102F484 /* AgentPagerApp.swift in Sources */,
 				451488794A4E27E84515ED9C /* AgentView.swift in Sources */,
 				2A55FAF002CD29EE74DB3DF7 /* AgentsListView.swift in Sources */,
+				93E933C10C46E875C6789870 /* Alerts.swift in Sources */,
 				DF3350557E5F9D7E2A01B318 /* AppModel.swift in Sources */,
 				7197B88CC291C4521A5CFF40 /* ConnectSheet.swift in Sources */,
 				E6D6837387CFA81B337FE83A /* DecisionSheet.swift in Sources */,
@@ -417,6 +423,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = AgentPager/AgentPager.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = AgentPager/Info.plist;
@@ -456,6 +463,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = AgentPager/AgentPager.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = AgentPager/Info.plist;

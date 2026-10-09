@@ -7,6 +7,7 @@ import * as C from './contract.ts';
 import { BUILD, forward, type Env } from './env.ts';
 import { body, decode, emptyBody, iso, json, refusal, sha256, token } from './shared.ts';
 import { codeDocument, codePage, OLD_CONNECT, startDocument } from './start.ts';
+import { PushTarget } from './push.ts';
 export { Session } from './session.ts';
 export { Registry } from './registry.ts';
 
@@ -32,13 +33,13 @@ async function phoneHash(request: Request) {
   return sha256(key);
 }
 // The listing row outlives any pager it names; by then the phone holds the pager's key.
-const NumberHit = Schema.Struct({ phoneHash: Schema.NullOr(Schema.String) });
+const NumberHit = Schema.Struct({ phoneHash: Schema.NullOr(Schema.String), push: Schema.NullOr(PushTarget) });
 async function page(env: Env, number: string, name: string, lifetime: C.Lifetime) {
   const sessionId = token();
   const reply = await registry(env, '/number-page', { numberHash: await sha256(number), sessionId, expiresAt: iso(Date.now() + C.LIFETIMES['30d'] + C.RETENTION_MS) });
   const hit = decode(NumberHit, await reply.json());
   if (!hit.phoneHash) throw C.refuse.numberInvalid();
-  return forward(env.SESSION, sessionId, '/open', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sessionId, phoneHash: hit.phoneHash, name, lifetime }) });
+  return forward(env.SESSION, sessionId, '/open', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sessionId, phoneHash: hit.phoneHash, name, lifetime, push: hit.push }) });
 }
 async function optionalBody(request: Request): Promise<unknown> {
   const text = await request.clone().text();
@@ -70,6 +71,11 @@ async function api(request: Request, env: Env, origin: string): Promise<Response
     }
     if (method === 'GET') return registry(env, '/number-list', { phoneHash: hash });
   }
+  // Where this phone gets alerts: each pager an agent opens with its number starts with it.
+  if (parts.length === 2 && parts[0] === 'numbers' && parts[1] === 'push' && method === 'POST') {
+    const hash = await phoneHash(request), push = decode(PushTarget, await body(request));
+    return registry(env, '/number-push', { phoneHash: hash, push });
+  }
   if (parts.length === 3 && parts[0] === 'numbers' && parts[2] === 'pagers' && method === 'POST') {
     const number = decode(C.Token, parts[1]), input = decode(C.CreateInput, await body(request));
     return page(env, number, input.name, input.lifetime ?? C.DEFAULT_LIFETIME);
@@ -88,7 +94,7 @@ async function api(request: Request, env: Env, origin: string): Promise<Response
       if (parts[4] === 'answer') return pass(sessionId, `/${method === 'GET' ? 'read' : 'answer'}/${decisionId}`);
       if (parts[4] === 'acknowledge' && method === 'POST') return pass(sessionId, `/ack/${decisionId}`);
     }
-    if (method === 'POST' && (rest === 'end' || rest === 'finish' || rest === 'lifetime')) return pass(sessionId, `/${rest}`);
+    if (method === 'POST' && (rest === 'end' || rest === 'finish' || rest === 'lifetime' || rest === 'push')) return pass(sessionId, `/${rest}`);
   }
   throw C.refuse.notFound();
 }

@@ -18,6 +18,11 @@ const config = {
   migrations: [{ tag: 'v1', new_sqlite_classes: ['Session'] }, { tag: 'v2', new_sqlite_classes: ['Registry'] }],
   // Local builds keep the caller's origin (a LAN dogfood server hands out LAN links); only deploy binds the domain.
   ...(local ? {} : { routes: [{ pattern: 'agentpager.me', custom_domain: true }] }),
+  // Alerts (push.ts). The key itself is the Worker secret APNS_KEY_P8, never in a build. A local build takes these
+  // from the environment, so tests can point it at a stand-in for Apple.
+  vars: local
+    ? Object.fromEntries(['APNS_KEY_P8', 'APNS_KEY_ID', 'APNS_TEAM_ID', 'APNS_TOPIC', 'APNS_ORIGIN'].filter(k => process.env[k]).map(k => [k, process.env[k]]))
+    : { APNS_KEY_ID: 'LP76VF4XQ5', APNS_TEAM_ID: 'X3M532E87A', APNS_TOPIC: 'me.agentpager.app.dev' },
   workers_dev: false,
 };
 await writeFile(path.join(out, 'wrangler.json'), JSON.stringify(config, null, 2));

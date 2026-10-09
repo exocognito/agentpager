@@ -2,8 +2,9 @@ import SwiftUI
 
 @main
 struct AgentPagerApp: App {
-    @State private var model = Sample.demo(UserDefaults.standard.string(forKey: "demo")) ?? AppModel()
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @Environment(\.scenePhase) private var scenePhase
+    private var model: AppModel { appDelegate.model }
 
     var body: some Scene {
         WindowGroup {
@@ -11,7 +12,7 @@ struct AgentPagerApp: App {
                 .environment(model)
                 .onOpenURL { model.handle(url: $0) }
                 .task(id: scenePhase == .active) {
-                    // Foreground only: refresh about every 3 s. There are no push notifications in this build.
+                    // Foreground: refresh about every 3 s. A closed app hears its agents through alerts (Alerts.swift).
                     if scenePhase == .active { await model.pollLoop() }
                 }
                 .onChange(of: scenePhase) { _, phase in

@@ -47,6 +47,10 @@ Cold agent arrivals are **reviewer dogfood**, not acceptance tests: D2 and `reci
 
 Commit and clean the checkout, then `pnpm deploy:app`. The script reads only the prescribed vault item using the service-account token in `~/Agents/.secrets/op-service-account.token`, and supplies its credential and account id only to the one Wrangler deployment process. It creates the `agentpager.me` custom-domain route, verifies the binding, queries DNS and Durable Object placement, and checks the public HTTPS build header. Logs never contain token values. The Worker stays named `ownerpager`, with `Session`/`Registry` SQLite migrations `v1`/`v2`. Build artifacts and vault material are never committed.
 
+### Alerts
+
+Alerts go through Apple's push service with the owner's APNs key (D7). Deployment also reads the vault item `AgentPager APN.p8 key` and gives the key to the Worker as the secret `APNS_KEY_P8`, on Wrangler's stdin; `scripts/build.mjs` sets its key id, team id and topic. A local server (`dogfood`, `start`) cannot reach Apple's service, which speaks HTTP/2 only, so it sends no alerts; the tests point a local server at a stand-in for Apple.
+
 ## Enforcement
 
 - Strict imported schemas decode UTF-8 requests before writes. The MCP byte gate refuses invalid UTF-8 before the SDK can normalize it; a refusal-only credential check preserves authorization precedence. Credential syntax is validated before header construction. Inputs are not trimmed or truncated.

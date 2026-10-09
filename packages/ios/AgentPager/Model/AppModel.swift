@@ -1,6 +1,7 @@
 import SwiftUI
 import Observation
 import UIKit
+import UserNotifications
 
 enum Route: Hashable { case agent(String) }
 
@@ -75,6 +76,26 @@ final class AppModel {
     var numberError: String?
     var numberBusy = false
     private var autoPaired: Set<String> = []
+    // Alerts (Alerts.swift).
+    var deviceToken: String? { didSet { if deviceToken != oldValue { Task { await givePushToken() } } } }
+    private var pushGiven: Set<String> = []
+    private var askedForAlerts = false
+    private var badge: Int?
+    // The Apple service this build's token belongs to: its signing profile's aps-environment. A TestFlight or App
+    // Store build has no embedded profile and uses production; the Simulator uses the sandbox.
+    static let pushEnvironment: String = {
+        #if targetEnvironment(simulator)
+        return "sandbox"
+        #else
+        guard let url = Bundle.main.url(forResource: "embedded", withExtension: "mobileprovision"),
+              let data = try? Data(contentsOf: url),
+              let start = data.range(of: Data("<?xml".utf8)),
+              let end = data.range(of: Data("</plist>".utf8), in: start.lowerBound..<data.endIndex),
+              let profile = try? PropertyListSerialization.propertyList(from: data[start.lowerBound..<end.upperBound], format: nil) as? [String: Any],
+              let entitlements = profile["Entitlements"] as? [String: Any] else { return "production" }
+        return entitlements["aps-environment"] as? String == "production" ? "production" : "sandbox"
+        #endif
+    }()
     var demoFlow: PairingFlow?
     let live: Bool
     // Debug only: `-failSends N` makes the next N answer attempts fail as if the network dropped,
@@ -144,6 +165,8 @@ final class AppModel {
     // MARK: Polling
 
     func pollLoop() async {
+        // Each return to the foreground gives the device token again, in case the server dropped one.
+        pushGiven = []
         while !Task.isCancelled {
             await refreshAll()
             try? await Task.sleep(for: .seconds(Self.pollSeconds))
@@ -178,6 +201,9 @@ final class AppModel {
             }
         }
         if failed == nil { lastSuccess = now; if lastFailure != nil { lastFailure = nil } } else { lastFailure = failed }
+        await askForAlertsOnce()
+        await givePushToken()
+        await showWaitingOnIcon()
     }
 
     // Pagers agents opened with the pager number join the list in the same poll. Returns a failure description.
@@ -234,6 +260,52 @@ final class AppModel {
             if case .transport(let text) = error { return text }
             return error.tag
         }
+    }
+
+    // MARK: Alerts
+
+    // Asked once, when the first pager is paired.
+    private func askForAlertsOnce() async {
+        guard !askedForAlerts, active.contains(where: { $0.status == .active }) else { return }
+        askedForAlerts = true
+        let center = UNUserNotificationCenter.current()
+        guard await center.notificationSettings().authorizationStatus == .notDetermined else { return }
+        _ = try? await center.requestAuthorization(options: [.alert, .sound, .badge])
+    }
+
+    // Gives the device token to the pager number and to each pager not yet given it. A request that does not reach
+    // the server is tried again on the next refresh; one the server refuses is not.
+    func givePushToken() async {
+        guard live, let token = deviceToken else { return }
+        let client = self.client, environment = Self.pushEnvironment
+        if let n = pagerNumber, n.server == server.absoluteString, pushGiven.insert("number \(n.phoneKey) \(token)").inserted {
+            do throws(APIError) { try await client.numberPush(phoneKey: n.phoneKey, token: token, environment: environment) } catch {
+                if error.isTransport { pushGiven.remove("number \(n.phoneKey) \(token)") }
+            }
+        }
+        for key in myKeys where inboxes[key.sessionId]?.session.status != .ended {
+            guard pushGiven.insert("\(key.sessionId) \(token)").inserted else { continue }
+            do throws(APIError) { try await client.push(key, token: token, environment: environment) } catch {
+                if error.isTransport { pushGiven.remove("\(key.sessionId) \(token)") }
+            }
+        }
+    }
+
+    // The app icon shows how many decisions are waiting on paired pagers.
+    private func showWaitingOnIcon() async {
+        let waiting = myKeys.compactMap { inboxes[$0.sessionId] }.filter { $0.session.status == .active }.reduce(0) { $0 + $1.open.count }
+        guard waiting != badge else { return }
+        badge = waiting
+        try? await UNUserNotificationCenter.current().setBadgeCount(waiting)
+    }
+
+    // Tapping an alert opens its decision: the decision sheet while it is open, its thread once answered.
+    func openAlert(sessionId: String, decisionId: String) async {
+        await refreshAll()
+        guard key(sessionId) != nil else { return }
+        path = [.agent(sessionId)]
+        guard let d = decision(sessionId, decisionId) else { return }
+        sheet = d.answer == nil ? .decision(sessionId: sessionId, decisionId: decisionId) : .thread(sessionId: sessionId, decisionId: decisionId)
     }
 
     func drop(_ sessionId: String) {
@@ -310,7 +382,7 @@ final class AppModel {
             let seen = Keychain.number(server: base).flatMap { $0.phoneKey == phoneKey ? $0.seen : nil } ?? []
             let n = PagerNumber(server: base, phoneKey: phoneKey, number: made.number, seen: seen)
             Keychain.save(n)
-            if server.absoluteString == base { pagerNumber = n }
+            if server.absoluteString == base { pagerNumber = n; Task { await givePushToken() } }
         } catch {
             if server.absoluteString == base { numberError = "Can’t reach your AgentPager server at \(base)." }
         }
@@ -332,6 +404,8 @@ final class AppModel {
             keys = Keychain.all()
         }
         autoPaired.insert(summary.sessionId)
+        // Now, not at the next poll: the owner may leave the app straight after pairing.
+        Task { await givePushToken() }
         inboxes[summary.sessionId] = Inbox(session: summary, open: inboxes[summary.sessionId]?.open ?? [], answered: inboxes[summary.sessionId]?.answered ?? [])
         Task {
             try? await Task.sleep(for: .seconds(1.5))

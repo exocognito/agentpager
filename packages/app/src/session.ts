@@ -5,6 +5,7 @@ import * as C from './contract.ts';
 import { acceptsChoice } from '../../blueprint/design/ui/components/cards/schemas.ts';
 import { body, decode, emptyBody, iso, json, refusal, sameDigest, sha256, token } from './shared.ts';
 import { forward, lifetimes, type Env } from './env.ts';
+import { alert, PushTarget, questionBody, type Alert } from './push.ts';
 
 const Digest = Schema.String.pipe(Schema.pattern(/^[a-f0-9]{64}$/));
 const Index = Schema.Number.pipe(Schema.int(), Schema.between(0, C.PALETTE_SIZE - 1));
@@ -16,13 +17,15 @@ const Meta = Schema.Struct({
   triesLeft: Schema.Number.pipe(Schema.int(), Schema.between(0, C.PAIRING_TRIES)), lastActivityAt: C.Timestamp,
   agentHash: Schema.NullOr(Digest), phoneHash: Schema.NullOr(Digest), codeHash: Schema.NullOr(Digest),
   palette: Schema.Array(C.PaletteEntry), code: Schema.NullOr(Schema.Tuple(Index, Index, Index)),
+  // Where the phone gets alerts (C17); absent on pagers made before alerts.
+  push: Schema.optional(Schema.NullOr(PushTarget)),
 });
 type Meta = typeof Meta.Type;
 // What survives an end for RETENTION_MS: the name, reason and time, plus key digests so only the holders can read it.
 const Tombstone = Schema.Struct({ sessionId: C.Token, name: Schema.NullOr(C.SessionName), endReason: C.EndReason, endedAt: C.Timestamp, agentHash: Schema.NullOr(Digest), phoneHash: Schema.NullOr(Digest) });
 type Tombstone = typeof Tombstone.Type;
 const Init = Schema.Struct({ sessionId: C.Token, code: C.Token, origin: Schema.String, by: Schema.Literal('agent', 'phone'), name: Schema.NullOr(C.SessionName), lifetime: C.Lifetime });
-const Open = Schema.Struct({ sessionId: C.Token, phoneHash: Digest, name: C.SessionName, lifetime: C.Lifetime });
+const Open = Schema.Struct({ sessionId: C.Token, phoneHash: Digest, name: C.SessionName, lifetime: C.Lifetime, push: Schema.NullOr(PushTarget) });
 
 const randomIndex = (n: number) => { // Rejection sampling: no modulo bias in the palette or the code.
   const ceiling = Math.floor(0x100000000 / n) * n;
@@ -156,6 +159,15 @@ export class Session {
     return decode(C.Decision, { ...proposal, status: a.choice.kind === 'feedback' ? 'feedback' : ack ? 'acknowledged' : 'answered', answer: a, ...(ack ? { acknowledgement: decode(C.Acknowledgement, JSON.parse(ack.json)) } : {}) });
   }
   private touch(m: Meta) { this.save({ ...m, lastActivityAt: iso() }); }
+  // Alerts go only to a paired phone that gave its token. Apple's refusal of a token drops it.
+  private async alertPhone(m: Meta, decisionId: string, kind: 'decision' | 'acknowledgement', body: string) {
+    if (m.status !== 'active' || !m.push) return;
+    const to = m.push;
+    const a: Alert = { title: m.name ?? 'Your agent', body, timeSensitive: kind === 'decision', expiresAt: m.endsAt, collapseId: decisionId, thread: m.sessionId, data: { kind, sessionId: m.sessionId, decisionId } };
+    if (await alert(this.env, to, a) !== 'gone') return;
+    try { this.tx(() => { const now = this.tomb() ? null : this.meta(); if (now?.push?.token === to.token) this.save({ ...now, push: null }); }); }
+    catch (error) { console.error('Dropping a gone device token failed', error instanceof Error ? error.message : 'unknown'); }
+  }
 
   async fetch(request: Request): Promise<Response> {
     let response: Response;
@@ -190,7 +202,7 @@ export class Session {
     if (action === 'open') {
       const input = decode(Open, await body(request));
       const agentKey = token(), now = Date.now();
-      const m: Meta = { sessionId: input.sessionId, name: input.name, status: 'active', lifetime: input.lifetime, createdAt: iso(now), pairedAt: iso(now), endsAt: iso(now + lifetimes.lifetimeMs(input.lifetime)), windowEndsAt: iso(now), triesLeft: C.PAIRING_TRIES, lastActivityAt: iso(now), agentHash: await sha256(agentKey), phoneHash: input.phoneHash, codeHash: null, palette: [], code: null };
+      const m: Meta = { sessionId: input.sessionId, name: input.name, status: 'active', lifetime: input.lifetime, createdAt: iso(now), pairedAt: iso(now), endsAt: iso(now + lifetimes.lifetimeMs(input.lifetime)), windowEndsAt: iso(now), triesLeft: C.PAIRING_TRIES, lastActivityAt: iso(now), agentHash: await sha256(agentKey), phoneHash: input.phoneHash, codeHash: null, palette: [], code: null, push: input.push };
       this.tx(() => { if (this.row('pager') || this.row('tombstone')) throw C.refuse.invalid('This pager already exists.'); this.save(m); });
       return json(decode(C.Paged, { session: this.summary(m), agentKey }));
     }
@@ -240,14 +252,16 @@ export class Session {
     if (action === 'ask') {
       const digest = await agentDigest(request);
       const question = decode(C.QuestionInput, await body(request));
-      return json(this.tx(() => {
+      const asked = this.tx(() => {
         const m = this.agent(digest);
         if (this.openCount() >= C.MAX_OPEN_DECISIONS) throw C.refuse.tooMany();
         const d: C.Decision = { ...question, decisionId: token(), kind: 'card', status: 'open', askedAt: iso() };
         decode(C.Decision, d);
         this.ctx.storage.sql.exec('INSERT INTO proposals VALUES (?, ?)', d.decisionId, JSON.stringify(d));
-        this.touch(m); return { decisionId: d.decisionId };
-      }));
+        this.touch(m); return { m, decisionId: d.decisionId };
+      });
+      await this.alertPhone(asked.m, asked.decisionId, 'decision', questionBody(question));
+      return json({ decisionId: asked.decisionId });
     }
     if (action === 'read') {
       const digest = await agentDigest(request);
@@ -264,15 +278,17 @@ export class Session {
     if (action === 'ack') {
       const digest = await agentDigest(request);
       const id = decode(C.Token, param), input = decode(C.AcknowledgementInput, await body(request));
-      return json(this.tx(() => {
+      const done = this.tx(() => {
         const m = this.agent(digest), d = this.decision(id);
         if (!d.answer) throw C.refuse.notAnswered();
         if (d.answer.answerId !== input.answerId) throw C.refuse.answerMismatch();
         if (d.acknowledgement) throw C.refuse.alreadyAcknowledged();
         const ack = decode(C.Acknowledgement, { ...input, decisionId: id, acknowledgedAt: iso() });
         this.ctx.storage.sql.exec('INSERT INTO acknowledgements VALUES (?, ?)', id, JSON.stringify(ack));
-        this.touch(m); return ack;
-      }));
+        this.touch(m); return { m, ack };
+      });
+      await this.alertPhone(done.m, id, 'acknowledgement', done.ack.nextSteps);
+      return json(done.ack);
     }
     if (action === 'finish') {
       const digest = await agentDigest(request);
@@ -324,6 +340,12 @@ export class Session {
         const endedAt = iso(); this.end(p.m, 'ownerEnded', endedAt);
         return { session: this.endedSummary({ sessionId: p.m.sessionId, name: p.m.name, endedAt, endReason: 'ownerEnded' }) };
       }));
+    }
+    // The phone's device token for alerts. It lives with the pager and goes when the pager ends.
+    if (action === 'push') {
+      const digest = await phoneDigest(request);
+      const input = decode(PushTarget, await body(request));
+      return json(this.tx(() => { const m = this.livePhone(digest); this.save({ ...m, push: input }); return { ok: true }; }));
     }
     if (action === 'lifetime') {
       const digest = await phoneDigest(request);

@@ -135,6 +135,7 @@ nonisolated struct CreatedPager: Codable, Sendable { var session: PagerSummary; 
 nonisolated struct SessionEnvelope: Codable, Sendable { var session: PagerSummary }
 nonisolated struct NumberMade: Codable, Sendable { var number: String }
 nonisolated struct NumberPagers: Codable, Sendable { var sessionIds: [String] }
+nonisolated struct Done: Codable, Sendable { var ok: Bool }
 
 nonisolated struct ErrorBody: Codable, Sendable {
     var error: String
@@ -220,6 +221,13 @@ nonisolated struct APIClient: Sendable {
     }
     func setLifetime(_ key: PagerKey, _ lifetime: Lifetime) async throws(APIError) -> SessionEnvelope {
         try await request("POST", "api/sessions/\(key.sessionId)/lifetime", phoneKey: key.phoneKey, body: ["lifetime": lifetime.rawValue])
+    }
+    // Where this phone gets alerts: given to each pager it holds, and to its pager number for pagers agents open later.
+    func push(_ key: PagerKey, token: String, environment: String) async throws(APIError) {
+        let _: Done = try await request("POST", "api/sessions/\(key.sessionId)/push", phoneKey: key.phoneKey, body: ["token": token, "environment": environment])
+    }
+    func numberPush(phoneKey: String, token: String, environment: String) async throws(APIError) {
+        let _: Done = try await request("POST", "api/numbers/push", phoneKey: phoneKey, body: ["token": token, "environment": environment])
     }
     func startInfo(code: String) async throws(APIError) -> StartInfo {
         try await request("GET", "api/start/\(code)")

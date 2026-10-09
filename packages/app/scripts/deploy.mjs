@@ -14,6 +14,12 @@ try {
   const field = name => item.fields.find(f => f.label === name || f.id === name)?.value;
   const credential = field('credential'), account = field('account_id');
   if (!credential || !account) throw new Error('Vault fields missing.');
+  // The APNs key (alerts, D7) reaches only the Worker secret, through wrangler's stdin.
+  let apns;
+  try { apns = JSON.parse(execFileSync('op', ['item', 'get', 'AgentPager APN.p8 key', '--vault', 'Yolo Sam', '--format', 'json'], { env: { ...process.env, OP_SERVICE_ACCOUNT_TOKEN: serviceToken }, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 30_000 })); }
+  catch { throw new Error('APNs key lookup failed (output withheld).'); }
+  const apnsKey = apns.fields.find(f => f.id === 'credential')?.value;
+  if (!apnsKey) throw new Error('APNs key field missing.');
   const cf = async (route, init = {}) => {
     const response = await fetch('https://api.cloudflare.com/client/v4' + route, { ...init, headers: { authorization: `Bearer ${credential}`, 'content-type': 'application/json' } });
     const value = await response.json();
@@ -29,6 +35,9 @@ try {
   const output = `${deploy.stdout || ''}${deploy.stderr || ''}`.replaceAll(credential, '[REDACTED]').replaceAll(serviceToken, '[REDACTED]');
   console.log(output);
   if (deploy.status !== 0) throw new Error('Wrangler deploy failed.');
+  const secret = spawnSync('pnpm', ['exec', 'wrangler', 'secret', 'put', 'APNS_KEY_P8', '--name', 'ownerpager'], { input: apnsKey, env: { ...process.env, CLOUDFLARE_API_TOKEN: credential, CLOUDFLARE_ACCOUNT_ID: account }, encoding: 'utf8', timeout: 120_000 });
+  console.log(`${secret.stdout || ''}${secret.stderr || ''}`.replaceAll(apnsKey, '[REDACTED]').replaceAll(credential, '[REDACTED]').replaceAll(serviceToken, '[REDACTED]'));
+  if (secret.status !== 0) throw new Error('Setting the APNs key secret failed.');
   const domains = await cf(`/accounts/${account}/workers/domains`);
   if (!domains.some(d => d.hostname === 'agentpager.me' && d.service === 'ownerpager')) throw new Error('Custom domain binding missing.');
   const dns = await cf(`/zones/${zones[0].id}/dns_records?name=agentpager.me`);
@@ -42,6 +51,7 @@ try {
   const bindings = settings.bindings.filter(b => b.type === 'durable_object_namespace');
   for (const [name, className] of [['SESSION', 'Session'], ['REGISTRY', 'Registry']]) if (!bindings.some(b => b.name === name && b.class_name === className && placement.some(n => n.id === b.namespace_id && n.class === className))) throw new Error(`Incorrect ${name} binding.`);
   console.log('Bindings:', JSON.stringify(bindings));
+  if (!settings.bindings.some(b => b.type === 'secret_text' && b.name === 'APNS_KEY_P8')) throw new Error('The Worker secret APNS_KEY_P8 is missing, so no alerts go out.');
   for (let n = 0; n < 30; n++) {
     const response = await fetch('https://agentpager.me/start');
     if (response.headers.get('x-agentpager-build') === sha) { console.log(`Verified HTTPS candidate ${sha}`); process.exit(0); }

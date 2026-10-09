@@ -10,7 +10,7 @@ settings:
     MARKETING_VERSION: "0.1"
     CURRENT_PROJECT_VERSION: "1"
     CODE_SIGN_STYLE: Automatic
-    # Sam's Personal Team, set in Xcode; kept here so xcodegen does not drop it.
+    # Sam's paid Apple Developer team (alerts need it, D7); kept here so xcodegen does not drop it.
     DEVELOPMENT_TEAM: X3M532E87A
     # The dogfood server. Change it here, or in the app's Server screen, or with the launch argument
     # -AgentPagerServerURL http://host:8787
@@ -21,6 +21,13 @@ targets:
     platform: iOS
     sources:
       - path: AgentPager
+    # Alerts (C17): Apple's push service, time-sensitive alerts, and a wake in the background to refresh the badge.
+    # Xcode's automatic signing registers these for the app id the first time the owner builds.
+    entitlements:
+      path: AgentPager/AgentPager.entitlements
+      properties:
+        aps-environment: development
+        com.apple.developer.usernotifications.time-sensitive: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: me.agentpager.app.dev
@@ -49,6 +56,8 @@ targets:
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
         NSLocalNetworkUsageDescription: AgentPager connects to your AgentPager server on this network.
+        UIBackgroundModes:
+          - remote-notification
         AgentPagerServerURL: $(AGENTPAGER_SERVER_URL)
   AgentPagerUITests:
     type: bundle.ui-testing

@@ -13,6 +13,13 @@ final class FlowTests: XCTestCase {
         app.launchArguments += ["-resetKeys", "-AgentPagerServerURL", AgentHarness.server.absoluteString]
     }
 
+    // The first paired pager asks for alerts (C17::get-paged). While the prompt is up the app is inactive and does
+    // not refresh, so allow alerts before waiting on the app. Asked once per install, so usually there is none.
+    private func allowAlerts() {
+        let allow = XCUIApplication(bundleIdentifier: "com.apple.springboard").alerts.buttons["Allow"]
+        if allow.waitForExistence(timeout: 3) { allow.tap() }
+    }
+
     private func launch(extra: [String] = []) {
         app.launchArguments += extra
         app.launch()
@@ -55,6 +62,7 @@ final class FlowTests: XCTestCase {
         wait(app.staticTexts["Paired"], 8)
         if let shots { shot("\(shots)-paired") }
         wait(app.buttons["agent-menu"], 6) // Paired closes itself and lands on the agent screen.
+        allowAlerts()
         return s
     }
 
@@ -144,6 +152,7 @@ final class FlowTests: XCTestCase {
         app.buttons["pair-button"].tap()
         wait(app.staticTexts["Paired"], 8)
         wait(app.buttons["agent-menu"], 6)
+        allowAlerts()
         let status = try agent.status()
         XCTAssertEqual(status["status"] as? String, "active")
         XCTAssertEqual(status["lifetime"] as? String, "7d")
@@ -165,6 +174,7 @@ final class FlowTests: XCTestCase {
         app.buttons["Close"].firstMatch.tap()
         let row = app.buttons["agent-Claude Code · numbered"]
         wait(row, 10)
+        allowAlerts()
         XCTAssertFalse(app.staticTexts["status-line"].exists, "no status pill while the server is reachable")
         shot("61-agents-numbered")
 
@@ -339,6 +349,7 @@ final class FlowTests: XCTestCase {
         enter(s.names)
         app.buttons["pair-button"].tap()
         wait(app.buttons["agent-menu"], 8)
+        allowAlerts()
         let ends = AgentHarness.date(try agent.status()["endsAt"] as! String)
         XCTAssertLessThan(ends.timeIntervalSinceNow, 60)
         wait(app.staticTexts["This pager has ended"], ends.timeIntervalSinceNow + 10)

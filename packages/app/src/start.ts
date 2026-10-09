@@ -70,7 +70,7 @@ Each read holds up to \`wait\` seconds (at most ${ANSWER_WAIT_MAX_SECONDS}; with
 
 \`choice\` is \`{"kind":"option","number":n}\`, or \`{"kind":"feedback","text":"…"}\` when your owner wrote a note instead of choosing an option: follow the note, and ask a new card only if you still need a decision.
 
-Keep reading while you have nothing better to do. Your owner answers from their phone and can't wake you, so before your turn ends:
+Stay in your turn and keep reading until the answer comes: your owner answers from their phone, and nothing can wake you once your turn has ended. Only if your turn must end anyway:
 - if you can run a command in the background and be woken when it finishes, keep the read going there;
 - otherwise tell your owner, in your last message, to send you a message once they have answered.
 
@@ -102,11 +102,12 @@ Every refusal is \`{"error":"<Tag>","message":"...", ...}\`. \`InvalidInput\` ad
 | --- | --- |
 ${errors()}
 
-## MCP setup (an owner step)
+## Owner setup (optional)
 
-- Claude Code: \`claude mcp add --transport http agentpager "${origin}/mcp"\`
-- Codex: \`codex mcp add agentpager --url "${origin}/mcp"\`
+- Claude Code MCP: \`claude mcp add --transport http agentpager "${origin}/mcp"\`
+- Codex MCP: \`codex mcp add agentpager --url "${origin}/mcp"\`
 - Any other MCP client: \`${origin}/mcp\`, streamable HTTP, no login.
+- Codex over HTTP: its sandbox blocks the network by default, so every request waits for your approval in the terminal. To page you while you are away, start it with \`codex -c sandbox_workspace_write.network_access=true\`, or set that in its config.
 
 If you have no AgentPager tools for this server, use the HTTP API; do not wait for your owner to add them.
 `;

@@ -102,6 +102,8 @@ final class DriverTests: XCTestCase {
                 center.press(forDuration: 0.05, thenDragTo: center.withOffset(CGVector(dx: dx, dy: dy)))
             default: break
             }
+            // Let the app apply the change, so a tap straight after (Send after choosing) sees it.
+            RunLoop.current.run(until: Date().addingTimeInterval(0.3))
             return ["ok": true, "label": s.label, "id": s.identifier, "enabled": s.isEnabled]
         case "gone":
             guard let el = find(cmd) else { return ["ok": false, "error": "give id, label or contains"] }

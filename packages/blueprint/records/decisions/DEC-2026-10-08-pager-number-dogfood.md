@@ -15,6 +15,6 @@ Sam wants to dogfood with many agents without showing each one a link and tappin
 - An agent opens a pager with `POST /api/numbers/<number>/pagers` or the MCP tool `page_owner`, then asks, waits and acknowledges as on any pager. The phone lists the pager already paired.
 - The service stores numbers only as digests, as it does keys and link codes.
 
-This breaks SI2 and I16 on purpose. Anyone who has the number and can reach the server can open a pager on the phone and put cards on it, though not read other pagers or answer cards. Sam accepts that for himself: the number sits only where agents he trusts read it. SI2 and I16 are unchanged, and MAPP says when pager numbers must be removed or promised.
+This breaks SI2 and I16 on purpose. Anyone who has the number and can reach the server can open a pager on the phone and put cards on it, though not read other pagers or answer cards. Sam accepted that for himself: the number sits only where agents he trusts read it. SI2 and I16 are unchanged.
 
 PR #2 also names an idea it did not build: several numbers at once, one per trust level, as a premium feature.

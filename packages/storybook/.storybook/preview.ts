@@ -16,7 +16,7 @@ export default {
     const expected=viewport==='phone'?390:viewport==='desktop'?1280:undefined;
     if(expected!==undefined && window.innerWidth!==expected)throw new Error(`Expected ${expected}px viewport, got ${window.innerWidth}px`);
   },
-  parameters:{options:{storySort:{order:['v1',['Front page','Start','Claim','Home','Session',['States','Journeys']]]}},layout:'fullscreen',a11y:{test:'error'},viewport:{options:{
+  parameters:{options:{storySort:{order:['iPhone',['Canvas','Agents','Settings','Connect an Agent','Around the app','Pairing','Agent','Decision','After you answer'],'v1',['Front page','Start','Claim','Home','Session',['States','Journeys']]]}},layout:'fullscreen',a11y:{test:'error'},viewport:{options:{
     phone:{name:'Phone',styles:{width:'390px',height:'844px'}},
     desktop:{name:'Desktop',styles:{width:'1280px',height:'900px'}},
   }}},

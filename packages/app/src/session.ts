@@ -25,7 +25,8 @@ type Meta = typeof Meta.Type;
 const Tombstone = Schema.Struct({ sessionId: C.Token, name: Schema.NullOr(C.SessionName), endReason: C.EndReason, endedAt: C.Timestamp, agentHash: Schema.NullOr(Digest), phoneHash: Schema.NullOr(Digest) });
 type Tombstone = typeof Tombstone.Type;
 const Init = Schema.Struct({ sessionId: C.Token, code: C.Token, origin: Schema.String, by: Schema.Literal('agent', 'phone'), name: Schema.NullOr(C.SessionName), lifetime: C.Lifetime });
-const Open = Schema.Struct({ sessionId: C.Token, phoneHash: Digest, name: C.SessionName, lifetime: C.Lifetime, push: Schema.NullOr(PushTarget) });
+// `push` is optional: a Worker from before alerts may open the pager during a deploy (see worker.ts).
+const Open = Schema.Struct({ sessionId: C.Token, phoneHash: Digest, name: C.SessionName, lifetime: C.Lifetime, push: Schema.optional(Schema.NullOr(PushTarget)) });
 
 const randomIndex = (n: number) => { // Rejection sampling: no modulo bias in the palette or the code.
   const ceiling = Math.floor(0x100000000 / n) * n;
@@ -202,7 +203,7 @@ export class Session {
     if (action === 'open') {
       const input = decode(Open, await body(request));
       const agentKey = token(), now = Date.now();
-      const m: Meta = { sessionId: input.sessionId, name: input.name, status: 'active', lifetime: input.lifetime, createdAt: iso(now), pairedAt: iso(now), endsAt: iso(now + lifetimes.lifetimeMs(input.lifetime)), windowEndsAt: iso(now), triesLeft: C.PAIRING_TRIES, lastActivityAt: iso(now), agentHash: await sha256(agentKey), phoneHash: input.phoneHash, codeHash: null, palette: [], code: null, push: input.push };
+      const m: Meta = { sessionId: input.sessionId, name: input.name, status: 'active', lifetime: input.lifetime, createdAt: iso(now), pairedAt: iso(now), endsAt: iso(now + lifetimes.lifetimeMs(input.lifetime)), windowEndsAt: iso(now), triesLeft: C.PAIRING_TRIES, lastActivityAt: iso(now), agentHash: await sha256(agentKey), phoneHash: input.phoneHash, codeHash: null, palette: [], code: null, push: input.push ?? null };
       this.tx(() => { if (this.row('pager') || this.row('tombstone')) throw C.refuse.invalid('This pager already exists.'); this.save(m); });
       return json(decode(C.Paged, { session: this.summary(m), agentKey }));
     }

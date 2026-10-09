@@ -44,3 +44,4 @@ A pager lasts 24 hours from pairing unless I chose 7 or 30 days. I can change th
 - Answering from the Lock Screen, and Live Activities.
 - Android, the web app, accounts, Pro, and product cards. Every card is `generic` ([DEC-2026-10-02-generic-cards-first](../../records/decisions/DEC-2026-10-02-generic-cards-first.md)).
 - Carrying out approved actions: the owner's agent does that.
+- Pager numbers. The dogfood build has them as Sam's exception to SI2 and I16 ([DEC-2026-10-08-pager-number-dogfood](../../records/decisions/DEC-2026-10-08-pager-number-dogfood.md)). MAPP closes only once they are removed or promised.

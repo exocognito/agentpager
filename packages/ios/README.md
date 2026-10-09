@@ -7,7 +7,8 @@ SwiftUI app, iOS 26.0+, bundle id `me.agentpager.app.dev`. The Xcode project is 
 
 1. Start the server on your Mac (see `../app`): `pnpm --filter @agentpager/app dogfood` from `toy-examples/agentpager`.
 2. `open AgentPager.xcodeproj`
-3. Select the **AgentPager** target, then **Signing & Capabilities**, and set **Team** to your Personal Team.
+3. Select the **AgentPager** target, then **Signing & Capabilities**, and check **Team** is your Apple developer team
+   (X3M532E87A). The first build registers push and time-sensitive alerts for `me.agentpager.app.dev`.
 4. Pick your iPhone as the run destination and press **Run**.
 5. The first time, trust the developer on the phone: **Settings → General → VPN & Device Management**, then Run again.
 6. Allow **Local Network** when the app asks.
@@ -23,8 +24,21 @@ server address.
 Settings (the gear) shows this phone's pager number. **Copy for Your Agents** copies a line for your AGENTS.md; any
 agent that reads it opens its own pager on this phone, already paired, with MCP `page_owner` or
 `POST /api/numbers/<number>/pagers`. **Change Pager Number** retires the old number at once; pagers already open keep
-working. This is a dogfood exception to emoji pairing (SI2): anyone who has the number and can reach the server can
-put cards on this phone.
+working. Anyone who has the number and can reach the server can put cards on this phone (C25).
+
+## Alerts
+
+When an agent asks, the phone alerts with the agent's name and the question, even with the app closed; tapping the
+alert opens that decision (C17). The app asks to send alerts once the first pager is paired, and gives its device token
+to each pager and to its pager number. Only the deployed server (`https://agentpager.me`) sends alerts: a server on
+the Mac cannot reach Apple's push service. Builds from Xcode use Apple's sandbox service.
+
+In the Simulator, deliver an alert by hand with a payload like the server's (`aps`, plus `kind`, `sessionId` and
+`decisionId`):
+
+```sh
+xcrun simctl push booted me.agentpager.app.dev alert.apns
+```
 
 ## Tests
 

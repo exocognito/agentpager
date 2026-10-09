@@ -1,6 +1,7 @@
 import SwiftUI
 import Observation
 import UIKit
+import UserNotifications
 
 enum Route: Hashable { case agent(String) }
 
@@ -75,6 +76,16 @@ final class AppModel {
     var numberError: String?
     var numberBusy = false
     private var autoPaired: Set<String> = []
+    // Alerts (Alerts.swift). Debug builds from Xcode are signed for Apple's sandbox service.
+    var deviceToken: String? { didSet { if deviceToken != oldValue { Task { await givePushToken() } } } }
+    private var pushGiven: Set<String> = []
+    private var askedForAlerts = false
+    private var badge: Int?
+    #if DEBUG
+    static let pushEnvironment = "sandbox"
+    #else
+    static let pushEnvironment = "production"
+    #endif
     var demoFlow: PairingFlow?
     let live: Bool
     // Debug only: `-failSends N` makes the next N answer attempts fail as if the network dropped,
@@ -178,6 +189,9 @@ final class AppModel {
             }
         }
         if failed == nil { lastSuccess = now; if lastFailure != nil { lastFailure = nil } } else { lastFailure = failed }
+        await askForAlertsOnce()
+        await givePushToken()
+        await showWaitingOnIcon()
     }
 
     // Pagers agents opened with the pager number join the list in the same poll. Returns a failure description.
@@ -234,6 +248,52 @@ final class AppModel {
             if case .transport(let text) = error { return text }
             return error.tag
         }
+    }
+
+    // MARK: Alerts
+
+    // Asked once, when the first pager is paired.
+    private func askForAlertsOnce() async {
+        guard !askedForAlerts, active.contains(where: { $0.status == .active }) else { return }
+        askedForAlerts = true
+        let center = UNUserNotificationCenter.current()
+        guard await center.notificationSettings().authorizationStatus == .notDetermined else { return }
+        _ = try? await center.requestAuthorization(options: [.alert, .sound, .badge])
+    }
+
+    // Gives the device token to the pager number and to each pager not yet given it. A request that does not reach
+    // the server is tried again on the next refresh; one the server refuses is not.
+    func givePushToken() async {
+        guard live, let token = deviceToken else { return }
+        let client = self.client, environment = Self.pushEnvironment
+        if let n = pagerNumber, n.server == server.absoluteString, pushGiven.insert("number \(n.phoneKey) \(token)").inserted {
+            do throws(APIError) { try await client.numberPush(phoneKey: n.phoneKey, token: token, environment: environment) } catch {
+                if error.isTransport { pushGiven.remove("number \(n.phoneKey) \(token)") }
+            }
+        }
+        for key in myKeys where inboxes[key.sessionId]?.session.status != .ended {
+            guard pushGiven.insert("\(key.sessionId) \(token)").inserted else { continue }
+            do throws(APIError) { try await client.push(key, token: token, environment: environment) } catch {
+                if error.isTransport { pushGiven.remove("\(key.sessionId) \(token)") }
+            }
+        }
+    }
+
+    // The app icon shows how many decisions are waiting on paired pagers.
+    private func showWaitingOnIcon() async {
+        let waiting = myKeys.compactMap { inboxes[$0.sessionId] }.filter { $0.session.status == .active }.reduce(0) { $0 + $1.open.count }
+        guard waiting != badge else { return }
+        badge = waiting
+        try? await UNUserNotificationCenter.current().setBadgeCount(waiting)
+    }
+
+    // Tapping an alert opens its decision: the decision sheet while it is open, its thread once answered.
+    func openAlert(sessionId: String, decisionId: String) async {
+        await refreshAll()
+        guard key(sessionId) != nil else { return }
+        path = [.agent(sessionId)]
+        guard let d = decision(sessionId, decisionId) else { return }
+        sheet = d.answer == nil ? .decision(sessionId: sessionId, decisionId: decisionId) : .thread(sessionId: sessionId, decisionId: decisionId)
     }
 
     func drop(_ sessionId: String) {

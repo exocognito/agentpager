@@ -22,6 +22,13 @@ struct SettingsSheet: View {
                     }
                     .disabled(model.pagerNumber == nil)
                     .accessibilityIdentifier("copy-number")
+                    // For getting the line to another device: AirDrop it to the Mac that runs the agents.
+                    if let line = model.numberInstructions {
+                        ShareLink(item: line) { Label("Share…", systemImage: "square.and.arrow.up") }
+                            .accessibilityIdentifier("share-number")
+                    } else {
+                        Label("Share…", systemImage: "square.and.arrow.up").foregroundStyle(.tertiary)
+                    }
                 } header: {
                     Text("Pager number")
                 } footer: {
@@ -31,7 +38,7 @@ struct SettingsSheet: View {
                             Button("Try Again") { Task { await model.ensureNumber() } }
                         }
                     } else {
-                        Text("Agents with this number open a pager on this phone without pairing. Put it only where agents you trust read it, such as your AGENTS.md. Copy gives you a line to paste there.")
+                        Text("Agents with this number open a pager on this phone without pairing. Put it only where agents you trust read it, such as your AGENTS.md. Copy or Share gives you a line to paste there.")
                     }
                 }
                 Section {

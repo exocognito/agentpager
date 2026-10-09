@@ -1,6 +1,10 @@
 import type { DurableObjectNamespace, Fetcher } from '@cloudflare/workers-types';
 import { LIFETIMES, PAIRING_WINDOW_MS, RETENTION_MS, type Lifetime } from './contract.ts';
-export interface Env { SESSION: DurableObjectNamespace; REGISTRY: DurableObjectNamespace; ASSETS: Fetcher }
+// The APNS_ values are set only where alerts go out (see push.ts); APNS_ORIGIN points tests at a stand-in for Apple.
+export interface Env {
+  SESSION: DurableObjectNamespace; REGISTRY: DurableObjectNamespace; ASSETS: Fetcher;
+  APNS_KEY_P8?: string; APNS_KEY_ID?: string; APNS_TEAM_ID?: string; APNS_TOPIC?: string; APNS_ORIGIN?: string;
+}
 declare const __LOCAL_UNPAIRED_MS__: number;
 declare const __LOCAL_SESSION_MS__: number;
 declare const __LOCAL_RETAIN_MS__: number;

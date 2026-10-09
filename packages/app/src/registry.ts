@@ -1,7 +1,9 @@
 import type { DurableObjectState } from '@cloudflare/workers-types';
 import { Schema } from 'effect';
 import { Token, Timestamp } from './contract.ts';
+import { Refusal } from './contract.ts';
 import { body, decode, json, refusal } from './shared.ts';
+import { PushTarget } from './push.ts';
 import type { Env } from './env.ts';
 
 const Digest = Schema.String.pipe(Schema.pattern(/^[a-f0-9]{64}$/));
@@ -10,9 +12,11 @@ const Key = Schema.Struct({ codeHash: Digest });
 const NumberPut = Schema.Struct({ numberHash: Digest, phoneHash: Digest });
 const NumberPage = Schema.Struct({ numberHash: Digest, sessionId: Token, expiresAt: Timestamp });
 const PhoneKey = Schema.Struct({ phoneHash: Digest });
+const NumberPush = Schema.Struct({ phoneHash: Digest, push: PushTarget });
 
 // Maps a link code's SHA-256 to its pager for the pairing window only. The plain code is never stored.
-// Also keeps each phone key's one pager number (dogfood), and the pagers agents opened with it, as digests.
+// Also keeps each phone key's one pager number and the pagers agents opened with it, as digests, and where that
+// phone gets alerts, which each pager opened with the number starts with.
 export class Registry {
   constructor(private ctx: DurableObjectState, private env: Env) {
     void this.env;
@@ -20,7 +24,8 @@ export class Registry {
     ctx.storage.sql.exec(`DROP TABLE IF EXISTS ap_links_v1; DROP TABLE IF EXISTS ap_connects_v1;
       CREATE TABLE IF NOT EXISTS links_v2 (code_hash TEXT PRIMARY KEY, session_id TEXT NOT NULL, expires_at INTEGER NOT NULL);
       CREATE TABLE IF NOT EXISTS numbers_v1 (phone_hash TEXT PRIMARY KEY, number_hash TEXT NOT NULL UNIQUE);
-      CREATE TABLE IF NOT EXISTS number_pagers_v1 (phone_hash TEXT NOT NULL, session_id TEXT NOT NULL, expires_at INTEGER NOT NULL, PRIMARY KEY (phone_hash, session_id));`);
+      CREATE TABLE IF NOT EXISTS number_pagers_v1 (phone_hash TEXT NOT NULL, session_id TEXT NOT NULL, expires_at INTEGER NOT NULL, PRIMARY KEY (phone_hash, session_id));
+      CREATE TABLE IF NOT EXISTS number_push_v1 (phone_hash TEXT PRIMARY KEY, json TEXT NOT NULL);`);
   }
   async fetch(request: Request): Promise<Response> {
     try {
@@ -37,8 +42,17 @@ export class Registry {
       if (action === 'number-page') {
         const p = decode(NumberPage, data);
         const row = this.ctx.storage.sql.exec<{ phone_hash: string }>('SELECT phone_hash FROM numbers_v1 WHERE number_hash=?', p.numberHash).toArray()[0];
-        if (row) this.ctx.storage.sql.exec('INSERT INTO number_pagers_v1 VALUES (?, ?, ?)', row.phone_hash, p.sessionId, Date.parse(p.expiresAt));
-        return json({ phoneHash: row ? row.phone_hash : null });
+        if (!row) return json({ phoneHash: null, push: null });
+        this.ctx.storage.sql.exec('INSERT INTO number_pagers_v1 VALUES (?, ?, ?)', row.phone_hash, p.sessionId, Date.parse(p.expiresAt));
+        const push = this.ctx.storage.sql.exec<{ json: string }>('SELECT json FROM number_push_v1 WHERE phone_hash=?', row.phone_hash).toArray()[0];
+        return json({ phoneHash: row.phone_hash, push: push ? decode(PushTarget, JSON.parse(push.json)) : null });
+      }
+      // Only a phone key that holds a number keeps a token here.
+      if (action === 'number-push') {
+        const p = decode(NumberPush, data);
+        if (!this.ctx.storage.sql.exec('SELECT 1 FROM numbers_v1 WHERE phone_hash=?', p.phoneHash).toArray().length) throw new Refusal('Unauthorized', 'This phone key has no pager number.');
+        this.ctx.storage.sql.exec('INSERT OR REPLACE INTO number_push_v1 VALUES (?, ?)', p.phoneHash, JSON.stringify(p.push));
+        return json({ ok: true });
       }
       // Listed by phone key, not number, so a pager opened just before a change of number still reaches the phone.
       if (action === 'number-list') {

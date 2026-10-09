@@ -2,7 +2,7 @@
 id: D6::iphone-app
 statement: The owner's side runs as a native SwiftUI app on an iPhone.
 providedBy: owner
-provided: Xcode and the iOS Simulator on the owner's Mac, which build and run the app; and, for the walk, the owner's iPhone in Developer Mode over USB, signed with the owner's Apple developer team (D7::apple-developer-program). The owner signs; no role creates or uses an Apple credential.
+provided: Xcode and the iOS Simulator on the owner's Mac, which build and run the app; and, for the walk, the owner's iPhone in Developer Mode over USB, signed with the owner's Apple developer team (D7::apple-developer-program). The owner signs; no role creates or uses an Apple signing credential.
 caveats:
   - One simulated iPhone stands for every iPhone. The loop samples no real handset; the owner's iPhone is sampled at the walk.
 ---

@@ -285,13 +285,14 @@ final class AppModel {
         let phoneKey = old?.phoneKey ?? randomToken(), base = server.absoluteString
         do throws(APIError) {
             let made = try await client.makeNumber(phoneKey: phoneKey)
-            guard server.absoluteString == base else { return }
-            let seen = pagerNumber.flatMap { $0.phoneKey == phoneKey ? $0.seen : nil } ?? []
+            // The server has retired the old number, so keep the new one for `base` even if the owner switched
+            // servers meanwhile; show it only if `base` is still current.
+            let seen = Keychain.number(server: base).flatMap { $0.phoneKey == phoneKey ? $0.seen : nil } ?? []
             let n = PagerNumber(server: base, phoneKey: phoneKey, number: made.number, seen: seen)
             Keychain.save(n)
-            pagerNumber = n
+            if server.absoluteString == base { pagerNumber = n }
         } catch {
-            numberError = "Can’t reach your AgentPager server at \(server.absoluteString)."
+            if server.absoluteString == base { numberError = "Can’t reach your AgentPager server at \(base)." }
         }
     }
 

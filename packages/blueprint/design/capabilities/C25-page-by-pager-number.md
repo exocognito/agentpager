@@ -6,8 +6,11 @@ serves:
   - SP5
 statement: Give agents you trust your pager number, and each opens its own pager on your phone, already paired, with no link to show and no code to tap.
 caveats:
+  - Dogfooding: subject to change or removal (DEC-2026-10-08-pager-numbers).
   - Numbers carry the Token schema's 192 random bits. Resistance to guessing holds by construction, not by an attack.
 ---
+
+**Dogfooding. Subject to change or removal.**
 
 ## Behaviors
 

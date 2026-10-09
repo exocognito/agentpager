@@ -16,9 +16,9 @@ caveats:
 - storage holds no cards, answers, acknowledgements or link, even after the service restarts;
 - the link registry forgets the link, and the pager clears its copy; both also happen when the pairing window closes, whether or not the pager paired.
 
-**After 7 days.** The service forgets the pager entirely, and the phone drops its row.
+**After 7 days.** The service forgets the pager entirely. Dogfooding, subject to change: the phone drops the row, and its own read-only copy of the decisions, 24 hours after the end (DEC-2026-10-08-ended-pagers-readable).
 
 **Breaking this looks like:**
 - activity keeping a pager alive;
 - an ended pager that still accepts calls;
-- a card that can still be read after its pager ended.
+- a card the service can still serve after its pager ended.

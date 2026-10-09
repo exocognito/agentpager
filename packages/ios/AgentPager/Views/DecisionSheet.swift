@@ -44,11 +44,9 @@ struct DecisionSheet: View {
 
     private func choose(_ d: Decision) -> some View {
         List {
-            Section {
-                DecisionHeader(decision: d)
-            }
-            .listRowBackground(Color.clear)
-            .listRowInsets(EdgeInsets(top: 0, leading: 4, bottom: 0, trailing: 4))
+            // A section header, not a clear row: insetGrouped rows clip to their rounded shape and shave the
+            // glyphs at the corners.
+            Section {} header: { DecisionHeader(decision: d) }
             Section("Choose one") {
                 ForEach(d.card.options, id: \.number) { o in
                     Button { selection = o.number } label: {
@@ -97,10 +95,12 @@ struct DecisionHeader: View {
     var decision: Decision
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(decision.title).font(.title2.bold())
-            if let detail = decision.detail { Text(detail).font(.body).foregroundStyle(.secondary) }
+            // Explicit label colours: a section header dims the hierarchical .primary and .secondary styles.
+            Text(decision.title).font(.title2.bold()).foregroundStyle(Color(.label))
+            if let detail = decision.detail { Text(detail).font(.body).foregroundStyle(Color(.secondaryLabel)) }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .textCase(nil)
     }
 }
 
@@ -188,24 +188,21 @@ struct ThreadContent: View {
 
     var body: some View {
         List {
-            Section { DecisionHeader(decision: decision) }
-                .listRowBackground(Color.clear)
-                .listRowInsets(EdgeInsets(top: 0, leading: 4, bottom: 0, trailing: 4))
+            Section {} header: { DecisionHeader(decision: decision) }
             if let row {
-                Section {
+                Section {} header: {
                     VStack(spacing: 10) {
                         Bubble(text: answerText(row), mine: true, caption: "You · " + Wording.time(decision.answer?.sentAt ?? model.now))
                         if let ack = decision.acknowledgement {
                             Bubble(text: ack.nextSteps, mine: false, caption: "Your agent confirmed · " + Wording.time(ack.acknowledgedAt))
                         } else {
                             SendStatusLine(row: row)
-                            .font(.subheadline).foregroundStyle(.secondary)
+                            .font(.subheadline).foregroundStyle(Color(.secondaryLabel))
                             .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
+                    .textCase(nil)
                 }
-                .listRowBackground(Color.clear)
-                .listRowInsets(EdgeInsets(top: 4, leading: 4, bottom: 4, trailing: 4))
             }
             Section("Options") {
                 ForEach(decision.card.options, id: \.number) { o in
@@ -240,10 +237,11 @@ struct Bubble: View {
     var body: some View {
         VStack(alignment: mine ? .trailing : .leading, spacing: 4) {
             Text(text)
+                .font(.body)
                 .padding(.horizontal, 14).padding(.vertical, 9)
-                .foregroundStyle(mine ? Color.white : Color.primary)
+                .foregroundStyle(mine ? Color.white : Color(.label))
                 .background(mine ? Color.accentColor : Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 18))
-            Text(caption).font(.caption).foregroundStyle(.secondary).padding(.horizontal, 6)
+            Text(caption).font(.caption).foregroundStyle(Color(.secondaryLabel)).padding(.horizontal, 6)
         }
         .frame(maxWidth: .infinity, alignment: mine ? .trailing : .leading)
         .padding(mine ? .leading : .trailing, 48)

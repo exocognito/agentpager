@@ -6,7 +6,7 @@ struct AgentPagerApp: App {
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
-        if ProcessInfo.processInfo.arguments.contains("-resetKeys") { Keychain.deleteAll() }
+        if ProcessInfo.processInfo.arguments.contains("-resetKeys") { Keychain.deleteAll(); InboxCache.deleteAll() }
     }
 
     var body: some Scene {

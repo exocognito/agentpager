@@ -11,4 +11,4 @@ Must supply: Apple's push service (APNs), associated domains for agentpager.me, 
 
 Must never do: let the APNs key reach the app bundle, the worktree, a log or a transcript.
 
-Proof runs on: a TestFlight build on the owner's iPhone, with production APNs.
+Proof runs on: the owner's iPhone. In MAPP, a build from Xcode with Apple's sandbox push service; from MSHIP, also a TestFlight build with the production service.

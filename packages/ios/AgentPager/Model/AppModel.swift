@@ -84,7 +84,13 @@ final class AppModel {
     init(live: Bool = true) {
         self.live = live
         self.server = Self.configuredServer()
-        if live { keys = Keychain.all(); pagerNumber = Keychain.number(server: server.absoluteString); inboxes = InboxCache.load() }
+        if live {
+            // Here, not in the App's init: its @State model is built before that init's body runs.
+            if ProcessInfo.processInfo.arguments.contains("-resetKeys") { Keychain.deleteAll(); InboxCache.deleteAll() }
+            keys = Keychain.all()
+            pagerNumber = Keychain.number(server: server.absoluteString)
+            inboxes = InboxCache.load()
+        }
     }
 
     static func configuredServer() -> URL {
@@ -380,7 +386,9 @@ final class AppModel {
         if undo?.sessionId == sessionId { undo = nil }
         do throws(APIError) {
             let env = try await client.end(key)
-            inboxes[sessionId] = Inbox(session: env.session, open: [], answered: [])
+            // The reply carries only the ended session; keep the phone's copy of the decisions (see InboxCache).
+            let last = inboxes[sessionId]
+            inboxes[sessionId] = Inbox(session: env.session, open: last?.open ?? [], answered: last?.answered ?? [])
             path = []
         } catch {
             await refresh(sessionId)

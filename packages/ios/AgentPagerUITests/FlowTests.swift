@@ -321,6 +321,7 @@ final class FlowTests: XCTestCase {
         app.buttons["agent-Claude · trip planner"].tap()
         wait(app.staticTexts["This pager has ended"])
         XCTAssertEqual(app.staticTexts["end-reason"].label, "You ended it.")
+        wait(app.buttons["answered-Dinner on Friday?"], 5) // the phone keeps its copy when the owner ends it, too
         shot("48-ended-by-you")
     }
 

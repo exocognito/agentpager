@@ -22,6 +22,7 @@ type Meta = typeof Meta.Type;
 const Tombstone = Schema.Struct({ sessionId: C.Token, name: Schema.NullOr(C.SessionName), endReason: C.EndReason, endedAt: C.Timestamp, agentHash: Schema.NullOr(Digest), phoneHash: Schema.NullOr(Digest) });
 type Tombstone = typeof Tombstone.Type;
 const Init = Schema.Struct({ sessionId: C.Token, code: C.Token, origin: Schema.String, by: Schema.Literal('agent', 'phone'), name: Schema.NullOr(C.SessionName), lifetime: C.Lifetime });
+const Open = Schema.Struct({ sessionId: C.Token, phoneHash: Digest, name: C.SessionName, lifetime: C.Lifetime });
 
 const randomIndex = (n: number) => { // Rejection sampling: no modulo bias in the palette or the code.
   const ceiling = Math.floor(0x100000000 / n) * n;
@@ -183,6 +184,15 @@ export class Session {
       const code = this.pairingCode(m);
       if (agentKey && code) return json(decode(C.Created, { session: this.summary(m), agentKey, link, pairingCode: code }));
       return json(decode(C.PhoneCreated, { session: this.summary(m), link }));
+    }
+    // A pager opened with the owner's pager number is paired from the start: the number stands in for the code,
+    // so there is no link, palette or pairing window.
+    if (action === 'open') {
+      const input = decode(Open, await body(request));
+      const agentKey = token(), now = Date.now();
+      const m: Meta = { sessionId: input.sessionId, name: input.name, status: 'active', lifetime: input.lifetime, createdAt: iso(now), pairedAt: iso(now), endsAt: iso(now + lifetimes.lifetimeMs(input.lifetime)), windowEndsAt: iso(now), triesLeft: C.PAIRING_TRIES, lastActivityAt: iso(now), agentHash: await sha256(agentKey), phoneHash: input.phoneHash, codeHash: null, palette: [], code: null };
+      this.tx(() => { if (this.row('pager') || this.row('tombstone')) throw C.refuse.invalid('This pager already exists.'); this.save(m); });
+      return json(decode(C.Paged, { session: this.summary(m), agentKey }));
     }
     if (action === 'start') {
       const m = this.tx(() => this.linked());

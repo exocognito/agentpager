@@ -16,7 +16,7 @@ enum ActiveSheet: Identifiable, Hashable {
     case pairing(PairingTarget)
     case decision(sessionId: String, decisionId: String)
     case thread(sessionId: String, decisionId: String)
-    case server
+    case settings
 
     var id: String {
         switch self {
@@ -24,7 +24,7 @@ enum ActiveSheet: Identifiable, Hashable {
         case .pairing(let t): "pairing-\(t.code)"
         case .decision(_, let d): "decision-\(d)"
         case .thread(_, let d): "thread-\(d)"
-        case .server: "server"
+        case .settings: "settings"
         }
     }
 }
@@ -70,6 +70,9 @@ final class AppModel {
     var drafts: [String: Choice] = [:]
     var connectError: String?
     var connectBusy = false
+    var pagerNumber: PagerNumber?
+    var numberError: String?
+    var numberBusy = false
     private var autoPaired: Set<String> = []
     var demoFlow: PairingFlow?
     let live: Bool
@@ -80,7 +83,7 @@ final class AppModel {
     init(live: Bool = true) {
         self.live = live
         self.server = Self.configuredServer()
-        if live { keys = Keychain.all() }
+        if live { keys = Keychain.all(); pagerNumber = Keychain.number(server: server.absoluteString) }
     }
 
     static func configuredServer() -> URL {
@@ -97,6 +100,8 @@ final class AppModel {
         guard let url = URL(string: trimmed), let scheme = url.scheme, ["http", "https"].contains(scheme), url.host() != nil else { return false }
         UserDefaults.standard.set(trimmed, forKey: "AgentPagerServerURL")
         server = url
+        pagerNumber = Keychain.number(server: url.absoluteString)
+        numberError = nil
         inboxes = [:]
         lastSuccess = nil
         lastFailure = nil
@@ -139,6 +144,7 @@ final class AppModel {
     func refreshAll() async {
         now = Date()
         guard live else { return }
+        let numberFailure = await takeNumberPagers()
         let stored = Keychain.all()
         if stored != keys { keys = stored }
         let client = self.client
@@ -153,10 +159,31 @@ final class AppModel {
             for await r in group { all.append(r) }
             return all
         }
-        var failed: String?
+        var failed = numberFailure
         for (key, result) in results { if let f = apply(key, result) { failed = f } }
         now = Date()
         if failed == nil { lastSuccess = now; if lastFailure != nil { lastFailure = nil } } else { lastFailure = failed }
+    }
+
+    // Pagers agents opened with the pager number join the list in the same poll. Returns a failure description.
+    private func takeNumberPagers() async -> String? {
+        guard let phoneKey = pagerNumber?.phoneKey else { return nil }
+        let listed: NumberPagers
+        do throws(APIError) { listed = try await client.numberPagers(phoneKey: phoneKey) } catch {
+            if case .transport(let text) = error { return text }
+            return error.tag
+        }
+        // Re-read after the request: the number may have changed meanwhile, and that change must not be undone.
+        guard var n = pagerNumber, n.phoneKey == phoneKey else { return nil }
+        let fresh = listed.sessionIds.filter { !n.seen.contains($0) }
+        guard !fresh.isEmpty else { return nil }
+        for id in fresh where key(id) == nil {
+            Keychain.save(PagerKey(sessionId: id, phoneKey: n.phoneKey, server: n.server, madeByPhone: false, linkCode: nil, linkURL: nil, createdAt: Date()))
+        }
+        n.seen += fresh
+        Keychain.save(n)
+        pagerNumber = n
+        return nil
     }
 
     func refresh(_ sessionId: String) async {
@@ -229,6 +256,44 @@ final class AppModel {
     func setConnectLifetime(_ lifetime: Lifetime) async {
         guard let key = connectKey else { return }
         await setLifetime(key.sessionId, lifetime)
+    }
+
+    // MARK: Pager number
+
+    // What the owner pastes into AGENTS.md.
+    var numberInstructions: String? {
+        guard let n = pagerNumber else { return nil }
+        return "When you need a decision from me, page me on AgentPager: read \(server.appending(path: "start").absoluteString), then open a pager with my pager number \(n.number). Open one pager for your piece of work and keep it for every question."
+    }
+
+    func ensureNumber() async {
+        guard live, pagerNumber == nil, !numberBusy else { return }
+        await makeNumber(replacing: nil)
+    }
+
+    // The old number stops working at once. The phone key stays, so pagers already open keep working and the
+    // server's listing carries over.
+    func rotateNumber() async {
+        guard live, let n = pagerNumber, !numberBusy else { return }
+        await makeNumber(replacing: n)
+    }
+
+    private func makeNumber(replacing old: PagerNumber?) async {
+        numberBusy = true
+        numberError = nil
+        defer { numberBusy = false }
+        let phoneKey = old?.phoneKey ?? randomToken(), base = server.absoluteString
+        do throws(APIError) {
+            let made = try await client.makeNumber(phoneKey: phoneKey)
+            // The server has retired the old number, so keep the new one for `base` even if the owner switched
+            // servers meanwhile; show it only if `base` is still current.
+            let seen = Keychain.number(server: base).flatMap { $0.phoneKey == phoneKey ? $0.seen : nil } ?? []
+            let n = PagerNumber(server: base, phoneKey: phoneKey, number: made.number, seen: seen)
+            Keychain.save(n)
+            if server.absoluteString == base { pagerNumber = n }
+        } catch {
+            if server.absoluteString == base { numberError = "Can’t reach your AgentPager server at \(base)." }
+        }
     }
 
     // MARK: Pairing

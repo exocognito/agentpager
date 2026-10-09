@@ -15,7 +15,16 @@ SwiftUI app, iOS 26.0+, bundle id `me.agentpager.app.dev`. The Xcode project is 
 ## Server address
 
 The default is the build setting `AGENTPAGER_SERVER_URL` in `project.yml` (the Mac's LAN address). To change it
-without rebuilding, tap the server button at the top left of Agents. Pagers are kept per server address.
+without rebuilding, tap the gear at the top right of Agents, then Server. Pagers and the pager number are kept per
+server address.
+
+## Pager number
+
+Settings (the gear) shows this phone's pager number. **Copy for Your Agents** copies a line for your AGENTS.md; any
+agent that reads it opens its own pager on this phone, already paired, with MCP `page_owner` or
+`POST /api/numbers/<number>/pagers`. **Change Pager Number** retires the old number at once; pagers already open keep
+working. This is a dogfood exception to emoji pairing (SI2): anyone who has the number and can reach the server can
+put cards on this phone.
 
 ## Tests
 

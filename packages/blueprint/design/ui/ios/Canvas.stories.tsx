@@ -37,12 +37,12 @@ const ROWS = [
     ...pick(connect, ConnectStories, ["LinkReady", "LifetimeMenu", "Copied", "MakingLink", "CantMakeLink"]),
     ...pick(around, AroundStories, ["LinkPageStory", "AgentShowsCode"]),
   ]],
-  ["3 · Pairing", pick(pairing, PairingStories, ["Start", "PhoneMadeLink", "TwoEntered", "Ready", "Checking", "Wrong", "LastTry", "CouldntReachServer", "Failed", "Paired", "Loading", "WaitingForAgent", "AlreadyPaired", "LinkExpired", "PagerEnded", "CantReachServer"])],
+  ["3 · Pairing", pick(pairing, PairingStories, ["Start", "PhoneMadeLink", "TwoEntered", "Ready", "Checking", "Wrong", "LastTry", "AfterWrong", "CouldntReachServer", "Failed", "Paired", "Loading", "WaitingForAgent", "AlreadyPaired", "AnotherPhonePaired", "LinkExpired", "PagerEnded", "CantReachServer"])],
   ["4 · Inside an agent", pick(agent, AgentStories, ["Decisions", "NoDecisionsYet", "Menu", "EndsMenu", "EndConfirm", "EndedAgentFinished", "EndedTimedOut", "EndedByYou", "EndedPairingFailed"])],
   ["5 · Answering a decision", pick(decision, DecisionStories, ["OptionChosen", "NothingChosen", "AskForChanges", "AskForChangesWithHtml", "Cleared"])],
   ["6 · After you answer", [
     ...pick(after, AfterSendStories, ["Undo", "Sending", "NotConfirmed", "Waiting", "Confirmed"]),
-    ...pick(decision, DecisionStories, ["ThreadWaiting", "ThreadConfirmed", "ThreadFeedback"]),
+    ...pick(decision, DecisionStories, ["ThreadUndo", "ThreadSending", "ThreadWaiting", "ThreadConfirmed", "ThreadFeedback"]),
   ]],
 ] as const;
 

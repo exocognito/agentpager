@@ -60,6 +60,14 @@ export const LastTry: Story = {
     await expect(status(canvas)).toHaveTextContent(WORDS.lastTry);
   },
 };
+// After a wrong code the first emoji tapped starts again; the pad then counts the tries left.
+export const AfterWrong: Story = {
+  name: "After a wrong code, 2 tries left",
+  args: { entered: [fox, null, null], focus: 1, triesLeft: 2 },
+  play: async ({ canvas }) => {
+    await expect(status(canvas)).toHaveTextContent("2 tries left.");
+  },
+};
 export const CouldntReachServer: Story = {
   name: "Couldn’t reach the server",
   args: { entered: [...CODE], focus: null, note: WORDS.pairOffline },
@@ -86,7 +94,15 @@ export const WaitingForAgent: Story = {
     await expect(canvas.getByRole("heading", { name: UNAVAILABLE.waiting[0] })).toBeVisible();
   },
 };
-export const AlreadyPaired: Story = { name: "Already paired", args: { phase: "unavailable", unavailable: "otherPhone" } };
+// Opening the link of a pager that is already paired, and losing the race to another phone, say different things.
+export const AlreadyPaired: Story = {
+  name: "Already paired",
+  args: { phase: "unavailable", unavailable: "alreadyPaired" },
+  play: async ({ canvas }) => {
+    await expect(canvas.getByText(UNAVAILABLE.alreadyPaired[1])).toBeVisible();
+  },
+};
+export const AnotherPhonePaired: Story = { name: "Another phone paired", args: { phase: "unavailable", unavailable: "otherPhone" } };
 export const LinkExpired: Story = { name: "Link expired", args: { phase: "unavailable", unavailable: "expired" } };
 export const PagerEnded: Story = { name: "Pager ended", args: { phase: "unavailable", unavailable: "ended" } };
 export const CantReachServer: Story = { name: "Can’t reach server", args: { phase: "unavailable", unavailable: "offline" } };

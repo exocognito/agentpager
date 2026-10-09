@@ -107,7 +107,7 @@ export const WORDS = {
   linkPageTitle: "AgentPager link",
   linkPageText: "Open this link in the AgentPager app on your iPhone to pair with your agent.",
   openInApp: "Open in AgentPager",
-  noApp: "Don't have the app? AgentPager for iPhone is in testing and is not in the App Store yet.",
+  noApp: "Don’t have the app? AgentPager for iPhone is in testing and is not in the App Store yet.",
   areYouAnAgent: "Are you an agent?",
 } as const;
 

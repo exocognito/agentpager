@@ -29,7 +29,8 @@ export const NothingChosen: Story = {
     await expect(canvas.getByRole("button", { name: WORDS.askForChanges })).toBeVisible();
   },
 };
-// The agent's pager ended, or the decision was cleared, while the sheet was open.
+// The agent's pager ended, or the decision was cleared, while the sheet was open. An answered decision's
+// thread shows the same.
 export const Cleared: Story = {
   name: "Decision cleared",
   args: { decision: undefined },
@@ -72,6 +73,18 @@ export const ThreadWaiting: Story = {
   play: async ({ canvas }) => {
     await expect(canvas.getByText(WORDS.waitingForAgent)).toBeVisible();
   },
+};
+// An answered row opens its thread at any point: during Undo, while sending, or after.
+export const ThreadUndo: Story = {
+  name: "Answered: sending in 4s",
+  render: (args) => <ThreadSheet agent={claude.name} answered={answeredUpdate({ kind: "undo", seconds: 4 })} timeZone={TIME_ZONE} dark={args.dark} />,
+  play: async ({ canvas }) => {
+    await expect(canvas.getByText("Sending in 4s")).toBeVisible();
+  },
+};
+export const ThreadSending: Story = {
+  name: "Answered: sending",
+  render: (args) => <ThreadSheet agent={claude.name} answered={answeredUpdate({ kind: "sending" })} timeZone={TIME_ZONE} dark={args.dark} />,
 };
 export const ThreadFeedback: Story = {
   name: "Answered with a note",

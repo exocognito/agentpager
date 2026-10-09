@@ -13,12 +13,12 @@ caveats:
 
 ## Behaviors
 
-1. The Agents list shows active pagers apart from ended ones. Each row names the agent and gives its status and time, worded like "Pager active · Ends in 24h", "Pager not paired · Ends in 14m" or "Pager ended · 1d ago". Active rows show how many decisions are open. A link the phone made is not listed until an agent joins it; until then it lives in Connect an Agent (C20). A pager an agent opened with a pager number belonging to this phone is listed as active as soon as it opens (C25).
+1. The Agents list shows active pagers apart from ended ones. Each row names the agent and gives its status and time, worded like "Pager active · Ends in 24h", "Pager not paired · Ends in 14m" or "Pager ended · 5h ago". Active rows show how many decisions are open. A link the phone made is not listed until an agent joins it; until then it lives in Connect an Agent (C20). A pager an agent opened with a pager number belonging to this phone is listed as active as soon as it opens (C25).
 2. With no pagers, the list says how to connect an agent. A + button on the list opens Connect an Agent (C20).
 3. Tapping an active row opens that agent's screen, with its open decisions, each marked unread, kept apart from the answered ones. Tapping a row that is not yet paired opens pairing.
-4. An ended row keeps only the agent's name and why and when the pager ended. It stays for 7 days after the end, then disappears. Tapping it opens the ended screen (C22).
+4. Ended rows are listed under "Ended in the last 24 hours" with the agent's name and why and when the pager ended, and disappear 24 hours after the end (dogfooding, subject to change). Tapping one opens the ended screen (C22).
 5. While open, the list stays current without the owner refreshing it.
-6. The list is what the service reports for the pagers whose keys this phone holds. The phone keeps no list of its own, and drops a pager the service no longer knows.
+6. The list is what the service reports for the pagers whose keys this phone holds. The phone keeps no list of its own, only its last copy of each pager's decisions for C22, and drops a pager the service no longer knows.
 
 ## Never
 

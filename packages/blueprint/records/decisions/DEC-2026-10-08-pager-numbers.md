@@ -10,6 +10,8 @@ basis:
 
 # Pager numbers are part of the product
 
+**Dogfooding. Subject to change or removal.**
+
 Pairing every agent through a link and three emoji is too much work when an owner runs many agents. So an owner can also give agents they trust a pager number, and each agent opens its own pager on the owner's phone, already paired. PR #2 built it for dogfooding and called it an exception to SI2. Sam then made it part of the product: how agents connect should get more flexible, and dogfooding is how AgentPager finds the right way.
 
 As built at acbc809:

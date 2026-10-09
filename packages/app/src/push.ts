@@ -62,6 +62,7 @@ export async function alert(env: Env, to: PushTarget, a: Alert): Promise<Outcome
     if (response.ok) return 'sent';
     const reason = await response.json().then((b: { reason?: string }) => b.reason ?? '', () => '');
     console.error(`APNs refused an alert: ${response.status} ${reason}`);
+    if (reason === 'ExpiredProviderToken') signed = null;
     return response.status === 410 || reason === 'BadDeviceToken' || reason === 'DeviceTokenNotForTopic' ? 'gone' : 'failed';
   } catch (error) {
     console.error('APNs alert failed', error instanceof Error ? error.name : 'unknown');

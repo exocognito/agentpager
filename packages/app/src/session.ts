@@ -165,7 +165,8 @@ export class Session {
     const to = m.push;
     const a: Alert = { title: m.name ?? 'Your agent', body, timeSensitive: kind === 'decision', expiresAt: m.endsAt, collapseId: decisionId, thread: m.sessionId, data: { kind, sessionId: m.sessionId, decisionId } };
     if (await alert(this.env, to, a) !== 'gone') return;
-    this.tx(() => { const now = this.tomb() ? null : this.meta(); if (now?.push?.token === to.token) this.save({ ...now, push: null }); });
+    try { this.tx(() => { const now = this.tomb() ? null : this.meta(); if (now?.push?.token === to.token) this.save({ ...now, push: null }); }); }
+    catch (error) { console.error('Dropping a gone device token failed', error instanceof Error ? error.message : 'unknown'); }
   }
 
   async fetch(request: Request): Promise<Response> {

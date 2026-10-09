@@ -76,16 +76,26 @@ final class AppModel {
     var numberError: String?
     var numberBusy = false
     private var autoPaired: Set<String> = []
-    // Alerts (Alerts.swift). Debug builds from Xcode are signed for Apple's sandbox service.
+    // Alerts (Alerts.swift).
     var deviceToken: String? { didSet { if deviceToken != oldValue { Task { await givePushToken() } } } }
     private var pushGiven: Set<String> = []
     private var askedForAlerts = false
     private var badge: Int?
-    #if DEBUG
-    static let pushEnvironment = "sandbox"
-    #else
-    static let pushEnvironment = "production"
-    #endif
+    // The Apple service this build's token belongs to: its signing profile's aps-environment. A TestFlight or App
+    // Store build has no embedded profile and uses production; the Simulator uses the sandbox.
+    static let pushEnvironment: String = {
+        #if targetEnvironment(simulator)
+        return "sandbox"
+        #else
+        guard let url = Bundle.main.url(forResource: "embedded", withExtension: "mobileprovision"),
+              let data = try? Data(contentsOf: url),
+              let start = data.range(of: Data("<?xml".utf8)),
+              let end = data.range(of: Data("</plist>".utf8), in: start.lowerBound..<data.endIndex),
+              let profile = try? PropertyListSerialization.propertyList(from: data[start.lowerBound..<end.upperBound], format: nil) as? [String: Any],
+              let entitlements = profile["Entitlements"] as? [String: Any] else { return "production" }
+        return entitlements["aps-environment"] as? String == "production" ? "production" : "sandbox"
+        #endif
+    }()
     var demoFlow: PairingFlow?
     let live: Bool
     // Debug only: `-failSends N` makes the next N answer attempts fail as if the network dropped,
@@ -155,6 +165,8 @@ final class AppModel {
     // MARK: Polling
 
     func pollLoop() async {
+        // Each return to the foreground gives the device token again, in case the server dropped one.
+        pushGiven = []
         while !Task.isCancelled {
             await refreshAll()
             try? await Task.sleep(for: .seconds(Self.pollSeconds))
@@ -370,7 +382,7 @@ final class AppModel {
             let seen = Keychain.number(server: base).flatMap { $0.phoneKey == phoneKey ? $0.seen : nil } ?? []
             let n = PagerNumber(server: base, phoneKey: phoneKey, number: made.number, seen: seen)
             Keychain.save(n)
-            if server.absoluteString == base { pagerNumber = n }
+            if server.absoluteString == base { pagerNumber = n; Task { await givePushToken() } }
         } catch {
             if server.absoluteString == base { numberError = "Can’t reach your AgentPager server at \(base)." }
         }
@@ -392,6 +404,8 @@ final class AppModel {
             keys = Keychain.all()
         }
         autoPaired.insert(summary.sessionId)
+        // Now, not at the next poll: the owner may leave the app straight after pairing.
+        Task { await givePushToken() }
         inboxes[summary.sessionId] = Inbox(session: summary, open: inboxes[summary.sessionId]?.open ?? [], answered: inboxes[summary.sessionId]?.answered ?? [])
         Task {
             try? await Task.sleep(for: .seconds(1.5))

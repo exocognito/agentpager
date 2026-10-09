@@ -3,8 +3,7 @@ import { ActionSheet, BackButton, Chevron, CloseButton, GlassButton, NavBar, Pho
 import { WORDS, serverNow } from "./words.ts";
 
 // Settings, from the gear: the phone's pager number, which agents the owner trusts use to open pagers that are
-// paired from the start (a dogfood exception to SI2, DEC-2026-10-08-pager-number-dogfood); the server; and
-// changing the number, after a confirmation.
+// paired from the start (C25::page-by-pager-number); the server; and changing the number, after a confirmation.
 export function SettingsSheet({ number, making, error, copied, server, status, confirmChange, dark }: { number?: string; making?: boolean; error?: string; copied?: boolean; server: string; status: string; confirmChange?: boolean; dark?: boolean }) {
   const footer = error ? (
     <>

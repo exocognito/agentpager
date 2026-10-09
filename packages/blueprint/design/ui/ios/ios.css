@@ -193,6 +193,8 @@
 .ios .unavailable .icon { color: var(--label2); }
 .ios .unavailable .icon.red { color: var(--red); }
 .ios .unavailable .icon.green { color: var(--green); }
+/* The app icon: the AgentPager mark on its blue tile, as the canvas draws it. */
+.ios .ap-logo { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; background: #0a63e0; }
 .ios .spinner { animation: ios-spin 1s linear infinite; color: var(--label2); }
 .ios .center-spinner { position: absolute; left: calc(50% - 14px); top: calc(45% - 14px); }
 @keyframes ios-spin { to { transform: rotate(360deg); } }

@@ -1,5 +1,6 @@
+import { LogoMark } from "../components/LogoMark.tsx";
 import type { Pager } from "./fixtures.ts";
-import { AntennaIcon, Chevron, GearIcon, GlassButton, NavBar, Phone, PlusIcon, Section, Unavailable } from "./kit.tsx";
+import { Chevron, GearIcon, GlassButton, NavBar, Phone, PlusIcon, Section, Unavailable } from "./kit.tsx";
 import { WORDS, subtitle } from "./words.ts";
 
 // Agents: every pager this phone holds, active ones first. A row that is not paired yet opens pairing; the
@@ -14,7 +15,7 @@ export function AgentsScreen({ agents, status = WORDS.updatedJustNow, now, dark 
       <h1 className="large-title">{WORDS.agents}</h1>
       {agents.length === 0 ? (
         <>
-          <Unavailable icon={<AntennaIcon />} title={WORDS.noAgents}>
+          <Unavailable icon={<LogoMark size={64} />} title={WORDS.noAgents}>
             <p>{WORDS.noAgentsText}</p>
           </Unavailable>
           <div className="toolbar end">

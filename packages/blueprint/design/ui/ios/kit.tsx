@@ -174,10 +174,6 @@ export const BubbleIcon = () => (
 export const ArrowUpIcon = () => (
   <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 15V3M3.5 8.5 9 3l5.5 5.5" /></svg>
 );
-// antenna.radiowaves.left.and.right, the empty Agents list
-export const AntennaIcon = () => (
-  <svg className="icon" width="60" height="60" viewBox="0 0 60 60" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="30" cy="26" r="4" /><path d="M30 30v22M20 16a14 14 0 0 0 0 20M40 16a14 14 0 0 1 0 20M13 9a24 24 0 0 0 0 34M47 9a24 24 0 0 1 0 34" /></svg>
-);
 // clock.badge.xmark, an ended pager
 export const EndedIcon = () => (
   <svg className="icon" width="60" height="60" viewBox="0 0 60 60" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M44 26a20 20 0 1 0-18 26" /><path d="M28 18v12l7 5" /><path d="m40 40 12 12M52 40 40 52" /></svg>

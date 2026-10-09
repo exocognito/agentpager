@@ -24,6 +24,7 @@ export const ActiveAndEnded: Story = {
     await expect(canvas.getByRole("button", { name: WORDS.settings })).toBeVisible();
   },
 };
+// The empty list shows the app's mark, the AgentPager logo on its blue tile.
 export const Empty: Story = {
   args: { agents: [] },
   play: async ({ canvas }) => {

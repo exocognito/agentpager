@@ -2,7 +2,6 @@
 id: MSHIP
 title: AgentPager for people I invite
 deliverables:
-  - C17::get-paged
   - C18::website-points-to-the-app
   - C19::try-a-demo-agent
   - C24::camera-opens-the-app

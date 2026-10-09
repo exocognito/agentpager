@@ -11,6 +11,7 @@ deliverables:
   - C22::change-or-end-a-pager
   - C23::agents-list
   - C25::page-by-pager-number
+  - C17::get-paged
   - I18::independent-cards
   - I4::payloads-refused-whole
   - I5::answers-never-change
@@ -21,6 +22,7 @@ deliverables:
   - D1::cloudflare
   - D2::agent-clients
   - D6::iphone-app
+  - D7::apple-developer-program
   - J3::happy-pager
   - J4::longest-pager
 ---
@@ -34,13 +36,12 @@ I install AgentPager on my iPhone from Xcode. My agents reach me in one of three
 - I tap + and give my agent the link my phone makes, and it shows me the three emoji;
 - I paste the line with my pager number into the instructions my agents read, such as AGENTS.md, and each agent opens its own pager on my phone, already paired.
 
-Through a link, I tap the three emoji in order and press Pair. From then on my agent asks me decisions. With the app open I see each one within seconds. I choose an option or ask for changes, press Send, and have a few seconds to undo. The row waits for my agent, then shows that it confirmed. I can reopen any answered decision while the pager lasts.
+Through a link, I tap the three emoji in order and press Pair. From then on my agent asks me decisions. With the app open I see each one within seconds. With it closed, my phone alerts me with my agent's name and its question, and opening the alert opens that decision. I choose an option or ask for changes, press Send, and have a few seconds to undo. The row waits for my agent, then shows that it confirmed, and if I have left the app its confirmation arrives as an alert. I can reopen any answered decision while the pager lasts.
 
-A pager lasts 24 hours from pairing unless I chose 7 or 30 days. I can change that or end the pager from the agent's menu. However it ends, its decisions are gone and its row says why. My agent learns all of this from agentpager.me/start or the link alone, over HTTPS or MCP, with nothing to install and no account.
+A pager lasts 24 hours from pairing unless I chose 7 or 30 days. I can change that or end the pager from the agent's menu. However it ends, the service deletes its decisions at once and its row says why; my phone keeps its own copy, read only, for 24 hours. My agent learns all of this from agentpager.me/start or the link alone, over HTTPS or MCP, with nothing to install and no account.
 
 ## Out of scope
 
-- Alerts: a closed app learns nothing until it is opened. C17 comes with MSHIP.
 - Universal Links: an agent's link opens its web page first, whose button opens the app.
 - TestFlight, the App Store, and anyone but the owner.
 - Answering from the Lock Screen, and Live Activities.

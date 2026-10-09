@@ -68,8 +68,8 @@ struct SheetContent: View {
             DecisionSheet(sessionId: s, decisionId: d)
         case .thread(let s, let d):
             ThreadSheet(sessionId: s, decisionId: d)
-        case .server:
-            ServerSheet()
+        case .settings:
+            SettingsSheet()
         }
     }
 }

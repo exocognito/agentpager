@@ -148,6 +148,52 @@ final class FlowTests: XCTestCase {
         shot("23-agent-7d")
     }
 
+    // Pager number: Settings makes one; an agent opens a pager with it, which is listed already paired and gets
+    // cards. Changing the number refuses the old one and leaves the open pager working.
+    func testPagerNumber() throws {
+        launch()
+        app.buttons["settings-button"].tap()
+        let number = app.staticTexts["pager-number"]
+        waitUntil(10, "number") { number.exists && number.label.count == 32 }
+        shot("60-settings")
+        let first = number.label
+        try agent.page(number: first, name: "Claude Code · numbered")
+        app.buttons["Close"].firstMatch.tap()
+        let row = app.buttons["agent-Claude Code · numbered"]
+        wait(row, 10)
+        shot("61-agents-numbered")
+
+        let ship = try agent.ask("Ship it?", options: [("🚀", "Ship", nil), ("🛑", "Hold", nil)])
+        row.tap()
+        wait(app.buttons["open-Ship it?"], 8)
+        app.buttons["open-Ship it?"].tap()
+        app.buttons["option-1"].tap()
+        app.buttons["send-button"].tap()
+        let answer = try XCTUnwrap(try agent.waitForAnswer(ship, seconds: 20))
+        XCTAssertEqual((answer["choice"] as! [String: Any])["number"] as? Int, 1)
+        shot("62-numbered-answered")
+
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        wait(app.navigationBars["Agents"])
+        app.buttons["settings-button"].tap()
+        waitUntil(10, "same number") { number.exists && number.label == first }
+        app.buttons["change-number"].tap()
+        let confirm = app.buttons["Change Number"]
+        wait(confirm, 5)
+        shot("63-change-confirm")
+        confirm.tap()
+        waitUntil(10, "new number") { number.exists && number.label.count == 32 && number.label != first }
+        shot("64-new-number")
+        XCTAssertThrowsError(try AgentHarness(base: AgentHarness.server).page(number: first, name: "Pi · old number")) { e in
+            XCTAssertEqual((e as? ToolError)?.tag, "NumberInvalid")
+        }
+        try AgentHarness(base: AgentHarness.server).page(number: number.label, name: "Codex · after change")
+        app.buttons["Close"].firstMatch.tap()
+        wait(app.buttons["agent-Codex · after change"], 10)
+        XCTAssertNoThrow(try agent.ask("Still on?", options: [("✅", "Yes", nil), ("❌", "No", nil)]))
+        shot("65-agents-after-change")
+    }
+
     // Three wrong codes end the pager with "pairing failed"; the agent's next call says so.
     func testWrongCodeThreeTimes() throws {
         launch()

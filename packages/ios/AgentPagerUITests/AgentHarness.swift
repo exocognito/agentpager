@@ -74,6 +74,13 @@ final class AgentHarness {
         return (c["emojis"] as! [String], c["names"] as! [String], c["text"] as! String)
     }
 
+    // Opens a pager with the owner's pager number: paired already, nothing to show.
+    func page(number: String, name: String) throws {
+        let r = try tool("page_owner", ["number": number, "name": name])
+        sessionId = (r["session"] as! [String: Any])["sessionId"] as! String
+        agentKey = r["agentKey"] as! String
+    }
+
     var creds: [String: Any] { ["sessionId": sessionId, "agentKey": agentKey] }
 
     func ask(_ title: String, detail: String? = nil, options: [(String, String, String?)], recommended: Int? = nil) throws -> String {

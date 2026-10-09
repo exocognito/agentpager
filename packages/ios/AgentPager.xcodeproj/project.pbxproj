@@ -16,6 +16,7 @@
 		70BFBD2E5191D0A402206B10 /* DriverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4201AE0E7919CEB179790B7E /* DriverTests.swift */; };
 		7197B88CC291C4521A5CFF40 /* ConnectSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B616C7FA810C63150805C23 /* ConnectSheet.swift */; };
 		B046AD611FE5C412661A5399 /* Previews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FA71DC2065059897B5BE3C7 /* Previews.swift */; };
+		C9B12D4D5A91B2871DFD039E /* SettingsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBB5067282C525F5B688ABF2 /* SettingsSheet.swift */; };
 		DC666BE4FC8C2BB3330578F0 /* FlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C28C78D36D8223DDE88ADE4 /* FlowTests.swift */; };
 		DD3DFD921630978FF1CEB7C8 /* AgentHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD4C535AB23CF5192F290774 /* AgentHarness.swift */; };
 		DF3350557E5F9D7E2A01B318 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A27A68C79B4A7080DFE2CB13 /* AppModel.swift */; };
@@ -52,6 +53,7 @@
 		CD17272A74255F239FAD6E9D /* Wording.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Wording.swift; sourceTree = "<group>"; };
 		CD4EDD3C2F1BF6179A574EFE /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		DD4C535AB23CF5192F290774 /* AgentHarness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentHarness.swift; sourceTree = "<group>"; };
+		EBB5067282C525F5B688ABF2 /* SettingsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSheet.swift; sourceTree = "<group>"; };
 		F71733347285EBBB63759032 /* PairingSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairingSheet.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -106,6 +108,7 @@
 				1B616C7FA810C63150805C23 /* ConnectSheet.swift */,
 				B15D89126E1DFBF8EAB0304A /* DecisionSheet.swift */,
 				F71733347285EBBB63759032 /* PairingSheet.swift */,
+				EBB5067282C525F5B688ABF2 /* SettingsSheet.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -233,6 +236,7 @@
 				5C7A268057B477EB532A8908 /* Keychain.swift in Sources */,
 				17C9F662EDE6821D8CFAC5BF /* PairingSheet.swift in Sources */,
 				B046AD611FE5C412661A5399 /* Previews.swift in Sources */,
+				C9B12D4D5A91B2871DFD039E /* SettingsSheet.swift in Sources */,
 				06FED050D6A559D46D34656D /* Wording.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

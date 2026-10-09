@@ -30,9 +30,10 @@ struct AgentsListView: View {
         .navigationTitle("Agents")
         .navigationBarTitleDisplayMode(.large)
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button { model.sheet = .server } label: { Image(systemName: "server.rack") }
-                    .accessibilityLabel("Server")
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { model.sheet = .settings } label: { Image(systemName: "gearshape") }
+                    .accessibilityLabel("Settings")
+                    .accessibilityIdentifier("settings-button")
             }
             ToolbarSpacer(.flexible, placement: .bottomBar)
             if !model.listed.isEmpty {

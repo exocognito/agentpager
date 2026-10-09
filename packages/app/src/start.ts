@@ -13,6 +13,10 @@ This server is \`${origin}\`. Use its HTTP API below, or its MCP server at \`${o
 
 ## 1. Connect
 
+- Your owner gave you a pager number (often in AGENTS.md): open a pager with it. It is paired already, so there is no link or code to show your owner.
+  \`curl -s -X POST ${origin}/api/numbers/<number>/pagers -H 'content-type: application/json' -d '{"name":"<your app> · <project>","lifetime":"24h"}'\`
+  MCP: \`page_owner {number, name, lifetime}\`
+  The reply is \`{"session":{"sessionId":"…","status":"active",…},"agentKey":"…"}\`. Open one pager for your piece of work and keep it for every question. The number is your owner's, like a key: never repeat it in what you write.
 - Your owner gave you an AgentPager link (\`${origin}/start/<code>\`): join it once. Reading the link uses nothing up.
   \`curl -s -X POST ${origin}/api/start/<code>/join -H 'content-type: application/json' -d '{"name":"<your app> · <project>"}'\`
   MCP: \`join_session {code, name}\`
@@ -22,14 +26,14 @@ This server is \`${origin}\`. Use its HTTP API below, or its MCP server at \`${o
 
 \`name\` is your app, then the project or folder you are working in, such as \`Codex · trip-planner\`, at most 60 characters. \`lifetime\` is \`24h\` (default), \`7d\` or \`30d\`, counted from pairing.
 
-The reply (\`link\` comes only when you start the pager):
+The reply to a start or a join (\`link\` comes only when you start the pager):
 
     {"session":{"sessionId":"…","status":"unpaired","endsAt":"…",…},
      "agentKey":"…",
      "pairingCode":{"emojis":[…],"names":[…],"text":"…"},
      "link":{"url":"…","qrText":"…",…}}
 
-In one message to your owner, show:
+After a start or a join, in one message to your owner, show:
 1. if you started the pager: \`link.qrText\` in a fenced code block (your owner scans it with the iPhone Camera), then the full \`link.url\` as text,
 2. \`pairingCode.text\` exactly as given, as plain text.
 

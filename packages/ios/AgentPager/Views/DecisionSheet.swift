@@ -271,38 +271,3 @@ struct UndoPill: View {
         .transition(.move(edge: .bottom).combined(with: .opacity))
     }
 }
-
-struct ServerSheet: View {
-    @Environment(AppModel.self) private var model
-    @State private var text = ""
-    @State private var invalid = false
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    TextField("http://192.168.1.10:8787", text: $text)
-                        .keyboardType(.URL)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .accessibilityIdentifier("server-field")
-                } header: {
-                    Text("AgentPager server")
-                } footer: {
-                    Text(invalid ? "Enter a full http:// or https:// address." : "Your pagers are kept per server. Now: \(model.statusLine).")
-                        .foregroundStyle(invalid ? Color.red : Color.secondary)
-                }
-            }
-            .navigationTitle("Server")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) { Button(role: .close) { model.sheet = nil } }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Save") { if model.setServer(text) { model.sheet = nil } else { invalid = true } }
-                        .accessibilityIdentifier("server-save")
-                }
-            }
-        }
-        .onAppear { text = model.server.absoluteString }
-    }
-}

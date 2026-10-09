@@ -11,6 +11,14 @@ pnpm start:app
 
 The front page and `/app` run the Blueprint's imported React screens and XState machines. `/start` serves its imported plain Markdown document. The HTTPS API and stateless MCP server share SQLite-backed per-session Durable Objects. A registry object routes pairing links and serializes phone-connect joins. No accounts, notification service, or action execution is implemented.
 
+## Pager number (dogfood)
+
+`POST /api/numbers` with a phone key makes that key's one pager number and retires any older one. An agent with the
+number opens a pager with `POST /api/numbers/<number>/pagers {name, lifetime?}` (MCP `page_owner`), already paired to
+that phone key, so there is no link or emoji code. `GET /api/numbers` lists, for the phone key, the pagers opened with
+any of its numbers. The Registry stores numbers and keys only as digests. This relaxes SI2 for numbered pagers on
+purpose: the number is the owner's trust in the agents that can read it.
+
 ## Local configuration
 
 `PORT`, `AGENTPAGER_INSPECTOR_PORT`, and `AGENTPAGER_PERSIST` select the local listener, inspector and persistent storage (outside the worktree). `AGENTPAGER_UNPAIRED_MS` and `AGENTPAGER_SESSION_MS` are local-only compile-time settings; defaults are 60000 and 180000. The imported schema bounds these at 10000–60000 and 10000–180000. Local startup builds to a private temporary directory, so concurrent instances never race over a bundle or database. Production builds always compile the production 15-minute / 24-hour constants, regardless of these environment variables.

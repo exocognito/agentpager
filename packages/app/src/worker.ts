@@ -5,7 +5,7 @@ import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import * as C from './contract.ts';
 import { BUILD, forward, type Env } from './env.ts';
-import { body, decode, json, refusal, sha256, token } from './shared.ts';
+import { body, decode, emptyBody, iso, json, refusal, sha256, token } from './shared.ts';
 import { codeDocument, codePage, OLD_CONNECT, startDocument } from './start.ts';
 export { Session } from './session.ts';
 export { Registry } from './registry.ts';
@@ -25,6 +25,21 @@ async function init(env: Env, request: Request, origin: string, by: 'agent' | 'p
   if (by === 'phone' && phoneKey) headers[C.PHONE_AUTH_HEADER] = phoneKey;
   return forward(env.SESSION, sessionId, '/init', { method: 'POST', headers, body: JSON.stringify({ sessionId, code, origin, by, name, lifetime }) });
 }
+const registry = (env: Env, path: string, data: unknown) => forward(env.REGISTRY, 'registry', path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(data) });
+async function phoneHash(request: Request) {
+  const key = request.headers.get(C.PHONE_AUTH_HEADER);
+  if (!key || !Schema.is(C.Token)(key)) throw C.refuse.unauthorized();
+  return sha256(key);
+}
+// The listing row outlives any pager it names; by then the phone holds the pager's key.
+const NumberHit = Schema.Struct({ phoneHash: Schema.NullOr(Schema.String) });
+async function page(env: Env, number: string, name: string, lifetime: C.Lifetime) {
+  const sessionId = token();
+  const reply = await registry(env, '/number-page', { numberHash: await sha256(number), sessionId, expiresAt: iso(Date.now() + C.LIFETIMES['30d'] + C.RETENTION_MS) });
+  const hit = decode(NumberHit, await reply.json());
+  if (!hit.phoneHash) throw C.refuse.numberInvalid();
+  return forward(env.SESSION, sessionId, '/open', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sessionId, phoneHash: hit.phoneHash, name, lifetime }) });
+}
 async function optionalBody(request: Request): Promise<unknown> {
   const text = await request.clone().text();
   return text === '' ? {} : body(request);
@@ -41,6 +56,23 @@ async function api(request: Request, env: Env, origin: string): Promise<Response
   if (parts.length === 1 && parts[0] === 'pagers' && method === 'POST') {
     const input = decode(C.PhoneCreateInput, await optionalBody(request));
     return init(env, request, origin, 'phone', null, input.lifetime ?? C.DEFAULT_LIFETIME);
+  }
+  // The owner's pager number: the phone makes one, which retires its old one (POST), and lists the pagers agents
+  // opened with it (GET). An agent with the number opens a pager that is already paired.
+  if (parts.length === 1 && parts[0] === 'numbers') {
+    const hash = await phoneHash(request);
+    if (method === 'POST') {
+      await emptyBody(request);
+      const number = token();
+      const saved = await registry(env, '/number-put', { numberHash: await sha256(number), phoneHash: hash });
+      if (!saved.ok) throw new Error('Registry refused the number');
+      return json(decode(C.NumberMade, { number }));
+    }
+    if (method === 'GET') return registry(env, '/number-list', { phoneHash: hash });
+  }
+  if (parts.length === 3 && parts[0] === 'numbers' && parts[2] === 'pagers' && method === 'POST') {
+    const number = decode(C.Token, parts[1]), input = decode(C.CreateInput, await body(request));
+    return page(env, number, input.name, input.lifetime ?? C.DEFAULT_LIFETIME);
   }
   if (parts[0] === 'start' && parts.length >= 2) {
     const code = decode(C.Token, parts[1]), sub = parts[2];
@@ -66,6 +98,7 @@ async function api(request: Request, env: Env, origin: string): Promise<Response
 const descriptions = (origin: string): Record<keyof typeof C.MCP_TOOLS, string> => ({
   start_session: `Start a pager on your owner's phone, on the AgentPager server ${origin}. lifetime is 24h (default), 7d or 30d. Then, in one message of your own (not only in a command's output), show your owner link.qrText in a fenced code block, the full link.url as text, and pairingCode.text verbatim as plain text. Never show agentKey; keep sessionId and agentKey for later turns. Then call ask_card right away: your owner sees it as soon as the phone pairs. Full guide: ${origin}/start`,
   join_session: `Join the pager your owner's phone made, using the code from their AgentPager link (${origin}/start/<code>); links from other servers will not work here. Only the first join works. Print pairingCode.text to your owner verbatim as plain text; never show agentKey, and keep sessionId and agentKey for later turns. Then call ask_card right away.`,
+  page_owner: `Open a new pager on your owner's phone with the pager number they gave you (for example in AGENTS.md), on the AgentPager server ${origin}. It is paired already: there is no link or code to show. Open one pager for your piece of work and keep it for every question. lifetime is 24h (default), 7d or 30d. Never show agentKey or the number; keep sessionId and agentKey for later turns. Then call ask_card. Full guide: ${origin}/start`,
   ask_card: 'Ask your owner one decision with 2 to 5 numbered options. Works before pairing (the phone shows it once paired). At most 10 open decisions per pager. Replies {decisionId}.',
   wait_for_card_answer: 'Hold a read for up to 50 seconds. Replies {status:"pending"} (read again) or {status:"answered", answer:{answerId, choice, ...}}. Keep reading while you have nothing better to do; if your turn ends, the answer waits for your next turn.',
   acknowledge_card: 'Acknowledge the exact answerId with your next steps; your owner sees them with a green tick. Only the first acknowledgement counts.',
@@ -85,6 +118,7 @@ async function mcp(request: Request, env: Env, origin: string) {
       switch (call.params.name) {
         case 'start_session': { data = decode(C.MCP_TOOLS.start_session.input, raw); path = '/api/sessions'; break; }
         case 'join_session': { const p = decode(C.MCP_TOOLS.join_session.input, raw); path = `/api/start/${p.code}/join`; data = { name: p.name }; break; }
+        case 'page_owner': { const p = decode(C.MCP_TOOLS.page_owner.input, raw); path = `/api/numbers/${p.number}/pagers`; data = { name: p.name, ...(p.lifetime ? { lifetime: p.lifetime } : {}) }; break; }
         case 'ask_card': { const p = decode(C.MCP_TOOLS.ask_card.input, raw); path = `/api/sessions/${p.sessionId}/cards`; data = p.question; agentKey = p.agentKey; break; }
         case 'wait_for_card_answer': { const p = decode(C.MCP_TOOLS.wait_for_card_answer.input, raw); path = `/api/sessions/${p.sessionId}/cards/${p.decisionId}/answer?wait=${p.waitSeconds ?? C.ANSWER_WAIT_MAX_SECONDS}`; method = 'GET'; agentKey = p.agentKey; break; }
         case 'acknowledge_card': { const p = decode(C.MCP_TOOLS.acknowledge_card.input, raw); path = `/api/sessions/${p.sessionId}/cards/${p.decisionId}/acknowledge`; data = p.acknowledgement; agentKey = p.agentKey; break; }

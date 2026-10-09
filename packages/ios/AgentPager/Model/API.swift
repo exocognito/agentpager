@@ -133,6 +133,8 @@ nonisolated struct StartInfo: Codable, Sendable {
 nonisolated struct LinkInfo: Codable, Hashable, Sendable { var code: String; var url: String }
 nonisolated struct CreatedPager: Codable, Sendable { var session: PagerSummary; var link: LinkInfo }
 nonisolated struct SessionEnvelope: Codable, Sendable { var session: PagerSummary }
+nonisolated struct NumberMade: Codable, Sendable { var number: String }
+nonisolated struct NumberPagers: Codable, Sendable { var sessionIds: [String] }
 
 nonisolated struct ErrorBody: Codable, Sendable {
     var error: String
@@ -198,6 +200,13 @@ nonisolated struct APIClient: Sendable {
     // Phone routes.
     func createPager(lifetime: Lifetime, phoneKey: String) async throws(APIError) -> CreatedPager {
         try await request("POST", "api/pagers", phoneKey: phoneKey, body: ["lifetime": lifetime.rawValue])
+    }
+    // A new number retires this phone key's old one at once.
+    func makeNumber(phoneKey: String) async throws(APIError) -> NumberMade {
+        try await request("POST", "api/numbers", phoneKey: phoneKey)
+    }
+    func numberPagers(phoneKey: String) async throws(APIError) -> NumberPagers {
+        try await request("GET", "api/numbers", phoneKey: phoneKey)
     }
     func inbox(_ key: PagerKey) async throws(APIError) -> Inbox {
         try await request("GET", "api/sessions/\(key.sessionId)/cards", phoneKey: key.phoneKey)

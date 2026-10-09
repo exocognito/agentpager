@@ -33,13 +33,15 @@ async function phoneHash(request: Request) {
   return sha256(key);
 }
 // The listing row outlives any pager it names; by then the phone holds the pager's key.
-const NumberHit = Schema.Struct({ phoneHash: Schema.NullOr(Schema.String), push: Schema.NullOr(PushTarget) });
+// During a deploy the Worker and its Durable Objects can run different versions for minutes, so what passes between
+// them stays readable by the version before: `push` may be absent, and is sent only when there is one.
+const NumberHit = Schema.Struct({ phoneHash: Schema.NullOr(Schema.String), push: Schema.optional(Schema.NullOr(PushTarget)) });
 async function page(env: Env, number: string, name: string, lifetime: C.Lifetime) {
   const sessionId = token();
   const reply = await registry(env, '/number-page', { numberHash: await sha256(number), sessionId, expiresAt: iso(Date.now() + C.LIFETIMES['30d'] + C.RETENTION_MS) });
   const hit = decode(NumberHit, await reply.json());
   if (!hit.phoneHash) throw C.refuse.numberInvalid();
-  return forward(env.SESSION, sessionId, '/open', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sessionId, phoneHash: hit.phoneHash, name, lifetime, push: hit.push }) });
+  return forward(env.SESSION, sessionId, '/open', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sessionId, phoneHash: hit.phoneHash, name, lifetime, ...(hit.push ? { push: hit.push } : {}) }) });
 }
 async function optionalBody(request: Request): Promise<unknown> {
   const text = await request.clone().text();

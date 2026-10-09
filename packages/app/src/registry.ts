@@ -42,10 +42,11 @@ export class Registry {
       if (action === 'number-page') {
         const p = decode(NumberPage, data);
         const row = this.ctx.storage.sql.exec<{ phone_hash: string }>('SELECT phone_hash FROM numbers_v1 WHERE number_hash=?', p.numberHash).toArray()[0];
-        if (!row) return json({ phoneHash: null, push: null });
+        if (!row) return json({ phoneHash: null });
         this.ctx.storage.sql.exec('INSERT INTO number_pagers_v1 VALUES (?, ?, ?)', row.phone_hash, p.sessionId, Date.parse(p.expiresAt));
         const push = this.ctx.storage.sql.exec<{ json: string }>('SELECT json FROM number_push_v1 WHERE phone_hash=?', row.phone_hash).toArray()[0];
-        return json({ phoneHash: row.phone_hash, push: push ? decode(PushTarget, JSON.parse(push.json)) : null });
+        // `push` only when there is one: a Worker from before alerts refuses fields it does not know (see worker.ts).
+        return json({ phoneHash: row.phone_hash, ...(push ? { push: decode(PushTarget, JSON.parse(push.json)) } : {}) });
       }
       // Only a phone key that holds a number keeps a token here.
       if (action === 'number-push') {

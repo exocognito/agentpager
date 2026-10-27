@@ -55,7 +55,7 @@
   cursor: default;
   opacity: 0.45;
 }
-.ap-app.ap-rich :is(button, a, input, textarea, select, summary):focus-visible {
+.ap-app.ap-rich :is(button, a, input, textarea, select, summary, .ap-session-name):focus-visible {
   outline: 2px solid var(--ap-blue);
   outline-offset: 2px;
 }
@@ -112,6 +112,13 @@
   font-weight: 600;
   letter-spacing: -0.01em;
   min-width: 0;
+}
+/* Even a valid all-newlines name cannot consume the queue's viewport. The full
+   literal name stays scrollable by touch, wheel and keyboard, never truncated. */
+.ap-rich .ap-session-name {
+  max-height: min(20dvh, 160px);
+  overflow: auto;
+  overscroll-behavior: contain;
 }
 .ap-rich .ap-nav-left {
   justify-self: start;

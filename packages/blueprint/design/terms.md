@@ -21,6 +21,7 @@ The words that mean something specific in this product. They name things; the pr
 | Card | One question from the agent, with the options the agent wrote. The app calls it a decision. |
 | Option | One action the agent offers on a card. |
 | Recommended | The option the agent marks as its suggestion. Nothing is chosen for the owner. |
+| Brief | A card the agent writes as Markdown sections (Context, Options, Tradeoffs, Recommendation, Next steps, Small print), with lettered options; the phone draws every brief as the same headed template. |
 | Feedback | The owner's own words sent in place of an option. The app calls it Ask for Changes. It closes the card. |
 | Draft | A choice or feedback the owner has prepared but not sent. |
 | Undo window | The few seconds after Send in which the owner can take an answer back. |

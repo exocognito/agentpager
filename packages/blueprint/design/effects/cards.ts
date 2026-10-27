@@ -14,7 +14,7 @@ export class CardApi extends Context.Tag("@agentpager/CardApi")<CardApi, CardApi
 // What the home screen calls. The product's layer lists every session this browser holds a phone key for, most recent
 // activity first: a live one read with its key, an ended or expired one from only its name and end time stored here.
 // For each connect id registered here, it asks SessionStore.readConnect which session an agent made, and keeps the id
-// until that names a session or answers ConnectLinkInvalid; a session that ended before then is never listed (C8).
+// until that names a session, returns the reserved phone's terminal name/time receipt, or answers ConnectLinkInvalid.
 // Persisted pending claims are membership too: recover them using the original claimant key before listing.
 // Discovery consumes a still-owned pending record under the same cross-tab commit lock as retirement;
 // a delayed reply never restores a consumed record or a retired capability.

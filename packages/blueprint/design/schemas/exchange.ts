@@ -1,9 +1,11 @@
 import { Schema } from "effect";
 import { Token, Text, Body, Emoji, Timestamp, OptionNumber, Option, SessionName } from "./values.ts";
 import { Card, acceptsChoice } from "../ui/components/cards/schemas.ts";
+import { Attachments, AttachmentInfo, attachmentTypes, missingAttachment } from "../ui/components/cards/brief/schema.ts";
 // The primitives live in values.ts; this module re-exports them so one import path carries the whole exchange.
 export * from "./values.ts";
 export { Card, CardKind } from "../ui/components/cards/schemas.ts";
+export { AttachmentInfo, AttachmentInput, AttachmentType, BRIEF_OPTIONS_MAX, letter } from "../ui/components/cards/brief/schema.ts";
 
 export const PAIRING_OPTION_COUNT = 5;
 
@@ -43,11 +45,16 @@ export const Acknowledgement = Schema.Struct({
   acknowledgedAt: Timestamp,
 });
 export type Acknowledgement = typeof Acknowledgement.Type;
+// Attachments come only with a brief, and every image or page the brief names must be one of them.
+const briefLinks = (q: { card: Card; attachments?: ReadonlyArray<{ name: string; type: AttachmentInfo["type"] }> }) =>
+  q.card.type === "brief" ? missingAttachment(q.card.markdown, attachmentTypes(q.attachments)) ?? true
+    : q.attachments === undefined || "attachments come only with a brief card";
 export const QuestionInput = Schema.Struct({
   title: Text,
   detail: Schema.optional(Body),
   card: Card,
-}).annotations({parseOptions:{onExcessProperty:"error"}});
+  attachments: Schema.optional(Attachments),
+}).annotations({parseOptions:{onExcessProperty:"error"}}).pipe(Schema.filter(briefLinks));
 export type QuestionInput = typeof QuestionInput.Type;
 export const Decision = Schema.Struct({
   decisionId: Token,
@@ -56,10 +63,12 @@ export const Decision = Schema.Struct({
   title: Text,
   detail: Schema.optional(Body),
   card: Card,
+  attachments: Schema.optional(Schema.Array(AttachmentInfo)),
   askedAt: Timestamp,
   answer: Schema.optional(Answer),
   acknowledgement: Schema.optional(Acknowledgement),
 }).pipe(
+  Schema.filter(briefLinks),
   Schema.filter(
     (d) =>
       (d.status === "open") ===
@@ -139,8 +148,14 @@ export type SessionCreated = typeof SessionCreated.Type;
 // when the id stops working if no agent has used it (C9::connect-an-agent-from-the-phone).
 export const ConnectOpened = Schema.Struct({ phoneKey: Token, expiresAt: Timestamp });
 export type ConnectOpened = typeof ConnectOpened.Type;
-// Which session an agent made with a registered connect id: null until one joins.
-export const ConnectStatus = Schema.Struct({ sessionId: Schema.NullOr(Token) });
+// Discovery carries the real name in the same response as membership, never a placeholder.
+export const ClaimedSession = Schema.Struct({ sessionId: Token, phoneKey: Token, name: SessionName });
+export type ClaimedSession = typeof ClaimedSession.Type;
+// Null until one joins. Terminal discovery is a refusal with the owner's name/time receipt.
+export const ConnectStatus = Schema.Union(
+  Schema.Struct({ sessionId: Schema.Null }),
+  Schema.Struct({ sessionId: Token, name: SessionName }),
+);
 export type ConnectStatus = typeof ConnectStatus.Type;
 // What an agent receives on joining a phone: like SessionCreated, with no pairing link because the phone already holds the session.
 export const PhoneJoined = Schema.Struct({ session: SessionSummary, agentKey: Token, pairingDecisionId: Token, pairingTarget: Option });

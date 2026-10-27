@@ -9,6 +9,7 @@ import {
 import { createCardServices } from "../fixtures/services.ts";
 import { inbox, question, answered, feedbackDecision, pairingInbox, pairingDecision, pairedInbox, pairedDecision, updateQuestion, pairingTarget } from "../fixtures/decisions.ts";
 import { CardScreen } from "./CardScreen.tsx";
+import { optionDetail, optionMark } from "../components/cards/schemas.ts";
 
 const services = createCardServices(inbox);
 const machine = createCardMachine(services.layer, services.now);
@@ -78,7 +79,7 @@ export const RowMarks: Story = {
   play: async ({ canvasElement }) => {
     const marks = [...canvasElement.querySelectorAll(".ap-mark")];
     await expect(marks.map((m) => m.className)).toEqual(["ap-mark ap-mark-open", "ap-mark", "ap-mark", "ap-mark"]);
-    const emoji = (d: typeof answered) => d.card.options.find((o) => d.answer?.choice.kind === "option" && o.number === d.answer.choice.number)!.emoji;
+    const emoji = (d: typeof answered) => { const o = d.card.options.find((o) => d.answer?.choice.kind === "option" && o.number === d.answer.choice.number)!; return optionMark(o); };
     await expect(marks[1].querySelector("svg")).not.toBeNull();
     await expect(marks.slice(2).map((m) => m.textContent)).toEqual([emoji(answered), emoji(pairedDecision)]);
   },
@@ -100,9 +101,9 @@ export const Chosen: Story = {
   args: { value: { live: { screen: "view", clock: "counting" } }, patch: { choice: { kind: "option", number: 1 } } },
   play: async ({ canvas }) => {
     const [first, ...rest] = question.card.options;
-    await expect(canvas.getByRole("button", { name: /^Choose 1:/ })).toHaveAccessibleDescription(first.detail!);
-    await expect(canvas.getByText(first.detail!)).toBeVisible();
-    for (const option of rest) expect(canvas.queryByText(option.detail!)).toBeNull();
+    await expect(canvas.getByRole("button", { name: /^Choose 1:/ })).toHaveAccessibleDescription(optionDetail(first)!);
+    await expect(canvas.getByText(optionDetail(first)!)).toBeVisible();
+    for (const option of rest) expect(canvas.queryByText(optionDetail(option)!)).toBeNull();
   },
 };
 // A long question detail starts at four lines with Show more.

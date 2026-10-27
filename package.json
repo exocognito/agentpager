@@ -7,7 +7,7 @@
     "node": ">=22.19"
   },
   "scripts": {
-    "check": "tsc --noEmit",
+    "check": "tsc --noEmit && pnpm --filter @agentpager/app lint",
     "test": "pnpm --filter @agentpager/blueprint --filter @agentpager/storybook test",
     "test:unit": "pnpm --filter @agentpager/blueprint test",
     "storybook": "pnpm --filter @agentpager/storybook storybook",

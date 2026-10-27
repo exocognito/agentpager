@@ -53,10 +53,13 @@ export async function body(request: Request): Promise<unknown> {
     return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
   } catch { throw refuse.invalid('Send a JSON object encoded as valid UTF-8.'); }
 }
-export const Empty = Schema.Struct({}).annotations({ parseOptions: strict });
+// No body, or `{}`: an empty struct schema reports no excess fields, so any other value is refused here.
 export async function emptyBody(request: Request) {
   const text = await request.text();
-  if (text !== '') { try { decode(Empty, JSON.parse(text)); } catch { throw refuse.invalid('This operation takes no fields.'); } }
+  if (text === '') return;
+  let value: unknown = null;
+  try { value = JSON.parse(text); } catch { /* not JSON: refused below */ }
+  if (typeof value !== 'object' || value === null || Array.isArray(value) || Object.keys(value).length > 0) throw refuse.invalid('This operation takes no fields.');
 }
 
 // Keys and link codes are stored only as SHA-256 hex digests. Hash before a transaction (digest is async);

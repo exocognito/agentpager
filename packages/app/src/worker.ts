@@ -60,6 +60,7 @@ async function api(request: Request, env: Env, origin: string): Promise<Response
     return init(env, request, origin, 'agent', input.name, input.lifetime ?? C.DEFAULT_LIFETIME);
   }
   if (parts.length === 1 && parts[0] === 'pagers' && method === 'POST') {
+    await phoneHash(request);
     const input = decode(C.PhoneCreateInput, await optionalBody(request));
     return init(env, request, origin, 'phone', null, input.lifetime ?? C.DEFAULT_LIFETIME);
   }
@@ -137,9 +138,9 @@ async function mcp(request: Request, env: Env, origin: string) {
         case 'start_session': { data = decode(C.MCP_TOOLS.start_session.input, raw); path = '/api/sessions'; break; }
         case 'join_session': { const p = decode(C.MCP_TOOLS.join_session.input, raw); path = `/api/start/${p.code}/join`; data = { name: p.name }; break; }
         case 'page_owner': { const p = decode(C.MCP_TOOLS.page_owner.input, raw); path = `/api/numbers/${p.number}/pagers`; data = { name: p.name, ...(p.lifetime ? { lifetime: p.lifetime } : {}) }; break; }
-        case 'ask_card': { const p = decode(AskCall, raw); path = `/api/sessions/${p.sessionId}/cards`; data = p.question; agentKey = p.agentKey; break; }
+        case 'ask_card': { const p = decode(AskCall, raw); if (p.question === undefined) throw C.refuse.invalid('question: is missing'); path = `/api/sessions/${p.sessionId}/cards`; data = p.question; agentKey = p.agentKey; break; }
         case 'wait_for_card_answer': { const p = decode(C.MCP_TOOLS.wait_for_card_answer.input, raw); path = `/api/sessions/${p.sessionId}/cards/${p.decisionId}/answer?wait=${p.waitSeconds ?? C.ANSWER_WAIT_MAX_SECONDS}`; method = 'GET'; agentKey = p.agentKey; break; }
-        case 'acknowledge_card': { const p = decode(AckCall, raw); path = `/api/sessions/${p.sessionId}/cards/${p.decisionId}/acknowledge`; data = p.acknowledgement; agentKey = p.agentKey; break; }
+        case 'acknowledge_card': { const p = decode(AckCall, raw); if (p.acknowledgement === undefined) throw C.refuse.invalid('acknowledgement: is missing'); path = `/api/sessions/${p.sessionId}/cards/${p.decisionId}/acknowledge`; data = p.acknowledgement; agentKey = p.agentKey; break; }
         case 'finish_session': { const p = decode(C.MCP_TOOLS.finish_session.input, raw); path = `/api/sessions/${p.sessionId}/finish`; agentKey = p.agentKey; break; }
         default: throw C.refuse.invalid('Unknown tool. Read /start.');
       }

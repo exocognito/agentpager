@@ -33,9 +33,20 @@ test('a wrong key wins over invalid input, over HTTP and MCP', { timeout: 180_00
       await f.refused(401, 'Unauthorized', route, { data, phone: token() }).catch(e => { throw new Error(`${label}: ${e}`); });
       await f.refused(400, 'InvalidInput', route, { data, phone }).catch(e => { throw new Error(`${label}, right key: ${e}`); });
     }
-    // Ending takes no fields: a wrong key is refused before the body is read, with the right key the body is.
+    // Ending takes no fields: a wrong key is refused before the body is read, and with the right key a field is refused.
     await f.refused(401, 'Unauthorized', `/api/sessions/${sid}/end`, { data: { now: true }, phone: token() });
+    await f.refused(400, 'InvalidInput', `/api/sessions/${sid}/end`, { data: { now: true }, phone });
     await f.refused(401, 'Unauthorized', `/api/sessions/${sid}/finish`, { data: { now: true }, agent: token() });
+    await f.refused(400, 'InvalidInput', `/api/sessions/${sid}/finish`, { data: { now: true }, agent: s.agentKey });
+    // A phone makes a pager only with a key; a link its phone made pairs only that phone.
+    await f.refused(401, 'Unauthorized', '/api/pagers', { data: { lifetime: 'forever' } });
+    await f.refused(400, 'InvalidInput', '/api/pagers', { data: { lifetime: 'forever' }, phone: token() });
+    const owner = token(), made = await f.phoneCreate(owner, '24h');
+    await f.join(made.link.code, 'Codex · keys');
+    const pair = `/api/start/${made.link.code}/pair`;
+    await f.refused(401, 'Unauthorized', pair, { data: { code: 'nope' } });
+    await f.refused(401, 'Unauthorized', pair, { data: { code: 'nope' }, phone: token() });
+    await f.refused(400, 'InvalidInput', pair, { data: { code: 'nope' }, phone: owner });
 
     // MCP: the tool call is decoded only for routing, so the pager checks the key before the question.
     await client.connect(new StreamableHTTPClientTransport(new URL(f.origin + '/mcp')));
@@ -49,6 +60,10 @@ test('a wrong key wins over invalid input, over HTTP and MCP', { timeout: 180_00
     assert.equal(await tool('ask_card', { sessionId: sid, agentKey: s.agentKey, question: bad }), 'InvalidInput');
     assert.equal(await tool('acknowledge_card', { sessionId: sid, agentKey: token(), decisionId: did, acknowledgement: { nextSteps: 'Go.' } }), 'Unauthorized');
     assert.equal(await tool('acknowledge_card', { sessionId: sid, agentKey: s.agentKey, decisionId: did, acknowledgement: { nextSteps: 'Go.' } }), 'InvalidInput');
+    // A missing question or acknowledgement is named, not reported as an empty body.
+    const missing = async (name: string, args: Record<string, unknown>) => JSON.parse(decode(TextResult, await client.callTool({ name, arguments: args })).content[0].text).message;
+    assert.match(await missing('ask_card', { sessionId: sid, agentKey: s.agentKey }), /question: is missing/);
+    assert.match(await missing('acknowledge_card', { sessionId: sid, agentKey: s.agentKey, decisionId: did }), /acknowledgement: is missing/);
     // tools/list describes only briefs for a new card.
     const ask = (await client.listTools()).tools.find(t => t.name === 'ask_card');
     assert.ok(ask && JSON.stringify(ask.inputSchema).includes('"brief"'));

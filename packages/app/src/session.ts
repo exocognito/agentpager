@@ -233,8 +233,11 @@ export class Session {
       return json(decode(C.Joined, { session: this.summary(m), agentKey, pairingCode: code }));
     }
     if (action === 'pair') {
-      const input = decode(C.PairInput, await body(request));
       const digest = await phoneDigest(request);
+      // A phone key is needed, and a pager that already knows its phone takes only that one. A paired pager answers
+      // AlreadyPaired in the transaction below, as before.
+      this.tx(() => { const m = this.linked(); if (!digest || (m.status !== 'active' && m.phoneHash && !sameDigest(digest, m.phoneHash))) throw C.refuse.unauthorized(); });
+      const input = decode(C.PairInput, await body(request));
       const outcome = this.tx((): PairOutcome => {
         const m = this.linked();
         if (!digest) throw C.refuse.unauthorized();

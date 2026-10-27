@@ -7,6 +7,7 @@ serves:
 statement: Reopen any sent card to read its exact payload, your answer and the agent's acknowledgement, with nothing to edit.
 caveats:
   - History is read on the phone that holds the pager; nothing proves it on another device.
+  - After a pager ends, the phone's read-only copy keeps each brief's text, but its images and pages show as unavailable: the service deletes attachments with the pager (DEC-2026-10-27-briefs-are-the-card).
 ---
 
 ## Behaviors

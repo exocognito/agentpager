@@ -1,3 +1,15 @@
+---
+items:
+  SP3:
+    status: deprecated
+    successor: SP7
+    decision: DEC-2026-10-27-briefs-are-the-card
+  SP4:
+    status: deprecated
+    successor: SP8
+    decision: DEC-2026-10-27-briefs-are-the-card
+---
+
 # AgentPager
 
 ## Vision
@@ -11,9 +23,9 @@ _Technically: strategic capabilities_
 
 Connect my agents to my phone easily. I give the agents I trust my pager number, and each opens its own pager on my phone with nothing for me to tap. Any other agent connects with an AgentPager link: my agent shows me one as a link and a QR code, or my phone makes one for me to give my agent, and I confirm the pairing by tapping, on my phone, the three emoji my agent shows me.
 
-Once paired, my agent sends me a multiple-choice decision when it needs me. I answer, see that my answer was sent, and get the agent's acknowledgement and its next steps. I can look back at a pager's decisions while it lasts, and for 24 hours after it ends.
+Once paired, my agent sends me a decision brief when it needs me: the decision first, with two to four options and the detail one tap away. I answer, see that my answer was sent, and get the agent's acknowledgement and its next steps. I can look back at a pager's decisions while it lasts, and for 24 hours after it ends.
 
-Decision cards can show the exact email, pull request, calendar invitation or reply, the way that product would show it, with the agent's options for what to do with it. The agent carries out the option I chose; AgentPager only carries my answer.
+A brief's option can preview exactly what it would send or change, such as a draft email, a pull request's diff or a calendar invitation, so I approve that exact version. The agent carries out the option I chose; AgentPager only carries my answer.
 
 Accounts should let me return across devices without making a pager public.
 
@@ -48,7 +60,7 @@ Its end time is 24 hours after pairing unless I choose 7 or 30 days, and I can c
 
 ### SI6 · UTF-8 with Markdown is allowed; invalid or over-limit text is refused, never truncated
 
-Card titles, option labels, option detail and agent acknowledgements allow 280 visible characters; question detail and my written feedback allow 1,000. Count spaces and Markdown punctuation. Text is valid UTF-8 with Markdown and no HTML. Anything else is refused whole, with an error that tells the agent what to fix. Nothing is truncated or silently cleaned. On screen, titles, option labels and agent names show each run of spaces and line breaks as one space; detail text shows them as sent.
+Card titles, option labels, option detail and agent acknowledgements allow 280 visible characters; question detail and my written feedback allow 1,000. Count spaces and Markdown punctuation. Text is valid UTF-8 with Markdown and no HTML. Anything else is refused whole, with an error that tells the agent what to fix. Nothing is truncated or silently cleaned. On screen, titles, option labels and agent names show each run of spaces and line breaks as one space; detail text shows them as sent. A brief, and each Markdown page attached to it, holds up to 20,000 characters; a brief carries at most 8 attachments, PNG, JPEG or Markdown, of at most 1 MB per image and 3 MB in all. HTML is allowed only inside code, where it shows as text.
 
 ### SI7 · Cards are independent
 
@@ -56,7 +68,7 @@ Several cards can be open at once and answered in any order. Answering one never
 
 ### SI8 · Approval refers to the exact proposal
 
-Before I answer a rich card, I see its complete target and content, and my answer refers to exactly that version.
+Before I answer a rich card, I see its complete target and content, and my answer refers to exactly that version. A brief may fold its sections and its options' detail: all of it can be opened before I press Send, and Send never waits for me to open each part.
 
 ### SI9 · Research never pretends to be an available paid upgrade
 
@@ -103,6 +115,14 @@ Any agent whose client can send HTTPS requests or add an MCP server can use Agen
 ### SP6 · Feel native
 
 Use the platform's own components and conventions (lists, sheets, menus, alerts, notifications and the Camera) rather than custom ones, so the app is familiar and the system does the work. Behaviour, data and words are the same on every platform; how they are drawn follows each platform.
+
+### SP7 · Letters tell options apart; ✶ marks the recommendation
+
+For every card, the agent chooses the question and two to four options. They are lettered A to D in the order the agent gives them, and the letter tells them apart, so I can refer to them when I ask for changes, such as "do A, then B". I choose one option, never several, and the phone marks my choice the platform's usual way. The agent may mark the option it recommends; the phone marks it ✶, and nothing is chosen for me.
+
+### SP8 · Lead with the decision; keep the rest one tap away
+
+A brief opens on what I need to decide: the question, its context, each option's short label and the agent's recommendation. What each option changes, why to choose or pass on it, what it assumes, the tradeoffs and any attachments stay one tap away. Aim for about 100 characters for the question. These are writing guides; SI6 sets the hard limits.
 
 ## Strategic Design Decisions
 _Technically, SD: sometimes specific design decisions get made top down and are pinned in design even though they may seem objectively inferior decision to make autonomously given all the other requirements in the blueprint. i.e. this may not be a permanent set of laws like the rest, but a temporarily true design constraint or limitation we choose to apply as we explore the design space. (Lets just see what actually gets written here and review if useful)_

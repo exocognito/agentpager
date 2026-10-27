@@ -18,7 +18,7 @@ The words that mean something specific in this product. They name things; the pr
 | End reason | Why a pager ended: timed out, you ended it, agent finished, or pairing failed. |
 | Agents list | The app's home: the pagers this phone holds, active apart from ended. |
 | Agent screen | One pager's open and answered cards, with its menu for Ends and End Pager. |
-| Card | One question from the agent, with the options the agent wrote. The app calls it a decision. |
+| Card | One question from the agent, with the options the agent wrote. The app calls it a decision. Every new card is a brief; an emoji card is the retired kind, still answerable if it was asked before 2026-10-27. |
 | Option | One action the agent offers on a card. |
 | Recommended | The option the agent marks as its suggestion. Nothing is chosen for the owner. |
 | Brief | A card the agent writes as Markdown sections (Context, Options, Tradeoffs, Recommendation, Next steps, Small print), with lettered options; the phone draws every brief as the same headed template. |

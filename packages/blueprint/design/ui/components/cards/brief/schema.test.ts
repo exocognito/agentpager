@@ -81,6 +81,15 @@ it("reads a backslash-escaped bracket as text, so an escape hides no link", () =
   expect(missingAttachment("See [me\\]](tel:+15551234) now", new Map())).toMatch(/neither an attachment nor an https link/);
   expect(missingAttachment("See ![m\\]](missing.png)", new Map())).toMatch(/is not an attachment/);
   expect(missingAttachment("A \\[not a link\\](x) here", new Map())).toBeUndefined();
+  // An escaped backtick opens no code span.
+  expect(missingAttachment("See \\`[me](notes.md)` now", new Map())).toMatch(/neither an attachment nor an https link/);
+  expect(Schema.is(QuestionInput)(brief(ok + "\n\nSee \\`<img src=x>` now"))).toBe(false);
+});
+it("reads every line of a chat as chat, fence markers included", () => {
+  const chat = ":::chat\nFrom: hi\n~~~\nFrom: [secret](notes.md)\n~~~\n:::";
+  expect(missingAttachment(chat, new Map())).toMatch(/neither an attachment nor an https link/);
+  expect(proseLines("```\n[a](b)\n```\n" + chat)).toContain("From: [secret](notes.md)");
+  expect(proseLines("```\n[a](b)\n```")).toEqual([]);
 });
 it("gives each option its number's keycap for phones from before briefs, unless the agent chose an emoji", () => {
   const card = Schema.decodeUnknownSync(Payload)({ type: "brief", options: [...options.slice(0, 1), { ...options[1], emoji: "🗂️" }], recommended: 1, markdown: ok });

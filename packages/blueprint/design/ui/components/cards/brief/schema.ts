@@ -15,46 +15,48 @@ const FENCE = /^\s*(`{3,}|~{3,})/;
 const CONTAINER_OPEN = /^(:{3,})([a-z]+)(?:[ \t]+(.*?))?\s*$/;
 const CONTAINER_CLOSE = /^(:{3,})\s*$/;
 const LINK = /(!?)\[[^\]]*\]\(([^)\s]*)(?:\s+"[^"]*")?\)/g;
-// A code span opens with a run of backticks and closes at the next run of the same length (CommonMark); an
-// unpaired run is literal text. What a code span holds is code, never a link or HTML.
+// One left-to-right pass, as CommonMark reads a line: a backslash before ASCII punctuation makes that character text
+// (an escaped backtick opens nothing); a code span opens with a run of backticks and closes at the next run of the
+// same length, and an unpaired run is literal. What a code span holds is code, never a link or HTML, so it is
+// dropped; an escaped pair is dropped too, so "[a\\]b](tel:1)" still reads as a link to tel:1.
 export function withoutCodeSpans(line: string) {
   let out = "", at = 0;
   while (at < line.length) {
-    const open = line.indexOf("`", at);
-    if (open < 0) { out += line.slice(at); break; }
-    const run = line.slice(open).match(/^`+/)?.[0] ?? "`";
+    if (line[at] === "\\" && /[!-/:-@[-`{-~]/.test(line[at + 1] ?? "")) { at += 2; continue; }
+    if (line[at] !== "`") { out += line[at]; at++; continue; }
+    const run = line.slice(at).match(/^`+/)?.[0] ?? "`";
     let close = -1;
-    for (let i = open + run.length; i < line.length;) {
+    for (let i = at + run.length; i < line.length;) {
       const next = line.indexOf("`", i);
       if (next < 0) break;
       const r = line.slice(next).match(/^`+/)?.[0] ?? "`";
       if (r.length === run.length) { close = next; break; }
       i = next + r.length;
     }
-    if (close < 0) { out += line.slice(at, open + run.length); at = open + run.length; continue; }
-    out += line.slice(at, open);
+    if (close < 0) { out += run; at += run.length; continue; }
     at = close + run.length;
   }
   return out;
 }
 
 // The lines of Markdown that are prose, not fenced code. A fence closes on the same character, at least as long.
+// Inside a :::chat block every line is a chat line, fence markers included, as the phone reads it.
 export function proseLines(markdown: string): string[] {
   const out: string[] = [];
-  let fence: string | null = null;
+  let fence: string | null = null, chat = 0;
   for (const line of markdown.split("\n")) {
+    if (chat) { const close = line.match(CONTAINER_CLOSE)?.[1]; if (close) chat = 0; out.push(line); continue; }
     const f = line.match(FENCE)?.[1];
     if (fence) { if (f && f[0] === fence[0] && f.length >= fence.length && line.trim() === f) fence = null; continue; }
     if (f) { fence = f; continue; }
+    const open = line.match(CONTAINER_OPEN);
+    if (open && open[2] === "chat") chat = open[1].length;
     out.push(line);
   }
   return out;
 }
 
-// A backslash-escaped punctuation character is that character as text (CommonMark), so the checks drop the pair:
-// "[a\\]b](tel:1)" is still a link to tel:1.
-const withoutEscapes = (line: string) => line.replace(/\\[!-/:-@[-`{-~]/g, "");
-const prose = (line: string) => withoutEscapes(withoutCodeSpans(line));
+const prose = withoutCodeSpans;
 
 // Every link and image target outside code, with whether it is an image.
 export function targets(markdown: string): { image: boolean; target: string }[] {

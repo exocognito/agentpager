@@ -51,9 +51,14 @@ export function proseLines(markdown: string): string[] {
   return out;
 }
 
+// A backslash-escaped punctuation character is that character as text (CommonMark), so the checks drop the pair:
+// "[a\\]b](tel:1)" is still a link to tel:1.
+const withoutEscapes = (line: string) => line.replace(/\\[!-/:-@[-`{-~]/g, "");
+const prose = (line: string) => withoutEscapes(withoutCodeSpans(line));
+
 // Every link and image target outside code, with whether it is an image.
 export function targets(markdown: string): { image: boolean; target: string }[] {
-  return proseLines(markdown).flatMap(line => [...withoutCodeSpans(line).matchAll(LINK)].map(m => ({ image: m[1] === "!", target: m[2] })));
+  return proseLines(markdown).flatMap(line => [...prose(line).matchAll(LINK)].map(m => ({ image: m[1] === "!", target: m[2] })));
 }
 
 // HTML is refused outside code; inside a fence it is code, shown as text and never rendered.
@@ -61,7 +66,7 @@ export const BriefMarkdown = Schema.String.pipe(
   Schema.filter(text => text.isWellFormed() || "text must be well-formed Unicode"),
   Schema.filter(text => text.trim().length > 0 || "text may not be blank"),
   Schema.filter(text => characters(text) <= BRIEF_MAX_CHARACTERS || `a brief or page may not exceed ${BRIEF_MAX_CHARACTERS} characters`),
-  Schema.filter(text => !proseLines(text).some(line => HTML_OPENER.test(withoutCodeSpans(line))) || "HTML is not allowed outside fenced code blocks"),
+  Schema.filter(text => !proseLines(text).some(line => HTML_OPENER.test(prose(line))) || "HTML is not allowed outside fenced code blocks"),
 );
 
 // The Frame's refusals that need only the card: a recommendation or option block or table column for a letter

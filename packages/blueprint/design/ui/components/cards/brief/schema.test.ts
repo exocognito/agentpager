@@ -77,6 +77,11 @@ it("pairs code spans by equal backtick runs, so an unpaired run hides no link", 
   expect(withoutCodeSpans("``a ` b`` c")).toBe(" c");
   expect(missingAttachment("Call ``[me](tel:+15551234)` now", new Map())).toMatch(/neither an attachment nor an https link/);
 });
+it("reads a backslash-escaped bracket as text, so an escape hides no link", () => {
+  expect(missingAttachment("See [me\\]](tel:+15551234) now", new Map())).toMatch(/neither an attachment nor an https link/);
+  expect(missingAttachment("See ![m\\]](missing.png)", new Map())).toMatch(/is not an attachment/);
+  expect(missingAttachment("A \\[not a link\\](x) here", new Map())).toBeUndefined();
+});
 it("gives each option its number's keycap for phones from before briefs, unless the agent chose an emoji", () => {
   const card = Schema.decodeUnknownSync(Payload)({ type: "brief", options: [...options.slice(0, 1), { ...options[1], emoji: "🗂️" }], recommended: 1, markdown: ok });
   expect(withKeycaps(card).options.map(o => o.emoji)).toEqual(["1️⃣", "🗂️"]);

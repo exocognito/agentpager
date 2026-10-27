@@ -15,7 +15,7 @@ struct DecisionSheet: View {
         NavigationStack(path: $path) {
             Group {
                 if let d = model.decision(sessionId, decisionId) {
-                    if d.status != .open { ThreadContent(sessionId: sessionId, decision: d) { path.append("page:" + $0) } }
+                    if d.status != .open { ThreadContent(sessionId: sessionId, decision: d, openPage: { path.append("page:" + $0) }, openOptions: { path.append("options") }) }
                     else if d.card.isBrief { brief(d) } else { choose(d) }
                 } else {
                     ContentUnavailableView("Decision Cleared", systemImage: "tray", description: Text("This decision is no longer on your pager."))
@@ -30,6 +30,9 @@ struct DecisionSheet: View {
                 if let d = model.decision(sessionId, decisionId) {
                     if value.hasPrefix("page:") {
                         BriefPageView(sessionId: sessionId, decision: d, name: String(value.dropFirst(5))) { path.append("page:" + $0) }
+                    } else if value == "options" {
+                        BriefOptionsView(sessionId: sessionId, decision: d, start: d.status == .open ? selection : nil) { path.append("page:" + $0) }
+                            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button(role: .close) { model.sheet = nil } } }
                     } else {
                         AskChangesView(decision: d, text: $feedback) { model.send(sessionId: sessionId, decisionId: decisionId, choice: .feedback(feedback)) }
                     }
@@ -51,6 +54,7 @@ struct DecisionSheet: View {
         BriefView(sessionId: sessionId, decision: d, picked: $selection,
                   askForChanges: { path.append("changes") },
                   openPage: { path.append("page:" + $0) },
+                  openOptions: { path.append("options") },
                   send: { model.send(sessionId: sessionId, decisionId: decisionId, choice: .option($0)) })
     }
 
@@ -176,7 +180,7 @@ struct ThreadSheet: View {
         NavigationStack(path: $path) {
             Group {
                 if let d = model.decision(sessionId, decisionId) {
-                    ThreadContent(sessionId: sessionId, decision: d) { path.append($0) }
+                    ThreadContent(sessionId: sessionId, decision: d, openPage: { path.append("page:" + $0) }, openOptions: { path.append("options") })
                 } else {
                     ContentUnavailableView("Decision Cleared", systemImage: "tray", description: Text("This decision is no longer on your pager."))
                 }
@@ -186,8 +190,15 @@ struct ThreadSheet: View {
                 ToolbarItem(placement: .principal) { Text(model.inboxes[sessionId]?.session.name ?? "").font(.subheadline).foregroundStyle(.secondary) }
                 ToolbarItem(placement: .topBarTrailing) { Button(role: .close) { model.sheet = nil } }
             }
-            .navigationDestination(for: String.self) { name in
-                if let d = model.decision(sessionId, decisionId) { BriefPageView(sessionId: sessionId, decision: d, name: name) { path.append($0) } }
+            .navigationDestination(for: String.self) { value in
+                if let d = model.decision(sessionId, decisionId) {
+                    if value == "options" {
+                        BriefOptionsView(sessionId: sessionId, decision: d, start: nil) { path.append("page:" + $0) }
+                            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button(role: .close) { model.sheet = nil } } }
+                    } else {
+                        BriefPageView(sessionId: sessionId, decision: d, name: String(value.dropFirst(5))) { path.append("page:" + $0) }
+                    }
+                }
             }
         }
     }
@@ -199,6 +210,7 @@ struct ThreadContent: View {
     var sessionId: String
     var decision: Decision
     var openPage: (String) -> Void = { _ in }
+    var openOptions: () -> Void = {}
 
     private var row: AnsweredRow? { model.answeredRows(sessionId).first { $0.decision.decisionId == decision.decisionId } }
     private var chosenNumber: Int? { if case .option(let n) = row?.choice { n } else { nil } }
@@ -206,7 +218,7 @@ struct ThreadContent: View {
     var body: some View {
         if decision.card.isBrief {
             // The brief stays readable under the answer; nothing on it can be chosen again (SI3).
-            BriefView(sessionId: sessionId, decision: decision, openPage: openPage, answered: AnyView(bubbles))
+            BriefView(sessionId: sessionId, decision: decision, openPage: openPage, openOptions: openOptions, answered: AnyView(bubbles))
         } else {
             list
         }
@@ -217,7 +229,7 @@ struct ThreadContent: View {
             VStack(spacing: 10) {
                 Bubble(text: answerText(row), mine: true, caption: "You · " + Wording.time(decision.answer?.sentAt ?? model.now))
                 if let ack = decision.acknowledgement {
-                    Bubble(text: ack.nextSteps, mine: false, caption: "Your agent confirmed · " + Wording.time(ack.acknowledgedAt), onPlain: true)
+                    Bubble(text: ack.nextSteps, mine: false, caption: "Your agent confirmed · " + Wording.time(ack.acknowledgedAt))
                 } else {
                     SendStatusLine(row: row)
                         .font(.subheadline).foregroundStyle(Color(.secondaryLabel))
@@ -269,8 +281,6 @@ struct Bubble: View {
     var text: String
     var mine: Bool
     var caption: String
-    // On a white page (a brief) the agent's bubble needs a grey of its own.
-    var onPlain = false
 
     var body: some View {
         VStack(alignment: mine ? .trailing : .leading, spacing: 4) {
@@ -278,7 +288,7 @@ struct Bubble: View {
                 .font(.body)
                 .padding(.horizontal, 14).padding(.vertical, 9)
                 .foregroundStyle(mine ? Color.white : Color(.label))
-                .background(mine ? Color.accentColor : onPlain ? Color(.systemGray6) : Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 18))
+                .background(mine ? Color.accentColor : Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 18))
             Text(caption).font(.caption).foregroundStyle(Color(.secondaryLabel)).padding(.horizontal, 6)
         }
         .frame(maxWidth: .infinity, alignment: mine ? .trailing : .leading)

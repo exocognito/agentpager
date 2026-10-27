@@ -20,6 +20,12 @@ Shop support bot: Sorry about that! I’ve passed this to our team. You’ll hea
 + - Page on-call for every refund.
 + - Say we reply within an hour.
 ```
+### Why choose A
+- No wrong refunds: a person still approves every one.
+### Why pass on A
+- It costs the team 10 hours a week, and customers still wait about an hour.
+### Assumptions A makes
+- On-call can answer every refund within the hour.
 ::::
 
 ::::option B
@@ -38,6 +44,12 @@ Shop support bot: Sorry about that! I’ve refunded $18 to your card. It should 
 + - Hand the rest to a person.
   - Say we reply within a day.
 ```
+### Why choose B
+- Customers get small refunds in seconds, and the team saves 8 hours a week.
+### Why pass on B
+- About $300 a month goes out in wrong refunds.
+### Assumptions B makes
+- Under 5% of small requests are abuse (2% last quarter).
 ::::
 
 ::::option C
@@ -56,6 +68,12 @@ Shop support bot: Sorry about that! I can add $19.80 in store credit right now, 
 + - If they say no, hand it to a person.
   - Say we reply within a day.
 ```
+### Why choose C
+- It keeps revenue, and customers who take credit are done in seconds.
+### Why pass on C
+- Customers who say no still wait about 9 hours.
+### Assumptions C makes
+- Most customers will take credit worth 110% instead of a refund.
 ::::
 
 ## Tradeoffs

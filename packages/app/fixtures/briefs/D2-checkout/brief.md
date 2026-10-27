@@ -20,6 +20,13 @@ If the first charge went through, that’s two.
 -   return spin()
 +   return retry(order)
 ```
+### Why choose A
+- Customers do nothing, and it’s an hour’s work.
+### Why pass on A
+- If the first charge went through, the customer pays twice.
+### Assumptions A makes
+- A timed-out charge almost never went through.
+
 [Design notes on all three](design.md)
 :::
 
@@ -40,6 +47,13 @@ Nobody pays twice. If it didn’t go through, they retry from their cart.
 +   const paid = await status(order)
 +   return paid ? done() : backToCart()
 ```
+### Why choose B
+- Nobody pays twice, and it ships today.
+### Why pass on B
+- If the first charge failed, the customer retries from their cart.
+### Assumptions B makes
+- The processor answers a status check in under 5 s (its docs say 1 s).
+
 [Design notes on all three](design.md)
 :::
 
@@ -59,6 +73,13 @@ Nobody pays twice, but they wait for an email.
 +   await hold(order)
 +   return emailWhenSettled(order)
 ```
+### Why choose C
+- Nobody pays twice, even when the processor can’t answer at all.
+### Why pass on C
+- The customer waits for an email, and it takes a day to build.
+### Assumptions C makes
+- Customers will wait for an email instead of buying elsewhere.
+
 [Design notes on all three](design.md)
 :::
 

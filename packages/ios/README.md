@@ -54,11 +54,16 @@ TEST_RUNNER_AGENTPAGER_SERVER_URL=http://<mac-ip>:8787 TEST_RUNNER_SCREENSHOT_DI
 
 ## Decision briefs
 
-A brief card (`card.type: "brief"`) draws as the canvas's headed template: Context, Options (tap a row to see that
-option; it never chooses it), Tradeoffs, Recommendation, Next steps and Small print, each folded by its heading,
-with the answer tiles and "Ask for changes" / "Send option X" below. Attachments load from
-`/api/sessions/<id>/cards/<decisionId>/files/<name>` with the phone key; Markdown pages open in the sheet, Mermaid
-flowcharts are drawn on the phone (anything else shows its source).
+A brief card (`card.type: "brief"`) draws as the canvas's headed template, laid out inset-grouped: "Decision: " and
+the question, then each section's heading above its own card. Context; Decision Options (the Tradeoffs table, with
+the picked option's column outlined, and a row to the Options screen); Recommendation; Next steps and Small print,
+folded at first. The Options screen shows one option at a time, switched by swiping or the segmented control at
+the bottom; it never chooses one. Each option reads what it changes, why to choose it, why to pass on it and what
+it assumes, then what it looks like. Below the brief are the tinted answer buttons and "Ask for changes" / "Send
+option X". Attachments load from
+`/api/sessions/<id>/cards/<decisionId>/files/<name>` with the phone key; Markdown pages open in the sheet, images one
+after another show as a strip of thumbnails that opens full screen and swipes, Mermaid flowcharts are drawn on the phone
+(anything else shows its source).
 
 `BriefTests` plays the owner for the canvas's four examples and keeps every screenshot in the test result. A real
 agent asks them first, over MCP, from `../app`:

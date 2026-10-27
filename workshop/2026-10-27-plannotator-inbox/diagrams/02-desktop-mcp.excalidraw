@@ -1,0 +1,550 @@
+{
+  "type": "excalidraw",
+  "version": 2,
+  "source": "https://github.com/excalidraw/excalidraw-mcp",
+  "elements": [
+    {
+      "type": "text",
+      "id": "2-1",
+      "x": 28,
+      "y": 22,
+      "text": "2 · Desktop + remote MCP",
+      "fontSize": 30,
+      "strokeColor": "#25283b",
+      "fontFamily": 2,
+      "width": 446.4,
+      "height": 37.5
+    },
+    {
+      "type": "rectangle",
+      "id": "2-2",
+      "x": 25,
+      "y": 100,
+      "width": 375,
+      "height": 650,
+      "backgroundColor": "#f5f3fc",
+      "strokeColor": "#a9b1c1",
+      "roughness": 0,
+      "strokeWidth": 1,
+      "roundness": {
+        "type": 3
+      }
+    },
+    {
+      "type": "rectangle",
+      "id": "2-3",
+      "x": 465,
+      "y": 100,
+      "width": 295,
+      "height": 650,
+      "backgroundColor": "#f5f6fb",
+      "strokeColor": "#a9b1c1",
+      "roughness": 0,
+      "strokeWidth": 1,
+      "roundness": {
+        "type": 3
+      }
+    },
+    {
+      "type": "rectangle",
+      "id": "2-4",
+      "x": 825,
+      "y": 100,
+      "width": 350,
+      "height": 650,
+      "backgroundColor": "#f5f6fb",
+      "strokeColor": "#a9b1c1",
+      "roughness": 0,
+      "strokeWidth": 1,
+      "roundness": {
+        "type": 3
+      }
+    },
+    {
+      "type": "text",
+      "id": "2-5",
+      "x": 48,
+      "y": 118,
+      "text": "YOUR AGENT MACHINE",
+      "fontSize": 19,
+      "strokeColor": "#374151",
+      "fontFamily": 2,
+      "width": 212.04,
+      "height": 23.75
+    },
+    {
+      "type": "text",
+      "id": "2-6",
+      "x": 488,
+      "y": 118,
+      "text": "CLOUD SERVICES",
+      "fontSize": 19,
+      "strokeColor": "#374151",
+      "fontFamily": 2,
+      "width": 164.92,
+      "height": 23.75
+    },
+    {
+      "type": "text",
+      "id": "2-7",
+      "x": 848,
+      "y": 118,
+      "text": "YOUR IPHONE",
+      "fontSize": 19,
+      "strokeColor": "#374151",
+      "fontFamily": 2,
+      "width": 129.58,
+      "height": 23.75
+    },
+    {
+      "type": "rectangle",
+      "id": "2-8",
+      "x": 50,
+      "y": 175,
+      "width": 325,
+      "height": 110,
+      "backgroundColor": "#eeebfa",
+      "strokeColor": "#565166",
+      "roughness": 0,
+      "strokeWidth": 1,
+      "roundness": {
+        "type": 3
+      }
+    },
+    {
+      "type": "text",
+      "id": "2-8-label",
+      "x": 62.46000000000001,
+      "y": 202.5,
+      "width": 300.08,
+      "height": 55,
+      "text": "Codex desktop app\n+ coding-agent runtime",
+      "fontSize": 22,
+      "fontFamily": 2,
+      "strokeColor": "#565166",
+      "textAlign": "center",
+      "verticalAlign": "middle"
+    },
+    {
+      "type": "rectangle",
+      "id": "2-9",
+      "x": 490,
+      "y": 175,
+      "width": 245,
+      "height": 95,
+      "backgroundColor": "#ffffff",
+      "strokeColor": "#565166",
+      "roughness": 0,
+      "strokeWidth": 1,
+      "roundness": {
+        "type": 3
+      }
+    },
+    {
+      "type": "text",
+      "id": "2-9-label",
+      "x": 513.3,
+      "y": 197.5,
+      "width": 198.4,
+      "height": 50,
+      "text": "OpenAI model API\n(inference)",
+      "fontSize": 20,
+      "fontFamily": 2,
+      "strokeColor": "#565166",
+      "textAlign": "center",
+      "verticalAlign": "middle"
+    },
+    {
+      "type": "arrow",
+      "id": "2-10",
+      "x": 375,
+      "y": 215,
+      "width": 115,
+      "height": 0,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          115,
+          0
+        ]
+      ],
+      "strokeColor": "#8991a1",
+      "roughness": 0,
+      "strokeWidth": 2,
+      "strokeStyle": "dashed",
+      "endArrowhead": "arrow",
+      "startArrowhead": "arrow"
+    },
+    {
+      "type": "text",
+      "id": "2-10-label",
+      "x": 407.7,
+      "y": 205,
+      "width": 49.6,
+      "height": 20,
+      "text": "HTTPS",
+      "fontSize": 16,
+      "fontFamily": 2,
+      "strokeColor": "#8991a1",
+      "textAlign": "center",
+      "verticalAlign": "middle"
+    },
+    {
+      "type": "text",
+      "id": "2-11",
+      "x": 492,
+      "y": 292,
+      "text": "Unchanged in every scenario",
+      "fontSize": 16,
+      "strokeColor": "#737b8d",
+      "fontFamily": 2,
+      "width": 267.84,
+      "height": 20
+    },
+    {
+      "type": "rectangle",
+      "id": "2-12",
+      "x": 490,
+      "y": 445,
+      "width": 245,
+      "height": 145,
+      "backgroundColor": "#ffffff",
+      "strokeColor": "#565166",
+      "roughness": 0,
+      "strokeWidth": 1,
+      "roundness": {
+        "type": 3
+      }
+    },
+    {
+      "type": "text",
+      "id": "2-12-label",
+      "x": 494.7,
+      "y": 493.75,
+      "width": 235.6,
+      "height": 47.5,
+      "text": "AgentPager relay\nremote MCP + storage",
+      "fontSize": 19,
+      "fontFamily": 2,
+      "strokeColor": "#565166",
+      "textAlign": "center",
+      "verticalAlign": "middle"
+    },
+    {
+      "type": "rectangle",
+      "id": "2-13",
+      "x": 850,
+      "y": 445,
+      "width": 300,
+      "height": 145,
+      "backgroundColor": "#ffffff",
+      "strokeColor": "#565166",
+      "roughness": 0,
+      "strokeWidth": 1,
+      "roundness": {
+        "type": 3
+      }
+    },
+    {
+      "type": "text",
+      "id": "2-13-label",
+      "x": 811.52,
+      "y": 481.875,
+      "width": 376.96,
+      "height": 71.25,
+      "text": "AgentPager on iPhone\nSafari today\nNative app is a separate upgrade",
+      "fontSize": 19,
+      "fontFamily": 2,
+      "strokeColor": "#565166",
+      "textAlign": "center",
+      "verticalAlign": "middle"
+    },
+    {
+      "type": "rectangle",
+      "id": "2-14",
+      "x": 50,
+      "y": 445,
+      "width": 325,
+      "height": 145,
+      "backgroundColor": "#ffffff",
+      "strokeColor": "#565166",
+      "roughness": 0,
+      "strokeWidth": 1,
+      "roundness": {
+        "type": 3
+      }
+    },
+    {
+      "type": "text",
+      "id": "2-14-label",
+      "x": 77.03,
+      "y": 481.875,
+      "width": 270.94,
+      "height": 71.25,
+      "text": "Built-in MCP client\n(part of Codex desktop)\nNo AgentPager binary",
+      "fontSize": 19,
+      "fontFamily": 2,
+      "strokeColor": "#565166",
+      "textAlign": "center",
+      "verticalAlign": "middle"
+    },
+    {
+      "type": "arrow",
+      "id": "2-15",
+      "x": 215,
+      "y": 285,
+      "width": 0,
+      "height": 160,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          160
+        ]
+      ],
+      "strokeColor": "#6044be",
+      "roughness": 0,
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "endArrowhead": "arrow",
+      "startArrowhead": "arrow"
+    },
+    {
+      "type": "text",
+      "id": "2-15-label",
+      "x": 125.72,
+      "y": 355,
+      "width": 178.56,
+      "height": 20,
+      "text": "Tool call / result",
+      "fontSize": 16,
+      "fontFamily": 2,
+      "strokeColor": "#6044be",
+      "textAlign": "center",
+      "verticalAlign": "middle"
+    },
+    {
+      "type": "arrow",
+      "id": "2-16",
+      "x": 375,
+      "y": 480,
+      "width": 115,
+      "height": 0,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          115,
+          0
+        ]
+      ],
+      "strokeColor": "#6044be",
+      "roughness": 0,
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "endArrowhead": "arrow",
+      "startArrowhead": null
+    },
+    {
+      "type": "text",
+      "id": "2-16-label",
+      "x": 377.94,
+      "y": 460,
+      "width": 109.12,
+      "height": 40,
+      "text": "1 ASK\nMCP / HTTPS",
+      "fontSize": 16,
+      "fontFamily": 2,
+      "strokeColor": "#6044be",
+      "textAlign": "center",
+      "verticalAlign": "middle"
+    },
+    {
+      "type": "arrow",
+      "id": "2-17",
+      "x": 490,
+      "y": 555,
+      "width": -115,
+      "height": 0,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          -115,
+          0
+        ]
+      ],
+      "strokeColor": "#6044be",
+      "roughness": 0,
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "endArrowhead": "arrow",
+      "startArrowhead": null
+    },
+    {
+      "type": "text",
+      "id": "2-17-label",
+      "x": 368.02,
+      "y": 535,
+      "width": 128.96,
+      "height": 40,
+      "text": "4 ANSWER\nMCP wait tool",
+      "fontSize": 16,
+      "fontFamily": 2,
+      "strokeColor": "#6044be",
+      "textAlign": "center",
+      "verticalAlign": "middle"
+    },
+    {
+      "type": "arrow",
+      "id": "2-18",
+      "x": 735,
+      "y": 480,
+      "width": 115,
+      "height": 0,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          115,
+          0
+        ]
+      ],
+      "strokeColor": "#6044be",
+      "roughness": 0,
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "endArrowhead": "arrow",
+      "startArrowhead": null
+    },
+    {
+      "type": "text",
+      "id": "2-18-label",
+      "x": 742.9,
+      "y": 460,
+      "width": 99.2,
+      "height": 40,
+      "text": "2 CARD\nHTTPS read",
+      "fontSize": 16,
+      "fontFamily": 2,
+      "strokeColor": "#6044be",
+      "textAlign": "center",
+      "verticalAlign": "middle"
+    },
+    {
+      "type": "arrow",
+      "id": "2-19",
+      "x": 850,
+      "y": 555,
+      "width": -115,
+      "height": 0,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          -115,
+          0
+        ]
+      ],
+      "strokeColor": "#6044be",
+      "roughness": 0,
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "endArrowhead": "arrow",
+      "startArrowhead": null
+    },
+    {
+      "type": "text",
+      "id": "2-19-label",
+      "x": 742.9,
+      "y": 535,
+      "width": 99.2,
+      "height": 40,
+      "text": "3 SEND\nHTTPS POST",
+      "fontSize": 16,
+      "fontFamily": 2,
+      "strokeColor": "#6044be",
+      "textAlign": "center",
+      "verticalAlign": "middle"
+    },
+    {
+      "type": "text",
+      "id": "2-20",
+      "x": 50,
+      "y": 625,
+      "text": "Model/caller must maintain the wait.\nNo automatic next-turn delivery.",
+      "fontSize": 18,
+      "strokeColor": "#374151",
+      "fontFamily": 2,
+      "width": 401.76,
+      "height": 45
+    },
+    {
+      "type": "text",
+      "id": "2-21",
+      "x": 490,
+      "y": 625,
+      "text": "Service receipt confirms storage.\nAgent acknowledgement is separate.",
+      "fontSize": 16,
+      "strokeColor": "#374151",
+      "fontFamily": 2,
+      "width": 337.28,
+      "height": 40
+    },
+    {
+      "type": "text",
+      "id": "2-22",
+      "x": 850,
+      "y": 625,
+      "text": "Phone polls every 3s today.\nNo direct phone-to-laptop access.",
+      "fontSize": 17,
+      "strokeColor": "#374151",
+      "fontFamily": 2,
+      "width": 347.82,
+      "height": 42.5
+    },
+    {
+      "type": "text",
+      "id": "2-23",
+      "x": 28,
+      "y": 798,
+      "text": "CURRENT CONTRACT · Waits hold up to 50s; caller repeats on pending.",
+      "fontSize": 21,
+      "strokeColor": "#374151",
+      "fontFamily": 2,
+      "width": 872.34,
+      "height": 26.25
+    },
+    {
+      "type": "text",
+      "id": "2-24",
+      "x": 28,
+      "y": 835,
+      "text": "Agent machine must be awake and online. AgentPager carries the decision; Codex executes the work.",
+      "fontSize": 18,
+      "strokeColor": "#62677d",
+      "fontFamily": 2,
+      "width": 1082.52,
+      "height": 22.5
+    }
+  ],
+  "appState": {
+    "gridSize": null,
+    "viewBackgroundColor": "#ffffff"
+  },
+  "files": {}
+}

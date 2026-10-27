@@ -1,6 +1,6 @@
 # Plannotator Inbox: what AgentPager should borrow
 
-[Read the HTML report](report.html) — an offline page with the delivery flow, implementation alternatives and the full research evidence.
+[Compare Codex architecture scenarios](scenarios.html) · [Read the HTML report](report.html) — an offline page with the delivery flow, implementation alternatives and the full research evidence.
 
 Research date: 2026-10-27. Recommendation, not an approved change to the Blueprint.
 

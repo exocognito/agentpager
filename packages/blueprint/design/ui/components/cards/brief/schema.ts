@@ -146,14 +146,41 @@ export function base64Bytes(text: string): Uint8Array | null {
   if (text.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/.test(text)) return null;
   try { return Uint8Array.from(atob(text), c => c.charCodeAt(0)); } catch { return null; }
 }
-// Starts and ends the way the format requires: PNG's signature, IHDR first and IEND last; JPEG's start and end of
-// image markers. The phone's image decoder sees only bytes shaped like their type.
+// The file's structure, walked end to end: a PNG's chunks from IHDR (with a size) through image data to IEND at
+// the very end; a JPEG's segments from its start marker through a frame header to the scan, and its end marker.
+// The Worker has no image decoder, so pixel data itself is not decoded; the phone shows a placeholder if it fails.
 const has = (bytes: Uint8Array, at: number, want: number[]) => at >= 0 && want.every((b, i) => bytes[at + i] === b);
-const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], IHDR = [0x49, 0x48, 0x44, 0x52], IEND = [0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82];
-const shaped: Record<"image/png" | "image/jpeg", (b: Uint8Array) => boolean> = {
-  "image/png": b => b.length >= 57 && has(b, 0, PNG_SIGNATURE) && has(b, 12, IHDR) && has(b, b.length - 8, IEND),
-  "image/jpeg": b => b.length >= 4 && has(b, 0, [0xff, 0xd8, 0xff]) && has(b, b.length - 2, [0xff, 0xd9]),
-};
+const u32 = (b: Uint8Array, at: number) => ((b[at] << 24) >>> 0) + (b[at + 1] << 16) + (b[at + 2] << 8) + b[at + 3];
+const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+function wholePng(b: Uint8Array) {
+  if (!has(b, 0, PNG_SIGNATURE)) return false;
+  let at = 8, data = false;
+  while (at + 12 <= b.length) {
+    const length = u32(b, at), type = String.fromCharCode(...b.subarray(at + 4, at + 8)), end = at + 12 + length;
+    if (end > b.length) return false;
+    if (at === 8 && (type !== "IHDR" || length !== 13 || u32(b, at + 8) === 0 || u32(b, at + 12) === 0)) return false;
+    if (type === "IDAT") data = true;
+    if (type === "IEND") return data && end === b.length;
+    at = end;
+  }
+  return false;
+}
+function wholeJpeg(b: Uint8Array) {
+  if (!has(b, 0, [0xff, 0xd8]) || !has(b, b.length - 2, [0xff, 0xd9])) return false;
+  let at = 2, frame = false;
+  while (at + 4 <= b.length - 2) {
+    if (b[at] !== 0xff) return false;
+    const marker = b[at + 1];
+    if (marker === 0xff) { at++; continue; }
+    const length = (b[at + 2] << 8) + b[at + 3];
+    if (length < 2 || at + 2 + length > b.length - 2) return false;
+    if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) frame = true;
+    if (marker === 0xda) return frame;
+    at += 2 + length;
+  }
+  return false;
+}
+const shaped: Record<"image/png" | "image/jpeg", (b: Uint8Array) => boolean> = { "image/png": wholePng, "image/jpeg": wholeJpeg };
 export const utf8Bytes = (text: string) => new TextEncoder().encode(text).length;
 
 export const PageInput = Schema.Struct({ name: AttachmentName, type: Schema.Literal("text/markdown"), text: BriefMarkdown }).pipe(Schema.filter(named));

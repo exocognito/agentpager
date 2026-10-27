@@ -47,16 +47,22 @@ it("needs every image and relative link to be an attachment of its kind; https l
   expect(missingAttachment("[Site](http://example.com)", names)).toMatch(/neither/);
   expect(missingAttachment("```\n[More](notes.md)\n```", names)).toBeUndefined();
 });
-it("refuses an image that is only the start of one", () => {
-  const png = (bytes: number[]) => ({ name: "a.png", type: "image/png", base64: btoa(String.fromCharCode(...bytes)) });
-  const jpeg = (bytes: number[]) => ({ name: "a.jpg", type: "image/jpeg", base64: btoa(String.fromCharCode(...bytes)) });
-  const header = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52, ...Array(29).fill(0)];
-  const iend = [0, 0, 0, 0, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82];
-  const ask = (a: unknown, name: string) => brief(ok + `\n![x](${name})`, { attachments: [a] });
-  expect(Schema.is(QuestionInput)(ask(png([...header, ...iend]), "a.png"))).toBe(true);
-  expect(Schema.is(QuestionInput)(ask(png(header), "a.png"))).toBe(false);
-  expect(Schema.is(QuestionInput)(ask(jpeg([0xff, 0xd8, 0xff]), "a.jpg"))).toBe(false);
-  expect(Schema.is(QuestionInput)(ask(jpeg([0xff, 0xd8, 0xff, 0xe0, 0, 0xff, 0xd9]), "a.jpg"))).toBe(true);
+it("refuses an image whose structure is not whole", () => {
+  const ask = (type: string, name: string, base64: string) => brief(ok + `\n![x](${name})`, { attachments: [{ name, type, base64 }] });
+  const png = (bytes: number[]) => ask("image/png", "a.png", btoa(String.fromCharCode(...bytes)));
+  const jpeg = (bytes: number[]) => ask("image/jpeg", "a.jpg", btoa(String.fromCharCode(...bytes)));
+  // A real 1×1 PNG.
+  const dot = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+  expect(Schema.is(QuestionInput)(ask("image/png", "a.png", dot))).toBe(true);
+  const bytes = Array.from(atob(dot), c => c.charCodeAt(0));
+  const ihdr = bytes.slice(0, 33), iend = bytes.slice(-12);
+  expect(Schema.is(QuestionInput)(png([...ihdr, ...iend]))).toBe(false); // no image data
+  expect(Schema.is(QuestionInput)(png(bytes.slice(0, -12)))).toBe(false); // no IEND
+  expect(Schema.is(QuestionInput)(png([...bytes, 0]))).toBe(false); // bytes after IEND
+  const sof = [0xff, 0xc0, 0, 11, 8, 0, 1, 0, 1, 1, 1, 0x11, 0], sos = [0xff, 0xda, 0, 8, 1, 1, 0, 0, 0x3f, 0];
+  expect(Schema.is(QuestionInput)(jpeg([0xff, 0xd8, ...sof, ...sos, 0x12, 0x34, 0xff, 0xd9]))).toBe(true);
+  expect(Schema.is(QuestionInput)(jpeg([0xff, 0xd8, 0xff, 0xe0, 0, 0xff, 0xd9]))).toBe(false); // markers only
+  expect(Schema.is(QuestionInput)(jpeg([0xff, 0xd8, ...sos, 0xff, 0xd9]))).toBe(false); // no frame header
 });
 it("gives each option its number's keycap for phones from before briefs, unless the agent chose an emoji", () => {
   const card = Schema.decodeUnknownSync(Payload)({ type: "brief", options: [...options.slice(0, 1), { ...options[1], emoji: "🗂️" }], recommended: 1, markdown: ok });

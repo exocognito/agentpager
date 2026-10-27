@@ -5,7 +5,7 @@ import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import * as C from './contract.ts';
 import { BUILD, forward, type Env } from './env.ts';
-import { body, decode, emptyBody, iso, json, refusal, sha256, token } from './shared.ts';
+import { body, decode, emptyBody, iso, json, read, refusal, sha256, token } from './shared.ts';
 import { codeDocument, codePage, OLD_CONNECT, startDocument } from './start.ts';
 import { PushTarget } from './push.ts';
 import { AttachmentName } from '../../blueprint/design/ui/components/cards/brief/schema.ts';
@@ -52,7 +52,9 @@ async function optionalBody(request: Request): Promise<unknown> {
 // Public HTTPS routes -> one pager object (or the registry for link codes).
 async function api(request: Request, env: Env, origin: string): Promise<Response> {
   const u = new URL(request.url), method = request.method, parts = u.pathname.split('/').filter(Boolean).slice(1);
-  const pass = async (sessionId: string, path: string) => forward(env.SESSION, sessionId, path + u.search, { method, headers: request.headers, body: method === 'GET' ? undefined : await request.arrayBuffer() });
+  const pass = async (sessionId: string, path: string) => method === 'GET'
+    ? read(path + u.search, p => forward(env.SESSION, sessionId, p, { method, headers: request.headers }))
+    : forward(env.SESSION, sessionId, path + u.search, { method, headers: request.headers, body: await request.arrayBuffer() });
   if (parts.length === 1 && parts[0] === 'sessions' && method === 'POST') {
     const input = decode(C.CreateInput, await body(request));
     return init(env, request, origin, 'agent', input.name, input.lifetime ?? C.DEFAULT_LIFETIME);
@@ -112,7 +114,7 @@ const descriptions = (origin: string): Record<keyof typeof C.MCP_TOOLS, string> 
   join_session: `Join the pager your owner's phone made, using the code from their AgentPager link (${origin}/start/<code>); links from other servers will not work here. Only the first join works. Print pairingCode.text to your owner verbatim as plain text; never show agentKey, and keep sessionId and agentKey for later turns. Then call ask_card right away.`,
   page_owner: `Open a new pager on your owner's phone with the pager number they gave you (for example in AGENTS.md), on the AgentPager server ${origin}. It is paired already: there is no link or code to show. Open one pager for your piece of work and keep it for every question. lifetime is 24h (default), 7d or 30d. Never show agentKey or the number; keep sessionId and agentKey for later turns. Then call ask_card. Full guide: ${origin}/start`,
   ask_card: `Ask your owner one decision as a "brief" card: a Markdown decision brief with 2 to 4 lettered options (number 1 is A) and optional attachments. Read "Decision briefs" in ${origin}/start before your first one; emoji ("generic") cards are refused. Works before pairing (the phone shows it once paired). At most 10 open decisions per pager. Replies {decisionId}.`,
-  wait_for_card_answer: 'Hold a read for up to 50 seconds. Replies {status:"pending"} (read again) or {status:"answered", answer:{answerId, choice, ...}}. Keep reading while you have nothing better to do; if your turn ends, the answer waits for your next turn.',
+  wait_for_card_answer: 'Hold a read for up to 50 seconds. Replies {status:"pending"} (read again) or {status:"answered", answer:{answerId, choice, ...}}. On InternalError, read again after a few seconds. Keep reading while you have nothing better to do; if your turn ends, the answer waits for your next turn.',
   acknowledge_card: 'Acknowledge the exact answerId with your next steps; your owner sees them with a green tick. Only the first acknowledgement counts.',
   finish_session: 'End the pager when your work is done. Your key stops working.',
 });

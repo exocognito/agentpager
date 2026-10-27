@@ -112,6 +112,7 @@ test('briefs: refused whole, with a reason that says what to fix', { timeout: 12
       const e = await f.refused(400, 'InvalidInput', cards, { agent: s.agentKey, data });
       assert.match(e.reason ?? '', reason, `${label}: ${e.reason}`);
     }
+    await f.refused(401, 'Unauthorized', cards, { agent: token(), data: emojiCard });
     const inbox = await f.inbox(s.session.sessionId, phone);
     assert.equal(inbox.open.length, 0, 'nothing refused was stored');
 

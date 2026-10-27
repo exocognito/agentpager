@@ -40,8 +40,11 @@ export async function fixture(name: string, lifetimes = { windowMs: 60_000, life
   const persist = path.join(directory, 'persist');
   let child: ChildProcess | undefined;
   const log = createWriteStream(path.join(evidence, 'server.log'));
-  child = spawn(process.execPath, ['scripts/start.mjs'], { cwd: app, detached: true, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, PORT: String(serverPort), AGENTPAGER_INSPECTOR_PORT: String(inspector), AGENTPAGER_PERSIST: persist, AGENTPAGER_BUILD_DIR: path.join(directory, 'build'), AGENTPAGER_UNPAIRED_MS: String(lifetimes.windowMs), AGENTPAGER_SESSION_MS: String(lifetimes.lifetimeMs), AGENTPAGER_RETAIN_MS: String(lifetimes.retainMs) } });
-  child.stdout?.pipe(log); child.stderr?.pipe(log);
+  async function launch() {
+    child = spawn(process.execPath, ['scripts/start.mjs'], { cwd: app, detached: true, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, PORT: String(serverPort), AGENTPAGER_INSPECTOR_PORT: String(inspector), AGENTPAGER_PERSIST: persist, AGENTPAGER_BUILD_DIR: path.join(directory, 'build'), AGENTPAGER_UNPAIRED_MS: String(lifetimes.windowMs), AGENTPAGER_SESSION_MS: String(lifetimes.lifetimeMs), AGENTPAGER_RETAIN_MS: String(lifetimes.retainMs) } });
+    child.stdout?.pipe(log, { end: false }); child.stderr?.pipe(log, { end: false });
+    try { await until(async () => (await fetch(origin + '/start')).status, s => s === 200, 90_000); } catch (e) { await stop(); throw e; }
+  }
   async function stop() {
     const pid = child?.pid; if (!pid) return;
     const gone = () => { try { process.kill(-pid, 0); return false; } catch { return true; } };
@@ -51,7 +54,9 @@ export async function fixture(name: string, lifetimes = { windowMs: 60_000, life
     for (let n = 0; n < 30 && !gone(); n++) await pause(100);
     assert.ok(gone(), 'started process group is gone'); child = undefined;
   }
-  try { await until(async () => (await fetch(origin + '/start')).status, s => s === 200, 90_000); } catch (e) { await stop(); throw e; }
+  // Stops the server and starts it again on the same port and data, as a deploy does.
+  async function restart() { await stop(); await launch(); }
+  await launch();
 
   async function request(route: string, opts: { method?: string; data?: unknown; agent?: string; phone?: string; raw?: string } = {}) {
     const r = await fetch(origin + route, { method: opts.method || (opts.data !== undefined || opts.raw !== undefined ? 'POST' : 'GET'), headers: { ...(opts.agent ? { authorization: `Bearer ${opts.agent}` } : {}), ...(opts.phone ? { 'x-phone-key': opts.phone } : {}), 'content-type': 'application/json' }, body: opts.raw ?? (opts.data === undefined ? undefined : JSON.stringify(opts.data)) });
@@ -83,7 +88,7 @@ export async function fixture(name: string, lifetimes = { windowMs: 60_000, life
     return { s, phone, session: p.session };
   }
   async function artifact(file: string, value: unknown) { await writeFile(path.join(evidence, file), typeof value === 'string' ? value : JSON.stringify(value, null, 2)); }
-  return { origin, evidence, persist, stop, request, ok, refused, create, phoneCreate, join, info, pair, inbox, ask, answer, read, ack, paired, artifact, lifetimes };
+  return { origin, evidence, persist, stop, restart, request, ok, refused, create, phoneCreate, join, info, pair, inbox, ask, answer, read, ack, paired, artifact, lifetimes };
 }
 // Three emojis from the palette that are not the code at some position.
 export function wrongCode(palette: ReadonlyArray<{ emoji: string }>, right: ReadonlyArray<string>) {

@@ -186,10 +186,10 @@ async function serve(request: Request, env: Env) {
   }
   if (u.pathname === '/favicon.ico') return new Response(null, { status: 204 });
   if (u.pathname === '/' && !isBrowser(request)) return text(`# AgentPager\n\nAgents start at ${origin}/start.\n`, 'text/markdown');
-  // The web app is parked; its bundle is still served as it was.
-  const page = u.pathname === '/' || u.pathname === '/app';
-  if (!page && !u.pathname.startsWith('/assets/')) return json({ error: 'NotFound', message: 'No such page. Agents read /start.' }, 404);
-  const asset = await env.ASSETS.fetch(new URL(page ? '/index.html' : u.pathname, u.origin).href);
+  // The owner's side is the iPhone app, so the web serves the front page alone; the old web app's address leads there.
+  if (u.pathname === '/app') return Response.redirect(origin + '/', 302);
+  if (u.pathname !== '/' && !u.pathname.startsWith('/assets/')) return json({ error: 'NotFound', message: 'No such page. Agents read /start.' }, 404);
+  const asset = await env.ASSETS.fetch(new URL(u.pathname === '/' ? '/index.html' : u.pathname, u.origin).href);
   return new Response(await asset.arrayBuffer(), { status: asset.status, headers: Object.fromEntries(asset.headers) });
 }
 export default {

@@ -535,3 +535,9 @@
     padding: 40px 20px;
   }
 }
+
+/* A download button with nowhere to go yet: the App Store page is not published. */
+.mk-soon {
+  opacity: 0.5;
+  cursor: default;
+}

@@ -1,5 +1,7 @@
 # Plannotator Inbox: what AgentPager should borrow
 
+[Read the HTML report](report.html) — an offline page with the delivery flow, implementation alternatives and the full research evidence.
+
 Research date: 2026-10-27. Recommendation, not an approved change to the Blueprint.
 
 **Recommendation:** keep AgentPager's installation-free HTTPS/MCP entry point, and evaluate an optional local bridge that receives answers outside the model and delivers them to the exact agent session. The major improvement is automatic continuation after the agent stops waiting. Replacing long polling with a socket alone does not provide that.

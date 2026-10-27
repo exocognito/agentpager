@@ -44,7 +44,7 @@ describe('the agent start document', () => {
   it('explains nested results, choices, required text and input bounds', () => {
     const document = startDocument();
     expect(document).toContain('never blank');
-    expect(document).toContain('2 to 5');
+    expect(document).toContain('2 to 4 options');
     expect(document).toContain('one Unicode RGI emoji');
     expect(document).toContain('8 code points');
     expect(document).toContain('32 URL-safe');
@@ -94,7 +94,8 @@ describe('the agent start document', () => {
   });
 
   it('decodes every documented card and keeps one tool set', () => {
-    for (const card of Object.values(CARD_EXAMPLES)) expect(Schema.is(Card)(card)).toBe(true);
+    // What an agent sends: every documented card is a question the schema takes, not only a card some decision holds.
+    for (const card of Object.values(CARD_EXAMPLES)) expect(Schema.is(QuestionInput)({ title: 'Documented card', card })).toBe(true);
     expect(Object.keys(MCP_TOOLS).sort()).toEqual(['acknowledge_card', 'ask_card', 'finish_session', 'join_session', 'start_session', 'wait_for_card_answer']);
   });
 

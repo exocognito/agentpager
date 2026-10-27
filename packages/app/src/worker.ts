@@ -60,6 +60,7 @@ async function api(request: Request, env: Env, origin: string): Promise<Response
     return init(env, request, origin, 'agent', input.name, input.lifetime ?? C.DEFAULT_LIFETIME);
   }
   if (parts.length === 1 && parts[0] === 'pagers' && method === 'POST') {
+    await phoneHash(request);
     const input = decode(C.PhoneCreateInput, await optionalBody(request));
     return init(env, request, origin, 'phone', null, input.lifetime ?? C.DEFAULT_LIFETIME);
   }
@@ -118,6 +119,15 @@ const descriptions = (origin: string): Record<keyof typeof C.MCP_TOOLS, string> 
   acknowledge_card: 'Acknowledge the exact answerId with your next steps; your owner sees them with a green tick. Only the first acknowledgement counts.',
   finish_session: 'End the pager when your work is done. Your key stops working.',
 });
+// A keyed tool call is decoded only as far as routing needs: the pager's and the decision's ids. The key goes on only
+// when well formed (a malformed key is no key, as over HTTP), and the question, acknowledgement and wait go on as
+// sent, so the pager checks the key before any of them (I4). tools/list still lists the full schemas.
+const Keyed = { sessionId: C.Token, agentKey: Schema.optional(Schema.Unknown) };
+const AskCall = Schema.Struct({ ...Keyed, question: Schema.optional(Schema.Unknown) });
+const WaitCall = Schema.Struct({ ...Keyed, decisionId: C.Token, waitSeconds: Schema.optional(Schema.Unknown) });
+const AckCall = Schema.Struct({ ...Keyed, decisionId: C.Token, acknowledgement: Schema.optional(Schema.Unknown) });
+const FinishCall = Schema.Struct(Keyed);
+const keyOf = (value: unknown) => Schema.is(C.Token)(value) ? value : undefined;
 async function mcp(request: Request, env: Env, origin: string) {
   // Stateless JSON replies only: never let the SDK open a GET event stream.
   if (request.method !== 'POST') {
@@ -128,20 +138,23 @@ async function mcp(request: Request, env: Env, origin: string) {
   server.setRequestHandler(CallToolRequestSchema, async (call) => {
     const raw = call.params.arguments;
     try {
-      let path: string, method = 'POST', data: unknown, agentKey: string | undefined;
+      let path: string, method = 'POST', data: unknown, agentKey: string | undefined, missing: string | undefined;
       switch (call.params.name) {
         case 'start_session': { data = decode(C.MCP_TOOLS.start_session.input, raw); path = '/api/sessions'; break; }
         case 'join_session': { const p = decode(C.MCP_TOOLS.join_session.input, raw); path = `/api/start/${p.code}/join`; data = { name: p.name }; break; }
         case 'page_owner': { const p = decode(C.MCP_TOOLS.page_owner.input, raw); path = `/api/numbers/${p.number}/pagers`; data = { name: p.name, ...(p.lifetime ? { lifetime: p.lifetime } : {}) }; break; }
-        case 'ask_card': { const p = decode(C.MCP_TOOLS.ask_card.input, raw); path = `/api/sessions/${p.sessionId}/cards`; data = p.question; agentKey = p.agentKey; break; }
-        case 'wait_for_card_answer': { const p = decode(C.MCP_TOOLS.wait_for_card_answer.input, raw); path = `/api/sessions/${p.sessionId}/cards/${p.decisionId}/answer?wait=${p.waitSeconds ?? C.ANSWER_WAIT_MAX_SECONDS}`; method = 'GET'; agentKey = p.agentKey; break; }
-        case 'acknowledge_card': { const p = decode(C.MCP_TOOLS.acknowledge_card.input, raw); path = `/api/sessions/${p.sessionId}/cards/${p.decisionId}/acknowledge`; data = p.acknowledgement; agentKey = p.agentKey; break; }
-        case 'finish_session': { const p = decode(C.MCP_TOOLS.finish_session.input, raw); path = `/api/sessions/${p.sessionId}/finish`; agentKey = p.agentKey; break; }
+        case 'ask_card': { const p = decode(AskCall, raw); path = `/api/sessions/${p.sessionId}/cards`; data = p.question; agentKey = keyOf(p.agentKey); if (p.question === undefined) [missing, path, method] = ['question', `/api/sessions/${p.sessionId}`, 'GET']; break; }
+        // waitSeconds goes on as JSON, so the pager refuses a string or a fraction just as the schema would.
+        case 'wait_for_card_answer': { const p = decode(WaitCall, raw); path = `/api/sessions/${p.sessionId}/cards/${p.decisionId}/answer?wait=${p.waitSeconds === undefined ? C.ANSWER_WAIT_MAX_SECONDS : encodeURIComponent(JSON.stringify(p.waitSeconds))}`; method = 'GET'; agentKey = keyOf(p.agentKey); break; }
+        case 'acknowledge_card': { const p = decode(AckCall, raw); path = `/api/sessions/${p.sessionId}/cards/${p.decisionId}/acknowledge`; data = p.acknowledgement; agentKey = keyOf(p.agentKey); if (p.acknowledgement === undefined) [missing, path, method] = ['acknowledgement', `/api/sessions/${p.sessionId}`, 'GET']; break; }
+        case 'finish_session': { const p = decode(FinishCall, raw); path = `/api/sessions/${p.sessionId}/finish`; agentKey = keyOf(p.agentKey); break; }
         default: throw C.refuse.invalid('Unknown tool. Read /start.');
       }
       let response: Response;
       try { response = await api(new Request(origin + path, { method, headers: { ...(agentKey ? { authorization: `Bearer ${agentKey}` } : {}), 'content-type': 'application/json' }, body: data === undefined ? undefined : JSON.stringify(data) }), env, origin); }
       catch (error) { response = refusal(error); }
+      // A missing question or acknowledgement is named only once the pager has taken the key, by reading its status.
+      if (missing && response.ok) response = refusal(C.refuse.invalid(`${missing}: is missing`));
       const result: unknown = await response.json();
       return { ...(response.ok ? {} : { isError: true }), content: [{ type: 'text', text: JSON.stringify(result) }] };
     } catch (error) { return { isError: true, content: [{ type: 'text', text: await refusal(error).text() }] }; }

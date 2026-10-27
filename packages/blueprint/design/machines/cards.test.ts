@@ -89,7 +89,7 @@ describe("pairing and the session clock", () => {
   actor.send({type:"SELECT",number:pairingTarget});actor.send({type:"SEND"});await tick();
   const deadline=f.read().session.expiresAt;
   f.acknowledge(f.read().history[0].decisionId,"Connected.");
-  const card=f.ask({title:"Choose",card:{type:"generic",options:[{number:1,emoji:"🍋",title:"One"},{number:2,emoji:"🦊",title:"Two"}]}});
+  const card=f.ask({title:"Choose",card:{type:"brief",recommended:2,options:[{number:1,title:"First plan",prioritizes:"speed"},{number:2,title:"Second plan",prioritizes:"safety"}],markdown:"## Context: two plans\nBoth are ready to start.\n\n## Options\n\n## Recommendation: B\n**Why:** It is safer.\n"}});
   f.advance(5000);await vi.advanceTimersByTimeAsync(3000);
   actor.send({type:"OPEN",decisionId:card.decisionId});actor.send({type:"SELECT",number:1});actor.send({type:"SEND"});await tick();
   f.acknowledge(card.decisionId,"Acting now.");

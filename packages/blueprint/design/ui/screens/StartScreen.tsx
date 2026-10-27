@@ -1,6 +1,7 @@
 import { SchemaAST, type Schema } from 'effect';
-import { SESSION_NAME_MAX_CHARACTERS, SessionInput, PhoneJoined, UNPAIRED_LIFETIME_MS, ANSWER_WAIT_MAX_MS, Acknowledgement, AcknowledgementInput, AgentStatus, Answer, BODY_MAX_CHARACTERS, Choice, Decision, DecisionKind, DecisionStatus, EMOJI_MAX_CODE_POINTS, Option, OPTIONS_MAX, OPTIONS_MIN, PAIRING_OPTION_COUNT, PairingLink, QuestionInput, SESSION_LIFETIME_MS, SessionCreated, SessionSummary, TEXT_MAX_CHARACTERS, TOKEN_LENGTH } from '../../schemas/exchange.ts';
+import { SESSION_NAME_MAX_CHARACTERS, SessionInput, PhoneJoined, UNPAIRED_LIFETIME_MS, ANSWER_WAIT_MAX_MS, Acknowledgement, AcknowledgementInput, AgentStatus, Answer, BODY_MAX_CHARACTERS, Choice, Decision, DecisionKind, DecisionStatus, EMOJI_MAX_CODE_POINTS, Option, OPTIONS_MAX, PAIRING_OPTION_COUNT, PairingLink, QuestionInput, SESSION_LIFETIME_MS, SessionCreated, SessionSummary, TEXT_MAX_CHARACTERS, TOKEN_LENGTH } from '../../schemas/exchange.ts';
 import { schemas as cardSchemas } from '../components/cards/schemas.ts';
+import { BRIEF_OPTIONS_MAX, BRIEF_OPTIONS_MIN } from '../components/cards/brief/schema.ts';
 import { AGENT_AUTH_HEADER, HTTP_STATUS, MCP, PHONE_AUTH_HEADER, ROUTES } from '../../effects/session.ts';
 
 export const PRODUCTION_ORIGIN = 'https://agentpager.me';
@@ -46,13 +47,14 @@ export const START = {
   ] as ReadonlyArray<readonly [string, (origin: string) => string]>,
   example: {
     question: 'Which should I do first?',
-    options: [['🧪', 'Run the tests'], ['📖', 'Update the docs']],
+    options: [['Run the tests', 'catching a break early'], ['Update the docs', 'what users read first']],
     nextSteps: 'Running the tests now.',
   },
 } as const;
 
+// Every new card is a brief; this is its short form.
 export const CARD_EXAMPLES={
- generic:{type:"generic",options:[{number:1,emoji:"🍋",title:"Use the first plan"},{number:2,emoji:"🦊",title:"Use the second plan"}]},
+ brief:{type:"brief",recommended:1,options:[{number:1,title:"Use the first plan",prioritizes:"speed"},{number:2,title:"Use the second plan",prioritizes:"safety"}],markdown:"## Context: two plans\nBoth are ready to start.\n\n## Options\n\n## Recommendation: A\n**Why:** It is quicker."},
 } as const;
 
 const fieldsOf = (schema: Schema.Schema.Any) => SchemaAST.getPropertySignatures(schema.ast).map(field => `${String(field.name)}${field.isOptional ? '?' : ''}`).join(', ');
@@ -74,7 +76,8 @@ export function startBody(origin = PRODUCTION_ORIGIN, connectId?: string) {
   const curl = (key: keyof typeof ROUTES) => `curl -s -X ${ROUTES[key].method}`;
   // Tokens are URL-safe, so the expanded answer id needs no JSON escaping; authored text still does.
   const acknowledgement = (nextSteps: string) => `${shellQuote('{"answerId":"')}"$ANSWER_ID"${shellQuote(`","nextSteps":${JSON.stringify(nextSteps)}}`)}`;
-  const options = START.example.options.map(([emoji, title], index) => ({ number: index + 1, emoji, title }));
+  const options = START.example.options.map(([title, prioritizes], index) => ({ number: index + 1, title, prioritizes }));
+  const exampleCard = { type: 'brief', recommended: 1, options, markdown: `## Context: ${START.example.question}\nBoth are ready.\n\n## Options\n\n## Recommendation: A\n**Why:** It catches a break early.` };
   const examples = Object.entries(CARD_EXAMPLES).map(([kind, card]) => `### ${kind}\n\n\`\`\`json\n${JSON.stringify({ title: 'Which plan should I use?', card }, null, 2)}\n\`\`\``).join('\n\n');
   const connect = connectId ? { ...p, connectId } : p;
   return [
@@ -117,13 +120,13 @@ export function startBody(origin = PRODUCTION_ORIGIN, connectId?: string) {
     '| --- | --- |',
     shapeRows(),
     `| Choice | ${Choice.members.map(fieldsOf).join(' OR ')} |`,
-    `| Card | type, then that type’s fields; type is ${literals(Object.keys(cardSchemas))}. A complete example closes this document. |`,
+    `| Card | type, then that type’s fields. A new card's type is \`brief\`; a decision asked before may hold ${literals(Object.keys(cardSchemas).filter(kind => kind !== 'brief'))}. A complete example closes this document. |`,
     '',
     `createSession takes SessionInput and returns SessionCreated; joinPhone takes SessionInput and returns PhoneJoined; agentStatus returns AgentStatus. askCard takes QuestionInput and returns {"decisionId":"<Token>"}; acknowledgeCard takes AcknowledgementInput and returns Acknowledgement. finishSession returns {"finishedAt":"<Timestamp>"}. readCardAnswer returns {"status":"pending"} or {"status":"answered","answer":<Answer>}; hold it with wait=1..${seconds(ANSWER_WAIT_MAX_MS)} seconds and repeat while pending. A held read returns within one second of the service accepting Send.`,
     '',
     `SessionCreated.session and AgentStatus.session are SessionSummary; their pairing is PairingLink (null in AgentStatus after the first phone claims it). SessionCreated.agentKey authenticates later calls; pairingDecisionId names the pairing decision, which you read and acknowledge like any card. PairingLink.url is the one-use owner link; qrUrl is its SVG. SessionCreated.pairingTarget and AgentStatus.pairingTarget are the server-selected random Option from the ${NUMBER_WORDS[PAIRING_OPTION_COUNT]} distinct pairing choices. The target is never included in Inbox. AgentStatus.pairingTarget is null after correct pairing.`,
     '',
-    `QuestionInput.card is a \`generic\` card: the title and detail carry the question, so write them to stand alone. Every card carries ${OPTIONS_MIN} to ${OPTIONS_MAX} numbered options you write, each with a distinct emoji: they are what your owner can choose, so make each one an action you will carry out, such as Send now, Send at 9:00 tomorrow or Don’t send. Set card.recommended to the number of the option you would pick, and use the question detail for a short reason; never put a second question there. Your owner still chooses; nothing is chosen for them. Decision.kind is ${literals(DecisionKind.literals)}; status is ${literals(DecisionStatus.literals)}. An open decision has no answer or acknowledgement; an answered decision has Answer, and an acknowledged decision also has Acknowledgement. Feedback is a final answer: its decision keeps status \`feedback\` even after acknowledgement.`,
+    `QuestionInput.card is a \`brief\` card: Markdown sections carry the question, starting with its Context, and it carries ${BRIEF_OPTIONS_MIN} to ${BRIEF_OPTIONS_MAX} options, lettered A, B and on by number. Emoji cards are retired and refused. Make each option an action you will carry out, such as Send now, Send at 9:00 tomorrow or Don’t send. Set card.recommended to the number of the option you would pick, and use the question detail for a short reason; never put a second question there. Your owner still chooses; nothing is chosen for them. Decision.kind is ${literals(DecisionKind.literals)}; status is ${literals(DecisionStatus.literals)}. An open decision has no answer or acknowledgement; an answered decision has Answer, and an acknowledged decision also has Acknowledgement. Feedback is a final answer: its decision keeps status \`feedback\` even after acknowledgement.`,
     '',
     'Answer.choice is {"kind":"option","number":1} (an offered option number) or {"kind":"feedback","text":"Your reply"}. Feedback is not an extra option: it closes the question, and you ask again with a new card. The answer names its decision; an acknowledgement names that decision and its stored answer. Keep the answerId you read when acknowledging; only the first acknowledgement is accepted.',
     '',
@@ -159,7 +162,7 @@ export function startBody(origin = PRODUCTION_ORIGIN, connectId?: string) {
     `${curl('readCardAnswer')} ${auth} "${url('readCardAnswer', { ...p, decisionId: '$PAIRING_DECISION' })}"`,
     '# repeat until status is answered; set ANSWER_ID=answer.answerId, echo the chosen emoji, then acknowledge',
     `${curl('acknowledgeCard')} ${auth} ${json} -d ${acknowledgement('Paired. Asking my first question.')} "${url('acknowledgeCard', { ...p, decisionId: '$PAIRING_DECISION' })}"`,
-    `${curl('askCard')} ${auth} ${json} -d ${shellQuote(JSON.stringify({ title: START.example.question, card: { type: 'generic', options } }))} "${url('askCard')}"`,
+    `${curl('askCard')} ${auth} ${json} -d ${shellQuote(JSON.stringify({ title: START.example.question, card: exampleCard }))} "${url('askCard')}"`,
     '# set DECISION=decisionId from the reply',
     `${curl('readCardAnswer')} ${auth} "${url('readCardAnswer')}"`,
     '# repeat until status is answered; set ANSWER_ID=answer.answerId from this answer, then act and acknowledge',

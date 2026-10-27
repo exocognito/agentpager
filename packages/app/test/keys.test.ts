@@ -47,6 +47,10 @@ test('a wrong key wins over invalid input, over HTTP and MCP', { timeout: 180_00
     await f.refused(401, 'Unauthorized', pair, { data: { code: 'nope' } });
     await f.refused(401, 'Unauthorized', pair, { data: { code: 'nope' }, phone: token() });
     await f.refused(400, 'InvalidInput', pair, { data: { code: 'nope' }, phone: owner });
+    // A paired pager answers another phone AlreadyPaired, whatever its body.
+    const live = `/api/start/${s.link.code}/pair`;
+    await f.refused(409, 'AlreadyPaired', live, { data: { code: 'nope' }, phone: token() });
+    await f.refused(400, 'InvalidInput', live, { data: { code: 'nope' }, phone });
 
     // MCP: the tool call is decoded only for routing, so the pager checks the key before the question.
     await client.connect(new StreamableHTTPClientTransport(new URL(f.origin + '/mcp')));
@@ -60,6 +64,14 @@ test('a wrong key wins over invalid input, over HTTP and MCP', { timeout: 180_00
     assert.equal(await tool('ask_card', { sessionId: sid, agentKey: s.agentKey, question: bad }), 'InvalidInput');
     assert.equal(await tool('acknowledge_card', { sessionId: sid, agentKey: token(), decisionId: did, acknowledgement: { nextSteps: 'Go.' } }), 'Unauthorized');
     assert.equal(await tool('acknowledge_card', { sessionId: sid, agentKey: s.agentKey, decisionId: did, acknowledgement: { nextSteps: 'Go.' } }), 'InvalidInput');
+    // The wait goes to the pager as sent, so it too is checked after the key, as strictly as its schema.
+    assert.equal(await tool('wait_for_card_answer', { sessionId: sid, agentKey: token(), decisionId: did, waitSeconds: 0 }), 'Unauthorized');
+    assert.equal(await tool('wait_for_card_answer', { sessionId: sid, agentKey: s.agentKey, decisionId: did, waitSeconds: 0 }), 'InvalidInput');
+    assert.equal(await tool('wait_for_card_answer', { sessionId: sid, agentKey: s.agentKey, decisionId: did, waitSeconds: '5' }), 'InvalidInput');
+    // A malformed key is no key, and a missing field is named only to the pager's own agent.
+    assert.equal(await tool('ask_card', { sessionId: sid, agentKey: 'short', question: bad }), 'Unauthorized');
+    assert.equal(await tool('ask_card', { sessionId: sid, agentKey: token() }), 'Unauthorized');
+    assert.equal(await tool('acknowledge_card', { sessionId: sid, agentKey: token(), decisionId: did }), 'Unauthorized');
     // A missing question or acknowledgement is named, not reported as an empty body.
     const missing = async (name: string, args: Record<string, unknown>) => JSON.parse(decode(TextResult, await client.callTool({ name, arguments: args })).content[0].text).message;
     assert.match(await missing('ask_card', { sessionId: sid, agentKey: s.agentKey }), /question: is missing/);

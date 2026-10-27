@@ -234,9 +234,14 @@ export class Session {
     }
     if (action === 'pair') {
       const digest = await phoneDigest(request);
-      // A phone key is needed, and a pager that already knows its phone takes only that one. A paired pager answers
-      // AlreadyPaired in the transaction below, as before.
-      this.tx(() => { const m = this.linked(); if (!digest || (m.status !== 'active' && m.phoneHash && !sameDigest(digest, m.phoneHash))) throw C.refuse.unauthorized(); });
+      // Before the code is read: a phone key is needed; a paired pager answers another phone AlreadyPaired; and a
+      // pager that already knows its phone takes only that one.
+      this.tx(() => {
+        const m = this.linked();
+        if (!digest) throw C.refuse.unauthorized();
+        if (m.status === 'active') { if (!sameDigest(digest, m.phoneHash)) throw C.refuse.alreadyPaired(); return; }
+        if (m.phoneHash && !sameDigest(digest, m.phoneHash)) throw C.refuse.unauthorized();
+      });
       const input = decode(C.PairInput, await body(request));
       const outcome = this.tx((): PairOutcome => {
         const m = this.linked();

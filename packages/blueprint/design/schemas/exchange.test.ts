@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Schema } from "effect";
-import { Body, Decision, HomeSession, Inbox, QuestionInput, MCP_TOOLS, SessionInput, SESSION_NAME_MAX_CHARACTERS, PAIRING_TITLE, SESSION_LIFETIME_MS, LOCAL_LIFETIME_FLOOR_MS, LOCAL_LIFETIMES, SessionSummary } from "./exchange.ts";
+import { Body, ClaimedSession, ConnectStatus, Decision, HomeSession, Inbox, QuestionInput, MCP_TOOLS, SessionInput, SESSION_NAME_MAX_CHARACTERS, PAIRING_TITLE, SESSION_LIFETIME_MS, LOCAL_LIFETIME_FLOOR_MS, LOCAL_LIFETIMES, SessionSummary } from "./exchange.ts";
 import { inbox, pairingDecision, pairingInbox, unpairedSession, NOW } from "../ui/fixtures/decisions.ts";
 const token = "a".repeat(32), answerId = "b".repeat(32);
 const when = "2026-09-29T12:00:00.000Z";
@@ -73,6 +73,14 @@ it("keeps only name and end time on a terminal home row", () => {
     expect(Schema.is(HomeSession)({ ...label, ...extra })).toBe(false);
     expect(() => Schema.decodeUnknownSync(HomeSession)({ ...label, ...extra })).toThrow();
   }
+});
+
+it("requires the real name whenever discovery grants membership", () => {
+  expect(Schema.is(ConnectStatus)({ sessionId: null })).toBe(true);
+  expect(Schema.is(ConnectStatus)({ sessionId: token })).toBe(false);
+  expect(Schema.is(ConnectStatus)({ sessionId: token, name: session.name })).toBe(true);
+  expect(Schema.is(ClaimedSession)({ sessionId: token, phoneKey: answerId })).toBe(false);
+  expect(Schema.is(ClaimedSession)({ sessionId: token, phoneKey: answerId, name: session.name })).toBe(true);
 });
 
 describe("pairing", () => {

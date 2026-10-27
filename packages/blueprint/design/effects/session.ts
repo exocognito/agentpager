@@ -1,5 +1,5 @@
 import { Context, Data, Effect } from 'effect';
-import { type Acknowledgement, type ConnectStatus, type AcknowledgementInput, type AgentStatus, type AnswerInput, type AnswerStatus, type Decision, type Inbox, type QuestionInput, type Receipt, type SessionCreated, type SessionInput, type ConnectOpened, type PhoneJoined, type Token } from '../schemas/exchange.ts';
+import { type Acknowledgement, type ClaimedSession, type ConnectStatus, type AcknowledgementInput, type AgentStatus, type AnswerInput, type AnswerStatus, type Decision, type Inbox, type QuestionInput, type Receipt, type SessionCreated, type SessionInput, type ConnectOpened, type PhoneJoined, type Token } from '../schemas/exchange.ts';
 
 export class Unauthorized extends Data.TaggedError('Unauthorized') {}
 export class UnknownSession extends Data.TaggedError('UnknownSession') {}
@@ -12,9 +12,10 @@ export class AlreadyAcknowledged extends Data.TaggedError('AlreadyAcknowledged')
 export class AnswerMismatch extends Data.TaggedError('AnswerMismatch') {}
 export class AlreadyAnswered extends Data.TaggedError('AlreadyAnswered')<{ readonly receipt: Receipt }> {}
 export class InvalidInput extends Data.TaggedError('InvalidInput')<{ readonly reason: string }> {}
-export class SessionExpired extends Data.TaggedError('SessionExpired')<{ readonly expiredAt: string }> {}
+// Only the reserved phone's credential can retrieve the optional terminal name receipt.
+export class SessionExpired extends Data.TaggedError('SessionExpired')<{ readonly expiredAt: string; readonly sessionName?: string }> {}
 // The owner ended the session, or the agent finished before pairing, which ends it (C4).
-export class SessionEnded extends Data.TaggedError('SessionEnded')<{ readonly endedAt: string; readonly endedBy: 'owner' | 'agent' }> {}
+export class SessionEnded extends Data.TaggedError('SessionEnded')<{ readonly endedAt: string; readonly endedBy: 'owner' | 'agent'; readonly sessionName?: string }> {}
 // The agent finished a paired session: its key is refused and the phone can no longer answer, but the phone still reads it (C4).
 export class AgentFinished extends Data.TaggedError('AgentFinished')<{ readonly finishedAt: string }> {}
 
@@ -32,10 +33,10 @@ export interface SessionStoreService {
   readonly joinPhone: (connectId: Token, input: SessionInput) => Effect.Effect<PhoneJoined, ConnectLinkInvalid | InvalidInput>;
   // How the registering phone finds the session an agent made with its connect id; only that id's phone key reads it.
   // A used id names its session; one that expired unused, or an unknown one, answers ConnectLinkInvalid.
-  readonly readConnect: (connectId: Token, phoneKey: Token) => Effect.Effect<ConnectStatus, Unauthorized | ConnectLinkInvalid>;
+  readonly readConnect: (connectId: Token, phoneKey: Token) => Effect.Effect<ConnectStatus, Unauthorized | ConnectLinkInvalid | SessionExpired | SessionEnded>;
   // Persist a random phone key before claiming; send it in PHONE_AUTH_HEADER. Only that first
   // credential can recover the reservation after a lost reply. A different claimant is refused (I1).
-  readonly claimPairing: (token: Token, phoneKey: Token) => Effect.Effect<{ readonly sessionId: Token; readonly phoneKey: Token }, Unauthorized | PairingLinkInvalid | AlreadyPaired | SessionExpired | SessionEnded>;
+  readonly claimPairing: (token: Token, phoneKey: Token) => Effect.Effect<ClaimedSession, Unauthorized | PairingLinkInvalid | AlreadyPaired | SessionExpired | SessionEnded>;
   // I3::independent-decisions owns when an ask is accepted.
   readonly askCard: (sessionId: Token, agentKey: Token, question: QuestionInput) => Effect.Effect<Decision, Unauthorized | UnknownSession | InvalidInput | SessionExpired | SessionEnded | AgentFinished>;
   readonly readCardAnswer: (sessionId: Token, agentKey: Token, decisionId: Token) => Effect.Effect<AnswerStatus, Unauthorized | UnknownSession | UnknownDecision | InvalidInput | SessionExpired | SessionEnded | AgentFinished>;

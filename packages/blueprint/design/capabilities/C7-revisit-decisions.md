@@ -4,7 +4,7 @@ serves:
   - SC1
   - SI3
   - SI4
-statement: Reopen any sent card to read it, your answer and the agent's acknowledgement, with nothing to edit.
+statement: Reopen any sent card to read its exact payload, your answer and the agent's acknowledgement, with nothing to edit.
 caveats:
   - History is read on the phone that holds the pager; nothing proves it on another device.
 ---

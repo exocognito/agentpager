@@ -1,0 +1,13 @@
+{
+  "title": "How should the support bot handle refunds?",
+  "detail": "Three rule changes to compare.",
+  "card": {
+    "type": "brief",
+    "recommended": 2,
+    "options": [
+      { "number": 1, "title": "A person approves, within the hour", "label": "Person", "prioritizes": "zero wrong refunds" },
+      { "number": 2, "title": "The bot refunds small orders", "label": "Bot refunds", "prioritizes": "customer speed" },
+      { "number": 3, "title": "Store credit first", "label": "Credit first", "prioritizes": "keeping revenue" }
+    ]
+  }
+}

@@ -6,6 +6,7 @@ import { createCardMachine } from "../../machines/cards.ts";
 import { createCardServices } from "../fixtures/services.ts";
 import { inbox, question, feedbackDecision, NOW, pairingInbox, pairingDecision } from "../fixtures/decisions.ts";
 import { CardScreen } from "./CardScreen.tsx";
+import { optionMark } from "../components/cards/schemas.ts";
 
 it("shows an explicit busy state while ending the session", () => {
   const machine = createCardMachine(createCardServices(inbox).layer);
@@ -107,7 +108,7 @@ it("marks each history row with the chosen option's emoji and names its title", 
   const html = renderToStaticMarkup(createElement(CardScreen, { snapshot, send: () => {} }));
   const [first] = inbox.history;
   const option = first.card.options.find((o) => first.answer?.choice.kind === "option" && o.number === first.answer.choice.number)!;
-  expect(html).toContain(`<span class="ap-mark" aria-hidden="true">${option.emoji}</span>`);
+  expect(html).toContain(`<span class="ap-mark" aria-hidden="true">${optionMark(option)}</span>`);
   expect(html).toMatch(new RegExp(`<small>${option.title}( · Waiting for your agent)?</small>`));
 });
 

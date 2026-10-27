@@ -1,0 +1,13 @@
+{
+  "title": "Which pricing page layout should I build?",
+  "detail": "Three mocks to compare.",
+  "card": {
+    "type": "brief",
+    "recommended": 2,
+    "options": [
+      { "number": 1, "title": "Cards", "label": "Cards", "prioritizes": "the lowest build time" },
+      { "number": 2, "title": "Table", "label": "Table", "prioritizes": "the best buying experience" },
+      { "number": 3, "title": "Today’s page + a limits link", "label": "Limits link", "prioritizes": "a safe, small change" }
+    ]
+  }
+}

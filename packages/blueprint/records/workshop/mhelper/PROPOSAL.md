@@ -65,7 +65,7 @@ Schema/machine design must distinguish unbound, bound, pending, verified, submit
 | D2 prohibits client-global changes for a cold test | Keep that prohibition for the no-helper cold arrival; qualify owner-selected helper setup separately under D6. | Unqualified facilities never count as supplied. |
 | Existing home/lifecycle/feedback decisions | No reversal. | Several independent rows in one browser, per-session pairing, 24-hour lifetime, explicit Send/Undo, immutable answers, agent-only acknowledgement and feedback attached to a decision. |
 
-[contract-amendments.patch](contract-amendments.patch) contains exact candidate changes to existing SP2, C2, D1 and D2. It is review material, not applied to those active entries. It deliberately does not promote drafts, fill MHELPER's deliverables, or represent a complete activation/pin operation. Original decision records remain untouched; only the owner's later approval can establish a superseding decision.
+[contract-amendments.patch](contract-amendments.patch) contains exact candidate changes to existing SP2, C2, D1 and D2. It is review material, not applied to those active entries. It is a zero-context patch: validate it against this exact proposal tree with `git apply --check --unidiff-zero packages/blueprint/records/workshop/mhelper/contract-amendments.patch` before any deliberate application. It deliberately does not promote drafts, fill MHELPER's deliverables, or represent a complete activation/pin operation. Original decision records remain untouched; only the owner's later approval can establish a superseding decision.
 
 ## Assumptions for explicit owner review
 

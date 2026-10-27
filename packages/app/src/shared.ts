@@ -20,13 +20,15 @@ export function refusal(error: unknown): Response {
   console.error('Internal failure', error instanceof Error ? error.message : 'unknown');
   return json({ error: 'InternalError', message: 'Something went wrong on the server. Try again.' }, 500);
 }
-// A pager object can restart at any time (a deploy moves it to new code, and Cloudflare moves objects too), and the
+// A Durable Object can restart at any time (a deploy moves it to new code, and Cloudflare moves objects too), and the
 // reads it holds then throw or reply 500. A read changes nothing, so it is sent again (`call` makes a fresh stub each
-// time), holding an answer wait only for the seconds it had left. An overloaded object is not asked again.
+// time) when the object replied 500 or the platform marks the error retryable, never when it is overloaded. An
+// answer wait pauses and holds only within the time it had left, so it still answers within its wait.
 const READ_TRIES = 3;
-const overloaded = (error: unknown) => typeof error === 'object' && error !== null && 'overloaded' in error && error.overloaded === true;
+const flag = (error: unknown, name: 'retryable' | 'overloaded') => typeof error === 'object' && error !== null && name in error && Reflect.get(error, name) === true;
 export async function read(path: string, call: (path: string) => Promise<Response>): Promise<Response> {
-  const url = new URL(path, 'https://object'), wait = Number(url.searchParams.get('wait')), until = Date.now() + wait * 1000;
+  const url = new URL(path, 'https://object'), wait = Number(url.searchParams.get('wait'));
+  const held = Number.isInteger(wait) && wait > 0, until = Date.now() + wait * 1000;
   for (let tries = 1; ; tries++) {
     let why: string;
     try {
@@ -34,13 +36,13 @@ export async function read(path: string, call: (path: string) => Promise<Respons
       if (response.status !== 500 || tries === READ_TRIES) return response;
       why = 'InternalError';
     } catch (error) {
-      if (tries === READ_TRIES || overloaded(error)) throw error;
+      if (tries === READ_TRIES || !flag(error, 'retryable') || flag(error, 'overloaded')) throw error;
       why = error instanceof Error ? error.message : 'unknown';
     }
     console.warn('Reading again', url.pathname.split('/')[1], why);
-    await new Promise(r => setTimeout(r, 1000 * tries));
-    if (Number.isInteger(wait) && wait > 0) {
-      const left = Math.ceil((until - Date.now()) / 1000);
+    await new Promise(r => setTimeout(r, held ? Math.min(1000 * tries, Math.max(0, until - Date.now())) : 1000 * tries));
+    if (held) {
+      const left = Math.floor((until - Date.now()) / 1000);
       if (left > 0) url.searchParams.set('wait', String(left)); else url.searchParams.delete('wait');
     }
   }

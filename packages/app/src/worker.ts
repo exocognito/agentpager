@@ -15,7 +15,7 @@ export { Registry } from './registry.ts';
 const RegistryHit = Schema.Struct({ sessionId: Schema.NullOr(C.Token) });
 async function lookup(env: Env, code: string) {
   const codeHash = await sha256(code);
-  const reply = await forward(env.REGISTRY, 'registry', '/get', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ codeHash }) });
+  const reply = await read('/get', p => registry(env, p, { codeHash }));
   const hit = decode(RegistryHit, await reply.json());
   if (!hit.sessionId) throw C.refuse.linkInvalid();
   return hit.sessionId;
@@ -74,7 +74,7 @@ async function api(request: Request, env: Env, origin: string): Promise<Response
       if (!saved.ok) throw new Error('Registry refused the number');
       return json(decode(C.NumberMade, { number }));
     }
-    if (method === 'GET') return registry(env, '/number-list', { phoneHash: hash });
+    if (method === 'GET') return read('/number-list', p => registry(env, p, { phoneHash: hash }));
   }
   // Where this phone gets alerts: each pager an agent opens with its number starts with it.
   if (parts.length === 2 && parts[0] === 'numbers' && parts[1] === 'push' && method === 'POST') {
@@ -114,7 +114,7 @@ const descriptions = (origin: string): Record<keyof typeof C.MCP_TOOLS, string> 
   join_session: `Join the pager your owner's phone made, using the code from their AgentPager link (${origin}/start/<code>); links from other servers will not work here. Only the first join works. Print pairingCode.text to your owner verbatim as plain text; never show agentKey, and keep sessionId and agentKey for later turns. Then call ask_card right away.`,
   page_owner: `Open a new pager on your owner's phone with the pager number they gave you (for example in AGENTS.md), on the AgentPager server ${origin}. It is paired already: there is no link or code to show. Open one pager for your piece of work and keep it for every question. lifetime is 24h (default), 7d or 30d. Never show agentKey or the number; keep sessionId and agentKey for later turns. Then call ask_card. Full guide: ${origin}/start`,
   ask_card: `Ask your owner one decision as a "brief" card: a Markdown decision brief with 2 to 4 lettered options (number 1 is A) and optional attachments. Read "Decision briefs" in ${origin}/start before your first one; emoji ("generic") cards are refused. Works before pairing (the phone shows it once paired). At most 10 open decisions per pager. Replies {decisionId}.`,
-  wait_for_card_answer: 'Hold a read for up to 50 seconds. Replies {status:"pending"} (read again) or {status:"answered", answer:{answerId, choice, ...}}. On InternalError, read again after a few seconds. Keep reading while you have nothing better to do; if your turn ends, the answer waits for your next turn.',
+  wait_for_card_answer: 'Hold a read for up to 50 seconds. Replies {status:"pending"} (read again) or {status:"answered", answer:{answerId, choice, ...}}. On InternalError, read again after a few seconds; if it keeps failing for several minutes, stop and tell your owner. Keep reading while you have nothing better to do; if your turn ends, the answer waits for your next turn.',
   acknowledge_card: 'Acknowledge the exact answerId with your next steps; your owner sees them with a green tick. Only the first acknowledgement counts.',
   finish_session: 'End the pager when your work is done. Your key stops working.',
 });

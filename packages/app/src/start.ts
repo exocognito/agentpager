@@ -70,7 +70,8 @@ Every card is a brief; emoji cards are refused. The example is a brief's short f
 Each read holds up to \`wait\` seconds (at most ${ANSWER_WAIT_MAX_SECONDS}; without \`wait\` it answers at once), then replies with one of:
 - \`{"status":"pending"}\`: read again.
 - \`{"status":"answered","answer":{"answerId":"…","decisionId":"…","choice":…,"sentAt":"…"}}\`
-- an error (below): stop reading and handle it.
+- \`InternalError\` (status 500): the server failed for a moment. Read again after a few seconds; if it keeps failing for several minutes, stop and tell your owner.
+- any other error (below): stop reading and handle it.
 
 \`choice\` is \`{"kind":"option","number":n}\`, or \`{"kind":"feedback","text":"…"}\` when your owner wrote a note instead of choosing an option: follow the note, and ask a new card only if you still need a decision.
 

@@ -45,7 +45,7 @@ test('briefs: the four canvas examples ask, read back as sent, answer, and go wi
       assert.ok(!JSON.stringify(d).includes('base64'));
     }
     const d1 = inbox.open.find(d => d.decisionId === asked.get('D1-pricing'));
-    assert.deepEqual(d1?.attachments?.map(a => a.name), ['a-cards.png', 'b-table.png', 'background.md', 'c-link.png']);
+    assert.deepEqual(d1?.attachments?.map(a => a.name), ['a-cards.png', 'b-table-phone.png', 'b-table.png', 'background.md', 'c-link.png']);
 
     // The phone reads each attachment byte for byte, with its type; nobody else can.
     const file = (decisionId: string, name: string, headers: Record<string, string> = { 'x-phone-key': phone }) => fetch(`${f.origin}${cards}/${decisionId}/files/${name}`, { headers });
@@ -122,12 +122,12 @@ test('briefs: refused whole, with a reason that says what to fix', { timeout: 12
     const tools = await client.listTools();
     assert.match(tools.tools.find(t => t.name === 'ask_card')?.description ?? '', /brief/);
     await client.close();
-    assert.equal((await f.inbox(s.session.sessionId, phone)).open[0].attachments?.length, 4);
+    assert.equal((await f.inbox(s.session.sessionId, phone)).open[0].attachments?.length, 5);
 
     // A build from before briefs ends a pager by deleting its proposals only; the attachments still go with them.
     await f.stop();
     const [db] = attachmentRows(f.persist).filter(d => count(d) > 0);
-    assert.equal(count(db), 4);
+    assert.equal(count(db), 5);
     db.exec('DELETE FROM proposals');
     assert.equal(count(db), 0, 'deleting a proposal deletes its attachments');
     db.close();

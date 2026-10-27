@@ -108,6 +108,12 @@ A brief: \`{"title":"How should checkout handle a payment timeout?","detail":"41
       <what A looks like: an image, a diagram, a sample>
       ### What A changes
       - <one line per change>
+      ### Why choose A
+      - <the case for A: what it wins, and when it's the right pick>
+      ### Why pass on A
+      - <the case against A: what it costs, and when to pass on it>
+      ### Assumptions A makes
+      - <what must stay true for A to work>
       :::
 
       ## Tradeoffs
@@ -127,8 +133,8 @@ A brief: \`{"title":"How should checkout handle a payment timeout?","detail":"41
       - <only when it matters: hidden costs, options ruled out early>
       :::
 
-- The phone puts ✶ on the recommended option everywhere. The options screen shows one option's \`:::option\` block at a time; viewing an option never chooses it.
-- In a block: images \`![Cards](a.png)\`; a Mermaid flowchart in a \`mermaid\` fence (\`flowchart TD\` or \`LR\`, where \`:::green\`, \`:::yellow\`, \`:::orange\` or \`:::red\` colors a node); a change in a \`diff\` fence whose info string names the file, such as \`diff checkout/pay.ts\`; a conversation as \`:::chat\` with one \`speaker: text\` line each, the first speaker being the one who writes in. Nest a \`:::\` block in an option with a longer fence: \`::::option A\` … \`::::\`. Code fences need no nesting.
+- The phone puts ✶ on the recommended option everywhere. The options screen shows one option's \`:::option\` block at a time: what it changes, why to choose it, why to pass on it and what it assumes, then what it looks like. Viewing an option never chooses it.
+- In a block: images \`![Cards](a.png)\`, where images one after another show as one strip of thumbnails that open full screen; a Mermaid flowchart in a \`mermaid\` fence (\`flowchart TD\` or \`LR\`, where \`:::green\`, \`:::yellow\`, \`:::orange\` or \`:::red\` colors a node); a change in a \`diff\` fence whose info string names the file, such as \`diff checkout/pay.ts\`; a conversation as \`:::chat\` with one \`speaker: text\` line each, the first speaker being the one who writes in. Nest a \`:::\` block in an option with a longer fence: \`::::option A\` … \`::::\`. Code fences need no nesting.
 - Color only rates, best to worst: \`:green[…]\`, \`:yellow[…]\`, \`:orange[…]\`, \`:red[…]\`. Never use color to mark the recommended option; the ✶ does that.
 - \`attachments\` (only with a brief): at most 8, 3,000,000 bytes in all, each named by the brief. A name is 1 to 64 letters, digits, dots, dashes or underscores, ending in \`.md\`, \`.png\` or \`.jpg\` to match its type. A page is \`{"name":"background.md","type":"text/markdown","text":"…"}\` and opens as its own page under the same Markdown rules; it needs none of the sections. An image is \`{"name":"a.png","type":"image/png","base64":"…"}\` (or \`image/jpeg\`, \`.jpg\`), standard padded base64, at most 1,000,000 bytes. Build a request with images in a script from the files, and send it over HTTP rather than typing base64 into a tool call.
 - Refused whole, with the reason: no \`## Options\` heading; HTML outside code fences; \`## Recommendation: X\` where X isn't \`recommended\`; an \`:::option\` block or Tradeoffs column for a letter that isn't an option; a \`:::\` block left open; a link or image that names a missing attachment (only \`https://\` links may point elsewhere); anything over a limit.

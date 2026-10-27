@@ -49,8 +49,8 @@ struct BriefView: View {
         return nil
     }
     private var context: BriefContext {
-        BriefContext(sessionId: sessionId, decisionId: decision.decisionId, star: star, picked: outlined, openPage: openPage) { [sessionId, decision] name in
-            fullScreen = FullScreenImage(sessionId: sessionId, decisionId: decision.decisionId, name: name)
+        BriefContext(sessionId: sessionId, decisionId: decision.decisionId, star: star, picked: outlined, openPage: openPage) { [sessionId, decision] names, start in
+            fullScreen = FullScreenImage(sessionId: sessionId, decisionId: decision.decisionId, names: names, start: start)
         }
     }
 
@@ -276,8 +276,9 @@ struct RowButtonStyle: ButtonStyle {
     }
 }
 
-// The Options screen: one option at a time, with its title, what it prioritizes, what it looks like and what it
-// changes. Swipe, or use the segmented control at the bottom, to see another; seeing an option never chooses it.
+// The Options screen: one option at a time, with its title, what it prioritizes, what it changes, why to choose or
+// pass on it, what it assumes and what it looks like. Swipe, or use the segmented control at the bottom, to see
+// another; seeing an option never chooses it.
 struct BriefOptionsView: View {
     var sessionId: String
     var decision: Decision
@@ -324,8 +325,8 @@ struct BriefOptionsView: View {
                 .accessibilityIdentifier("option-picker")
             }
         }
-        .environment(\.briefContext, BriefContext(sessionId: sessionId, decisionId: decision.decisionId, star: star, openPage: openPage) { [sessionId, decision] name in
-            fullScreen = FullScreenImage(sessionId: sessionId, decisionId: decision.decisionId, name: name)
+        .environment(\.briefContext, BriefContext(sessionId: sessionId, decisionId: decision.decisionId, star: star, openPage: openPage) { [sessionId, decision] names, start in
+            fullScreen = FullScreenImage(sessionId: sessionId, decisionId: decision.decisionId, names: names, start: start)
         })
         .environment(\.openURL, OpenURLAction { url in
             if url.scheme == nil { openPage(url.relativeString); return .handled }
@@ -353,23 +354,19 @@ struct BriefOptionsView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    // What the option changes and the case for and against it come first, then what it looks like.
     @ViewBuilder private func optionBlock(_ o: Option, _ block: BriefDocument.OptionBlock) -> some View {
         let mine = o.letter == star ? star : nil
+        if !block.sections.isEmpty {
+            BriefBlocksView(blocks: block.sections.map { b in
+                if case .heading(let level, let text) = b { return .heading(level: level, text: starred(text, letter: mine)) }
+                return b
+            })
+        }
         if !block.preview.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
-                let image = block.preview.lazy.compactMap(imageName).first
                 if let caption = block.caption {
                     Text(starred(caption, letter: mine)).font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
-                } else if let image {
-                    HStack {
-                        Spacer()
-                        Button { fullScreen = FullScreenImage(sessionId: sessionId, decisionId: decision.decisionId, name: image) } label: {
-                            Image(systemName: "arrow.up.left.and.arrow.down.right").font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
-                                .frame(width: 32, height: 32).background(Color(.systemBackground), in: .circle)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Open full screen")
-                    }
                 }
                 BriefBlocksView(blocks: block.preview, inPreview: true)
             }
@@ -379,19 +376,11 @@ struct BriefOptionsView: View {
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("option-preview-\(o.letter)")
         }
-        if !block.changes.isEmpty {
-            BriefBlocksView(blocks: block.changes.map { b in
-                if case .heading(let level, let text) = b { return .heading(level: level, text: starred(text, letter: mine)) }
-                return b
-            })
-        }
     }
-
-    private func imageName(_ b: BriefBlock) -> String? { if case .image(_, let name) = b { name } else { nil } }
 }
 
 // What the blocks of one brief need: where their attachments come from, the recommended letter, and how to open a
-// page or an image.
+// page or a strip of images at one of them.
 struct BriefContext {
     var sessionId = ""
     var decisionId = ""
@@ -399,7 +388,7 @@ struct BriefContext {
     // The option to outline in the tradeoffs table: picked to send, or sent.
     var picked: String?
     var openPage: (String) -> Void = { _ in }
-    var openImage: (String) -> Void = { _ in }
+    var openImages: (_ names: [String], _ start: Int) -> Void = { _, _ in }
 }
 extension EnvironmentValues {
     @Entry var briefContext = BriefContext()
@@ -408,8 +397,9 @@ extension EnvironmentValues {
 struct FullScreenImage: Identifiable, Hashable {
     var sessionId: String
     var decisionId: String
-    var name: String
-    var id: String { decisionId + "/" + name }
+    var names: [String]
+    var start: Int
+    var id: String { decisionId + "/" + names.joined(separator: "/") + "#\(start)" }
 }
 
 // MARK: Blocks
@@ -471,9 +461,23 @@ struct BriefBlocksView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in BlockView(block: block, tradeoffs: tradeoffs, inPreview: inPreview, small: small) }
+            ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+                switch item {
+                case .block(let block): BlockView(block: block, tradeoffs: tradeoffs, inPreview: inPreview, small: small)
+                case .images(let names): ImageStrip(names: names)
+                }
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    // Images one after another draw as one strip of thumbnails.
+    private enum Item { case block(BriefBlock), images([String]) }
+    private var items: [Item] {
+        blocks.reduce(into: []) { out, block in
+            guard case .image(_, let name) = block else { out.append(.block(block)); return }
+            if case .images(let names)? = out.last { out[out.count - 1] = .images(names + [name]) } else { out.append(.images([name])) }
+        }
     }
 }
 
@@ -513,10 +517,7 @@ struct BlockView: View {
         case .table(let header, let rows):
             TableBlock(header: header, rows: rows, letters: tradeoffs, star: context.star, picked: tradeoffs ? context.picked : nil)
         case .image(_, let name):
-            AttachmentImage(name: name)
-                .frame(maxWidth: .infinity)
-                .clipShape(.rect(cornerRadius: 10))
-                .onTapGesture { context.openImage(name) }
+            ImageStrip(names: [name])
         case .link(let text, let target):
             LinkRow(text: text, target: target)
         case .chat(let lines):
@@ -779,10 +780,35 @@ struct ChatBlock: View {
     }
 }
 
-// An image the agent attached, loaded with the phone key and kept in memory.
+// A run of attached images as thumbnails, like attachments; tapping one opens the run full screen at it.
+struct ImageStrip: View {
+    var names: [String]
+    @Environment(\.briefContext) private var context
+
+    var body: some View {
+        ScrollView(.horizontal) {
+            HStack(spacing: 8) {
+                ForEach(Array(names.enumerated()), id: \.offset) { n, name in
+                    Button { context.openImages(names, n) } label: {
+                        AttachmentImage(name: name, thumbnail: 120)
+                            .clipShape(.rect(cornerRadius: 10))
+                            .overlay { RoundedRectangle(cornerRadius: 10).strokeBorder(Color(.systemGray4), lineWidth: 0.5) }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("image-\(name)")
+                }
+            }
+        }
+        .scrollIndicators(.hidden)
+        .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+    }
+}
+
+// An image the agent attached, loaded with the phone key and kept in memory. As a thumbnail it is `thumbnail`
+// points tall and fills a frame between 3:4 and 2:1.
 struct AttachmentImage: View {
     var name: String
-    var fill = false
+    var thumbnail: CGFloat?
     @Environment(\.briefContext) private var context
     @Environment(AppModel.self) private var model
     @State private var image: UIImage?
@@ -790,12 +816,17 @@ struct AttachmentImage: View {
 
     var body: some View {
         Group {
-            if let image {
-                Image(uiImage: image).resizable().aspectRatio(contentMode: fill ? .fill : .fit)
+            if let image, let h = thumbnail {
+                Image(uiImage: image).resizable().scaledToFill()
+                    .frame(width: min(max(h * image.size.width / max(image.size.height, 1), h * 0.75), h * 2), height: h)
+                    .clipped()
+            } else if let image {
+                Image(uiImage: image).resizable().aspectRatio(contentMode: .fit)
             } else {
                 Rectangle().fill(Color(.systemGray5))
                     .overlay { if failed { Image(systemName: "photo").foregroundStyle(.secondary) } else { ProgressView() } }
-                    .aspectRatio(fill ? nil : 1.6, contentMode: .fit)
+                    .frame(width: thumbnail.map { $0 * 0.75 }, height: thumbnail)
+                    .aspectRatio(thumbnail == nil ? 1.6 : nil, contentMode: .fit)
             }
         }
         .accessibilityLabel(name)
@@ -819,18 +850,32 @@ extension AttachmentImage {
     }
 }
 
+// A strip of images full screen, opened at the one tapped; swipe for the one before or after it.
 struct FullScreenImageView: View {
     var image: FullScreenImage
+    @State private var shown: Int
     @Environment(\.dismiss) private var dismiss
+
+    init(image: FullScreenImage) {
+        self.image = image
+        _shown = State(initialValue: image.start)
+    }
+
     var body: some View {
         NavigationStack {
-            AttachmentImage(name: image.name)
-                .environment(\.briefContext, BriefContext(sessionId: image.sessionId, decisionId: image.decisionId))
-                .padding()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color(.systemBackground))
-                .toolbar { ToolbarItem(placement: .topBarTrailing) { Button(role: .close) { dismiss() } } }
-                .navigationBarTitleDisplayMode(.inline)
+            TabView(selection: $shown) {
+                ForEach(Array(image.names.enumerated()), id: \.offset) { n, name in
+                    AttachmentImage(name: name).padding().tag(n)
+                }
+            }
+            .tabViewStyle(.page(indexDisplayMode: image.names.count > 1 ? .always : .never))
+            .indexViewStyle(.page(backgroundDisplayMode: .always))
+            .environment(\.briefContext, BriefContext(sessionId: image.sessionId, decisionId: image.decisionId))
+            .background(Color(.systemBackground))
+            .accessibilityIdentifier("image-viewer")
+            .navigationTitle(image.names.count > 1 ? "\(shown + 1) of \(image.names.count)" : "")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button(role: .close) { dismiss() } } }
         }
     }
 }
@@ -871,8 +916,8 @@ struct BriefPageView: View {
             }
         }
         .background(Color(.systemGroupedBackground))
-        .environment(\.briefContext, BriefContext(sessionId: sessionId, decisionId: decision.decisionId, openPage: openPage) { [sessionId, decision] name in
-            fullScreen = FullScreenImage(sessionId: sessionId, decisionId: decision.decisionId, name: name)
+        .environment(\.briefContext, BriefContext(sessionId: sessionId, decisionId: decision.decisionId, openPage: openPage) { [sessionId, decision] names, start in
+            fullScreen = FullScreenImage(sessionId: sessionId, decisionId: decision.decisionId, names: names, start: start)
         })
         .environment(\.openURL, OpenURLAction { url in
             if url.scheme == nil { openPage(url.relativeString); return .handled }

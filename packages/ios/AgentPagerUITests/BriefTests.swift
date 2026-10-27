@@ -37,7 +37,8 @@ final class BriefTests: XCTestCase {
         wait(app.buttons["open-Which pricing page layout should I build?"], 30)
         shot("00-inbox")
 
-        // D1, a visual choice: see B on the Options screen, pick B (its column outlined), read the background, send B.
+        // D1, a visual choice: see B on the Options screen (what it changes and why first, then its images, which
+        // open full screen and swipe), pick B (its column outlined), read the background, send B.
         open("Which pricing page layout should I build?")
         shot("D1-1-top")
         reveal(app.buttons["open-options"])
@@ -45,6 +46,26 @@ final class BriefTests: XCTestCase {
         tap("open-options")
         showOption("B")
         shot("D1-3-option-B")
+        let page = app.scrollViews["option-page-B"]
+        let changes = page.staticTexts["What B ✶ changes"], why = page.staticTexts["Why choose B ✶"]
+        wait(changes, 10)
+        XCTAssertTrue(why.exists && page.staticTexts["Why pass on B ✶"].exists && page.staticTexts["Assumptions B ✶ makes"].exists)
+        let thumb = page.buttons["image-b-table.png"]
+        for _ in 0..<6 where !thumb.isHittable { page.swipeUp() }
+        XCTAssertLessThan(why.frame.maxY, thumb.frame.minY, "what B changes and why come before its images")
+        XCTAssertTrue(page.buttons["image-b-table-phone.png"].exists)
+        RunLoop.current.run(until: Date().addingTimeInterval(0.8))
+        shot("D1-3b-option-B-images")
+        thumb.tap()
+        wait(app.navigationBars["1 of 2"], 10)
+        RunLoop.current.run(until: Date().addingTimeInterval(1))
+        shot("D1-3c-image-1-of-2")
+        app.swipeLeft()
+        wait(app.navigationBars["2 of 2"], 10)
+        RunLoop.current.run(until: Date().addingTimeInterval(1))
+        shot("D1-3d-image-2-of-2")
+        app.navigationBars["2 of 2"].buttons.firstMatch.tap()
+        waitUntil(10, "the viewer closed") { !app.navigationBars["2 of 2"].exists && changes.exists }
         back()
         tap("fold-smallprint")
         tap("tile-B")

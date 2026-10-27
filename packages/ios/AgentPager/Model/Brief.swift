@@ -155,7 +155,8 @@ nonisolated struct BriefDocument: Sendable {
     struct OptionBlock: Sendable {
         var caption: String?
         var preview: [BriefBlock]
-        var changes: [BriefBlock]
+        // "What X changes", "Why choose X", "Why pass on X" and "Assumptions X makes", as written.
+        var sections: [BriefBlock]
     }
 
     var sections: [Section] = []
@@ -212,14 +213,19 @@ nonisolated struct BriefDocument: Sendable {
         return .other
     }
 
-    // What an option looks like comes before its "What X changes" heading; a heading that opens the block
-    // captions the preview.
+    // What an option looks like comes before its first "What X changes", "Why choose X", "Why pass on X" or
+    // "Assumptions X makes" heading; a heading that opens the block captions the preview.
     static func option(_ blocks: [BriefBlock]) -> OptionBlock {
-        let split = blocks.firstIndex { if case .heading(_, let t) = $0 { t.lowercased().hasPrefix("what ") && t.lowercased().hasSuffix("changes") } else { false } } ?? blocks.endIndex
+        let split = blocks.firstIndex { if case .heading(_, let t) = $0 { isOptionSection(t) } else { false } } ?? blocks.endIndex
         var preview = Array(blocks[..<split])
         var caption: String?
         if case .heading(_, let t)? = preview.first { caption = t; preview.removeFirst() }
-        return OptionBlock(caption: caption, preview: preview, changes: Array(blocks[split...]))
+        return OptionBlock(caption: caption, preview: preview, sections: Array(blocks[split...]))
+    }
+
+    private static func isOptionSection(_ heading: String) -> Bool {
+        let t = heading.lowercased()
+        return (t.hasPrefix("what ") && t.hasSuffix("changes")) || t.hasPrefix("why choose") || t.hasPrefix("why pass") || t.hasPrefix("assumptions")
     }
 }
 

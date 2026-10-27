@@ -55,7 +55,7 @@ export const MARKETING = {
   ],
   getStarted: "Get started for free",
   steps: {
-    app: ["Get AgentPager for iPhone", "Free on the App Store. Everything else happens in the app."],
+    app: ["Get AgentPager for iPhone", "Coming free to the App Store. Everything else happens in the app."],
     tell: ["Tell your agent", "Paste this into any agent session:"],
     scan: [
       "Pair",

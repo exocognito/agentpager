@@ -20,6 +20,6 @@ PR #1 merged on 2026-10-27 with its Oct 9 sign-off unfinished. Its open items la
   - a Strategic Design Decisions section.
 - **Question 1, a:** SG3 stays as written. It tests longer-running agents and $2.99 a month, even though free pagers now last up to 30 days.
 - **Question 2, b:** an agent can acknowledge and then finish at once. The ended record now keeps the last acknowledgement for 7 days, so the phone can still show it (I17). The service does not do this yet, so it is a gap for MAPP.
-- **Question 3, b:** the demo agent is a link for App Review only, Sam's original ask. agentpager.me does not offer it (C19).
+- **Question 3, b:** the demo agent is a link, not a public demo on agentpager.me (C19). It is Sam's original ask, for App Review. MSHIP and J5 also let owners Sam invites try it, so the link goes to them too; Sam confirms that reading in PR #18.
 - **Question 4:** settled by [DEC-2026-10-27-swift-app-is-the-brief-design](DEC-2026-10-27-swift-app-is-the-brief-design.md) for briefs.
 - **Questions 5 and 6** (how MAPP gets built, and the old copy in the blueprint repo) change nothing here and stay open.

@@ -60,7 +60,7 @@ Its end time is 24 hours after pairing unless I choose 7 or 30 days, and I can c
 
 ### SI6 · UTF-8 with Markdown is allowed; invalid or over-limit text is refused, never truncated
 
-Card titles, option labels, option detail and agent acknowledgements allow 280 visible characters; question detail and my written feedback allow 1,000. Count spaces and Markdown punctuation. Text is valid UTF-8 with Markdown and no HTML. Anything else is refused whole, with an error that tells the agent what to fix. Nothing is truncated or silently cleaned. On screen, titles, option labels and agent names show each run of spaces and line breaks as one space; detail text shows them as sent. A brief, and each Markdown page attached to it, holds up to 20,000 characters; a brief carries at most 8 attachments, PNG, JPEG or Markdown, of at most 1 MB per image and 3 MB in all. HTML is allowed only inside code, where it shows as text.
+Card titles, option titles, option detail and agent acknowledgements allow 280 visible characters; question detail and my written feedback allow 1,000. Count spaces and Markdown punctuation. Text is valid UTF-8 with Markdown and no HTML. Anything else is refused whole, with an error that tells the agent what to fix. Nothing is truncated or silently cleaned. On screen, titles, option labels and agent names show each run of spaces and line breaks as one space; detail text shows them as sent. A brief option's short label allows 20. A brief, and each Markdown page attached to it, holds up to 20,000 characters; a brief carries at most 8 attachments, PNG, JPEG or Markdown, of at most 1 MB per image and 3 MB in all. HTML is allowed only inside code, where it shows as text.
 
 ### SI7 · Cards are independent
 

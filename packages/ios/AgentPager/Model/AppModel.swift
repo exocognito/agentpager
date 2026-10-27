@@ -444,6 +444,17 @@ final class AppModel {
         return (inbox.open + inbox.answered).first { $0.decisionId == decisionId }
     }
 
+    // A brief's attachments, kept in memory once read: a decision never changes (SI8).
+    @ObservationIgnored private var files: [String: Data] = [:]
+    func attachment(_ sessionId: String, _ decisionId: String, _ name: String) async throws(APIError) -> Data {
+        let id = decisionId + "/" + name
+        if let data = files[id] { return data }
+        guard live, let key = key(sessionId) else { throw .transport("This phone holds no key for the pager.") }
+        let data = try await client.file(key, decisionId: decisionId, name: name)
+        files[id] = data
+        return data
+    }
+
     func setLifetime(_ sessionId: String, _ lifetime: Lifetime) async {
         guard live, let key = key(sessionId) else { return }
         do throws(APIError) {

@@ -52,6 +52,43 @@ TEST_RUNNER_AGENTPAGER_SERVER_URL=http://<mac-ip>:8787 TEST_RUNNER_SCREENSHOT_DI
 
 `-failSends N` (launch argument) makes the next N answer attempts fail, to show the "Answer Not Confirmed" alert.
 
+## Decision briefs
+
+A brief card (`card.type: "brief"`) draws as the canvas's headed template: Context, Options (tap a row to see that
+option; it never chooses it), Tradeoffs, Recommendation, Next steps and Small print, each folded by its heading,
+with the answer tiles and "Ask for changes" / "Send option X" below. Attachments load from
+`/api/sessions/<id>/cards/<decisionId>/files/<name>` with the phone key; Markdown pages open in the sheet, Mermaid
+flowcharts are drawn on the phone (anything else shows its source).
+
+`BriefTests` plays the owner for the canvas's four examples and keeps every screenshot in the test result. A real
+agent asks them first, over MCP, from `../app`:
+
+```sh
+# 1. This phone's pager number on the server (printed as AGENTPAGER_NUMBER=…)
+TEST_RUNNER_AGENTPAGER_SERVER_URL=http://<mac-ip>:8787 xcodebuild test -project AgentPager.xcodeproj -scheme AgentPager \
+  -destination '<destination>' -allowProvisioningUpdates -only-testing:AgentPagerUITests/BriefTests/testPagerNumber
+# 2. The agent: page_owner, ask_card ×4, then wait and acknowledge each answer
+node --experimental-strip-types ../app/scripts/briefs.ts http://<mac-ip>:8787 <pager number>
+# 3. The owner: open, view, pick, send; D4 asks for changes
+TEST_RUNNER_AGENTPAGER_SERVER_URL=http://<mac-ip>:8787 xcodebuild test -project AgentPager.xcodeproj -scheme AgentPager \
+  -destination '<destination>' -allowProvisioningUpdates -resultBundlePath /tmp/briefs.xcresult \
+  -only-testing:AgentPagerUITests/BriefTests/testBriefs
+xcrun xcresulttool export attachments --path /tmp/briefs.xcresult --output-path /tmp/brief-shots
+```
+
+On a phone the screen must stay unlocked while the test runs (Xcode can't mount its developer image on a locked
+phone). In the Simulator, `TEST_RUNNER_AGENTPAGER_BRIEF_RESET=1` on step 1 starts with no pagers; never use it on a
+phone in use, since it forgets every pager key on it.
+
+To install a Debug build on a phone without running tests:
+
+```sh
+xcodebuild -project AgentPager.xcodeproj -scheme AgentPager -configuration Debug -allowProvisioningUpdates \
+  -destination 'platform=iOS,id=<devicectl id>' -derivedDataPath /tmp/agentpager-dd build
+xcrun devicectl device install app --device <devicectl id> /tmp/agentpager-dd/Build/Products/Debug-iphoneos/AgentPager.app
+xcrun devicectl device process launch --device <devicectl id> me.agentpager.app.dev
+```
+
 ## Driving the app by hand (agents playing the owner)
 
 `DriverTests/testDrive` launches the app and waits for commands, so an agent can dogfood interactively against

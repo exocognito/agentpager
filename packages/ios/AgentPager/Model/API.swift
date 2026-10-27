@@ -50,17 +50,35 @@ nonisolated struct PagerSummary: Codable, Hashable, Sendable {
     var endReason: EndReason?
 }
 
+// A generic card's option has an emoji and maybe detail; a brief's option has a letter (number 1 is A), a label
+// for its answer tile and what it prioritizes.
 nonisolated struct Option: Codable, Hashable, Sendable {
     var number: Int
-    var emoji: String
+    var emoji: String?
     var title: String
     var detail: String?
+    var label: String?
+    var prioritizes: String?
+
+    var letter: String { String(UnicodeScalar(UInt8(64 + min(max(number, 1), 26)))) }
+    // What tells options apart: the emoji, or the brief's letter.
+    var mark: String { emoji ?? letter }
 }
 
 nonisolated struct Card: Codable, Hashable, Sendable {
     var type: String
     var options: [Option]
     var recommended: Int?
+    var markdown: String?
+
+    var isBrief: Bool { type == "brief" }
+}
+
+// An attachment the agent sent with a brief: the decision names it; the bytes come from its own route.
+nonisolated struct AttachmentInfo: Codable, Hashable, Sendable {
+    var name: String
+    var type: String
+    var bytes: Int
 }
 
 nonisolated enum Choice: Codable, Hashable, Sendable {
@@ -106,12 +124,20 @@ nonisolated struct Decision: Codable, Hashable, Identifiable, Sendable {
     var title: String
     var detail: String?
     var card: Card
+    var attachments: [AttachmentInfo]?
     var askedAt: Date
     var answer: Answer?
     var acknowledgement: Acknowledgement?
     var id: String { decisionId }
 
     func option(_ number: Int) -> Option? { card.options.first { $0.number == number } }
+    // An answer in words: "📨 Send now", or a brief's "B. Table".
+    func choiceText(_ choice: Choice) -> String {
+        switch choice {
+        case .option(let n): option(n).map { card.isBrief ? "\($0.letter). \($0.title)" : "\($0.mark) \($0.title)" } ?? "Option \(n)"
+        case .feedback(let text): text
+        }
+    }
 }
 
 nonisolated struct Inbox: Codable, Hashable, Sendable {
@@ -179,6 +205,11 @@ nonisolated struct APIClient: Sendable {
     }
 
     func request<T: Decodable & Sendable>(_ method: String, _ path: String, phoneKey: String? = nil, body: (any Encodable & Sendable)? = nil, timeout: TimeInterval = 15) async throws(APIError) -> T {
+        let data = try await raw(method, path, phoneKey: phoneKey, body: body, timeout: timeout)
+        do { return try Self.decoder.decode(T.self, from: data) } catch { throw .transport("decode \(path): \(error)") }
+    }
+
+    func raw(_ method: String, _ path: String, phoneKey: String? = nil, body: (any Encodable & Sendable)? = nil, timeout: TimeInterval = 15) async throws(APIError) -> Data {
         var r = URLRequest(url: base.appending(path: path))
         r.httpMethod = method
         r.timeoutInterval = timeout
@@ -195,7 +226,7 @@ nonisolated struct APIClient: Sendable {
             let body = (try? Self.decoder.decode(ErrorBody.self, from: data)) ?? ErrorBody(error: "HTTP\(status)")
             throw .server(status: status, body: body)
         }
-        do { return try Self.decoder.decode(T.self, from: data) } catch { throw .transport("decode \(path): \(error)") }
+        return data
     }
 
     // Phone routes.
@@ -215,6 +246,10 @@ nonisolated struct APIClient: Sendable {
     func answer(_ key: PagerKey, decisionId: String, requestId: String, choice: Choice) async throws(APIError) -> Receipt {
         struct Body: Encodable, Sendable { var requestId: String; var choice: Choice }
         return try await request("POST", "api/sessions/\(key.sessionId)/cards/\(decisionId)/answer", phoneKey: key.phoneKey, body: Body(requestId: requestId, choice: choice))
+    }
+    // One attachment of a brief, as the agent sent it.
+    func file(_ key: PagerKey, decisionId: String, name: String) async throws(APIError) -> Data {
+        try await raw("GET", "api/sessions/\(key.sessionId)/cards/\(decisionId)/files/\(name)", phoneKey: key.phoneKey, timeout: 30)
     }
     func end(_ key: PagerKey) async throws(APIError) -> SessionEnvelope {
         try await request("POST", "api/sessions/\(key.sessionId)/end", phoneKey: key.phoneKey)

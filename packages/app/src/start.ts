@@ -93,7 +93,7 @@ For a decision that needs a story (what broke, what each option looks like, what
 
 A brief: \`{"title":"How should checkout handle a payment timeout?","detail":"41 orders got stuck last week.","card":{"type":"brief","recommended":2,"options":[{"number":1,"title":"Retry","label":"Retry","prioritizes":"the least work for customers"},{"number":2,"title":"Check first","label":"Check first","prioritizes":"never charging twice"}],"markdown":"…"},"attachments":[…]}\`
 
-- \`options\`: 2 to 4, numbered 1..n. Number 1 is A, 2 is B, and so on; the answer's \`choice.number\` is still the number. \`title\` is the option's row, \`label\` (optional, at most 20 characters) its answer tile, and the row reads "Prioritizes <prioritizes>". \`detail\` is one line for the inbox.
+- \`options\`: 2 to 4, numbered 1..n. Number 1 is A, 2 is B, and so on; the answer's \`choice.number\` is still the number. \`title\` is the option's row, \`label\` (optional, at most 20 characters) its answer tile, and the row reads "Prioritizes <prioritizes>". A brief option has no \`detail\`: its \`:::option\` block tells its story.
 - \`markdown\` holds the sections, in this order, at most 20,000 characters:
 
       ## Context: <topic>
@@ -127,9 +127,10 @@ A brief: \`{"title":"How should checkout handle a payment timeout?","detail":"41
 - The phone draws the option rows from \`options\` and puts ✶ on the recommended option everywhere. Tapping a row shows its \`:::option\` block; it never chooses it.
 - In a block: images \`![Cards](a.png)\`; a Mermaid flowchart in a \`mermaid\` fence (\`flowchart TD\` or \`LR\`, where \`:::green\`, \`:::yellow\`, \`:::orange\` or \`:::red\` colors a node); a change in a \`diff\` fence whose info string names the file, such as \`diff checkout/pay.ts\`; a conversation as \`:::chat\` with one \`speaker: text\` line each, the first speaker being the one who writes in. Nest a block in an option with a longer fence: \`::::option A\` … \`::::\`.
 - Color only rates, best to worst: \`:green[…]\`, \`:yellow[…]\`, \`:orange[…]\`, \`:red[…]\`. Never color the recommendation.
-- \`attachments\`: at most 8, 3,000,000 bytes in all, each named by the brief. A page is \`{"name":"background.md","type":"text/markdown","text":"…"}\` and opens as its own page under the same rules. An image is \`{"name":"a.png","type":"image/png","base64":"…"}\` (or \`image/jpeg\`, \`.jpg\`), standard padded base64, at most 1,000,000 bytes. Build a request with images in a script from the files, and send it over HTTP rather than typing base64 into a tool call.
-- Refused whole, with the reason: HTML outside code fences; \`## Recommendation: X\` where X isn't \`recommended\`; an \`:::option\` block or Tradeoffs column for a letter that isn't an option; a link or image that names a missing attachment (only \`https://\` links may point elsewhere); anything over a limit.
-- A small decision uses the same template with fewer sections: leave out the option blocks, the background page and the small print, and keep the options and tradeoffs so each answer has its reason.
+- \`attachments\` (only with a brief): at most 8, 3,000,000 bytes in all, each named by the brief. A name is 1 to 64 letters, digits, dots, dashes or underscores, ending in \`.md\`, \`.png\` or \`.jpg\` to match its type. A page is \`{"name":"background.md","type":"text/markdown","text":"…"}\` and opens as its own page under the same rules. An image is \`{"name":"a.png","type":"image/png","base64":"…"}\` (or \`image/jpeg\`, \`.jpg\`), standard padded base64, at most 1,000,000 bytes. Build a request with images in a script from the files, and send it over HTTP rather than typing base64 into a tool call.
+- Refused whole, with the reason: no \`## Options\` heading; HTML outside code fences; \`## Recommendation: X\` where X isn't \`recommended\`; an \`:::option\` block or Tradeoffs column for a letter that isn't an option; a \`:::\` block left open; a link or image that names a missing attachment (only \`https://\` links may point elsewhere); anything over a limit.
+- Every brief has the \`## Options\` heading: the phone draws the option rows under it. A small decision uses the same template with fewer sections: leave out the option blocks (keep the heading, with nothing under it), the background page and the small print, and keep the tradeoffs so each answer has its reason.
+- In \`## Tradeoffs\`, the first column names the row and every other column starts with its option's letter.
 
 ## Status, times and ending
 

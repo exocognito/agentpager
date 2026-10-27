@@ -3,7 +3,7 @@ import { Schema } from 'effect';
 import { terminalQr } from './qr.ts';
 import * as C from './contract.ts';
 import { acceptsChoice } from '../../blueprint/design/ui/components/cards/schemas.ts';
-import { AttachmentName, attachmentInfo, base64Bytes } from '../../blueprint/design/ui/components/cards/brief/schema.ts';
+import { AttachmentName, attachmentInfo, base64Bytes, withKeycaps } from '../../blueprint/design/ui/components/cards/brief/schema.ts';
 import { body, decode, emptyBody, iso, json, refusal, sameDigest, sha256, token } from './shared.ts';
 import { forward, lifetimes, type Env } from './env.ts';
 import { alert, PushTarget, questionBody, type Alert } from './push.ts';
@@ -58,7 +58,8 @@ export class Session {
       CREATE TRIGGER IF NOT EXISTS proposal_immutable BEFORE UPDATE ON proposals BEGIN SELECT RAISE(ABORT,'immutable proposal'); END;
       CREATE TRIGGER IF NOT EXISTS answer_immutable BEFORE UPDATE ON answers BEGIN SELECT RAISE(ABORT,'immutable answer'); END;
       CREATE TRIGGER IF NOT EXISTS acknowledgement_immutable BEFORE UPDATE ON acknowledgements BEGIN SELECT RAISE(ABORT,'immutable acknowledgement'); END;
-      CREATE TRIGGER IF NOT EXISTS attachment_immutable BEFORE UPDATE ON attachments BEGIN SELECT RAISE(ABORT,'immutable attachment'); END;`);
+      CREATE TRIGGER IF NOT EXISTS attachment_immutable BEFORE UPDATE ON attachments BEGIN SELECT RAISE(ABORT,'immutable attachment'); END;
+      CREATE TRIGGER IF NOT EXISTS attachments_go_with_proposal AFTER DELETE ON proposals BEGIN DELETE FROM attachments WHERE decision_id = OLD.id; END;`);
   }
   private row(table: 'pager' | 'tombstone') { return this.ctx.storage.sql.exec<{ json: string }>(`SELECT json FROM ${table} WHERE id=1`).toArray()[0]?.json; }
   private meta(): Meta | null { const raw = this.row('pager'); return raw ? decode(Meta, JSON.parse(raw)) : null; }
@@ -69,7 +70,8 @@ export class Session {
   // Ending clears every decision, attachment, answer, acknowledgement, palette, code and link at once. A pager no agent ever
   // joined has no name to keep, so it is forgotten outright.
   private end(m: Meta, endReason: C.EndReason, endedAt: string) {
-    this.ctx.storage.sql.exec('DELETE FROM acknowledgements; DELETE FROM answers; DELETE FROM attachments; DELETE FROM proposals; DELETE FROM pager;');
+    // Deleting proposals deletes their attachments too (a trigger), even when a build from before briefs runs this.
+    this.ctx.storage.sql.exec('DELETE FROM acknowledgements; DELETE FROM answers; DELETE FROM proposals; DELETE FROM pager;');
     if (m.codeHash) this.unregister.push(m.codeHash);
     if (m.name === null) return null;
     const t: Tombstone = { sessionId: m.sessionId, name: m.name, endReason, endedAt, agentHash: m.agentHash, phoneHash: m.phoneHash };
@@ -259,10 +261,12 @@ export class Session {
       const asked = this.tx(() => {
         const m = this.agent(digest);
         if (this.openCount() >= C.MAX_OPEN_DECISIONS) throw C.refuse.tooMany();
-        // The decision keeps each attachment's name, type and size; the bytes live in their own table. It has no
-        // foreign key, so a build from before briefs can still end a pager that holds some (its alarm forgets them).
+        // The decision keeps each attachment's name, type and size; the bytes live in their own table, with no
+        // foreign key so a build from before briefs can still delete the proposal. A brief's options get keycaps,
+        // so a phone from before briefs draws it as an emoji card instead of failing the whole pager.
         const { attachments, ...asked } = question;
-        const d: C.Decision = { ...asked, ...(attachments ? { attachments: attachments.map(attachmentInfo) } : {}), decisionId: token(), kind: 'card', status: 'open', askedAt: iso() };
+        const card = asked.card.type === 'brief' ? withKeycaps(asked.card) : asked.card;
+        const d: C.Decision = { ...asked, card, ...(attachments ? { attachments: attachments.map(attachmentInfo) } : {}), decisionId: token(), kind: 'card', status: 'open', askedAt: iso() };
         decode(C.Decision, d);
         this.ctx.storage.sql.exec('INSERT INTO proposals VALUES (?, ?)', d.decisionId, JSON.stringify(d));
         for (const a of attachments ?? []) {

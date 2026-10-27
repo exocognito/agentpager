@@ -29,5 +29,5 @@ export const acceptsChoice = (card: Card, choice: Choice) =>
 
 // What tells options apart on a screen: a generic option's emoji, or a brief option's letter; and the line under it.
 type CardOption = Card["options"][number];
-export const optionMark = (option: CardOption) => "emoji" in option ? option.emoji : brief.letter(option.number);
-export const optionDetail = (option: CardOption) => "emoji" in option ? option.detail : `Prioritizes ${option.prioritizes}`;
+export const optionMark = (option: CardOption) => "prioritizes" in option ? brief.letter(option.number) : option.emoji;
+export const optionDetail = (option: CardOption) => "prioritizes" in option ? `Prioritizes ${option.prioritizes}` : option.detail;

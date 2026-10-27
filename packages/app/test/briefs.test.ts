@@ -1,5 +1,6 @@
 import { test } from 'node:test';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { DatabaseSync } from 'node:sqlite';
 import path from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
@@ -8,7 +9,16 @@ import { briefNames, briefsDir, loadBrief } from '../fixtures/briefs/load.ts';
 
 // Decision briefs: an agent sends Markdown with lettered options and attachments; the phone reads the decision
 // and fetches each attachment by name. The Frame's refusals are whole, with the reason.
-test('briefs: the four canvas examples ask, read back exactly, answer, and go with the pager', { timeout: 180_000 }, async () => {
+
+// The pager objects' stored databases, read after the server stops.
+function attachmentRows(persist: string) {
+  const files: string[] = [];
+  const walk = (dir: string) => { for (const name of readdirSync(dir)) { const p = path.join(dir, name); if (statSync(p).isDirectory()) walk(p); else if (p.endsWith('.sqlite')) files.push(p); } };
+  walk(path.join(persist, 'v3', 'do'));
+  return files.map(file => new DatabaseSync(file)).filter(db => db.prepare("SELECT 1 FROM sqlite_master WHERE name='attachments'").get());
+}
+const count = (db: DatabaseSync) => Number(db.prepare('SELECT count(*) AS n FROM attachments').get()?.n);
+test('briefs: the four canvas examples ask, read back as sent, answer, and go with the pager', { timeout: 180_000 }, async () => {
   const f = await fixture('briefs');
   try {
     const { s, phone } = await f.paired('Claude Code · shop');
@@ -27,7 +37,10 @@ test('briefs: the four canvas examples ask, read back exactly, answer, and go wi
     for (const d of inbox.open) {
       const sent = loadBrief([...asked].find(([, id]) => id === d.decisionId)?.[0] ?? '');
       assert.equal(d.card.type, 'brief');
-      assert.deepEqual(d.card, sent.card, 'the card reads back exactly as sent');
+      // As sent, plus each option's keycap for phones from before briefs.
+      const { options, ...rest } = d.card;
+      assert.deepEqual(options.map(o => o.emoji), ['1️⃣', '2️⃣', '3️⃣', '4️⃣'].slice(0, options.length));
+      assert.deepEqual({ ...rest, options: options.map(({ emoji, ...plain }) => plain) }, sent.card, 'the card reads back as sent');
       // The inbox names each attachment; its bytes never ride along with the poll.
       assert.ok(!JSON.stringify(d).includes('base64'));
     }
@@ -60,6 +73,10 @@ test('briefs: the four canvas examples ask, read back exactly, answer, and go wi
     // Ending the pager takes the attachments with it.
     await f.ok(C.SessionReply, `/api/sessions/${sessionId}/end`, { phone, data: {} });
     assert.equal((await file(d2, 'design.md')).status, 410);
+    await f.stop();
+    const stores = attachmentRows(f.persist);
+    assert.ok(stores.length > 0, 'the pager object has an attachments table');
+    for (const db of stores) { assert.equal(count(db), 0, 'no attachment bytes after the end'); db.close(); }
   } finally { await f.stop(); }
 });
 
@@ -83,7 +100,9 @@ test('briefs: refused whole, with a reason that says what to fix', { timeout: 12
       ['a container left open', card({ markdown: markdown + '\n:::smallprint\n- one\n' }), /never closed/],
       ['five options', card({ options: [1, 2, 3, 4, 5].map(number => ({ number, title: `Option ${number}`, prioritizes: 'speed' })) }), /at most 4|maxItems|4 items/i],
       ['a label too long for its tile', card({ options: [{ number: 1, title: 'Delete them', label: 'Delete every one of them now', prioritizes: 'a clean list' }, { number: 2, title: 'Keep them', prioritizes: 'links' }] }), /label may not exceed 20/],
-      ['an image that is not what it says', { ...base, card: { ...card({}).card, markdown: markdown + '\n![Mock](a.png)\n' }, attachments: [{ name: 'a.png', type: 'image/png', base64: Buffer.from('GIF89a not a png').toString('base64') }] }, /is not a PNG file/],
+      ['an image that is not what it says', { ...base, card: { ...card({}).card, markdown: markdown + '\n![Mock](a.png)\n' }, attachments: [{ name: 'a.png', type: 'image/png', base64: Buffer.from('GIF89a not a png').toString('base64') }] }, /is not a whole PNG file/],
+      ['a brief with no Options section', card({ markdown: markdown.replace('## Options\n', '') }), /needs an "## Options" section/],
+      ['an image naming a page', { ...base, card: { ...card({}).card, markdown: markdown + '\n![Mock](notes.md)\n' }, attachments: [{ name: 'notes.md', type: 'text/markdown', text: '# Notes' }] }, /names a page, not an image/],
       ['an image named for another type', { ...base, card: { ...card({}).card, markdown: markdown + '\n![Mock](a.jpg)\n' }, attachments: [{ name: 'a.jpg', type: 'image/png', base64: png }] }, /must end in \.png/],
       ['attachments on an emoji card', { title: 'Which plan?', card: { type: 'generic', options: [{ number: 1, emoji: '🚀', title: 'One' }, { number: 2, emoji: '🛠️', title: 'Two' }] }, attachments: [{ name: 'a.png', type: 'image/png', base64: png }] }, /only with a brief card/],
       ['an unknown field', { ...base, card: { ...card({}).card, extra: 'dropped?' } }, /extra|is unexpected/],
@@ -104,5 +123,13 @@ test('briefs: refused whole, with a reason that says what to fix', { timeout: 12
     assert.match(tools.tools.find(t => t.name === 'ask_card')?.description ?? '', /brief/);
     await client.close();
     assert.equal((await f.inbox(s.session.sessionId, phone)).open[0].attachments?.length, 4);
+
+    // A build from before briefs ends a pager by deleting its proposals only; the attachments still go with them.
+    await f.stop();
+    const [db] = attachmentRows(f.persist).filter(d => count(d) > 0);
+    assert.equal(count(db), 4);
+    db.exec('DELETE FROM proposals');
+    assert.equal(count(db), 0, 'deleting a proposal deletes its attachments');
+    db.close();
   } finally { await f.stop(); }
 });

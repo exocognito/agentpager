@@ -1,7 +1,7 @@
 import { Schema } from "effect";
 import { Token, Text, Body, Emoji, Timestamp, OptionNumber, Option, SessionName } from "./values.ts";
 import { Card, acceptsChoice } from "../ui/components/cards/schemas.ts";
-import { Attachments, AttachmentInfo, missingAttachment } from "../ui/components/cards/brief/schema.ts";
+import { Attachments, AttachmentInfo, attachmentTypes, missingAttachment } from "../ui/components/cards/brief/schema.ts";
 // The primitives live in values.ts; this module re-exports them so one import path carries the whole exchange.
 export * from "./values.ts";
 export { Card, CardKind } from "../ui/components/cards/schemas.ts";
@@ -46,8 +46,8 @@ export const Acknowledgement = Schema.Struct({
 });
 export type Acknowledgement = typeof Acknowledgement.Type;
 // Attachments come only with a brief, and every image or page the brief names must be one of them.
-const briefLinks = (q: { card: Card; attachments?: ReadonlyArray<{ name: string }> }) =>
-  q.card.type === "brief" ? missingAttachment(q.card.markdown, new Set((q.attachments ?? []).map(a => a.name))) ?? true
+const briefLinks = (q: { card: Card; attachments?: ReadonlyArray<{ name: string; type: AttachmentInfo["type"] }> }) =>
+  q.card.type === "brief" ? missingAttachment(q.card.markdown, attachmentTypes(q.attachments)) ?? true
     : q.attachments === undefined || "attachments come only with a brief card";
 export const QuestionInput = Schema.Struct({
   title: Text,

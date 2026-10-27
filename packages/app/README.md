@@ -28,6 +28,11 @@ that is no option, a link to a missing attachment, or a size over its limit. The
 name, type and size; the bytes live in their own table, immutable, and go when the pager ends. The phone reads one
 with `GET /api/sessions/<id>/cards/<decisionId>/files/<name>` and its phone key.
 
+Versions: a brief's options get their number's keycap as `emoji`, so an iPhone build from before briefs draws a
+brief as an emoji card instead of failing the whole pager. A deleted proposal deletes its attachments (a trigger), so
+a build from before briefs still clears them when a pager ends. But that build cannot read a stored brief at all:
+before rolling the server back past briefs, end the pagers that hold one, or they answer `InvalidInput` until they end.
+
 `fixtures/briefs/` holds the canvas's four examples (D1–D4) word for word. `scripts/briefs.ts <server> <pager number>`
 plays the agent over MCP: it opens a pager with the number, asks all four, then acknowledges each answer.
 

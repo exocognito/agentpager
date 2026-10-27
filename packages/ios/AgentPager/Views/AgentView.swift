@@ -188,7 +188,8 @@ struct AnsweredRowView: View {
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             Group {
-                if let chosen, let emoji = chosen.emoji { Text(emoji).font(.title3) }
+                // A brief's options carry keycaps only for older builds; this one marks them by letter.
+                if let chosen, !row.decision.card.isBrief, let emoji = chosen.emoji { Text(emoji).font(.title3) }
                 else if let chosen {
                     Text(chosen.letter).font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
                         .frame(width: 26, height: 26).background(Color(.systemGray5), in: .circle)

@@ -75,20 +75,20 @@ final class FlowTests: XCTestCase {
         shot("03-agent-no-decisions")
 
         _ = try agent.ask("What should we aim for first?", detail: "Maya’s team can start this week; reliability work can follow their first real session.",
-                          options: [("🚀", "Ship to Maya’s team", nil), ("🛠️", "Reliability first", nil)], recommended: 1)
+                          options: ["Ship to Maya’s team", "Reliability first"], recommended: 1)
         let maya = try agent.ask("Send Maya the update?", detail: "Maya asked for an update once the phone flow was ready.",
-                                 options: [("📨", "Send now", "As drafted."), ("🌅", "Send at 9:00 tomorrow", "It lands at the top of Maya’s morning."), ("🗑️", "Don’t send it", nil)], recommended: 1)
+                                 options: ["Send now", "Send at 9:00 tomorrow", "Don’t send it"], recommended: 1)
         wait(app.buttons["open-Send Maya the update?"], 8)
         shot("04-agent-open")
 
         app.buttons["open-Send Maya the update?"].tap()
-        wait(app.buttons["send-button"])
-        XCTAssertFalse(app.buttons["send-button"].isEnabled)
+        wait(app.buttons["tile-A"])
+        XCTAssertFalse(app.buttons["send-option"].exists, "nothing to send until an option is picked")
         shot("05-decision")
-        app.buttons["option-2"].tap()
+        app.buttons["tile-B"].tap()
         shot("06-decision-selected")
         let sentAt = Date()
-        app.buttons["send-button"].tap()
+        app.buttons["send-option"].tap()
         wait(app.buttons["undo-button"], 3)
         shot("07-undo-window")
 
@@ -119,7 +119,7 @@ final class FlowTests: XCTestCase {
         wait(app.descendants(matching: .any).matching(identifier: "unanswered-What should we aim for first?").firstMatch, 5)
         XCTAssertFalse(app.buttons["open-What should we aim for first?"].exists, "an ended pager's cards can't be answered")
         shot("11-ended-agent-finished")
-        XCTAssertThrowsError(try agent.ask("Again?", options: [("1️⃣", "One", nil), ("2️⃣", "Two", nil)])) { e in
+        XCTAssertThrowsError(try agent.ask("Again?", options: ["One", "Two"])) { e in
             XCTAssertEqual((e as? ToolError)?.tag, "PagerEnded")
         }
     }
@@ -178,12 +178,12 @@ final class FlowTests: XCTestCase {
         XCTAssertFalse(app.staticTexts["status-line"].exists, "no status pill while the server is reachable")
         shot("61-agents-numbered")
 
-        let ship = try agent.ask("Ship it?", options: [("🚀", "Ship", nil), ("🛑", "Hold", nil)])
+        let ship = try agent.ask("Ship it?", options: ["Ship", "Hold"])
         row.tap()
         wait(app.buttons["open-Ship it?"], 8)
         app.buttons["open-Ship it?"].tap()
-        app.buttons["option-1"].tap()
-        app.buttons["send-button"].tap()
+        app.buttons["tile-A"].tap()
+        app.buttons["send-option"].tap()
         let answer = try XCTUnwrap(try agent.waitForAnswer(ship, seconds: 20))
         XCTAssertEqual((answer["choice"] as! [String: Any])["number"] as? Int, 1)
         shot("62-numbered-answered")
@@ -205,7 +205,7 @@ final class FlowTests: XCTestCase {
         try AgentHarness(base: AgentHarness.server).page(number: number.label, name: "Codex · after change")
         app.buttons["Close"].firstMatch.tap()
         wait(app.buttons["agent-Codex · after change"], 10)
-        XCTAssertNoThrow(try agent.ask("Still on?", options: [("✅", "Yes", nil), ("❌", "No", nil)]))
+        XCTAssertNoThrow(try agent.ask("Still on?", options: ["Yes", "No"]))
         shot("65-agents-after-change")
     }
 
@@ -229,7 +229,7 @@ final class FlowTests: XCTestCase {
         app.buttons["pair-button"].tap()
         wait(app.staticTexts["Pairing Failed"], 6)
         shot("32-pairing-failed")
-        XCTAssertThrowsError(try agent.ask("Still there?", options: [("1️⃣", "One", nil), ("2️⃣", "Two", nil)])) { e in
+        XCTAssertThrowsError(try agent.ask("Still there?", options: ["One", "Two"])) { e in
             let body = (e as? ToolError)?.body ?? [:]
             XCTAssertEqual(body["error"] as? String, "PagerEnded")
             XCTAssertEqual(body["endReason"] as? String, "pairingFailed")
@@ -261,11 +261,11 @@ final class FlowTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Pager active · Ends in 30d"].waitForExistence(timeout: 5))
 
         // The first send fails all its retries (debug flag) -> "Answer Not Confirmed" -> Retry sends the same answer.
-        let flaky = try agent.ask("Book the 7:40 train?", options: [("🚆", "Book it", nil), ("⏳", "Wait for the 9:10", nil)])
+        let flaky = try agent.ask("Book the 7:40 train?", options: ["Book it", "Wait for the 9:10"])
         wait(app.buttons["open-Book the 7:40 train?"], 8)
         app.buttons["open-Book the 7:40 train?"].tap()
-        app.buttons["option-1"].tap()
-        app.buttons["send-button"].tap()
+        app.buttons["tile-A"].tap()
+        app.buttons["send-option"].tap()
         let alert = app.alerts["Answer Not Confirmed"]
         wait(alert, 25)
         shot("42-answer-not-confirmed")
@@ -275,23 +275,25 @@ final class FlowTests: XCTestCase {
         XCTAssertEqual((flakyAnswer["choice"] as! [String: Any])["number"] as? Int, 1)
 
         // Undo inside the window keeps the decision open and the choice selected.
-        let hotel = try agent.ask("Which hotel?", options: [("🏨", "Central", "Near the station."), ("🌊", "Seafront", nil)], recommended: 1)
+        let hotel = try agent.ask("Which hotel?", options: ["Central", "Seafront"], recommended: 1)
         wait(app.buttons["open-Which hotel?"], 8)
         app.buttons["open-Which hotel?"].tap()
-        app.buttons["option-2"].tap()
-        app.buttons["send-button"].tap()
+        app.buttons["tile-B"].tap()
+        app.buttons["send-option"].tap()
         wait(app.buttons["undo-button"], 3)
         app.buttons["undo-button"].tap()
-        wait(app.buttons["send-button"], 5)
-        XCTAssertTrue(app.buttons["option-2"].isSelected)
+        wait(app.buttons["send-option"], 5)
+        XCTAssertTrue(app.buttons["tile-B"].isSelected)
         shot("43-undo-reopened")
         app.buttons["close-decision"].tap()
         XCTAssertNil(try agent.waitForAnswer(hotel, seconds: 7), "an undone answer is never sent")
 
-        // Leaving the app during the Undo window sends at once.
+        // Leaving the app during the Undo window sends at once. Reopened, B is still picked (tapping it again
+        // would unpick it).
         app.buttons["open-Which hotel?"].tap()
-        app.buttons["option-2"].tap()
-        app.buttons["send-button"].tap()
+        wait(app.buttons["tile-B"], 5)
+        XCTAssertTrue(app.buttons["tile-B"].isSelected)
+        app.buttons["send-option"].tap()
         wait(app.buttons["undo-button"], 3)
         let left = Date()
         XCUIDevice.shared.press(.home)
@@ -301,7 +303,7 @@ final class FlowTests: XCTestCase {
         app.activate()
 
         // Ask for Changes sends feedback instead of an option.
-        let dinner = try agent.ask("Dinner on Friday?", options: [("🍣", "Sushi", nil), ("🍝", "Pasta", nil)])
+        let dinner = try agent.ask("Dinner on Friday?", options: ["Sushi", "Pasta"])
         wait(app.buttons["open-Dinner on Friday?"], 8)
         app.buttons["open-Dinner on Friday?"].tap()
         app.buttons["ask-for-changes"].tap()
@@ -325,7 +327,7 @@ final class FlowTests: XCTestCase {
         app.buttons.matching(identifier: "End Pager").allElementsBoundByIndex.last!.tap()
         wait(app.staticTexts["Ended in the last 24 hours"], 8)
         shot("47-agents-ended")
-        XCTAssertThrowsError(try agent.ask("Still there?", options: [("1️⃣", "One", nil), ("2️⃣", "Two", nil)])) { e in
+        XCTAssertThrowsError(try agent.ask("Still there?", options: ["One", "Two"])) { e in
             XCTAssertEqual((e as? ToolError)?.body["endReason"] as? String, "ownerEnded")
         }
         app.buttons["agent-Claude · trip planner"].tap()
@@ -355,7 +357,7 @@ final class FlowTests: XCTestCase {
         wait(app.staticTexts["This pager has ended"], ends.timeIntervalSinceNow + 10)
         XCTAssertEqual(app.staticTexts["end-reason"].label, "It reached its end time.")
         shot("50-ended-timed-out")
-        XCTAssertThrowsError(try agent.ask("Still there?", options: [("1️⃣", "One", nil), ("2️⃣", "Two", nil)])) { e in
+        XCTAssertThrowsError(try agent.ask("Still there?", options: ["One", "Two"])) { e in
             XCTAssertEqual((e as? ToolError)?.body["endReason"] as? String, "timedOut")
         }
     }

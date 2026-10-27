@@ -3,7 +3,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { Schema } from 'effect';
 import jsQR from 'jsqr';
-import { fixture, assert, token, C, decode, ErrorBody, question } from './support.ts';
+import { fixture, assert, token, C, decode, ErrorBody, question, emojiCard } from './support.ts';
 
 const TextResult = Schema.Struct({ content: Schema.Array(Schema.Struct({ type: Schema.Literal('text'), text: Schema.String })), isError: Schema.optional(Schema.Boolean) });
 
@@ -55,6 +55,7 @@ test('official MCP SDK: start, show code, ask, wait, acknowledge, finish; join a
     const ack = await call('acknowledge_card', { ...agent, decisionId: asked.decisionId, acknowledgement: { answerId: receipt.answerId, nextSteps: 'Going with the second plan.' } }, C.Acknowledgement);
     assert.equal((await f.inbox(s.session.sessionId, phone)).answered[0].acknowledgement?.acknowledgedAt, ack.acknowledgedAt);
     await fails('ask_card', { ...agent, question: { ...question(), surprise: true } }, 'InvalidInput');
+    assert.match((await fails('ask_card', { ...agent, question: emojiCard }, 'InvalidInput')).message, /Emoji cards are retired/);
     await call('finish_session', agent, C.Finished);
     const after = await fails('ask_card', { ...agent, question: question() }, 'PagerEnded');
     assert.equal(after.endReason, 'agentFinished');

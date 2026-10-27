@@ -4,7 +4,7 @@ import { DatabaseSync } from 'node:sqlite';
 import path from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { fixture, assert, token, C } from './support.ts';
+import { fixture, assert, token, C, emojiCard } from './support.ts';
 import { briefNames, briefsDir, loadBrief } from '../fixtures/briefs/load.ts';
 
 // Decision briefs: an agent sends Markdown with lettered options and attachments; the phone reads the decision
@@ -104,7 +104,8 @@ test('briefs: refused whole, with a reason that says what to fix', { timeout: 12
       ['a brief with no Options section', card({ markdown: markdown.replace('## Options\n', '') }), /needs an "## Options" section/],
       ['an image naming a page', { ...base, card: { ...card({}).card, markdown: markdown + '\n![Mock](notes.md)\n' }, attachments: [{ name: 'notes.md', type: 'text/markdown', text: '# Notes' }] }, /names a page, not an image/],
       ['an image named for another type', { ...base, card: { ...card({}).card, markdown: markdown + '\n![Mock](a.jpg)\n' }, attachments: [{ name: 'a.jpg', type: 'image/png', base64: png }] }, /must end in \.png/],
-      ['attachments on an emoji card', { title: 'Which plan?', card: { type: 'generic', options: [{ number: 1, emoji: '🚀', title: 'One' }, { number: 2, emoji: '🛠️', title: 'Two' }] }, attachments: [{ name: 'a.png', type: 'image/png', base64: png }] }, /only with a brief card/],
+      ['an emoji card', emojiCard, /Emoji cards are retired\. Send a brief/],
+      ['attachments on an emoji card', { ...emojiCard, attachments: [{ name: 'a.png', type: 'image/png', base64: png }] }, /only with a brief card/],
       ['an unknown field', { ...base, card: { ...card({}).card, extra: 'dropped?' } }, /extra|is unexpected/],
     ];
     for (const [label, data, reason] of cases) {
@@ -123,6 +124,12 @@ test('briefs: refused whole, with a reason that says what to fix', { timeout: 12
     assert.match(tools.tools.find(t => t.name === 'ask_card')?.description ?? '', /brief/);
     await client.close();
     assert.equal((await f.inbox(s.session.sessionId, phone)).open[0].attachments?.length, 5);
+
+    // /start's own example, a brief's short form, asks as written.
+    const doc = await (await fetch(f.origin + '/start')).text();
+    const example = doc.match(/^A question: `(.*)`$/m)?.[1];
+    assert.ok(example, '/start has its example question');
+    await f.ok(C.Asked, cards, { agent: s.agentKey, data: JSON.parse(example) });
 
     // A build from before briefs ends a pager by deleting its proposals only; the attachments still go with them.
     await f.stop();

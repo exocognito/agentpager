@@ -23,9 +23,12 @@ async function port() { const s = createServer(); await new Promise<void>(r => s
 
 export const ErrorBody = Schema.Struct({ error: Schema.String, message: Schema.String, reason: Schema.optional(Schema.String), triesLeft: Schema.optional(Schema.Number), endReason: Schema.optional(C.EndReason), endedAt: Schema.optional(C.Timestamp), name: Schema.optional(Schema.NullOr(Schema.String)), limit: Schema.optional(Schema.Number) });
 export type ErrorBody = typeof ErrorBody.Type;
+// A brief's short form: every card an agent asks is a brief.
 export function question(title = 'Which plan?', detail?: string) {
-  return { title, ...(detail ? { detail } : {}), card: { type: 'generic', recommended: 2, options: [{ number: 1, emoji: '🚀', title: 'First plan', detail: 'First complete detail' }, { number: 2, emoji: '🛠️', title: 'Second plan' }] } };
+  return { title, ...(detail ? { detail } : {}), card: { type: 'brief', recommended: 2, options: [{ number: 1, title: 'First plan', label: 'First', prioritizes: 'speed' }, { number: 2, title: 'Second plan', label: 'Second', prioritizes: 'safety' }], markdown: '## Context: two plans\nBoth are ready to start.\n\n## Options\n\n## Tradeoffs\n|       | A First        | B Second       |\n|-------|----------------|----------------|\n| Speed | :green[Fast]   | :yellow[Slower] |\n\n## Recommendation: B\n**Why:** It is safer.\n' } };
 }
+// An emoji card, as agents sent before briefs; the server refuses them now.
+export const emojiCard = { title: 'Which plan?', card: { type: 'generic', options: [{ number: 1, emoji: '🚀', title: 'One' }, { number: 2, emoji: '🛠️', title: 'Two' }] } };
 
 // Each test file starts its own workerd with the shortest local lifetimes its cases need.
 export async function fixture(name: string, lifetimes = { windowMs: 60_000, lifetimeMs: 120_000, retainMs: 60_000 }) {

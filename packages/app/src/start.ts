@@ -2,7 +2,7 @@ import { STATUS, MAX_OPEN_DECISIONS, ANSWER_WAIT_MAX_SECONDS } from './contract.
 
 // What agents read. Short on purpose; every route and field named here is real.
 const errors = () => Object.entries(STATUS).filter(([tag]) => tag !== 'NotFound').map(([tag, status]) => `| ${tag} | ${status} |`).join('\n');
-const example = JSON.stringify({ title: 'Which should I do first?', detail: 'The tests take 4 minutes.', card: { type: 'generic', recommended: 1, options: [{ number: 1, emoji: '🧪', title: 'Run the tests', detail: 'Then update the docs.' }, { number: 2, emoji: '📖', title: 'Update the docs' }] } });
+const example = JSON.stringify({ title: 'Which should I do first?', detail: 'The tests take 4 minutes.', card: { type: 'brief', recommended: 1, options: [{ number: 1, title: 'Run the tests, then update the docs', label: 'Tests first', prioritizes: 'docs that match what ships' }, { number: 2, title: 'Update the docs now', label: 'Docs first', prioritizes: 'the docs review starting sooner' }], markdown: '## Context: tests or docs first\nBoth are due today, and the tests take 4 minutes.\n\n## Options\n\n## Tradeoffs\n|                | A Tests first      | B Docs first      |\n|----------------|--------------------|-------------------|\n| Docs match     | :green[What ships] | :yellow[Maybe not] |\n| Review starts  | :yellow[In 4 min]  | :green[Now]       |\n\n## Recommendation: A\n**Why:** A failing test may change what the docs say.\n' } });
 
 export function startDocument(origin: string) {
   return `# AgentPager for agents
@@ -60,7 +60,7 @@ A question: \`${example}\`
 
 The reply: \`{"decisionId":"…"}\`
 
-Make the title a short question, about 100 characters, and put context in \`detail\`. 2 to 5 options numbered 1..n, each with a distinct emoji and an action you will carry out, its title also about 100 characters. \`recommended\` and \`detail\` are optional. Titles, option detail and \`nextSteps\` hold up to 280 characters, question detail up to 1000. Markdown stays literal; HTML is refused. A pager holds at most ${MAX_OPEN_DECISIONS} open decisions. Your owner's app says pager, never session, so say pager in what you write.
+Every card is a brief; emoji cards are refused. The example is a brief's short form, for a quick decision: read Decision briefs below before your first one. Make the title a short question, about 100 characters, and put context in \`detail\`; \`recommended\` and \`detail\` are optional. The title and \`nextSteps\` hold up to 280 characters, question detail up to 1000, as plain text; HTML is refused. A pager holds at most ${MAX_OPEN_DECISIONS} open decisions. Your owner's app says pager, never session, so say pager in what you write.
 
 ## 4. Wait for the answer
 
@@ -89,7 +89,7 @@ The reply: \`{"decisionId":"…","answerId":"…","nextSteps":"…","acknowledge
 
 ## Decision briefs
 
-For a decision that needs a story (what broke, what each option looks like, what it costs), send a brief instead of an emoji card. Your owner's phone draws every brief the same way: the question, then headed sections they can fold (your context, the colored tradeoffs table, your recommendation and your next steps) and the answer bar. Each option's story opens on its own screen, one tap from the table, so make the table enough to decide on.
+Every card is a brief. A quick decision needs only the short form, as in Ask above; one that needs a story (what broke, what each option looks like, what it costs) uses every section. Your owner's phone draws every brief the same way: the question, then headed sections they can fold (your context, the colored tradeoffs table, your recommendation and your next steps) and the answer bar. Each option's story opens on its own screen, one tap from the table, so make the table enough to decide on.
 
 If your \`ask_card\` tool offers no \`brief\` card, it was loaded before briefs existed: send the brief over HTTP.
 

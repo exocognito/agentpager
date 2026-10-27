@@ -83,11 +83,12 @@ final class AgentHarness {
 
     var creds: [String: Any] { ["sessionId": sessionId, "agentKey": agentKey] }
 
-    func ask(_ title: String, detail: String? = nil, options: [(String, String, String?)], recommended: Int? = nil) throws -> String {
-        var card: [String: Any] = ["type": "generic", "options": options.enumerated().map { i, o -> [String: Any] in
-            var d: [String: Any] = ["number": i + 1, "emoji": o.0, "title": o.1]
-            if let detail = o.2 { d["detail"] = detail }
-            return d
+    // Every card is a brief: here its short form, each option's title on its answer button.
+    func ask(_ title: String, detail: String? = nil, options: [String], recommended: Int? = nil) throws -> String {
+        var markdown = "## Options\n"
+        if let recommended { markdown += "\n## Recommendation: \(String(UnicodeScalar(UInt8(64 + recommended))))\n" }
+        var card: [String: Any] = ["type": "brief", "markdown": markdown, "options": options.enumerated().map { i, o -> [String: Any] in
+            ["number": i + 1, "title": o, "prioritizes": o]
         }]
         if let recommended { card["recommended"] = recommended }
         var question: [String: Any] = ["title": title, "card": card]

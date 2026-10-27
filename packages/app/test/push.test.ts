@@ -55,7 +55,7 @@ test('alerts: a paired phone that gave its token is alerted when its agent asks 
     const asked = await f.ask(s, 'Ship it?');
     const [decisionAlert] = await until(async () => sent(mine), d => d.length === 1);
     const aps = decisionAlert.payload.aps;
-    assert.deepEqual(aps.alert, { title: 'Claude Code · alerts', body: 'Ship it?\nRecommended: 🛠️ Second plan' });
+    assert.deepEqual(aps.alert, { title: 'Claude Code · alerts', body: 'Ship it?\nRecommended: B. Second plan' });
     assert.equal(aps['interruption-level'], 'time-sensitive');
     assert.equal(aps['thread-id'], session.sessionId);
     assert.deepEqual([decisionAlert.payload.kind, decisionAlert.payload.sessionId, decisionAlert.payload.decisionId], ['decision', session.sessionId, asked.decisionId]);

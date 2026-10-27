@@ -9,6 +9,8 @@ caveats:
   - That the target is drawn at random is shown by reading the code that draws it, not by watching draws.
 ---
 
+Deprecated. Succeeded by C20::connect-with-an-agentpager-link and C21::pair-by-entering-the-agents-code: the owner's side is the native app (SP2), and pairing is by the agent's three-emoji code (SI2).
+
 ## Behaviors
 
 1. The agent creates a session and shows its link, a QR code of the link, and the emoji to choose. The service picks that emoji at random from the five on the card and tells only the agent.

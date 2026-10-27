@@ -12,6 +12,8 @@ caveats:
   - One agent and one phone; nothing here proves two agents at once.
 ---
 
+Deprecated. Succeeded by J3::happy-pager.
+
 ## Steps
 
 On the local product with its real persistent storage, in one session:

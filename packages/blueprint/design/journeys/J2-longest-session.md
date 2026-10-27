@@ -16,6 +16,8 @@ caveats:
   - Runs locally with local lifetimes; the deployed lifetimes are D1's to show.
 ---
 
+Deprecated. Succeeded by J4::longest-pager.
+
 ## Steps
 
 On the local product, in real time, in one browser context. Preserve state except the explicit new session:

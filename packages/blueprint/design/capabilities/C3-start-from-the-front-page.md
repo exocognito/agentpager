@@ -9,6 +9,8 @@ caveats:
   - The clipboard copy is proved in a browser the test controls; a phone browser may refuse it, and the text stays selectable.
 ---
 
+Deprecated. Succeeded by C18::website-points-to-the-app: the web app is parked (ROADMAP), and the website now points people to the app.
+
 ## Behaviors
 
 1. agentpager.me says what AgentPager does and how it works. A browser that already holds a session goes to the home screen instead (C8).

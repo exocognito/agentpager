@@ -9,4 +9,6 @@ caveats:
   - The deadline is checked live 5 seconds before it and refused from 2 seconds after it; the exact boundary second is not proved.
 ---
 
+Deprecated. Succeeded by I17::ended-pagers-refuse-and-forget: lifetimes are 24 hours, 7 days or 30 days, and the owner can move the end (SI5).
+
 Claiming the link does not move the deadline, and neither does repeating the pairing answer. After the deadline, every call is refused, the phone shows the expired screen, and storage holds no cards, answers or acknowledgements, even after the service restarts. Breaking this looks like any activity keeping a session alive past its first deadline.

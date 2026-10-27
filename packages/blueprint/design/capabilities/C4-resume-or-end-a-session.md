@@ -10,6 +10,8 @@ caveats:
   - Nothing is proved about platform backups.
 ---
 
+Deprecated. Succeeded by C22::change-or-end-a-pager and C23::agents-list: when the agent finishes, its pager ends (SI5), and the owner can move the end time.
+
 ## Behaviors
 
 1. The owner closes the tab. Later, in the same browser, the link, the session page or the home screen leads back to the session and its history.

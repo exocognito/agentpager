@@ -2,31 +2,35 @@
 
 ## Vision
 
-AgentPager makes it easy for me to leave my agents working on my computer or in a cloud VM and send owner decisions to my phone so they can continue to do useful work while I am away.
+AgentPager makes it easy for me to leave my agents working on my computer or in a cloud VM and send owner decisions to my phone so they can continue to do useful work while I am away. It is an app on my phone that pages me when an agent needs me, the way a pager would.
 
 ## Strategic capabilities
 
 ### SC1 · Unblock my agent from my phone
 
-Connect my agent to my phone easily: the agent gives me a QR code or a link, or I copy a link from my phone to give the agent. To pair, the agent sends me a decision with five random emoji and tells me which one to choose.
+Connect my agent to my phone easily with an AgentPager link: my agent shows me one as a link and a QR code, or my phone makes one for me to give my agent. Either way I confirm the pairing by tapping, on my phone, the three emoji my agent shows me.
 
-Once paired, my agent sends me a multiple-choice decision when it needs me. I answer, see that my answer was sent, and get the agent's acknowledgement and its next steps. I can look back at past decisions.
+Once paired, my agent sends me a multiple-choice decision when it needs me. I answer, see that my answer was sent, and get the agent's acknowledgement and its next steps. I can look back at a pager's decisions while it lasts.
 
 Decision cards can show the exact email, pull request, calendar invitation or reply, the way that product would show it, with the agent's options for what to do with it. The agent carries out the option I chose; AgentPager only carries my answer.
 
-Accounts should let me return across devices without making a guest session public.
+Accounts should let me return across devices without making a pager public.
 
-<!-- Learn whether owners value longer sessions before building subscriptions. -->
+<!-- Learn whether owners value longer pagers before building subscriptions. -->
+
+### SC2 · Get paged when my agent needs me
+
+When my agent asks, my phone alerts me with the agent's name and its question, even when AgentPager is closed and, if I let its alerts through, a Focus mode is on. Opening the alert takes me to that decision.
 
 ## Strategic invariants
 
 ### SI1 · Sending a decision requires confirmation
 
-Following good UX practice, an action that cannot be undone needs a confirming step. So an answer always takes two taps: I choose an option or write a response, then press Send. Choosing alone never sends. The agent receives exactly what I sent.
+Following good UX practice, an action that cannot be undone needs a confirming step. So an answer always takes two taps: I choose an option or write a response, then press Send, and I have a few seconds to undo. Choosing alone never sends. The agent receives exactly what I sent.
 
-### SI2 · Only the first phone gets in
+### SI2 · Only the phone that enters my agent's code gets in
 
-The first phone to claim a pairing link reserves the session; later devices are refused, and the first keeps it. Choosing the emoji the agent showed and pressing Send pairs it; a wrong choice leaves it unpaired. Pairing links are unguessable and work once. A lost phone means a new session, never a transfer.
+A pager is one agent and one phone. A phone pairs only by entering the three emoji my agent shows, within 15 minutes and three tries; a third wrong try ends the pager. Opening or reading an AgentPager link never uses it up and never pairs anything. Once paired, no other phone or agent gets in. A lost phone means a new pager, never a transfer.
 
 ### SI3 · Sent decisions cannot be changed
 
@@ -36,13 +40,13 @@ I can reread the question, my answer and the agent's acknowledgement, but not ch
 
 An acknowledgement is a real message from the agent, never an automatic message from AgentPager. The phone tells apart "your answer was sent" from "your agent received it".
 
-### SI5 · A free session ends when I end it, or 24 hours after pairing
+### SI5 · A pager ends when I end it, when my agent finishes, or at its end time
 
-When my agent finishes, I can still read the session until it ends. Once a session ends or expires, its decisions are deleted.
+Its end time is 24 hours after pairing unless I choose 7 or 30 days, and I can change it later. When a pager ends, its decisions are deleted at once and my agent is told why on its next call. Ending a pager never stops the agent itself.
 
 ### SI6 · UTF-8 with Markdown is allowed; invalid or over-limit text is refused, never truncated
 
-Card titles, option labels, option detail and agent acknowledgements allow 280 visible characters; question detail and my written feedback allow 1,000. Count spaces and Markdown punctuation. Text is valid UTF-8 with Markdown and no HTML. Anything else is refused whole, with an error that tells the agent what to fix. Nothing is truncated or silently cleaned. On screen, titles, option labels and session names show each run of spaces and line breaks as one space; detail text shows them as sent.
+Card titles, option labels, option detail and agent acknowledgements allow 280 visible characters; question detail and my written feedback allow 1,000. Count spaces and Markdown punctuation. Text is valid UTF-8 with Markdown and no HTML. Anything else is refused whole, with an error that tells the agent what to fix. Nothing is truncated or silently cleaned. On screen, titles, option labels and agent names show each run of spaces and line breaks as one space; detail text shows them as sent.
 
 ### SI7 · Cards are independent
 
@@ -54,7 +58,7 @@ Before I answer a rich card, I see its complete target and content, and my answe
 
 ### SI9 · Research never pretends to be an available paid upgrade
 
-A Pro research offer takes no payment and changes nothing about my sessions. It sends my feedback only with my consent.
+A Pro research offer takes no payment and changes nothing about my pagers. It sends my feedback only with my consent.
 
 ## Strategic goals
 
@@ -74,20 +78,24 @@ Test whether owners need longer-running agents, for which work, and whether $2.9
 
 ### SP1 · Make the usual answer easy and clear
 
-Use plain language I can understand without specialist knowledge. Always offer feedback, except on the pairing card, for when the options do not fit; feedback is the fallback, not the usual path.
+Use plain language I can understand without specialist knowledge. Always offer a way to ask for changes when the options do not fit; it is the fallback, not the usual path. In the app, my agent has a pager, I end a pager, and nothing is called a session.
 
 ### SP2 · Keep the first version focused and its foundations explicit
 
-Serve one agent and one phone per session. Accounts, native apps, community cards and paid plans need their own design and user learning. Run on a Cloudflare Worker at agentpager.me, with one SQLite-backed Durable Object per session. Agents reach one service by plain HTTPS or a remote MCP server. Defer Alchemy until a date the owner sets.
+Serve one agent and one phone per pager. My side is a native phone app for iPhone and Android, with the same behaviour, data and words on each, drawn each platform's way. Accounts, community cards and paid plans need their own design and user learning. Run on a Cloudflare Worker at agentpager.me, with one SQLite-backed Durable Object per pager. Agents reach one service by plain HTTPS or a remote MCP server. Defer Alchemy until a date the owner sets.
 
 ### SP3 · Agents choose the options; AgentPager keeps them easy to answer
 
-For every card, the agent chooses the question, two to five options and their emoji. Each option is one target, its emoji and title, with no radio, check or number. The emoji tells options apart, so I can refer to them in feedback, such as "do 🚀 and then 🛠️". I choose one option, never several. On a product card the options are the actions the agent offers, such as Send now or Send tomorrow.
+For every card, the agent chooses the question, two to five options and their emoji. Each option is its emoji and title; the emoji, never a number, tells options apart, so I can refer to them when I ask for changes, such as "do 🚀 and then 🛠️". I choose one option, never several, and the phone marks my choice the platform's usual way. On a product card the options are the actions the agent offers, such as Send now or Send tomorrow.
 
 ### SP4 · Keep the decision short; make detail optional
 
-Aim for about 100 characters for the question and for each option. The agent may name the option it recommends; it shows under the question, with the question's detail as a short reason, never a second question. Nothing is chosen for me. Each option may carry about 200 characters of detail, shown only while it is chosen. These are writing guides; SI6 sets the hard limits.
+Aim for about 100 characters for the question and for each option. The agent may mark the option it recommends; the phone tags it, and nothing is chosen for me. Each option may carry about 200 characters of detail, always shown with it. These are writing guides; SI6 sets the hard limits.
 
 ### SP5 · Reach the agents owners actually use
 
-Any agent whose client can send HTTPS requests or add an MCP server can use AgentPager from agentpager.me/start alone, with nothing to install. That covers terminal agents, desktop and IDE apps, and chat apps on my phone. /start is written for developers of every level. A waiting agent has my answer within a second of the Undo window closing.
+Any agent whose client can send HTTPS requests or add an MCP server can use AgentPager from an AgentPager link or agentpager.me/start alone, with nothing to install. That covers terminal agents, desktop and IDE apps, and chat apps on my phone. The instructions are written for developers of every level. A waiting agent has my answer within a second of the Undo window closing.
+
+### SP6 · Feel native
+
+Use the platform's own components and conventions (lists, sheets, menus, alerts, notifications and the Camera) rather than custom ones, so the app is familiar and the system does the work. Behaviour, data and words are the same on every platform; how they are drawn follows each platform.

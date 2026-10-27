@@ -4,7 +4,9 @@
 
 Research date: 2026-10-27. Recommendation, not an approved change to the Blueprint.
 
-**Recommendation:** keep AgentPager's installation-free HTTPS/MCP entry point, and evaluate an optional local bridge that receives answers outside the model and delivers them to the exact agent session. The major improvement is automatic continuation after the agent stops waiting. Replacing long polling with a socket alone does not provide that.
+**Recommendation:** make automatic answer delivery and session continuation the primary experience for supported coding agents, using an installed local bridge and host adapters where needed. Keep HTTPS/MCP held reads as a compatibility path. The major improvement is automatic continuation after the agent stops waiting. Replacing long polling with a socket alone does not provide that.
+
+**Owner clarification:** C2's current no-wake caveat is not a hard requirement. It describes a limitation of the present contract, not a prohibition on a better model. The owner is considering installed integrations; this research does not assume that preserving a zero-install path must take precedence over reliable continuation. Requiring installation remains a product choice, not an implementation approved by this note.
 
 ## Evidence and limits
 
@@ -67,11 +69,24 @@ Channels can separately relay native tool approvals using a request ID and allow
 
 ## 3. How this compares with AgentPager today
 
-AgentPager already specifies a 50-second held answer read and delivery within one second of accepted Send to a waiting caller. The phone polls every three seconds. Its MCP server is stateless Streamable HTTP, with session authority in tool arguments. C2 explicitly says a stopped agent is not woken. [Answer contract](../../packages/blueprint/design/schemas/exchange.ts), [routes and authentication](../../packages/blueprint/design/effects/routes.ts), [C2](../../packages/blueprint/design/capabilities/C2-agent-starts-from-one-url.md), [K1](../../packages/blueprint/design/metrics/K1-visible-within-five-seconds.md).
+AgentPager already specifies a 50-second held answer read and delivery within one second of accepted Send to a waiting caller. The phone polls every three seconds. Its MCP server is stateless Streamable HTTP, with session authority in tool arguments. C2 records that a stopped agent is not woken; the owner has clarified that this is not a hard requirement. Treat it as the current contract's limitation, not a constraint on these options. [Answer contract](../../packages/blueprint/design/schemas/exchange.ts), [routes and authentication](../../packages/blueprint/design/effects/routes.ts), [C2](../../packages/blueprint/design/capabilities/C2-agent-starts-from-one-url.md), [K1](../../packages/blueprint/design/metrics/K1-visible-within-five-seconds.md).
 
 Therefore the likely gain is fewer repeated wait calls and reliable continuation across idle turns, not a demonstrated latency improvement. A shell program can loop over the existing held-read API without consulting the model, but it still needs a host adapter to wake a finished turn. A socket to an idle process does not itself schedule inference.
 
-SP5 currently promises nothing to install for agents with HTTPS or custom MCP. Mandatory plugins would narrow that reach, especially hosted chat apps. An optional enhanced mode can preserve the simple path. The current C2 caveat, D2 client qualification, K1 latency measurement and routes would need explicit additions before a bridge becomes a product promise. [Strategy](../../packages/blueprint/strategy/STRATEGY.md), [client dependency](../../packages/blueprint/design/dependencies/D2-agent-clients.md).
+SP5 separately promises nothing to install for agents with HTTPS or custom MCP. That reach has value, especially for hosted chat apps, but should be weighed against reliable continuation rather than treated as a veto on native integration. My revised recommendation is an installed bridge as the primary experience for supported coding agents, with a generic compatibility path where feasible. If installation becomes mandatory, explicitly revise SP5; before promising wake-up, update C2, D2 client qualification, K1 measurement and routes. [Strategy](../../packages/blueprint/strategy/STRATEGY.md), [client dependency](../../packages/blueprint/design/dependencies/D2-agent-clients.md).
+
+### What changes when no-wake is disregarded
+
+The technical options were already available. Their ranking changes: automatic continuation becomes part of the intended product behavior, and a local install can be justified by that behavior rather than presented only as an optional enhancement. A single bridge executable with thin host adapters is the preferred first architecture. A new agent launcher or a client built around an SDK/app-server becomes worth considering if AgentPager must also restart exited agents, but neither is required just to wake an idle session.
+
+| Session state | Proposed behavior | Additional requirement |
+| --- | --- | --- |
+| Busy, host still running | Queue the answer after current work; steer only when explicitly requested. | Host follow-up API and exact thread binding. |
+| Idle, host still running | Start the next turn automatically when the answer arrives. | Bridge or extension with authority to submit a turn. |
+| Host exited or crashed | Persist the answer; optionally restart/resume that session under a separately authorized policy. | Supervisor or launcher, supported resume API, saved execution context and permission/budget policy. A binary or plugin alone does not guarantee this. |
+| Machine asleep or offline | Persist the answer; deliver after reconnection. | Durable relay and replay protection. Waking the machine requires separate infrastructure. |
+
+Owning the launcher gives AgentPager more reliable process lifecycle control, at the cost of asking users to start agents through it. Owning an entire SDK/app-server client gives even more control and more maintenance. Start with adapters into existing clients; add a managed launcher only if exited-process recovery proves essential. These are architectural judgments, not tested compatibility claims.
 
 ## 4. Does a Bun binary help?
 
@@ -105,7 +120,7 @@ Keep SI4 intact: neither bridge transport receipt nor `codex queue` success shou
 
 ## 6. A small next experiment
 
-**Recommendation, not implementation authorization:** prove Codex first because the machine already exposes the required queue command. Add Pi as the next adapter; evaluate Claude Channels separately for preview restrictions. Do not first rewrite the cloud transport or make installation mandatory.
+**Recommendation, not implementation authorization:** prove Codex first because the machine already exposes the required queue command. Treat automatic continuation as the target default for supported coding agents. Add Pi as the next adapter; evaluate Claude Channels separately for preview restrictions. A required local install is a reasonable trade if these clients define the target audience; it is not technically necessary to require a separate plugin for every client. Prove host wake-up before rewriting the cloud transport.
 
 Acceptance criteria for the experiment:
 
@@ -115,4 +130,4 @@ Acceptance criteria for the experiment:
 4. Credentials and feedback never enter process arguments; the answer read returns the exact frozen proposal and answer. Agent acknowledgement remains distinct from queued receipt.
 5. Measure idle-answer-to-turn-start time, tool calls and tokens spent waiting, install effort and reconnection behavior against the current held-read path. Keep existing waiting-agent latency separate from next-turn scheduling latency.
 
-If that succeeds, amend the Blueprint with optional bridge delivery, supported clients, lifecycle/error states and evidence requirements. Decide on a multi-session subscription and E2EE only after their distinct value is established.
+If that succeeds, amend the Blueprint with automatic delivery as the supported-client experience, installation/setup requirements, lifecycle/error states and evidence requirements. Explicitly decide whether exited-process resume is included or remains queued until the user resumes. Decide on a multi-session subscription and E2EE only after their distinct value is established.

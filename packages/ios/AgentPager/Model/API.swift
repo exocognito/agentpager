@@ -51,7 +51,7 @@ nonisolated struct PagerSummary: Codable, Hashable, Sendable {
 }
 
 // A generic card's option has an emoji and maybe detail; a brief's option has a letter (number 1 is A), a label
-// for its answer tile and what it prioritizes.
+// for its answer button and what it prioritizes.
 nonisolated struct Option: Codable, Hashable, Sendable {
     var number: Int
     var emoji: String?

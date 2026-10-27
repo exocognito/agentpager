@@ -2,68 +2,76 @@ import SwiftUI
 import UIKit
 import ImageIO
 
-// A decision brief (the canvas's headed template): the question with one "x ago", then Context, Options,
-// Tradeoffs, Recommendation, Next steps and Small print, each folded by tapping its heading. Viewing an option
-// never chooses it; the answer bar below does, with today's Undo window and acknowledgement.
+// A decision brief (the canvas's headed template), laid out as an iOS inset-grouped page: "Decision: " and the
+// question with one "x ago", then each section's heading above its own card: Context, Decision Options (the
+// tradeoffs table, and a row to the Options screen), Recommendation, Next steps and Small print. Each folds by
+// its heading. Viewing an option never chooses it; the answer bar below does, with today's Undo window and
+// acknowledgement.
 struct BriefView: View {
     var sessionId: String
     var decision: Decision
-    // The answer tile picked, while the decision is open; nil once it is answered.
+    // The answer button picked, while the decision is open; nil once it is answered.
     var picked: Binding<Int?>?
     var askForChanges: () -> Void = {}
     var openPage: (String) -> Void = { _ in }
+    var openOptions: () -> Void = {}
     var send: (Int) -> Void = { _ in }
     // Shown above the sections once answered: your answer and your agent's reply.
     var answered: AnyView?
 
     @Environment(AppModel.self) private var model
-    @State private var viewing = 1
-    @State private var folded: Set<String> = ["smallprint"]
+    @Environment(\.openURL) private var openURL
+    @State private var folded: Set<String>
     @State private var document: BriefDocument
     @State private var fullScreen: FullScreenImage?
 
-    init(sessionId: String, decision: Decision, picked: Binding<Int?>? = nil, askForChanges: @escaping () -> Void = {}, openPage: @escaping (String) -> Void = { _ in }, send: @escaping (Int) -> Void = { _ in }, answered: AnyView? = nil) {
+    init(sessionId: String, decision: Decision, picked: Binding<Int?>? = nil, askForChanges: @escaping () -> Void = {}, openPage: @escaping (String) -> Void = { _ in }, openOptions: @escaping () -> Void = {}, send: @escaping (Int) -> Void = { _ in }, answered: AnyView? = nil) {
         self.sessionId = sessionId
         self.decision = decision
         self.picked = picked
         self.askForChanges = askForChanges
         self.openPage = openPage
+        self.openOptions = openOptions
         self.send = send
         self.answered = answered
-        _document = State(initialValue: BriefDocument(markdown: decision.card.markdown ?? ""))
-        // Once answered, the brief opens on the option you sent.
-        if case .option(let n)? = decision.answer?.choice { _viewing = State(initialValue: n) }
+        let document = BriefDocument(markdown: decision.card.markdown ?? "")
+        _document = State(initialValue: document)
+        // Next steps and the small print start folded.
+        _folded = State(initialValue: Set(document.sections.filter { $0.kind == .nextSteps }.map { "section-\($0.id)" } + ["smallprint"]))
     }
 
     private var recommended: Option? { decision.card.recommended.flatMap(decision.option) }
     private var star: String? { recommended?.letter }
+    // The option outlined in the table: the one picked to send, or the one sent.
+    private var outlined: String? {
+        if let n = picked?.wrappedValue { return decision.option(n)?.letter }
+        if case .option(let n)? = decision.answer?.choice { return decision.option(n)?.letter }
+        return nil
+    }
     private var context: BriefContext {
-        BriefContext(sessionId: sessionId, decisionId: decision.decisionId, star: star, openPage: openPage) { [sessionId, decision] name in
+        BriefContext(sessionId: sessionId, decisionId: decision.decisionId, star: star, picked: outlined, openPage: openPage) { [sessionId, decision] name in
             fullScreen = FullScreenImage(sessionId: sessionId, decisionId: decision.decisionId, name: name)
         }
     }
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(decision.title).font(.title3.weight(.semibold)).fixedSize(horizontal: false, vertical: true)
+                    Text("Decision: \(decision.title)").font(.title3.weight(.semibold)).fixedSize(horizontal: false, vertical: true)
                     Text(Wording.ago(decision.askedAt, now: model.now)).font(.footnote).foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 20).padding(.top, 12).padding(.bottom, 16)
+                .padding(.horizontal, 4).padding(.top, 12).padding(.bottom, 4)
                 .accessibilityElement(children: .combine)
                 .accessibilityIdentifier("brief-header")
 
-                VStack(alignment: .leading, spacing: 0) {
-                    if let answered { answered.padding(.top, 16) }
-                    ForEach(document.sections) { section in sectionView(section) }
-                    if !document.smallPrint.isEmpty { smallPrint }
-                }
-                .padding(.horizontal, 20).padding(.bottom, 24)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.systemBackground), in: UnevenRoundedRectangle(topLeadingRadius: 20, topTrailingRadius: 20))
+                if let answered { answered.padding(.vertical, 4) }
+                ForEach(document.screen) { section in sectionView(section) }
+                if !document.smallPrint.isEmpty { smallPrint }
             }
+            .padding(.horizontal, 16).padding(.bottom, 24)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .accessibilityIdentifier("brief-scroll")
         .background(Color(.systemGroupedBackground))
@@ -81,107 +89,76 @@ struct BriefView: View {
 
     @ViewBuilder private func sectionView(_ s: BriefDocument.Section) -> some View {
         let key = "section-\(s.id)"
-        let open = !folded.contains(key)
-        VStack(alignment: .leading, spacing: 10) {
-            if !s.title.isEmpty { FoldHeading(title: s.kind == .recommendation ? starred(s.title, letter: star) : s.title, open: open, id: key) { toggle(key) } }
-            if open || s.title.isEmpty {
-                if !s.blocks.isEmpty { BriefBlocksView(blocks: s.blocks, tradeoffs: s.kind == .tradeoffs) }
-                if s.kind == .options { options }
-            }
+        let open = !folded.contains(key) || s.title.isEmpty
+        VStack(alignment: .leading, spacing: 0) {
+            if !s.title.isEmpty { FoldHeading(title: s.kind == .recommendation ? recommendationTitle(s.title, letter: star) : s.title, open: open) { toggle(key) } }
+            if open { card(rows(s), tradeoffs: s.kind == .tradeoffs) }
         }
-        .padding(.top, s.id == 0 ? 16 : 18)
     }
 
     private func toggle(_ key: String) {
         withAnimation(.snappy(duration: 0.2)) { if folded.contains(key) { folded.remove(key) } else { folded.insert(key) } }
     }
 
-    private var options: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ForEach(decision.card.options, id: \.number) { o in optionRow(o) }
-            if let shown = decision.option(viewing), let block = document.options[shown.letter] {
-                optionBlock(shown, block)
-            }
-        }
+    // A section's card, as rows split by inset hairlines: its text, each "**Why:** …" lead-in as a label over
+    // its line, each link as a row that opens it, and on Decision Options a last row to the Options screen.
+    private enum Row {
+        case blocks([BriefBlock])
+        case labeled(String, String)
+        case link(String, String)
+        case options
     }
 
-    private func optionRow(_ o: Option) -> some View {
-        let on = viewing == o.number
-        return Button { viewing = o.number } label: {
-            HStack(alignment: .center, spacing: 12) {
-                if let thumb = document.options[o.letter]?.thumbnail {
-                    AttachmentImage(name: thumb, fill: true)
-                        .frame(width: 64, height: 44)
-                        .clipShape(.rect(cornerRadius: 6))
-                }
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Text("\(o.letter). \(o.title)").font(.body.weight(on ? .semibold : .regular)).foregroundStyle(.primary)
-                        Spacer(minLength: 0)
-                        if o.number == decision.card.recommended {
-                            Text("✶ Recommended").font(.footnote.weight(.semibold)).foregroundStyle(Color(.label)).fixedSize()
-                        }
+    private func rows(_ s: BriefDocument.Section) -> [Row] {
+        var out: [Row] = []
+        var run: [BriefBlock] = []
+        func flush() { if !run.isEmpty { out.append(.blocks(run)); run = [] } }
+        for block in s.blocks {
+            if case .link(let text, let target) = block { flush(); out.append(.link(text, target)) }
+            else if case .paragraph(let text) = block, let m = text.wholeMatch(of: /\*\*([^*]+):\*\*\s*(.*)/) { flush(); out.append(.labeled(String(m.1), String(m.2))) }
+            else { run.append(block) }
+        }
+        flush()
+        if s.kind == .tradeoffs { out.append(.options) }
+        return out
+    }
+
+    private func card(_ rows: [Row], tradeoffs: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(Array(rows.enumerated()), id: \.offset) { n, row in
+                if n > 0 { Divider().padding(.leading, 16) }
+                switch row {
+                case .blocks(let blocks):
+                    BriefBlocksView(blocks: blocks, tradeoffs: tradeoffs).padding(.horizontal, 16).padding(.vertical, 14)
+                case .labeled(let label, let text):
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(label).font(.footnote).foregroundStyle(.secondary)
+                        Text(Inline.text(text)).font(.callout).fixedSize(horizontal: false, vertical: true)
                     }
-                    if let p = o.prioritizes { Text("Prioritizes \(p)").font(.footnote).foregroundStyle(.secondary) }
-                }
-            }
-            .padding(.horizontal, 12).padding(.vertical, 10)
-            .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
-            .background(Color(.systemGray6), in: .rect(cornerRadius: 14))
-            // Viewing is a black ring, never blue: blue only means your own selection.
-            .overlay { RoundedRectangle(cornerRadius: 14).strokeBorder(on ? Color(.label) : .clear, lineWidth: 1.5) }
-            .contentShape(.rect)
-        }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(on ? .isSelected : [])
-        .accessibilityIdentifier("option-row-\(o.letter)")
-    }
-
-    @ViewBuilder private func optionBlock(_ o: Option, _ block: BriefDocument.OptionBlock) -> some View {
-        let name = o.letter + (o.letter == star ? "✶" : "")
-        if !block.preview.isEmpty {
-            VStack(alignment: .leading, spacing: 8) {
-                let image = block.preview.lazy.compactMap(imageName).first
-                if let caption = block.caption {
-                    Text(starred(caption, letter: o.letter == star ? star : nil)).font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
-                } else if let image {
-                    HStack {
-                        (Text(name).fontWeight(.semibold) + Text(" ") + Text(o.label ?? o.title)).font(.footnote).foregroundStyle(.secondary)
-                        Spacer()
-                        Button { context.openImage(image) } label: {
-                            Image(systemName: "arrow.up.left.and.arrow.down.right").font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
-                                .frame(width: 32, height: 32).background(Color(.systemBackground), in: .circle)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Open full screen")
+                    .padding(.horizontal, 16).padding(.vertical, 12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityElement(children: .combine)
+                case .link(let text, let target):
+                    NavigationRow(text: text, id: "link-\(target)") {
+                        if target.hasPrefix("https://"), let url = URL(string: target) { openURL(url) } else { openPage(target) }
                     }
+                case .options:
+                    NavigationRow(text: "Read more on options", id: "open-options", action: openOptions)
                 }
-                BriefBlocksView(blocks: block.preview, inPreview: true)
             }
-            .padding(12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(.systemGray6), in: .rect(cornerRadius: 12))
-            .accessibilityElement(children: .contain)
-            .accessibilityIdentifier("option-preview-\(o.letter)")
         }
-        if !block.changes.isEmpty {
-            BriefBlocksView(blocks: block.changes.map { b in
-                if case .heading(let level, let text) = b { return .heading(level: level, text: starred(text, letter: o.letter == star ? star : nil)) }
-                return b
-            })
-            .padding(.top, 6)
-        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 20))
+        .clipShape(.rect(cornerRadius: 20))
     }
 
-    private func imageName(_ b: BriefBlock) -> String? { if case .image(_, let name) = b { name } else { nil } }
-
+    // Small print sits on the page, like a list's footer.
     private var smallPrint: some View {
         let open = !folded.contains("smallprint")
         return VStack(alignment: .leading, spacing: 6) {
-            Divider().padding(.bottom, 2)
             Button { toggle("smallprint") } label: {
                 HStack {
-                    Text("Small print · \(document.smallPrintCount)").font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+                    Text("Small print · \(document.smallPrintCount)").font(.subheadline).foregroundStyle(.secondary)
                     Spacer()
                     Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
                         .rotationEffect(.degrees(open ? 90 : 0))
@@ -191,13 +168,14 @@ struct BriefView: View {
             .buttonStyle(.plain)
             .accessibilityIdentifier("fold-smallprint")
             .accessibilityValue(open ? "Open" : "Folded")
-            if open { BriefBlocksView(blocks: document.smallPrint, small: true) }
+            if open { BriefBlocksView(blocks: document.smallPrint, small: true).padding(.bottom, 8) }
         }
-        .padding(.top, 18)
+        .padding(.horizontal, 4)
     }
 
     // MARK: Answer bar
 
+    // Tinted buttons, one per option; the picked one fills with a ✓. Picking shows "Send option X".
     private func answerBar(_ picked: Binding<Int?>) -> some View {
         VStack(spacing: 10) {
             HStack(spacing: 8) {
@@ -205,19 +183,21 @@ struct BriefView: View {
                     let on = picked.wrappedValue == o.number
                     Button { picked.wrappedValue = on ? nil : o.number } label: {
                         VStack(spacing: 2) {
-                            Text(o.letter + (o.letter == star ? "✶" : "")).font(.body.weight(on ? .semibold : .regular))
-                            Text(o.label ?? o.title).font(.caption).foregroundStyle(on ? Color.accentColor : .secondary)
+                            HStack(spacing: 4) {
+                                if on { Image(systemName: "checkmark").font(.subheadline.weight(.bold)) }
+                                Text(o.letter + (o.letter == star ? " ✶" : "")).font(.body.weight(.semibold))
+                            }
+                            Text(o.label ?? o.title).font(.caption)
                                 .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
                         }
-                        .foregroundStyle(on ? Color.accentColor : Color(.label))
+                        .foregroundStyle(on ? Color.white : Color.accentColor)
                         .padding(.horizontal, 6).padding(.vertical, 8)
                         .frame(maxWidth: .infinity, minHeight: 60)
-                        .background(on ? Color.accentColor.opacity(0.08) : Color(.systemGray6), in: .rect(cornerRadius: 14))
-                        .overlay { RoundedRectangle(cornerRadius: 14).strokeBorder(on ? Color.accentColor : .clear, lineWidth: 1.5) }
+                        .background(on ? Color.accentColor : Color.accentColor.opacity(0.12), in: .rect(cornerRadius: 16))
                         .contentShape(.rect)
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Option \(o.letter): \(o.label ?? o.title)")
+                    .accessibilityLabel("Option \(o.letter)\(o.letter == star ? ", recommended" : ""): \(o.label ?? o.title)")
                     .accessibilityAddTraits(on ? .isSelected : [])
                     .accessibilityIdentifier("tile-\(o.letter)")
                 }
@@ -226,7 +206,7 @@ struct BriefView: View {
                 Button { send(n) } label: {
                     Text("Send option \(o.letter)").font(.headline).foregroundStyle(.white)
                         .frame(maxWidth: .infinity, minHeight: 50)
-                        .background(Color.accentColor, in: .rect(cornerRadius: 14))
+                        .background(Color.accentColor, in: .rect(cornerRadius: 16))
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("send-option")
@@ -234,7 +214,7 @@ struct BriefView: View {
                 Button(action: askForChanges) {
                     Label("Ask for changes", systemImage: "text.bubble").font(.headline).foregroundStyle(Color.accentColor)
                         .frame(maxWidth: .infinity, minHeight: 50)
-                        .background(Color(.systemGray6), in: .rect(cornerRadius: 14))
+                        .background(Color(.systemGray6), in: .rect(cornerRadius: 16))
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("ask-for-changes")
@@ -246,19 +226,20 @@ struct BriefView: View {
     }
 }
 
+// A section heading above its card, like a prominent list header; tapping it folds the card.
 struct FoldHeading: View {
     var title: String
     var open: Bool
-    var id: String
     var toggle: () -> Void
     var body: some View {
         Button(action: toggle) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(title).font(.headline).foregroundStyle(Color(.label)).multilineTextAlignment(.leading)
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Text(title).font(.title3.weight(.semibold)).foregroundStyle(Color(.label)).multilineTextAlignment(.leading)
                 Spacer(minLength: 0)
-                Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+                Image(systemName: "chevron.right").font(.subheadline.weight(.semibold)).foregroundStyle(.tertiary)
                     .rotationEffect(.degrees(open ? 90 : 0))
             }
+            .padding(.horizontal, 4)
             .frame(minHeight: 44).contentShape(.rect)
         }
         .buttonStyle(.plain)
@@ -268,12 +249,155 @@ struct FoldHeading: View {
     }
 }
 
+// A card row that goes somewhere, in the label colour with a grey chevron, highlighted while pressed.
+struct NavigationRow: View {
+    var text: String
+    var id: String
+    var action: () -> Void
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Text(text).font(.body).foregroundStyle(Color(.label)).multilineTextAlignment(.leading)
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, 16)
+            .frame(maxWidth: .infinity, minHeight: 48)
+            .contentShape(.rect)
+        }
+        .buttonStyle(RowButtonStyle())
+        .accessibilityIdentifier(id)
+    }
+}
+
+struct RowButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label.background(configuration.isPressed ? Color(.systemGray4) : .clear)
+    }
+}
+
+// The Options screen: one option at a time, with its title, what it prioritizes, what it looks like and what it
+// changes. Swipe, or use the segmented control at the bottom, to see another; seeing an option never chooses it.
+struct BriefOptionsView: View {
+    var sessionId: String
+    var decision: Decision
+    var openPage: (String) -> Void
+    @State private var shown: Int
+    @State private var document: BriefDocument
+    @State private var fullScreen: FullScreenImage?
+
+    // Opens on `start` (the option picked to send), else the option sent, else A.
+    init(sessionId: String, decision: Decision, start: Int?, openPage: @escaping (String) -> Void) {
+        self.sessionId = sessionId
+        self.decision = decision
+        self.openPage = openPage
+        _document = State(initialValue: BriefDocument(markdown: decision.card.markdown ?? ""))
+        var answered: Int? { if case .option(let n)? = decision.answer?.choice { n } else { nil } }
+        _shown = State(initialValue: start ?? answered ?? 1)
+    }
+
+    private var star: String? { decision.card.recommended.flatMap(decision.option)?.letter }
+
+    var body: some View {
+        TabView(selection: $shown) {
+            ForEach(decision.card.options, id: \.number) { o in
+                ScrollView {
+                    page(o).padding(.horizontal, 20).padding(.top, 16).padding(.bottom, 24)
+                }
+                .tag(o.number)
+                .accessibilityIdentifier("option-page-\(o.letter)")
+            }
+        }
+        .tabViewStyle(.page(indexDisplayMode: .never))
+        .background(Color(.systemBackground))
+        .navigationTitle("Options")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .bottomBar) {
+                Picker("Show option", selection: $shown) {
+                    ForEach(decision.card.options, id: \.number) { o in
+                        Text(o.letter + (o.letter == star ? " ✶" : "")).tag(o.number)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .frame(width: CGFloat(decision.card.options.count) * 72)
+                .accessibilityIdentifier("option-picker")
+            }
+        }
+        .environment(\.briefContext, BriefContext(sessionId: sessionId, decisionId: decision.decisionId, star: star, openPage: openPage) { [sessionId, decision] name in
+            fullScreen = FullScreenImage(sessionId: sessionId, decisionId: decision.decisionId, name: name)
+        })
+        .environment(\.openURL, OpenURLAction { url in
+            if url.scheme == nil { openPage(url.relativeString); return .handled }
+            return url.scheme == "https" ? .systemAction : .discarded
+        })
+        .fullScreenCover(item: $fullScreen) { FullScreenImageView(image: $0) }
+    }
+
+    private func page(_ o: Option) -> some View {
+        VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text("Option \(o.letter)" + (o.label.map { " · " + $0 } ?? ""))
+                    Spacer(minLength: 0)
+                    if o.letter == star { Text("✶ Recommended").foregroundStyle(Color(.label)).fixedSize() }
+                }
+                .font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
+                Text(o.title).font(.title3.weight(.semibold)).fixedSize(horizontal: false, vertical: true)
+                if let p = o.prioritizes { Text("Prioritizes \(p)").font(.subheadline).foregroundStyle(.secondary) }
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("option-header-\(o.letter)")
+            if let block = document.options[o.letter] { optionBlock(o, block) }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder private func optionBlock(_ o: Option, _ block: BriefDocument.OptionBlock) -> some View {
+        let mine = o.letter == star ? star : nil
+        if !block.preview.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                let image = block.preview.lazy.compactMap(imageName).first
+                if let caption = block.caption {
+                    Text(starred(caption, letter: mine)).font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
+                } else if let image {
+                    HStack {
+                        Spacer()
+                        Button { fullScreen = FullScreenImage(sessionId: sessionId, decisionId: decision.decisionId, name: image) } label: {
+                            Image(systemName: "arrow.up.left.and.arrow.down.right").font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
+                                .frame(width: 32, height: 32).background(Color(.systemBackground), in: .circle)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Open full screen")
+                    }
+                }
+                BriefBlocksView(blocks: block.preview, inPreview: true)
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(.systemGray6), in: .rect(cornerRadius: 14))
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("option-preview-\(o.letter)")
+        }
+        if !block.changes.isEmpty {
+            BriefBlocksView(blocks: block.changes.map { b in
+                if case .heading(let level, let text) = b { return .heading(level: level, text: starred(text, letter: mine)) }
+                return b
+            })
+        }
+    }
+
+    private func imageName(_ b: BriefBlock) -> String? { if case .image(_, let name) = b { name } else { nil } }
+}
+
 // What the blocks of one brief need: where their attachments come from, the recommended letter, and how to open a
 // page or an image.
 struct BriefContext {
     var sessionId = ""
     var decisionId = ""
     var star: String?
+    // The option to outline in the tradeoffs table: picked to send, or sent.
+    var picked: String?
     var openPage: (String) -> Void = { _ in }
     var openImage: (String) -> Void = { _ in }
 }
@@ -360,7 +484,7 @@ struct BlockView: View {
     var small = false
     @Environment(\.briefContext) private var context
 
-    private var bodyFont: Font { small ? .footnote : inPreview ? .footnote : .subheadline }
+    private var bodyFont: Font { small ? .footnote : inPreview ? .footnote : .callout }
 
     var body: some View {
         switch block {
@@ -387,7 +511,7 @@ struct BlockView: View {
         case .code(let language, let title, let lines):
             if language == "mermaid" { MermaidBlock(source: lines) } else { CodeBlock(title: title, lines: lines, diff: language == "diff") }
         case .table(let header, let rows):
-            TableBlock(header: header, rows: rows, letters: tradeoffs, star: context.star)
+            TableBlock(header: header, rows: rows, letters: tradeoffs, star: context.star, picked: tradeoffs ? context.picked : nil)
         case .image(_, let name):
             AttachmentImage(name: name)
                 .frame(maxWidth: .infinity)
@@ -436,21 +560,27 @@ struct LinkRow: View {
 }
 
 // The Tradeoffs table: "A Cards" columns gain ✶ on the recommended letter; a rated cell is tinted best to worst.
+// The option picked to send is outlined, header to last row.
 struct TableBlock: View {
     var header: [String]
     var rows: [[String]]
     var letters: Bool
     var star: String?
+    var picked: String?
 
     private var columns: Int { max(header.count, rows.map(\.count).max() ?? 0) }
-    private var labelWidth: CGFloat { columns <= 2 ? 150 : 96 }
+    private var labelWidth: CGFloat { [2: 150, 3: 96, 4: 76][columns] ?? 64 }
+    private var pickedColumn: Int? {
+        guard letters, let picked else { return nil }
+        return header.indices.dropFirst().first { letter(header[$0])?.0 == picked }
+    }
 
     var body: some View {
-        Grid(alignment: .topLeading, horizontalSpacing: 3, verticalSpacing: 3) {
+        Grid(alignment: .topLeading, horizontalSpacing: 4, verticalSpacing: 4) {
             if header.contains(where: { !$0.isEmpty }) {
                 GridRow {
                     ForEach(0..<columns, id: \.self) { c in
-                        headerCell(c < header.count ? header[c] : "", first: c == 0)
+                        headerCell(c < header.count ? header[c] : "", first: c == 0).column(c, of: pickedColumn)
                     }
                 }
             }
@@ -459,39 +589,66 @@ struct TableBlock: View {
                     ForEach(0..<columns, id: \.self) { c in
                         let cell = c < row.count ? row[c] : ""
                         if c == 0 {
-                            Text(Inline.text(cell)).font(.footnote.weight(.semibold)).foregroundStyle(Color(.label))
+                            Text(Inline.text(cell)).font(.footnote.weight(.medium)).foregroundStyle(Color(.label))
                                 .frame(width: labelWidth, alignment: .leading).padding(.vertical, 8)
-                        } else { valueCell(cell) }
+                        } else { valueCell(cell).column(c, of: pickedColumn) }
                     }
                 }
             }
         }
+        .overlayPreferenceValue(PickedColumn.self) { anchors in
+            GeometryReader { g in
+                if let first = anchors.first {
+                    let r = anchors.dropFirst().reduce(g[first]) { $0.union(g[$1]) }.insetBy(dx: -3, dy: -3)
+                    RoundedRectangle(cornerRadius: 11).strokeBorder(Color.accentColor, lineWidth: 2)
+                        .frame(width: r.width, height: r.height).offset(x: r.minX, y: r.minY)
+                }
+            }
+            .accessibilityHidden(true)
+        }
+        .animation(.snappy(duration: 0.2), value: picked)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    // "B Check" or "B ✶ Check": the letter, and the rest of the header.
+    private func letter(_ text: String) -> (String, String)? {
+        guard let m = text.firstMatch(of: /^([A-Z])\s?✶?(?![A-Za-z])\s*(.*)$/) else { return nil }
+        return (String(m.1), String(m.2))
     }
 
     @ViewBuilder private func headerCell(_ text: String, first: Bool) -> some View {
         if first {
             Text(Inline.text(text)).font(.footnote).foregroundStyle(.secondary).frame(width: labelWidth, alignment: .leading)
-        } else if letters, let m = text.firstMatch(of: /^([A-Z])✶?(?![A-Za-z])\s*(.*)$/) {
-            let l = String(m.1)
-            (Text(l + (l == star ? "✶" : "")).fontWeight(.semibold).foregroundStyle(Color(.label)) + Text(m.2.isEmpty ? "" : " " + m.2).foregroundStyle(.secondary))
-                .font(.footnote).padding(.horizontal, 8).padding(.vertical, 2)
+        } else if letters, let (l, rest) = letter(text) {
+            (Text(l + (l == star ? " ✶" : "")).fontWeight(.semibold).foregroundStyle(Color(.label)) + Text(rest.isEmpty ? "" : " " + rest).foregroundStyle(.secondary))
+                .font(.footnote).padding(.horizontal, 6).padding(.top, 4).padding(.bottom, 2)
                 .frame(maxWidth: .infinity, alignment: .leading)
         } else {
             Text(Inline.text(text)).font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
-                .padding(.horizontal, 8).padding(.vertical, 2).frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 6).padding(.top, 4).padding(.bottom, 2).frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
     @ViewBuilder private func valueCell(_ cell: String) -> some View {
         if let (rating, text) = Inline.rated(cell) {
-            Text(Inline.markdown(text)).font(.footnote.weight(.semibold)).foregroundStyle(rating.ink)
-                .padding(8).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            Text(Inline.markdown(text)).font(.footnote).foregroundStyle(rating.ink)
+                .padding(.horizontal, 6).padding(.vertical, 8).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 .background(rating.background, in: .rect(cornerRadius: 8))
         } else {
             Text(Inline.text(cell)).font(.footnote).foregroundStyle(Color(.label))
-                .padding(8).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .padding(.horizontal, 6).padding(.vertical, 8).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
+    }
+}
+
+// The cells of the picked column report their bounds, so the table can draw one outline around them.
+private struct PickedColumn: PreferenceKey {
+    static let defaultValue: [Anchor<CGRect>] = []
+    static func reduce(value: inout [Anchor<CGRect>], nextValue: () -> [Anchor<CGRect>]) { value += nextValue() }
+}
+private extension View {
+    func column(_ c: Int, of picked: Int?) -> some View {
+        anchorPreference(key: PickedColumn.self, value: .bounds) { c == picked ? [$0] : [] }
     }
 }
 

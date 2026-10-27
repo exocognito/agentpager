@@ -37,62 +37,96 @@ final class BriefTests: XCTestCase {
         wait(app.buttons["open-Which pricing page layout should I build?"], 30)
         shot("00-inbox")
 
-        // D1, a visual choice: view B, pick B, read the background, send B.
+        // D1, a visual choice: see B on the Options screen, pick B (its column outlined), read the background, send B.
         open("Which pricing page layout should I build?")
         shot("D1-1-top")
-        tap("option-row-B")
-        reveal(any("option-preview-B"))
-        shot("D1-2-viewing-B")
-        reveal(app.buttons["fold-Tradeoffs"])
-        shot("D1-3-tradeoffs")
+        reveal(app.buttons["open-options"])
+        shot("D1-2-decision-options")
+        tap("open-options")
+        showOption("B")
+        shot("D1-3-option-B")
+        back()
         tap("fold-smallprint")
         tap("tile-B")
+        reveal(app.buttons["open-options"])
         shot("D1-4-B-picked")
         tap("link-background.md")
         wait(app.navigationBars["Background"], 20)
         RunLoop.current.run(until: Date().addingTimeInterval(1.5))
         shot("D1-5-background")
-        app.navigationBars.buttons.element(boundBy: 0).tap()
+        back()
         sendPicked("Which pricing page layout should I build?", "D1")
 
-        // D2, a technical choice: view B (the diagram and diff), pick C, open the small print, send C.
+        // D2, a technical choice: see B (the diagram and diff), swipe to C, open the design notes, pick C, send C.
         open("How should checkout handle a payment timeout?")
-        tap("option-row-B")
-        reveal(any("option-preview-B"))
-        shot("D2-1-viewing-B")
-        tap("link-design.md")
+        tap("open-options")
+        showOption("B")
+        shot("D2-1-option-B")
+        app.swipeLeft()
+        waitUntil(10, "swiping to show C") { segment("C").isSelected && any("option-header-C").isHittable }
+        RunLoop.current.run(until: Date().addingTimeInterval(0.8))
+        shot("D2-2-swiped-to-C")
+        let notes = app.scrollViews["option-page-C"].buttons["link-design.md"]
+        for _ in 0..<6 where !notes.isHittable { app.scrollViews["option-page-C"].swipeUp() }
+        notes.tap()
         wait(app.navigationBars["Notes"], 20)
         RunLoop.current.run(until: Date().addingTimeInterval(1.5))
-        shot("D2-2-design-notes")
-        app.navigationBars.buttons.element(boundBy: 0).tap()
+        shot("D2-3-design-notes")
+        back()
+        back()
         tap("fold-smallprint")
         tap("tile-C")
-        shot("D2-3-C-picked")
+        shot("D2-4-C-picked")
         sendPicked("How should checkout handle a payment timeout?", "D2")
 
-        // D3, a content choice: view C (the chat sample and rules diff), pick B, send B.
+        // D3, a content choice: see C (the chat sample and rules diff), pick B, send B.
         open("How should the support bot handle refunds?")
-        tap("option-row-C")
-        reveal(any("option-preview-C"))
-        shot("D3-1-viewing-C")
+        tap("open-options")
+        showOption("C")
+        shot("D3-1-option-C")
+        back()
         tap("tile-B")
         shot("D3-2-B-picked")
         sendPicked("How should the support bot handle refunds?", "D3")
 
-        // D4, a small decision: ask for changes instead of an option.
+        // D4, a small decision: its options have no blocks; ask for changes instead of an option.
         open("Delete 14 merged preview branches?")
         shot("D4-1-top")
+        tap("open-options")
+        shot("D4-2-options")
+        back()
         app.buttons["ask-for-changes"].tap()
         let field = app.textViews["feedback-text"]
         wait(field, 10)
         app.typeText("Keep the two newest; delete the other 12.")
-        shot("D4-2-ask-for-changes")
+        shot("D4-3-ask-for-changes")
         app.buttons["send-feedback"].tap()
         confirmed("Delete 14 merged preview branches?", "D4")
 
+        // Answered, the brief stays readable, and its Options screen opens on the option sent.
         app.buttons["answered-Which pricing page layout should I build?"].tap()
         RunLoop.current.run(until: Date().addingTimeInterval(1.5))
         shot("D1-7-answered")
+        tap("open-options")
+        waitUntil(10, "the Options screen opening on B") { segment("B").isSelected }
+        shot("D1-8-answered-options")
+    }
+
+    // The Options screen's segmented control shows another option; it never chooses one.
+    private func segment(_ letter: String) -> XCUIElement {
+        app.segmentedControls.firstMatch.buttons.element(boundBy: Int(letter.unicodeScalars.first!.value) - 65)
+    }
+
+    private func showOption(_ letter: String) {
+        wait(app.segmentedControls.firstMatch, 10)
+        segment(letter).tap()
+        waitUntil(10, "option \(letter) shown") { any("option-header-\(letter)").isHittable }
+        RunLoop.current.run(until: Date().addingTimeInterval(0.8))
+    }
+
+    private func back() {
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        RunLoop.current.run(until: Date().addingTimeInterval(0.8))
     }
 
     private func any(_ id: String) -> XCUIElement { app.descendants(matching: .any)[id].firstMatch }

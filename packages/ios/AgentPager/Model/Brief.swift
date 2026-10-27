@@ -156,7 +156,6 @@ nonisolated struct BriefDocument: Sendable {
         var caption: String?
         var preview: [BriefBlock]
         var changes: [BriefBlock]
-        var thumbnail: String?
     }
 
     var sections: [Section] = []
@@ -182,6 +181,21 @@ nonisolated struct BriefDocument: Sendable {
         close()
     }
 
+    // The main screen's sections: Tradeoffs shows as "Decision Options" and takes in anything written under
+    // Options outside its option blocks; the option blocks themselves open on the Options screen. A brief with
+    // no Tradeoffs shows its Options heading as "Decision Options" instead.
+    var screen: [Section] {
+        let intro = sections.first { $0.kind == .options }?.blocks ?? []
+        let tradeoffs = sections.first { $0.kind == .tradeoffs }?.id
+        return sections.compactMap { s in
+            switch s.kind {
+            case .options: tradeoffs == nil ? Section(id: s.id, title: "Decision Options", kind: .tradeoffs, blocks: s.blocks) : nil
+            case .tradeoffs: Section(id: s.id, title: "Decision Options", kind: .tradeoffs, blocks: s.id == tradeoffs ? intro + s.blocks : s.blocks)
+            default: s
+            }
+        }
+    }
+
     // Small print counts its list items, or its paragraphs when it has no list.
     var smallPrintCount: Int {
         let items = smallPrint.reduce(0) { n, b in if case .list(_, let items) = b { n + items.count } else { n } }
@@ -199,25 +213,31 @@ nonisolated struct BriefDocument: Sendable {
     }
 
     // What an option looks like comes before its "What X changes" heading; a heading that opens the block
-    // captions the preview. The first image is the option's thumbnail in the list.
+    // captions the preview.
     static func option(_ blocks: [BriefBlock]) -> OptionBlock {
         let split = blocks.firstIndex { if case .heading(_, let t) = $0 { t.lowercased().hasPrefix("what ") && t.lowercased().hasSuffix("changes") } else { false } } ?? blocks.endIndex
         var preview = Array(blocks[..<split])
         var caption: String?
         if case .heading(_, let t)? = preview.first { caption = t; preview.removeFirst() }
-        let thumbnail = blocks.lazy.compactMap { if case .image(_, let name) = $0 { name } else { nil } }.first
-        return OptionBlock(caption: caption, preview: preview, changes: Array(blocks[split...]), thumbnail: thumbnail)
+        return OptionBlock(caption: caption, preview: preview, changes: Array(blocks[split...]))
     }
 }
 
 // ✶ marks the recommended option wherever its letter stands alone after the first word: "What B changes" reads
-// "What B✶ changes", and a recommendation heading "Recommendation: B" reads "Recommendation: B✶".
+// "What B ✶ changes".
 nonisolated func starred(_ text: String, letter: String?) -> String {
-    guard let letter, !text.contains("\(letter)✶") else { return text }
+    guard let letter, !text.contains("\(letter)✶"), !text.contains("\(letter) ✶") else { return text }
     var words = text.components(separatedBy: " ")
     for (n, word) in words.enumerated() where n > 0 {
         let bare = word.trimmingCharacters(in: CharacterSet(charactersIn: ".,:;"))
-        if bare == letter { words[n] = word.replacingOccurrences(of: letter, with: "\(letter)✶"); break }
+        if bare == letter { words[n] = word.replacingOccurrences(of: letter, with: "\(letter) ✶"); break }
     }
     return words.joined(separator: " ")
+}
+
+// The recommendation heading teaches the star where it first appears: "Recommendation: B" reads
+// "Recommendation (✶): B".
+nonisolated func recommendationTitle(_ text: String, letter: String?) -> String {
+    guard let letter, let m = text.wholeMatch(of: /(\w+)\s*:\s*([A-Z])\s*✶?(?![A-Za-z])(.*)/), String(m.2) == letter else { return text }
+    return "\(m.1) (✶): \(letter)\(m.3)"
 }

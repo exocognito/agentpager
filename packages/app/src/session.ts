@@ -3,6 +3,7 @@ import { Schema } from 'effect';
 import { terminalQr } from './qr.ts';
 import * as C from './contract.ts';
 import { acceptsChoice } from '../../blueprint/design/ui/components/cards/schemas.ts';
+import { AttachmentName, attachmentInfo, base64Bytes } from '../../blueprint/design/ui/components/cards/brief/schema.ts';
 import { body, decode, emptyBody, iso, json, refusal, sameDigest, sha256, token } from './shared.ts';
 import { forward, lifetimes, type Env } from './env.ts';
 import { alert, PushTarget, questionBody, type Alert } from './push.ts';
@@ -53,9 +54,11 @@ export class Session {
       CREATE TABLE IF NOT EXISTS proposals (id TEXT PRIMARY KEY, json TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS answers (decision_id TEXT PRIMARY KEY REFERENCES proposals(id), request_id TEXT NOT NULL UNIQUE, input TEXT NOT NULL, json TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS acknowledgements (decision_id TEXT PRIMARY KEY REFERENCES answers(decision_id), json TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS attachments (decision_id TEXT NOT NULL, name TEXT NOT NULL, type TEXT NOT NULL, data BLOB NOT NULL, PRIMARY KEY (decision_id, name));
       CREATE TRIGGER IF NOT EXISTS proposal_immutable BEFORE UPDATE ON proposals BEGIN SELECT RAISE(ABORT,'immutable proposal'); END;
       CREATE TRIGGER IF NOT EXISTS answer_immutable BEFORE UPDATE ON answers BEGIN SELECT RAISE(ABORT,'immutable answer'); END;
-      CREATE TRIGGER IF NOT EXISTS acknowledgement_immutable BEFORE UPDATE ON acknowledgements BEGIN SELECT RAISE(ABORT,'immutable acknowledgement'); END;`);
+      CREATE TRIGGER IF NOT EXISTS acknowledgement_immutable BEFORE UPDATE ON acknowledgements BEGIN SELECT RAISE(ABORT,'immutable acknowledgement'); END;
+      CREATE TRIGGER IF NOT EXISTS attachment_immutable BEFORE UPDATE ON attachments BEGIN SELECT RAISE(ABORT,'immutable attachment'); END;`);
   }
   private row(table: 'pager' | 'tombstone') { return this.ctx.storage.sql.exec<{ json: string }>(`SELECT json FROM ${table} WHERE id=1`).toArray()[0]?.json; }
   private meta(): Meta | null { const raw = this.row('pager'); return raw ? decode(Meta, JSON.parse(raw)) : null; }
@@ -63,10 +66,10 @@ export class Session {
   private save(m: Meta) { decode(Meta, m); this.ctx.storage.sql.exec('INSERT INTO pager VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET json=excluded.json', JSON.stringify(m)); }
   private tx<A>(run: () => A): A { this.settle(); return this.ctx.storage.transactionSync(run); }
 
-  // Ending clears every decision, answer, acknowledgement, palette, code and link at once. A pager no agent ever
+  // Ending clears every decision, attachment, answer, acknowledgement, palette, code and link at once. A pager no agent ever
   // joined has no name to keep, so it is forgotten outright.
   private end(m: Meta, endReason: C.EndReason, endedAt: string) {
-    this.ctx.storage.sql.exec('DELETE FROM acknowledgements; DELETE FROM answers; DELETE FROM proposals; DELETE FROM pager;');
+    this.ctx.storage.sql.exec('DELETE FROM acknowledgements; DELETE FROM answers; DELETE FROM attachments; DELETE FROM proposals; DELETE FROM pager;');
     if (m.codeHash) this.unregister.push(m.codeHash);
     if (m.name === null) return null;
     const t: Tombstone = { sessionId: m.sessionId, name: m.name, endReason, endedAt, agentHash: m.agentHash, phoneHash: m.phoneHash };
@@ -256,9 +259,17 @@ export class Session {
       const asked = this.tx(() => {
         const m = this.agent(digest);
         if (this.openCount() >= C.MAX_OPEN_DECISIONS) throw C.refuse.tooMany();
-        const d: C.Decision = { ...question, decisionId: token(), kind: 'card', status: 'open', askedAt: iso() };
+        // The decision keeps each attachment's name, type and size; the bytes live in their own table. It has no
+        // foreign key, so a build from before briefs can still end a pager that holds some (its alarm forgets them).
+        const { attachments, ...asked } = question;
+        const d: C.Decision = { ...asked, ...(attachments ? { attachments: attachments.map(attachmentInfo) } : {}), decisionId: token(), kind: 'card', status: 'open', askedAt: iso() };
         decode(C.Decision, d);
         this.ctx.storage.sql.exec('INSERT INTO proposals VALUES (?, ?)', d.decisionId, JSON.stringify(d));
+        for (const a of attachments ?? []) {
+          const bytes = 'text' in a ? new TextEncoder().encode(a.text) : base64Bytes(a.base64);
+          if (!bytes) throw new Error('An attachment passed its schema but did not decode');
+          this.ctx.storage.sql.exec('INSERT INTO attachments VALUES (?, ?, ?, ?)', d.decisionId, a.name, a.type, bytes.buffer);
+        }
         this.touch(m); return { m, decisionId: d.decisionId };
       });
       await this.alertPhone(asked.m, asked.decisionId, 'decision', questionBody(question));
@@ -307,6 +318,20 @@ export class Session {
         const answered = all.filter(d => d.answer).sort((a, b) => Date.parse(b.answer?.sentAt ?? '') - Date.parse(a.answer?.sentAt ?? ''));
         return decode(C.PhoneInbox, { session: this.summary(m), open: all.filter(d => !d.answer), answered });
       }));
+    }
+    // One attachment of a decision, for the phone: its bytes, with the type the agent declared and the schema checked.
+    if (action === 'file') {
+      const digest = await phoneDigest(request);
+      const id = decode(C.Token, param), name = decode(AttachmentName, url.pathname.split('/').filter(Boolean)[2] ?? '');
+      const file = this.tx(() => {
+        const m = this.livePhone(digest);
+        if (m.status !== 'active') throw C.refuse.invalid('Pair this pager before reading its attachments.');
+        this.decision(id);
+        const row = this.ctx.storage.sql.exec<{ type: string; data: ArrayBuffer }>('SELECT type, data FROM attachments WHERE decision_id=? AND name=?', id, name).toArray()[0];
+        if (!row) throw C.refuse.unknownFile();
+        return row;
+      });
+      return new Response(file.data, { headers: { 'content-type': file.type === 'text/markdown' ? 'text/markdown; charset=utf-8' : file.type } });
     }
     if (action === 'answer') {
       const digest = await phoneDigest(request);

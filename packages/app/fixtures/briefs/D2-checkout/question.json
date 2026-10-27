@@ -1,0 +1,13 @@
+{
+  "title": "How should checkout handle a payment timeout?",
+  "detail": "41 orders got stuck last week.",
+  "card": {
+    "type": "brief",
+    "recommended": 2,
+    "options": [
+      { "number": 1, "title": "Retry", "label": "Retry", "prioritizes": "the least work for customers" },
+      { "number": 2, "title": "Check first", "label": "Check first", "prioritizes": "never charging twice" },
+      { "number": 3, "title": "Hold and email", "label": "Hold + email", "prioritizes": "certainty over speed" }
+    ]
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "title": "Delete 14 merged preview branches?",
+  "detail": "Nothing depends on them.",
+  "card": {
+    "type": "brief",
+    "recommended": 1,
+    "options": [
+      { "number": 1, "title": "Delete them", "label": "Delete", "prioritizes": "a clean branch list" },
+      { "number": 2, "title": "Keep them", "label": "Keep", "prioritizes": "keeping old preview links working" }
+    ]
+  }
+}

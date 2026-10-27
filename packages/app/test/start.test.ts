@@ -10,7 +10,7 @@ test('/start documents, read-only /start/<code> for agents and browsers, old con
     const general = await fetch(f.origin + '/start');
     assert.equal(general.status, 200); assert.match(general.headers.get('content-type') ?? '', /text\/markdown/);
     const doc = await general.text();
-    for (const needle of ['start_session', 'join_session', 'ask_card', 'wait_for_card_answer', 'acknowledge_card', 'finish_session', 'link.qrText', 'pairingCode.text', `${f.origin}/mcp`, `${f.origin}/api/sessions`, 'PagerEnded']) assert.ok(doc.includes(needle), needle);
+    for (const needle of ['start_session', 'join_session', 'ask_card', 'wait_for_card_answer', 'acknowledge_card', 'finish_session', 'link.qrText', 'pairingCode.text', 'Decision briefs', '"type":"brief"', ':::option A', `${f.origin}/mcp`, `${f.origin}/api/sessions`, 'PagerEnded']) assert.ok(doc.includes(needle), needle);
     assert.equal(doc.includes('connect='), false);
 
     const old = await fetch(`${f.origin}/start?connect=${token()}`);

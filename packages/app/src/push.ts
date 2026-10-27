@@ -1,5 +1,6 @@
 import { Schema } from 'effect';
 import type { Env } from './env.ts';
+import { optionMark, type Card } from '../../blueprint/design/ui/components/cards/schemas.ts';
 
 // Alerts through Apple's push service (C17::get-paged). The phone gives each pager it holds its device token, and
 // the pager alerts that phone when its agent asks or acknowledges. The token goes when the pager ends.
@@ -72,9 +73,10 @@ export async function alert(env: Env, to: PushTarget, a: Alert): Promise<Outcome
 
 // The alert body: the question, then its detail and the recommended option, which show when the alert is expanded.
 // Cut to 600 characters so the payload stays under Apple's 4 KB.
-export function questionBody(q: { title: string; detail?: string; card: { recommended?: number; options: ReadonlyArray<{ number: number; emoji: string; title: string }> } }) {
+export function questionBody(q: { title: string; detail?: string; card: Card }) {
   const recommended = q.card.options.find(o => o.number === q.card.recommended);
-  const lines = [q.title, q.detail, recommended && `Recommended: ${recommended.emoji} ${recommended.title}`].filter(Boolean);
+  const mark = recommended && optionMark(recommended) + (q.card.type === 'brief' ? '.' : '');
+  const lines = [q.title, q.detail, recommended && `Recommended: ${mark} ${recommended.title}`].filter(Boolean);
   const characters = Array.from(lines.join('\n'));
   return characters.length > 600 ? characters.slice(0, 599).join('') + '…' : characters.join('');
 }

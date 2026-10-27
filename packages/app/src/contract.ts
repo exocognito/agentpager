@@ -101,7 +101,7 @@ export const PAIRING_EMOJIS: ReadonlyArray<readonly [string, string]> = [
 export const STATUS = {
   InvalidInput: 400, WrongCode: 400, Unauthorized: 401, UnknownSession: 404, UnknownDecision: 404,
   AlreadyJoined: 409, AlreadyPaired: 409, WaitingForAgent: 409, TooManyOpenDecisions: 409, NotAnswered: 409,
-  AlreadyAcknowledged: 409, AnswerMismatch: 409, AlreadyAnswered: 409, LinkInvalid: 410, NumberInvalid: 410, PagerEnded: 410, NotFound: 404,
+  AlreadyAcknowledged: 409, AnswerMismatch: 409, AlreadyAnswered: 409, LinkInvalid: 410, NumberInvalid: 410, PagerEnded: 410, NotFound: 404, UnknownFile: 404,
 } as const;
 export type Tag = keyof typeof STATUS;
 export class Refusal extends Error {
@@ -121,6 +121,7 @@ export const refuse = {
   unauthorized: () => new Refusal('Unauthorized', 'The key is missing or does not belong to this pager.'),
   unknownSession: () => new Refusal('UnknownSession', 'This pager does not exist or has been forgotten.'),
   unknownDecision: () => new Refusal('UnknownDecision', 'This pager has no decision with that id.'),
+  unknownFile: () => new Refusal('UnknownFile', 'This decision has no attachment with that name.'),
   alreadyJoined: () => new Refusal('AlreadyJoined', 'An agent has already joined this AgentPager link. Ask your owner for a new link.'),
   alreadyPaired: () => new Refusal('AlreadyPaired', 'This pager is already paired with another phone.'),
   waitingForAgent: () => new Refusal('WaitingForAgent', 'No agent has joined this link yet.'),

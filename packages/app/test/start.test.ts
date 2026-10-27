@@ -40,7 +40,8 @@ test('/start documents, read-only /start/<code> for agents and browsers, old con
     assert.equal(joined.session.status, 'unpaired');
     assert.equal((await fetch(`${f.origin}/start/not-a-code`)).status, 400);
 
-    for (const p of ['/', '/start', made.link.url.replace(f.origin, ''), '/missing', '/api/missing']) {
+    const app = await fetch(f.origin + '/app', { redirect: 'manual' }); assert.equal(app.status, 302, 'the old web app address leads to the front page'); assert.equal(app.headers.get('location'), f.origin + '/'); await app.arrayBuffer();
+    for (const p of ['/', '/app', '/start', made.link.url.replace(f.origin, ''), '/missing', '/api/missing']) {
       const r = await fetch(f.origin + p); assert.equal(r.headers.get('x-agentpager-build'), sha, p); assert.equal(r.headers.get('cache-control'), 'no-store'); await r.arrayBuffer();
     }
     const mcpGet = await fetch(f.origin + '/mcp'); assert.equal(mcpGet.status, 405); await mcpGet.arrayBuffer();

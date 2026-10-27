@@ -11,3 +11,10 @@ it("offers the agent instruction that points at the one start document", () => {
   expect(html).toContain("Copy the agent instruction");
   expect(html).toContain(MARKETING.headline);
 });
+
+it("sends the owner to the iPhone app, never to a web app", () => {
+  const html = renderToStaticMarkup(createElement(MarketingScreen));
+  expect(html).toContain(MARKETING.ctaButton);
+  // The phone picture still draws the card screen's back link; no button on the page leads to a web app.
+  expect(html).not.toMatch(/class="mk-(?:button|action)[^"]*" href="\/app"/);
+});

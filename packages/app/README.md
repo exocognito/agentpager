@@ -9,7 +9,7 @@ pnpm start:app
 # http://localhost:8787
 ```
 
-The front page and `/app` run the Blueprint's imported React screens and XState machines. `/start` serves its imported plain Markdown document. The HTTPS API and stateless MCP server share SQLite-backed per-session Durable Objects. A registry object routes pairing links and serializes phone-connect joins. No accounts, notification service, or action execution is implemented.
+The front page runs the Blueprint's imported React marketing screen; the owner's side of the product is the iPhone app in `../ios`, and the old web app address `/app` redirects to the front page. `/start` serves its imported plain Markdown document. The HTTPS API and stateless MCP server share SQLite-backed per-session Durable Objects. A registry object routes pairing links and serializes phone-connect joins. No accounts, notification service, or action execution is implemented.
 
 ## Pager number (dogfood)
 

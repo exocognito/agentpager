@@ -7,7 +7,7 @@ import { CardScreen } from "./CardScreen.tsx";
 import { CardApi } from "../../effects/cards.ts";
 import { ROUTES } from "../../effects/session.ts";
 import { createCardMachine } from "../../machines/cards.ts";
-import { Inbox, SESSION_LIFETIME_MS } from "../../schemas/exchange.ts";
+import { Inbox } from "../../schemas/exchange.ts";
 import { LogoMark } from "../components/LogoMark.tsx";
 import { QrPicture } from "../components/QrPicture.tsx";
 import { CopyIcon } from "../components/CopyIcon.tsx";
@@ -16,12 +16,16 @@ import { installPlaywrightQuestion, session } from "../fixtures/decisions.ts";
 const host = new URL(PRODUCTION_ORIGIN).host,
   pro = "$2.99/mo";
 
+// The App Store page, once AgentPager for iPhone is published. Empty until then: the download
+// buttons show, but do not link anywhere.
+export const APP_STORE_URL: string = "";
+
 export const MARKETING = {
   headline: "Let your agents bring their decisions to you",
   intro:
-    "Never again find your agent stuck, waiting for your answer. Now your agent can page you when it needs your decision.",
+    "Leave your agents working while you are away. When one needs you, it pages your iPhone with a decision you can answer in two taps, and it carries on.",
   terminal: {
-    scan: "Scan with your phone to connect",
+    scan: "Scan with your iPhone to connect",
     connected: "connected · Sam’s iPhone",
     thoughts: [
       "Screenshots need Playwright, but it isn’t installed here.",
@@ -31,70 +35,93 @@ export const MARKETING = {
     waiting: "waiting for Sam",
   },
   how: [
-    ["Scan the code your agent shows", "This connects the agent with your phone without sharing personal contact info"],
-    ["Your agent asks when it needs you", "Instead of guessing or getting stuck, your agent sends you the decision"],
-    ["Decide in seconds, from anywhere", "Your agent gets your response and keeps working"],
+    [
+      "Connect your agent once",
+      "Scan the code it shows with your iPhone. Or give the agents you trust your pager number in AGENTS.md, and they page you with no setup at all.",
+    ],
+    [
+      "Your agent asks when it needs you",
+      "Instead of guessing or getting stuck, it sends you the decision. Your iPhone alerts you, even with the app closed.",
+    ],
+    [
+      "Decide in seconds, from anywhere",
+      "Choose an option and press Send. Your agent has your answer within a second and tells you its next steps.",
+    ],
   ],
   scenes: [
-    "An agent terminal shows a QR code. Once your phone scans it, the terminal says it is connected to Sam’s iPhone.",
+    "An agent terminal shows a QR code. Once your iPhone scans it, the terminal says it is connected to Sam’s iPhone.",
     `The agent finds it needs Sam’s OK to install software, asks him over AgentPager, and waits: ${installPlaywrightQuestion.title}`,
-    `Sam’s phone shows the agent’s card: ${installPlaywrightQuestion.title}, with Yes, install it chosen.`,
+    `Sam’s iPhone shows the agent’s card: ${installPlaywrightQuestion.title}, with Yes, install it chosen.`,
   ],
   getStarted: "Get started for free",
   steps: {
-    app: ["Open on your phone", "Use AgentPager in your browser. Nothing to install."],
+    app: ["Get AgentPager for iPhone", "Free on the App Store. Everything else happens in the app."],
     tell: ["Tell your agent", "Paste this into any agent session:"],
     scan: [
-      "Scan the QR code",
-      "Open your agent’s link or QR code, choose its emoji, then press Send.",
+      "Pair",
+      "Open your agent’s link on your iPhone, or scan its QR code with the Camera, and tap Open in AgentPager. Tap the three emojis your agent showed you, in order, then press Pair.",
     ],
   },
-  download: "Open AgentPager",
+  download: "Download",
+  comingSoon: "Coming to the App Store",
   instruction: CARD_AGENT_INSTRUCTION,
   copy: "Copy",
   copiedShort: "Copied",
   copied: "Copied. Paste it to your agent.",
   made: "Made for humans and agents",
   madeIntro:
-    "AgentPager is like a walkie-talkie you can give your agent running anywhere. So they can safely contact you for big decisions, instead of guessing or stopping.",
+    "AgentPager is a pager you can give any agent, running anywhere, so it can reach you for the decisions that matter instead of guessing or stopping.",
   features: [
     [
-      "Works wherever agents can run",
-      "Any harness, any machine: laptop, dev box, cloud VM, container. If it can show a QR code, it can page you.",
+      "Works wherever agents run",
+      "Any harness, any machine: laptop, dev box, cloud VM, container. Agents need only HTTPS or MCP, with nothing to install on their side.",
+    ],
+    [
+      "Alerts that find you",
+      "Your iPhone alerts you with the agent’s name and its question, even with the app closed. Tap the alert and you are on the decision.",
     ],
     [
       "Choose, then Send",
       "Not an agent chat. Each message is designed to be a quick decision. Approve, decline, or ask for changes.",
     ],
     [
-      "Customize it for your work",
-      "AgentPager provides the infrastructure to connect; you and your agents are fully in control of what decisions you send each other.",
+      "One number for all your agents",
+      "Put your pager number in AGENTS.md and every agent you trust pages you, already paired. Change the number any time; pagers already open keep working.",
+    ],
+    [
+      "Pagers that fit the work",
+      "A pager lasts 24 hours, 7 days or 30 days, your choice. Ended pagers stay readable on your phone for a day, then their decisions are gone.",
+    ],
+    [
+      "Nothing to sign up for",
+      "No account. Links work once, keys are stored only as digests, and a lost phone means a new pager, never a transfer.",
     ],
   ],
   questions: "Questions",
   faq: [
     [
       "Which agents does it work with?",
-      `It works in any agent client that can send HTTPS requests or add an MCP server. Start at ${PRODUCTION_ORIGIN}${ROUTES.start.path}`,
+      `Any agent client that can send HTTPS requests or add an MCP server. It starts at ${PRODUCTION_ORIGIN}${ROUTES.start.path}`,
     ],
     [
       "I already get notifications from my agent app. Why do I need this?",
       "Maybe you don’t! AgentPager is useful when running agents in different apps or machines. If you find yourself “checking in” on long-running agent sessions anywhere, give them AgentPager to contact you instead.",
     ],
     [
+      "Is there an Android or web version?",
+      "Not yet. AgentPager is an iPhone app. Your agents can run anywhere.",
+    ],
+    [
       "What does it cost?",
-      `AgentPager is free to use for one agent and up to ${SESSION_LIFETIME_MS / 3_600_000}-hour connections. A Pro plan from ${pro} is planned; it is not on sale yet. Email pro@agentpager.me with the features you want to see in Pro.`,
+      `AgentPager is free while it is in testing. A Pro plan from ${pro} is planned; it is not on sale yet. Email pro@agentpager.me with the features you want to see in Pro.`,
     ],
   ],
-  cta: "Get AgentPager for free",
-  ctaIntro: "Open your agent’s link, choose its emoji, then press Send. No install needed.",
-  ctaButton: "Open AgentPager",
-  ctaNote: "Free to use · Pro planned",
+  cta: "Get AgentPager for iPhone",
+  ctaIntro: "Download the app and paste one line to your agent. The next time it needs you, it pages you.",
+  ctaButton: "Download for iPhone",
+  ctaNote: "Free while in testing · Pro planned",
   copyright: "© 2026 AgentPager",
 } as const;
-
-// The product is a browser app; opening it requires no download.
-const DOWNLOAD_HREF = ROUTES.homeApp.path;
 
 // The phone shows the real card screen with the Playwright card open and its first option chosen. It is a picture: nothing in it can take focus.
 const phone = (() => {
@@ -113,6 +140,18 @@ const Brand = () => (
     AgentPager
   </a>
 );
+
+// The download button: a link to the App Store once there is one, a placeholder until then.
+const Download = ({ className, label }: { className: string; label: string }) =>
+  APP_STORE_URL ? (
+    <a className={className} href={APP_STORE_URL}>
+      {label}
+    </a>
+  ) : (
+    <span className={`${className} mk-soon`} aria-disabled="true" title={MARKETING.comingSoon}>
+      {label}
+    </span>
+  );
 
 const Caption = ({ n }: { n: number }) => (
   <div className="mk-caption">
@@ -201,11 +240,9 @@ export function MarketingScreen({
               <span className="mk-n">1</span>
               <div>
                 <h3>{MARKETING.steps.app[0]}</h3>
-                <p>{MARKETING.steps.app[1]}</p>
+                <p>{APP_STORE_URL ? MARKETING.steps.app[1] : MARKETING.comingSoon}</p>
               </div>
-              <a className="mk-action" href={DOWNLOAD_HREF}>
-                {MARKETING.download}
-              </a>
+              <Download className="mk-action" label={MARKETING.download} />
             </li>
             <li>
               <span className="mk-n">2</span>
@@ -266,10 +303,8 @@ export function MarketingScreen({
         <section className="mk-cta" aria-labelledby="cta">
           <h2 id="cta">{MARKETING.cta}</h2>
           <p>{MARKETING.ctaIntro}</p>
-          <a className="mk-button" href={DOWNLOAD_HREF}>
-            {MARKETING.ctaButton}
-          </a>
-          <small>{MARKETING.ctaNote}</small>
+          <Download className="mk-button" label={MARKETING.ctaButton} />
+          <small>{APP_STORE_URL ? MARKETING.ctaNote : `${MARKETING.comingSoon} · ${MARKETING.ctaNote}`}</small>
         </section>
       </main>
       <footer className="mk-footer">

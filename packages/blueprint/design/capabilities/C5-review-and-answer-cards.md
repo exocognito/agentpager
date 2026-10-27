@@ -6,7 +6,7 @@ serves:
   - SP1
 statement: Read a question on a card, choose one of the agent's options and press Send, and the agent receives the exact decision.
 caveats:
-  - Only the generic card kind is built and proved; no product card is drawn.
+  - The generic card kind and, on the iPhone dogfood app only, the brief kind are built; no product card is drawn. The parked web screen shows a brief's options by letter, without its sections.
   - The proof shows the agent received the exact answer and acknowledged it, not that it carried out the chosen action.
 ---
 

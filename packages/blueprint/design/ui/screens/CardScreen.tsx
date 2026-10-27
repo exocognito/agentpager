@@ -25,13 +25,13 @@ import {
   UNDO_MS,
   type Decision,
 } from "../../schemas/exchange.ts";
-import { acceptsChoice } from "../components/cards/schemas.ts";
+import { acceptsChoice, optionDetail, optionMark } from "../components/cards/schemas.ts";
 import { ROUTES } from "../../effects/session.ts";
 import "./cards.css";
 export const choiceText = (d: Decision, c: Choice) => {
   if (c.kind === "feedback") return c.text;
   const option = d.card.options.find((o) => o.number === c.number);
-  return option ? `${option.emoji} ${option.title}` : `Option ${c.number}`;
+  return option ? `${optionMark(option)} ${option.title}` : `Option ${c.number}`;
 };
 export const answerText = (d: Decision) => (d.answer ? choiceText(d, d.answer.choice) : "");
 // Short, local and without seconds: "Sep 30, 11:00 PM".
@@ -191,7 +191,7 @@ const historyLine = (d: Decision) =>
   (d.acknowledgement ? "" : " · Waiting for your agent");
 // A row's mark: empty while open; once answered, the chosen option's emoji, or a speech bubble for asked changes.
 function RowMark({ d }: { d: Decision }) {
-  const emoji = chosenOption(d)?.emoji;
+  const chosen = chosenOption(d), emoji = chosen && optionMark(chosen);
   return (
     <span className={d.status === "open" ? "ap-mark ap-mark-open" : "ap-mark"} aria-hidden="true">
       {d.status === "feedback" ? <FeedbackIcon /> : emoji}
@@ -356,7 +356,7 @@ function DecisionTray({
           </p>
         ) : pick && (
           <p className="ap-pick">
-            Recommended: <span aria-hidden="true">{pick.emoji}</span> <strong>{pick.title}</strong>
+            Recommended: <span aria-hidden="true">{optionMark(pick)}</span> <strong>{pick.title}</strong>
           </p>
         )}
         {d.detail && <Detail text={d.detail} />}
@@ -410,7 +410,8 @@ function DecisionTray({
             {d.card.options.map((o) => {
               const selected = chosen?.kind === "option" && chosen.number === o.number,
                 detailId = `${d.decisionId}-${o.number}-detail`,
-                showDetail = (selected || history || finished) && !!o.detail;
+                detail = optionDetail(o),
+                showDetail = (selected || history || finished) && !!detail;
               return (
                 <button
                   key={`${d.decisionId}:${o.number}`}
@@ -421,11 +422,11 @@ function DecisionTray({
                   aria-describedby={showDetail ? detailId : undefined}
                   onClick={() => send({ type: "SELECT", number: o.number })}
                 >
-                  <span className="ap-option-emoji" aria-hidden="true">{o.emoji}</span>
+                  <span className="ap-option-emoji" aria-hidden="true">{optionMark(o)}</span>
                   <span className="ap-option-copy">
                     <strong>{o.title}</strong>
                     {/* Read-only cards expose the complete proposal, including unchosen detail (C4/C7). */}
-                    {showDetail && <span className="ap-option-detail" id={detailId}>{o.detail}</span>}
+                    {showDetail && <span className="ap-option-detail" id={detailId}>{detail}</span>}
                   </span>
                 </button>
               );

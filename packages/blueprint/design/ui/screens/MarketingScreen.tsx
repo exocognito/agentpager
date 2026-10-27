@@ -45,7 +45,7 @@ export const MARKETING = {
     ],
     [
       "Decide in seconds, from anywhere",
-      "Choose an option and press Send. Your agent has your answer within a second and tells you its next steps.",
+      "Choose an option and press Send. Once your few seconds to undo have passed, your agent has your answer at once and tells you its next steps.",
     ],
   ],
   scenes: [

@@ -77,12 +77,15 @@
   white-space: nowrap;
 }
 
-/* SI6/I4/C7: authored prose is literal, including indentation, repeated spaces and
-   line breaks. One presentation rule covers live proposals, answers and history. */
-.ap-rich :is(.ap-sheet-head h2, .ap-pick strong, .ap-option-copy strong, .ap-option-detail,
-  .ap-about p, .ap-outcome > strong, .ap-ack blockquote, .ap-history-detail blockquote,
+/* I4/SI6: detail text keeps its spaces and line breaks. Titles, names and row lines show each run of
+   spaces and line breaks as one space, and wrap in full rather than cut. */
+.ap-rich :is(.ap-option-detail, .ap-about p, .ap-ack blockquote, .ap-history-detail blockquote) {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ap-rich :is(.ap-sheet-head h2, .ap-pick strong, .ap-option-copy strong, .ap-outcome > strong,
   .ap-row-text strong, .ap-row-text small, .ap-nav h1, .ap-receipt h2) {
-  white-space: break-spaces;
+  white-space: normal;
   overflow-wrap: anywhere;
 }
 

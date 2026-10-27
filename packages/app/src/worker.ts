@@ -118,6 +118,10 @@ const descriptions = (origin: string): Record<keyof typeof C.MCP_TOOLS, string> 
   acknowledge_card: 'Acknowledge the exact answerId with your next steps; your owner sees them with a green tick. Only the first acknowledgement counts.',
   finish_session: 'End the pager when your work is done. Your key stops working.',
 });
+// A tool call is decoded only as far as routing needs: its ids, key and wait. The question and the acknowledgement
+// go on as sent, so the pager checks the key before them, as over HTTP (I4). tools/list still lists the full schemas.
+const AskCall = Schema.Struct({ sessionId: C.Token, agentKey: C.Token, question: Schema.Unknown });
+const AckCall = Schema.Struct({ sessionId: C.Token, agentKey: C.Token, decisionId: C.Token, acknowledgement: Schema.Unknown });
 async function mcp(request: Request, env: Env, origin: string) {
   // Stateless JSON replies only: never let the SDK open a GET event stream.
   if (request.method !== 'POST') {
@@ -133,9 +137,9 @@ async function mcp(request: Request, env: Env, origin: string) {
         case 'start_session': { data = decode(C.MCP_TOOLS.start_session.input, raw); path = '/api/sessions'; break; }
         case 'join_session': { const p = decode(C.MCP_TOOLS.join_session.input, raw); path = `/api/start/${p.code}/join`; data = { name: p.name }; break; }
         case 'page_owner': { const p = decode(C.MCP_TOOLS.page_owner.input, raw); path = `/api/numbers/${p.number}/pagers`; data = { name: p.name, ...(p.lifetime ? { lifetime: p.lifetime } : {}) }; break; }
-        case 'ask_card': { const p = decode(C.MCP_TOOLS.ask_card.input, raw); path = `/api/sessions/${p.sessionId}/cards`; data = p.question; agentKey = p.agentKey; break; }
+        case 'ask_card': { const p = decode(AskCall, raw); path = `/api/sessions/${p.sessionId}/cards`; data = p.question; agentKey = p.agentKey; break; }
         case 'wait_for_card_answer': { const p = decode(C.MCP_TOOLS.wait_for_card_answer.input, raw); path = `/api/sessions/${p.sessionId}/cards/${p.decisionId}/answer?wait=${p.waitSeconds ?? C.ANSWER_WAIT_MAX_SECONDS}`; method = 'GET'; agentKey = p.agentKey; break; }
-        case 'acknowledge_card': { const p = decode(C.MCP_TOOLS.acknowledge_card.input, raw); path = `/api/sessions/${p.sessionId}/cards/${p.decisionId}/acknowledge`; data = p.acknowledgement; agentKey = p.agentKey; break; }
+        case 'acknowledge_card': { const p = decode(AckCall, raw); path = `/api/sessions/${p.sessionId}/cards/${p.decisionId}/acknowledge`; data = p.acknowledgement; agentKey = p.agentKey; break; }
         case 'finish_session': { const p = decode(C.MCP_TOOLS.finish_session.input, raw); path = `/api/sessions/${p.sessionId}/finish`; agentKey = p.agentKey; break; }
         default: throw C.refuse.invalid('Unknown tool. Read /start.');
       }

@@ -1,7 +1,7 @@
 import { Schema } from "effect";
 import { Token, Text, Body, Emoji, Timestamp, OptionNumber, Option, SessionName } from "./values.ts";
 import { Card, acceptsChoice } from "../ui/components/cards/schemas.ts";
-import { Attachments, AttachmentInfo, attachmentTypes, missingAttachment } from "../ui/components/cards/brief/schema.ts";
+import { Attachments, AttachmentInfo, attachmentTypes, missingAttachment, Payload as BriefCard } from "../ui/components/cards/brief/schema.ts";
 // The primitives live in values.ts; this module re-exports them so one import path carries the whole exchange.
 export * from "./values.ts";
 export { Card, CardKind } from "../ui/components/cards/schemas.ts";
@@ -49,10 +49,11 @@ export type Acknowledgement = typeof Acknowledgement.Type;
 const briefLinks = (q: { card: Card; attachments?: ReadonlyArray<{ name: string; type: AttachmentInfo["type"] }> }) =>
   q.card.type === "brief" ? missingAttachment(q.card.markdown, attachmentTypes(q.attachments)) ?? true
     : q.attachments === undefined || "attachments come only with a brief card";
+// Every new card is a brief; a decision asked before emoji cards were retired may still hold one (Decision.card).
 export const QuestionInput = Schema.Struct({
   title: Text,
   detail: Schema.optional(Body),
-  card: Card,
+  card: BriefCard,
   attachments: Schema.optional(Attachments),
 }).annotations({parseOptions:{onExcessProperty:"error"}}).pipe(Schema.filter(briefLinks));
 export type QuestionInput = typeof QuestionInput.Type;

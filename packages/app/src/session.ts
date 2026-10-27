@@ -35,6 +35,8 @@ const randomIndex = (n: number) => { // Rejection sampling: no modulo bias in th
   return value % n;
 };
 const bare = (emoji: string) => emoji.replaceAll('️', '');
+// A card an agent sends as the retired emoji kind, told apart before the schema refuses it, so its reason says what to do.
+const emojiCard = (value: unknown) => typeof value === 'object' && value !== null && 'card' in value && typeof value.card === 'object' && value.card !== null && 'type' in value.card && value.card.type === 'generic';
 export function linkFor(origin: string, code: string, expiresAt: string): C.Link {
   const url = `${origin}/start/${code}`;
   return { code, url, qrText: terminalQr(url), qrUrl: `${url}/qr.svg`, expiresAt };
@@ -181,6 +183,8 @@ export class Session {
     try { await this.afterwards(); } catch (error) { console.error('Pager housekeeping failed', error instanceof Error ? error.message : 'unknown'); }
     return response;
   }
+  // Each call that carries a key checks it, and that the pager is live, before reading its input: a wrong key is
+  // refused as unauthorized even when the input is also invalid (I4).
   private async handle(request: Request): Promise<Response> {
     const url = new URL(request.url), [action, param] = url.pathname.split('/').filter(Boolean);
     if (action === 'init') {
@@ -257,18 +261,19 @@ export class Session {
     }
     if (action === 'ask') {
       const digest = await agentDigest(request);
-      const question = decode(C.QuestionInput, await body(request));
+      this.tx(() => this.agent(digest));
+      const raw = await body(request);
+      // Every new card is a brief (QuestionInput takes no other); emoji cards asked before stay answerable.
+      if (emojiCard(raw)) throw C.refuse.invalid('Emoji cards are retired. Send a brief (card.type "brief"); read "Decision briefs" in /start.');
+      const question = decode(C.QuestionInput, raw);
       const asked = this.tx(() => {
         const m = this.agent(digest);
-        // Every new card is a brief; emoji cards asked before stay answerable. A wrong key or an ended pager
-        // still answers first.
-        if (question.card.type !== 'brief') throw C.refuse.invalid('Emoji cards are retired. Send a brief (card.type "brief"); read "Decision briefs" in /start.');
         if (this.openCount() >= C.MAX_OPEN_DECISIONS) throw C.refuse.tooMany();
         // The decision keeps each attachment's name, type and size; the bytes live in their own table, with no
         // foreign key so a build from before briefs can still delete the proposal. A brief's options get keycaps,
         // so a phone from before briefs draws it as an emoji card instead of failing the whole pager.
         const { attachments, ...asked } = question;
-        const card = asked.card.type === 'brief' ? withKeycaps(asked.card) : asked.card;
+        const card = withKeycaps(asked.card);
         const d: C.Decision = { ...asked, card, ...(attachments ? { attachments: attachments.map(attachmentInfo) } : {}), decisionId: token(), kind: 'card', status: 'open', askedAt: iso() };
         decode(C.Decision, d);
         this.ctx.storage.sql.exec('INSERT INTO proposals VALUES (?, ?)', d.decisionId, JSON.stringify(d));
@@ -284,6 +289,7 @@ export class Session {
     }
     if (action === 'read') {
       const digest = await agentDigest(request);
+      this.tx(() => this.agent(digest));
       const id = decode(C.Token, param), wait = url.searchParams.get('wait');
       const seconds = wait === null ? 0 : decode(Schema.Number.pipe(Schema.int(), Schema.between(1, C.ANSWER_WAIT_MAX_SECONDS)), Number(wait));
       const until = Date.now() + seconds * 1000;
@@ -296,6 +302,7 @@ export class Session {
     }
     if (action === 'ack') {
       const digest = await agentDigest(request);
+      this.tx(() => this.agent(digest));
       const id = decode(C.Token, param), input = decode(C.AcknowledgementInput, await body(request));
       const done = this.tx(() => {
         const m = this.agent(digest), d = this.decision(id);
@@ -311,6 +318,7 @@ export class Session {
     }
     if (action === 'finish') {
       const digest = await agentDigest(request);
+      this.tx(() => this.agent(digest));
       await emptyBody(request);
       return json(this.tx(() => { const m = this.agent(digest), endedAt = iso(); this.end(m, 'agentFinished', endedAt); return { endedAt }; }));
     }
@@ -329,6 +337,7 @@ export class Session {
     // One attachment of a decision, for the phone: its bytes, with the type the agent declared and the schema checked.
     if (action === 'file') {
       const digest = await phoneDigest(request);
+      this.tx(() => this.livePhone(digest));
       const id = decode(C.Token, param), name = decode(AttachmentName, url.pathname.split('/').filter(Boolean)[2] ?? '');
       const file = this.tx(() => {
         const m = this.livePhone(digest);
@@ -342,6 +351,7 @@ export class Session {
     }
     if (action === 'answer') {
       const digest = await phoneDigest(request);
+      this.tx(() => this.livePhone(digest));
       const id = decode(C.Token, param), input = decode(C.AnswerInput, await body(request));
       const canonical = JSON.stringify({ requestId: input.requestId, choice: input.choice.kind === 'option' ? { kind: 'option', number: input.choice.number } : { kind: 'feedback', text: input.choice.text } });
       return json(this.tx(() => {
@@ -366,6 +376,7 @@ export class Session {
     }
     if (action === 'end') {
       const digest = await phoneDigest(request);
+      this.tx(() => this.phone(digest));
       await emptyBody(request);
       return json(this.tx(() => {
         const p = this.phone(digest);
@@ -377,11 +388,13 @@ export class Session {
     // The phone's device token for alerts. It lives with the pager and goes when the pager ends.
     if (action === 'push') {
       const digest = await phoneDigest(request);
+      this.tx(() => this.livePhone(digest));
       const input = decode(PushTarget, await body(request));
       return json(this.tx(() => { const m = this.livePhone(digest); this.save({ ...m, push: input }); return { ok: true }; }));
     }
     if (action === 'lifetime') {
       const digest = await phoneDigest(request);
+      this.tx(() => this.livePhone(digest));
       const input = decode(C.LifetimeInput, await body(request));
       return json(this.tx(() => {
         const m = this.livePhone(digest), now = Date.now();

@@ -16,16 +16,24 @@ it("keeps feedback as a final immutable answer even after acknowledgement",()=>{
 it("refuses duplicated decision identities across queue and history",()=>{expect(Schema.is(Inbox)({session,open:[question,question],history:[]})).toBe(false)});
 it("refuses cards before correct pairing",()=>{expect(Schema.is(Inbox)({session:{...session,paired:false,pairedAt:null,expiresAt:null},open:[question],history:[]})).toBe(false)});
 
+// Every new card is a brief; an emoji card is refused as a question but still a valid decision asked before.
+const brief = {type:"brief",recommended:2,options:[{number:1,title:"First plan",prioritizes:"speed"},{number:2,title:"Second plan",prioritizes:"safety"}],markdown:"## Context: two plans\nBoth are ready to start.\n\n## Options\n\n## Recommendation: B\n**Why:** It is safer.\n"};
+it('takes only briefs as new questions, while decisions asked before may hold emoji cards', () => {
+  expect(Schema.is(QuestionInput)({title:'Review',card:brief})).toBe(true);
+  expect(Schema.is(QuestionInput)({title:'Review',card:question.card})).toBe(false);
+  expect(Schema.is(Decision)(question)).toBe(true);
+});
+
 it('refuses malformed Unicode in card prose', () => {
   const bad = String.fromCharCode(0xd800);
-  const ask = (title: string) => ({title,card:{type:'generic',options:[{number:1,emoji:'📨',title:'Send it'},{number:2,emoji:'🗑️',title:'Don’t send'}]}});
+  const ask = (title: string) => ({title,card:brief});
   expect(Schema.is(QuestionInput)(ask('Review'))).toBe(true);
   expect(Schema.is(QuestionInput)(ask('Review'+bad))).toBe(false);
 });
 
 it('rejects excess card fields and unknown card types rather than silently dropping them', () => {
   const valid = ask();
-  function ask() { return {title:'Review',card:{type:'generic',options:[{number:1,emoji:'📨',title:'Send it'},{number:2,emoji:'🗑️',title:'Don’t send'}]}}; }
+  function ask() { return {title:'Review',card:brief}; }
   const extra = {...valid,card:{...valid.card,body:'Hidden text'}};
   const product = {...valid,card:{...valid.card,type:'gmail'}};
   expect(Schema.is(QuestionInput)(valid)).toBe(true);
@@ -37,7 +45,7 @@ it('rejects excess card fields and unknown card types rather than silently dropp
 
 it('rejects unknown MCP argument fields at the outer boundary', () => {
   const agent={sessionId:'s'.repeat(32),agentKey:'a'.repeat(32)},extra={unexpected:'must not be dropped'};
-  const inputs={ask_card:{...agent,question:{title:'Review',card:{type:'generic',options:[{number:1,emoji:'🍋',title:'One'},{number:2,emoji:'🦊',title:'Two'}]}},...extra},wait_for_card_answer:{...agent,decisionId:'d'.repeat(32),...extra},acknowledge_card:{...agent,decisionId:'d'.repeat(32),acknowledgement:{answerId:'b'.repeat(32),nextSteps:'Continue'},...extra}};
+  const inputs={ask_card:{...agent,question:{title:'Review',card:brief},...extra},wait_for_card_answer:{...agent,decisionId:'d'.repeat(32),...extra},acknowledge_card:{...agent,decisionId:'d'.repeat(32),acknowledgement:{answerId:'b'.repeat(32),nextSteps:'Continue'},...extra}};
   const decoders={ask_card:Schema.decodeUnknownSync(MCP_TOOLS.ask_card.input),wait_for_card_answer:Schema.decodeUnknownSync(MCP_TOOLS.wait_for_card_answer.input),acknowledge_card:Schema.decodeUnknownSync(MCP_TOOLS.acknowledge_card.input)};
   for(const name of ['ask_card','wait_for_card_answer','acknowledge_card'] as const)expect(()=>decoders[name](inputs[name])).toThrow();
 });

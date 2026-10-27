@@ -44,7 +44,7 @@ describe('the agent start document', () => {
   it('explains nested results, choices, required text and input bounds', () => {
     const document = startDocument();
     expect(document).toContain('never blank');
-    expect(document).toContain('2 to 5');
+    expect(document).toContain('2 to 4 options');
     expect(document).toContain('one Unicode RGI emoji');
     expect(document).toContain('8 code points');
     expect(document).toContain('32 URL-safe');

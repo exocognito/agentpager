@@ -105,7 +105,7 @@ test('briefs: refused whole, with a reason that says what to fix', { timeout: 12
       ['an image naming a page', { ...base, card: { ...card({}).card, markdown: markdown + '\n![Mock](notes.md)\n' }, attachments: [{ name: 'notes.md', type: 'text/markdown', text: '# Notes' }] }, /names a page, not an image/],
       ['an image named for another type', { ...base, card: { ...card({}).card, markdown: markdown + '\n![Mock](a.jpg)\n' }, attachments: [{ name: 'a.jpg', type: 'image/png', base64: png }] }, /must end in \.png/],
       ['an emoji card', emojiCard, /Emoji cards are retired\. Send a brief/],
-      ['attachments on an emoji card', { ...emojiCard, attachments: [{ name: 'a.png', type: 'image/png', base64: png }] }, /only with a brief card/],
+      ['attachments on an emoji card', { ...emojiCard, attachments: [{ name: 'a.png', type: 'image/png', base64: png }] }, /Emoji cards are retired\. Send a brief/],
       ['an unknown field', { ...base, card: { ...card({}).card, extra: 'dropped?' } }, /extra|is unexpected/],
     ];
     for (const [label, data, reason] of cases) {

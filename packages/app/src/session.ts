@@ -260,6 +260,9 @@ export class Session {
       const question = decode(C.QuestionInput, await body(request));
       const asked = this.tx(() => {
         const m = this.agent(digest);
+        // Every new card is a brief; emoji cards asked before stay answerable. A wrong key or an ended pager
+        // still answers first.
+        if (question.card.type !== 'brief') throw C.refuse.invalid('Emoji cards are retired. Send a brief (card.type "brief"); read "Decision briefs" in /start.');
         if (this.openCount() >= C.MAX_OPEN_DECISIONS) throw C.refuse.tooMany();
         // The decision keeps each attachment's name, type and size; the bytes live in their own table, with no
         // foreign key so a build from before briefs can still delete the proposal. A brief's options get keycaps,

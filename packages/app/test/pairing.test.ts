@@ -1,5 +1,5 @@
 import { test } from 'node:test';
-import { fixture, assert, token, C, decode, wrongCode } from './support.ts';
+import { fixture, assert, token, C, decode, wrongCode, emojiCard } from './support.ts';
 
 test('agent-made link: create, palette, pair by code, ask before pairing, answer, ack', { timeout: 180_000 }, async () => {
   const f = await fixture('pairing-agent-link');
@@ -102,7 +102,7 @@ test('three wrong codes end the pager as pairing failed; the agent hears it next
     // The right code no longer helps: the link is gone.
     await f.refused(410, 'LinkInvalid', route, { phone, data: { code: s.pairingCode.emojis } });
     await f.refused(410, 'LinkInvalid', `/api/start/${s.link.code}`);
-    const next = await f.refused(410, 'PagerEnded', `/api/sessions/${s.session.sessionId}/cards`, { agent: s.agentKey, data: { title: 'Still there?', card: { type: 'generic', options: [{ number: 1, emoji: '👍', title: 'Yes' }, { number: 2, emoji: '👎', title: 'No' }] } } });
+    const next = await f.refused(410, 'PagerEnded', `/api/sessions/${s.session.sessionId}/cards`, { agent: s.agentKey, data: emojiCard });
     assert.equal(next.endReason, 'pairingFailed'); assert.match(next.message, /Pairing failed/);
     await f.refused(401, 'Unauthorized', `/api/sessions/${s.session.sessionId}`, { agent: token() });
     await f.artifact('failed.json', { failed, next });

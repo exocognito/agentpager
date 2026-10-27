@@ -14,7 +14,7 @@ caveats:
 2. It gives one line to copy into an agent, and the steps to get started.
 3. Its privacy page lists what the service stores and for how long:
    - each pager's agent name, cards, answers and acknowledgements, until the pager ends;
-   - the agent name and why and when the pager ended, for 7 days after that;
+   - the agent name, why and when the pager ended, and the agent's last acknowledgement, for 7 days after that;
    - keys and link codes, stored only as digests.
 
    It also says that no account exists, and that alert text passes through Apple.

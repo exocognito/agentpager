@@ -1,0 +1,472 @@
+{
+  "type": "excalidraw",
+  "version": 2,
+  "source": "https://github.com/excalidraw/excalidraw-mcp",
+  "elements": [
+    {
+      "type": "text",
+      "id": "mh1",
+      "x": 30,
+      "y": 25,
+      "text": "MHELPER · one install, independent agent sessions",
+      "fontSize": 30,
+      "fontFamily": 2,
+      "strokeColor": "#374151",
+      "width": 911.4,
+      "height": 37.5
+    },
+    {
+      "type": "rectangle",
+      "id": "mh2",
+      "x": 25,
+      "y": 105,
+      "width": 510,
+      "height": 595,
+      "roughness": 0,
+      "backgroundColor": "#f5f3fc",
+      "strokeColor": "#565166",
+      "roundness": {
+        "type": 3
+      }
+    },
+    {
+      "type": "text",
+      "id": "mh3",
+      "x": 50,
+      "y": 125,
+      "text": "OWNER'S LAPTOP OR VM",
+      "fontSize": 21,
+      "fontFamily": 2,
+      "strokeColor": "#374151",
+      "width": 260.4,
+      "height": 26.25
+    },
+    {
+      "type": "rectangle",
+      "id": "mh4",
+      "x": 55,
+      "y": 190,
+      "width": 205,
+      "height": 110,
+      "roughness": 0,
+      "backgroundColor": "#ffffff",
+      "strokeColor": "#565166",
+      "roundness": {
+        "type": 3
+      }
+    },
+    {
+      "type": "text",
+      "id": "mh4-label",
+      "x": 52.099999999999994,
+      "y": 220,
+      "width": 210.8,
+      "height": 50,
+      "text": "Qualified agent A\nown session",
+      "fontSize": 20,
+      "fontFamily": 2,
+      "strokeColor": "#565166",
+      "textAlign": "center",
+      "verticalAlign": "middle"
+    },
+    {
+      "type": "rectangle",
+      "id": "mh5",
+      "x": 300,
+      "y": 190,
+      "width": 205,
+      "height": 110,
+      "roughness": 0,
+      "backgroundColor": "#ffffff",
+      "strokeColor": "#565166",
+      "roundness": {
+        "type": 3
+      }
+    },
+    {
+      "type": "text",
+      "id": "mh5-label",
+      "x": 297.1,
+      "y": 220,
+      "width": 210.8,
+      "height": 50,
+      "text": "Qualified agent B\nown session",
+      "fontSize": 20,
+      "fontFamily": 2,
+      "strokeColor": "#565166",
+      "textAlign": "center",
+      "verticalAlign": "middle"
+    },
+    {
+      "type": "arrow",
+      "id": "mh6",
+      "x": 155,
+      "y": 300,
+      "width": 0,
+      "height": 125,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          125
+        ]
+      ],
+      "roughness": 0,
+      "strokeColor": "#6044be",
+      "endArrowhead": "arrow",
+      "startArrowhead": "arrow"
+    },
+    {
+      "type": "text",
+      "id": "mh6-label",
+      "x": 81.22,
+      "y": 351.875,
+      "width": 147.56,
+      "height": 21.25,
+      "text": "Tools / events",
+      "fontSize": 17,
+      "fontFamily": 2,
+      "strokeColor": "#6044be",
+      "textAlign": "center",
+      "verticalAlign": "middle"
+    },
+    {
+      "type": "arrow",
+      "id": "mh7",
+      "x": 400,
+      "y": 300,
+      "width": 0,
+      "height": 125,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          125
+        ]
+      ],
+      "roughness": 0,
+      "strokeColor": "#6044be",
+      "endArrowhead": "arrow",
+      "startArrowhead": "arrow"
+    },
+    {
+      "type": "text",
+      "id": "mh7-label",
+      "x": 326.22,
+      "y": 351.875,
+      "width": 147.56,
+      "height": 21.25,
+      "text": "Tools / events",
+      "fontSize": 17,
+      "fontFamily": 2,
+      "strokeColor": "#6044be",
+      "textAlign": "center",
+      "verticalAlign": "middle"
+    },
+    {
+      "type": "rectangle",
+      "id": "mh8",
+      "x": 70,
+      "y": 425,
+      "width": 425,
+      "height": 150,
+      "roughness": 0,
+      "backgroundColor": "#eeebfa",
+      "strokeColor": "#565166",
+      "roundness": {
+        "type": 3
+      }
+    },
+    {
+      "type": "text",
+      "id": "mh8-label",
+      "x": 40.69999999999999,
+      "y": 462.5,
+      "width": 483.6,
+      "height": 75,
+      "text": "One optional helper\nbound answer delivery + observed status\nno arbitrary remote commands",
+      "fontSize": 20,
+      "fontFamily": 2,
+      "strokeColor": "#565166",
+      "textAlign": "center",
+      "verticalAlign": "middle"
+    },
+    {
+      "type": "text",
+      "id": "mh9",
+      "x": 65,
+      "y": 610,
+      "text": "Setup configures selected clients.\nPairing and authority remain per session.",
+      "fontSize": 18,
+      "fontFamily": 2,
+      "strokeColor": "#374151",
+      "width": 457.56,
+      "height": 45
+    },
+    {
+      "type": "rectangle",
+      "id": "mh10",
+      "x": 650,
+      "y": 425,
+      "width": 215,
+      "height": 150,
+      "roughness": 0,
+      "backgroundColor": "#ffffff",
+      "strokeColor": "#565166",
+      "roundness": {
+        "type": 3
+      }
+    },
+    {
+      "type": "text",
+      "id": "mh10-label",
+      "x": 621.1,
+      "y": 450,
+      "width": 272.8,
+      "height": 100,
+      "text": "AgentPager relay\nsession/card authority\ntrusted, readable\nin this proposal",
+      "fontSize": 20,
+      "fontFamily": 2,
+      "strokeColor": "#565166",
+      "textAlign": "center",
+      "verticalAlign": "middle"
+    },
+    {
+      "type": "arrow",
+      "id": "mh11",
+      "x": 495,
+      "y": 465,
+      "width": 155,
+      "height": 0,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          155,
+          0
+        ]
+      ],
+      "roughness": 0,
+      "strokeColor": "#6044be",
+      "endArrowhead": "arrow",
+      "startArrowhead": "arrow"
+    },
+    {
+      "type": "text",
+      "id": "mh11-label",
+      "x": 493.45,
+      "y": 443.75,
+      "width": 158.1,
+      "height": 42.5,
+      "text": "HTTPS\ncards + answers",
+      "fontSize": 17,
+      "fontFamily": 2,
+      "strokeColor": "#6044be",
+      "textAlign": "center",
+      "verticalAlign": "middle"
+    },
+    {
+      "type": "arrow",
+      "id": "mh12",
+      "x": 495,
+      "y": 545,
+      "width": 155,
+      "height": 0,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          155,
+          0
+        ]
+      ],
+      "roughness": 0,
+      "strokeColor": "#6044be",
+      "endArrowhead": "arrow",
+      "startArrowhead": "arrow"
+    },
+    {
+      "type": "text",
+      "id": "mh12-label",
+      "x": 482.90999999999997,
+      "y": 523.75,
+      "width": 179.18,
+      "height": 42.5,
+      "text": "Status\nstate + freshness",
+      "fontSize": 17,
+      "fontFamily": 2,
+      "strokeColor": "#6044be",
+      "textAlign": "center",
+      "verticalAlign": "middle"
+    },
+    {
+      "type": "rectangle",
+      "id": "mh13",
+      "x": 975,
+      "y": 265,
+      "width": 200,
+      "height": 390,
+      "roughness": 0,
+      "backgroundColor": "#f5f6fb",
+      "strokeColor": "#565166",
+      "roundness": {
+        "type": 3
+      }
+    },
+    {
+      "type": "text",
+      "id": "mh14",
+      "x": 995,
+      "y": 285,
+      "text": "ONE PHONE",
+      "fontSize": 21,
+      "fontFamily": 2,
+      "strokeColor": "#374151",
+      "width": 117.17999999999999,
+      "height": 26.25
+    },
+    {
+      "type": "rectangle",
+      "id": "mh15",
+      "x": 995,
+      "y": 345,
+      "width": 160,
+      "height": 100,
+      "roughness": 0,
+      "backgroundColor": "#ffffff",
+      "strokeColor": "#565166",
+      "roundness": {
+        "type": 3
+      }
+    },
+    {
+      "type": "text",
+      "id": "mh15-label",
+      "x": 994.4,
+      "y": 370,
+      "width": 161.2,
+      "height": 50,
+      "text": "Browser row A\npaired to A",
+      "fontSize": 20,
+      "fontFamily": 2,
+      "strokeColor": "#565166",
+      "textAlign": "center",
+      "verticalAlign": "middle"
+    },
+    {
+      "type": "rectangle",
+      "id": "mh16",
+      "x": 995,
+      "y": 495,
+      "width": 160,
+      "height": 100,
+      "roughness": 0,
+      "backgroundColor": "#ffffff",
+      "strokeColor": "#565166",
+      "roundness": {
+        "type": 3
+      }
+    },
+    {
+      "type": "text",
+      "id": "mh16-label",
+      "x": 994.4,
+      "y": 520,
+      "width": 161.2,
+      "height": 50,
+      "text": "Browser row B\npaired to B",
+      "fontSize": 20,
+      "fontFamily": 2,
+      "strokeColor": "#565166",
+      "textAlign": "center",
+      "verticalAlign": "middle"
+    },
+    {
+      "type": "arrow",
+      "id": "mh17",
+      "x": 865,
+      "y": 465,
+      "width": 110,
+      "height": 0,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          110,
+          0
+        ]
+      ],
+      "roughness": 0,
+      "strokeColor": "#6044be",
+      "endArrowhead": "arrow",
+      "startArrowhead": "arrow"
+    },
+    {
+      "type": "text",
+      "id": "mh17-label",
+      "x": 893.65,
+      "y": 454.375,
+      "width": 52.7,
+      "height": 21.25,
+      "text": "HTTPS",
+      "fontSize": 17,
+      "fontFamily": 2,
+      "strokeColor": "#6044be",
+      "textAlign": "center",
+      "verticalAlign": "middle"
+    },
+    {
+      "type": "text",
+      "id": "mh18",
+      "x": 645,
+      "y": 630,
+      "text": "No host-wide session\nor merged decision queue.",
+      "fontSize": 18,
+      "fontFamily": 2,
+      "strokeColor": "#374151",
+      "width": 279,
+      "height": 45
+    },
+    {
+      "type": "text",
+      "id": "mh19",
+      "x": 30,
+      "y": 755,
+      "text": "BASE PATH: agent ↔ remote MCP / HTTPS ↔ relay ↔ phone; no helper required.",
+      "fontSize": 21,
+      "fontFamily": 2,
+      "strokeColor": "#374151",
+      "width": 963.48,
+      "height": 26.25
+    },
+    {
+      "type": "text",
+      "id": "mh20",
+      "x": 30,
+      "y": 808,
+      "text": "DRAFT: no new tasks, model status prompts, steering, native approvals or process restart.",
+      "fontSize": 20,
+      "fontFamily": 2,
+      "strokeColor": "#374151",
+      "width": 1103.6,
+      "height": 25
+    }
+  ],
+  "appState": {
+    "gridSize": null,
+    "viewBackgroundColor": "#ffffff"
+  },
+  "files": {}
+}

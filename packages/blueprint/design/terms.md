@@ -1,3 +1,19 @@
+---
+items:
+  Helper:
+    status: draft
+  Helper host:
+    status: draft
+  Client connection:
+    status: draft
+  Agent activity:
+    status: draft
+  Agent connection:
+    status: draft
+  Delivery outcome:
+    status: draft
+---
+
 # Terms
 
 The words that mean something specific in this product. They name things; the promises and schemas say how the things behave.
@@ -26,3 +42,9 @@ The words that mean something specific in this product. They name things; the pr
 | Home screen | The owner's list of the sessions this browser holds, at `/app`. |
 | Connect link | A link the owner copies from the phone to an agent, so the agent joins that phone directly. |
 | Agent key, phone key | The secret each side holds to act in its session. |
+| Helper | An optional local AgentPager program that connects supported agents on its machine to their own phone-paired sessions. |
+| Helper host | The laptop or VM on which the helper and its bound agent runtimes run. |
+| Client connection | An owner-selected setup binding between the helper and a supported coding-agent client. |
+| Agent activity | Observed runtime phase: thinking, tool call or idle; unknown when reliable evidence is unavailable. |
+| Agent connection | The freshness-qualified reachability of a particular agent session through its helper. |
+| Delivery outcome | Whether an answer is stored, received by the helper, queued, uncertain or explicitly acknowledged by the agent. |

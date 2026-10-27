@@ -1,6 +1,9 @@
 # AgentPager roadmap
 
 1. MCARDS
+2. MHELPER
+
+MHELPER is a [draft proposal](milestones/MHELPER.md) for an optional multi-client helper, bound answer continuation and model-free connection/activity status. It is not approved or runnable: its promise selection, design, verification and owner decisions remain unpinned. [Review the proposal](../records/workshop/mhelper/PROPOSAL.md).
 
 ## Horizons
 

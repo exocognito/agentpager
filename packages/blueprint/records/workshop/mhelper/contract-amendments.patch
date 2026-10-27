@@ -1,0 +1,20 @@
+--- a/packages/blueprint/strategy/STRATEGY.md
++++ b/packages/blueprint/strategy/STRATEGY.md
+@@ -87 +87 @@
+-Serve one agent and one phone per session. Accounts, native apps, community cards and paid plans need their own design and user learning. Run on a Cloudflare Worker at agentpager.me, with one SQLite-backed Durable Object per session. Agents reach one service by plain HTTPS or a remote MCP server. Defer Alchemy until a date the owner sets.
++Serve one agent and one phone per session. Accounts, native apps, community cards and paid plans need their own design and user learning. Run on a Cloudflare Worker at agentpager.me, with one SQLite-backed Durable Object per session. Agents reach one service by plain HTTPS or a remote MCP server. An optional helper connects supported clients on their own machines to that same service; each agent and phone still have an independent session. Defer Alchemy until a date the owner sets.
+--- a/packages/blueprint/design/capabilities/C2-agent-starts-from-one-url.md
++++ b/packages/blueprint/design/capabilities/C2-agent-starts-from-one-url.md
+@@ -11 +11 @@
+-  - No helper, SDK or agent-specific adapter is promised. Nothing wakes an agent that has stopped; a waiting agent holds a read open.
++  - This capability covers the installation-free HTTPS and remote-MCP path. Its waiting caller holds a read open; this path alone does not wake an idle agent. Optional helper setup and bound answer continuation are separate capabilities and are never prerequisites for this full decision flow.
+--- a/packages/blueprint/design/dependencies/D1-cloudflare.md
++++ b/packages/blueprint/design/dependencies/D1-cloudflare.md
+@@ -3 +3 @@
+-statement: The product runs as one Worker on the agentpager.me zone, with one SQLite-backed Durable Object per session and one registry object, and nowhere else.
++statement: The cloud relay runs as one Worker on the agentpager.me zone, with one SQLite-backed Durable Object per session and one registry object, and nowhere else; optional local helper processes run on owner-selected agent machines.
+--- a/packages/blueprint/design/dependencies/D2-agent-clients.md
++++ b/packages/blueprint/design/dependencies/D2-agent-clients.md
+@@ -13 +13 @@
+-Must never do: change a client's global configuration to supply the test; present unavailable or unqualified facilities as supplied.
++Must never do: change a client's global configuration to supply the installation-free cold-arrival test; present unavailable or unqualified facilities as supplied. Owner-selected helper setup is qualified separately under D6::qualified-helper-hosts-and-adapters and may change only the entries that setup explicitly owns.

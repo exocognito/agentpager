@@ -1,3 +1,9 @@
+---
+items:
+  SP6:
+    status: draft
+---
+
 # AgentPager
 
 ## Vision
@@ -91,3 +97,7 @@ Aim for about 100 characters for the question and for each option. The agent may
 ### SP5 · Reach the agents owners actually use
 
 Any agent whose client can send HTTPS requests or add an MCP server can use AgentPager from agentpager.me/start alone, with nothing to install. That covers terminal agents, desktop and IDE apps, and chat apps on my phone. /start is written for developers of every level. A waiting agent has my answer within a second of the Undo window closing.
+
+### SP6 · Let owners choose progressive enhancement
+
+The full decision flow must work without installing our helper. Owners who choose more setup should gain a simpler way to connect several supported agents on a machine and more dependable answer delivery, without turning AgentPager into a general remote-control channel.

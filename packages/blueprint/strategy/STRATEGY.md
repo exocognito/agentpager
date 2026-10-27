@@ -9,9 +9,9 @@ _Technically: strategic capabilities_
 
 ### SC1 · Unblock my agent from my phone
 
-Connect my agent to my phone easily with an AgentPager link: my agent shows me one as a link and a QR code, or my phone makes one for me to give my agent. Either way I confirm the pairing by tapping, on my phone, the three emoji my agent shows me.
+Connect my agents to my phone easily. I give the agents I trust my pager number, and each opens its own pager on my phone with nothing for me to tap. Any other agent connects with an AgentPager link: my agent shows me one as a link and a QR code, or my phone makes one for me to give my agent, and I confirm the pairing by tapping, on my phone, the three emoji my agent shows me.
 
-Once paired, my agent sends me a multiple-choice decision when it needs me. I answer, see that my answer was sent, and get the agent's acknowledgement and its next steps. I can look back at a pager's decisions while it lasts.
+Once paired, my agent sends me a multiple-choice decision when it needs me. I answer, see that my answer was sent, and get the agent's acknowledgement and its next steps. I can look back at a pager's decisions while it lasts, and for 24 hours after it ends.
 
 Decision cards can show the exact email, pull request, calendar invitation or reply, the way that product would show it, with the agent's options for what to do with it. The agent carries out the option I chose; AgentPager only carries my answer.
 
@@ -30,9 +30,9 @@ _Technically, SI: a strategic selection of Invariants_
 
 Following good UX practice, an action that cannot be undone needs a confirming step. So an answer always takes two taps: I choose an option or write a response, then press Send, and I have a few seconds to undo. Choosing alone never sends. The agent receives exactly what I sent.
 
-### SI2 · Only the phone that enters my agent's code gets in
+### SI2 · Only agents I let in reach my phone
 
-A pager is one agent and one phone. A phone pairs only by entering the three emoji my agent shows, within 15 minutes and three tries; a third wrong try ends the pager. Opening or reading an AgentPager link never uses it up and never pairs anything. Once paired, no other phone or agent gets in. A lost phone means a new pager, never a transfer.
+A pager is one agent and one phone. An agent gets a pager on my phone only with my pager number, which I give to agents I trust and can change at any time, or through an AgentPager link, where my phone pairs only by entering the three emoji my agent shows, within 15 minutes and three tries; a third wrong try ends the pager. Opening or reading a link never uses it up and never pairs anything. Once a pager is open, no other phone or agent gets in. A lost phone means new pagers, never a transfer.
 
 ### SI3 · Sent decisions cannot be changed
 
@@ -44,7 +44,7 @@ An acknowledgement is a real message from the agent, never an automatic message 
 
 ### SI5 · A pager ends when I end it, when my agent finishes, or at its end time
 
-Its end time is 24 hours after pairing unless I choose 7 or 30 days, and I can change it later. When a pager ends, its decisions are deleted at once and my agent is told why on its next call. Ending a pager never stops the agent itself.
+Its end time is 24 hours after pairing unless I choose 7 or 30 days, and I can change it later. When a pager ends, its decisions are deleted from the service at once, and my phone keeps a read-only copy for 24 hours. My agent is told why on its next call. Ending a pager never stops the agent itself.
 
 ### SI6 · UTF-8 with Markdown is allowed; invalid or over-limit text is refused, never truncated
 

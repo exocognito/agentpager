@@ -1,7 +1,7 @@
 import { expect, it } from "vitest";
 import { Schema } from "effect";
 import { QuestionInput } from "../../../../schemas/exchange.ts";
-import { briefProblem, missingAttachment, proseLines, withKeycaps, Payload } from "./schema.ts";
+import { briefProblem, missingAttachment, proseLines, withKeycaps, withoutCodeSpans, Payload } from "./schema.ts";
 
 const options = [{ number: 1, title: "Delete them", label: "Delete", prioritizes: "a clean branch list" }, { number: 2, title: "Keep them", prioritizes: "old links" }];
 const brief = (markdown: string, extra: Record<string, unknown> = {}) => ({ title: "Delete 14 branches?", card: { type: "brief", options, recommended: 1, markdown }, ...extra });
@@ -57,12 +57,25 @@ it("refuses an image whose structure is not whole", () => {
   const bytes = Array.from(atob(dot), c => c.charCodeAt(0));
   const ihdr = bytes.slice(0, 33), iend = bytes.slice(-12);
   expect(Schema.is(QuestionInput)(png([...ihdr, ...iend]))).toBe(false); // no image data
+  expect(Schema.is(QuestionInput)(png([...ihdr, 0, 0, 0, 0, 0x49, 0x44, 0x41, 0x54, 0x35, 0xaf, 0x06, 0x1e, ...iend]))).toBe(false); // empty IDAT
+  expect(Schema.is(QuestionInput)(png([...ihdr, 0, 0, 0, 2, 0x49, 0x44, 0x41, 0x54, 0x12, 0x34, 0, 0, 0, 0, ...iend]))).toBe(false); // not zlib data
   expect(Schema.is(QuestionInput)(png(bytes.slice(0, -12)))).toBe(false); // no IEND
   expect(Schema.is(QuestionInput)(png([...bytes, 0]))).toBe(false); // bytes after IEND
   const sof = [0xff, 0xc0, 0, 11, 8, 0, 1, 0, 1, 1, 1, 0x11, 0], sos = [0xff, 0xda, 0, 8, 1, 1, 0, 0, 0x3f, 0];
   expect(Schema.is(QuestionInput)(jpeg([0xff, 0xd8, ...sof, ...sos, 0x12, 0x34, 0xff, 0xd9]))).toBe(true);
   expect(Schema.is(QuestionInput)(jpeg([0xff, 0xd8, 0xff, 0xe0, 0, 0xff, 0xd9]))).toBe(false); // markers only
   expect(Schema.is(QuestionInput)(jpeg([0xff, 0xd8, ...sos, 0xff, 0xd9]))).toBe(false); // no frame header
+  // A small file that declares a bitmap too big to decode on a phone.
+  const huge = [...bytes.slice(0, 16), 0, 0, 0x75, 0x30, 0, 0, 0x75, 0x30, ...bytes.slice(24)];
+  expect(Schema.is(QuestionInput)(png(huge))).toBe(false);
+  const bigFrame = [0xff, 0xc0, 0, 11, 8, 0x75, 0x30, 0x75, 0x30, 1, 1, 0x11, 0];
+  expect(Schema.is(QuestionInput)(jpeg([0xff, 0xd8, ...bigFrame, ...sos, 0x12, 0x34, 0xff, 0xd9]))).toBe(false);
+});
+it("pairs code spans by equal backtick runs, so an unpaired run hides no link", () => {
+  expect(withoutCodeSpans("a `b` c")).toBe("a  c");
+  expect(withoutCodeSpans("Call ``[me](tel:+15551234)` now")).toBe("Call ``[me](tel:+15551234)` now");
+  expect(withoutCodeSpans("``a ` b`` c")).toBe(" c");
+  expect(missingAttachment("Call ``[me](tel:+15551234)` now", new Map())).toMatch(/neither an attachment nor an https link/);
 });
 it("gives each option its number's keycap for phones from before briefs, unless the agent chose an emoji", () => {
   const card = Schema.decodeUnknownSync(Payload)({ type: "brief", options: [...options.slice(0, 1), { ...options[1], emoji: "🗂️" }], recommended: 1, markdown: ok });

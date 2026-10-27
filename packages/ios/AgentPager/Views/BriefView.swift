@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import ImageIO
 
 // A decision brief (the canvas's headed template): the question with one "x ago", then Context, Options,
 // Tradeoffs, Recommendation, Next steps and Small print, each folded by tapping its heading. Viewing an option
@@ -68,8 +69,9 @@ struct BriefView: View {
         .background(Color(.systemGroupedBackground))
         .environment(\.briefContext, context)
         .environment(\.openURL, OpenURLAction { url in
+            // An attachment opens as a page; only an https link leaves the app.
             if url.scheme == nil { openPage(url.relativeString); return .handled }
-            return .systemAction
+            return url.scheme == "https" ? .systemAction : .discarded
         })
         .safeAreaInset(edge: .bottom) { if let picked { answerBar(picked) } }
         .fullScreenCover(item: $fullScreen) { FullScreenImageView(image: $0) }
@@ -641,9 +643,22 @@ struct AttachmentImage: View {
         }
         .accessibilityLabel(name)
         .task(id: context.decisionId + name) {
-            do { image = UIImage(data: try await model.attachment(context.sessionId, context.decisionId, name)); failed = image == nil }
+            do { image = Self.decode(try await model.attachment(context.sessionId, context.decisionId, name)); failed = image == nil }
             catch { failed = true }
         }
+    }
+}
+
+extension AttachmentImage {
+    // Never decodes a full bitmap the header says is huge, and decodes at most a screen's worth of pixels.
+    nonisolated static func decode(_ data: Data) -> UIImage? {
+        guard let source = CGImageSourceCreateWithData(data as CFData, [kCGImageSourceShouldCache: false] as CFDictionary),
+              let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let w = props[kCGImagePropertyPixelWidth] as? Int, let h = props[kCGImagePropertyPixelHeight] as? Int,
+              w > 0, h > 0, w <= 8192, h <= 8192, w * h <= 16_777_216 else { return nil }
+        let options = [kCGImageSourceCreateThumbnailFromImageAlways: true, kCGImageSourceCreateThumbnailWithTransform: true,
+                       kCGImageSourceShouldCacheImmediately: true, kCGImageSourceThumbnailMaxPixelSize: 2400] as CFDictionary
+        return CGImageSourceCreateThumbnailAtIndex(source, 0, options).map { UIImage(cgImage: $0) }
     }
 }
 
@@ -704,7 +719,7 @@ struct BriefPageView: View {
         })
         .environment(\.openURL, OpenURLAction { url in
             if url.scheme == nil { openPage(url.relativeString); return .handled }
-            return .systemAction
+            return url.scheme == "https" ? .systemAction : .discarded
         })
         .fullScreenCover(item: $fullScreen) { FullScreenImageView(image: $0) }
         .navigationTitle(title)

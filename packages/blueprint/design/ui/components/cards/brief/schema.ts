@@ -15,7 +15,28 @@ const FENCE = /^\s*(`{3,}|~{3,})/;
 const CONTAINER_OPEN = /^(:{3,})([a-z]+)(?:[ \t]+(.*?))?\s*$/;
 const CONTAINER_CLOSE = /^(:{3,})\s*$/;
 const LINK = /(!?)\[[^\]]*\]\(([^)\s]*)(?:\s+"[^"]*")?\)/g;
-const withoutCodeSpans = (line: string) => line.replace(/`+[^`]*`+/g, "");
+// A code span opens with a run of backticks and closes at the next run of the same length (CommonMark); an
+// unpaired run is literal text. What a code span holds is code, never a link or HTML.
+export function withoutCodeSpans(line: string) {
+  let out = "", at = 0;
+  while (at < line.length) {
+    const open = line.indexOf("`", at);
+    if (open < 0) { out += line.slice(at); break; }
+    const run = line.slice(open).match(/^`+/)?.[0] ?? "`";
+    let close = -1;
+    for (let i = open + run.length; i < line.length;) {
+      const next = line.indexOf("`", i);
+      if (next < 0) break;
+      const r = line.slice(next).match(/^`+/)?.[0] ?? "`";
+      if (r.length === run.length) { close = next; break; }
+      i = next + r.length;
+    }
+    if (close < 0) { out += line.slice(at, open + run.length); at = open + run.length; continue; }
+    out += line.slice(at, open);
+    at = close + run.length;
+  }
+  return out;
+}
 
 // The lines of Markdown that are prose, not fenced code. A fence closes on the same character, at least as long.
 export function proseLines(markdown: string): string[] {
@@ -149,6 +170,10 @@ export function base64Bytes(text: string): Uint8Array | null {
 // The file's structure, walked end to end: a PNG's chunks from IHDR (with a size) through image data to IEND at
 // the very end; a JPEG's segments from its start marker through a frame header to the scan, and its end marker.
 // The Worker has no image decoder, so pixel data itself is not decoded; the phone shows a placeholder if it fails.
+// The size the header declares is bounded too: a small file can declare a bitmap too big for a phone to decode.
+export const IMAGE_MAX_SIDE = 8192;
+export const IMAGE_MAX_PIXELS = 16_777_216;
+const sized = (width: number, height: number) => width > 0 && height > 0 && width <= IMAGE_MAX_SIDE && height <= IMAGE_MAX_SIDE && width * height <= IMAGE_MAX_PIXELS;
 const has = (bytes: Uint8Array, at: number, want: number[]) => at >= 0 && want.every((b, i) => bytes[at + i] === b);
 const u32 = (b: Uint8Array, at: number) => ((b[at] << 24) >>> 0) + (b[at + 1] << 16) + (b[at + 2] << 8) + b[at + 3];
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
@@ -158,8 +183,10 @@ function wholePng(b: Uint8Array) {
   while (at + 12 <= b.length) {
     const length = u32(b, at), type = String.fromCharCode(...b.subarray(at + 4, at + 8)), end = at + 12 + length;
     if (end > b.length) return false;
-    if (at === 8 && (type !== "IHDR" || length !== 13 || u32(b, at + 8) === 0 || u32(b, at + 12) === 0)) return false;
-    if (type === "IDAT") data = true;
+    if (at === 8 && (type !== "IHDR" || length !== 13 || !sized(u32(b, at + 8), u32(b, at + 12)))) return false;
+    // Image data that starts as zlib data does (deflate, header checksum); an empty IDAT holds no image.
+    if (type === "IDAT" && length >= 2 && !data) { const cmf = b[at + 8], flg = b[at + 9]; if ((cmf & 0x0f) !== 8 || (cmf * 256 + flg) % 31 !== 0) return false; }
+    if (type === "IDAT" && length >= 2) data = true;
     if (type === "IEND") return data && end === b.length;
     at = end;
   }
@@ -174,7 +201,10 @@ function wholeJpeg(b: Uint8Array) {
     if (marker === 0xff) { at++; continue; }
     const length = (b[at + 2] << 8) + b[at + 3];
     if (length < 2 || at + 2 + length > b.length - 2) return false;
-    if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) frame = true;
+    if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) {
+      if (length < 8 || !sized((b[at + 7] << 8) + b[at + 8], (b[at + 5] << 8) + b[at + 6])) return false;
+      frame = true;
+    }
     if (marker === 0xda) return frame;
     at += 2 + length;
   }
@@ -190,7 +220,7 @@ export const ImageInput = Schema.Struct({ name: AttachmentName, type: Schema.Lit
     const bytes = base64Bytes(a.base64);
     if (!bytes || bytes.length === 0) return `"${a.name}": base64 must be standard, padded base64`;
     if (bytes.length > IMAGE_MAX_BYTES) return `"${a.name}" is ${bytes.length} bytes; an image may not exceed ${IMAGE_MAX_BYTES}`;
-    return shaped[a.type](bytes) || `"${a.name}" is not a whole ${a.type === "image/png" ? "PNG" : "JPEG"} file`;
+    return shaped[a.type](bytes) || `"${a.name}" is not a whole ${a.type === "image/png" ? "PNG" : "JPEG"} file of at most ${IMAGE_MAX_SIDE} pixels a side and ${IMAGE_MAX_PIXELS} in all`;
   }),
 );
 export const AttachmentInput = Schema.Union(PageInput, ImageInput);

@@ -4,7 +4,8 @@
 
 AgentPager makes it easy for me to leave my agents working on my computer or in a cloud VM and send owner decisions to my phone so they can continue to do useful work while I am away. It is an app on my phone that pages me when an agent needs me, the way a pager would.
 
-## Strategic capabilities
+## Hero Features
+_Technically: strategic capabilities_
 
 ### SC1 · Unblock my agent from my phone
 
@@ -22,7 +23,8 @@ Accounts should let me return across devices without making a pager public.
 
 When my agent asks, my phone alerts me with the agent's name and its question, even when AgentPager is closed and, if I let its alerts through, a Focus mode is on. Opening the alert takes me to that decision.
 
-## Strategic invariants
+## Guarantees
+_Technically, SI: a strategic selection of Invariants_
 
 ### SI1 · Sending a decision requires confirmation
 
@@ -60,7 +62,8 @@ Before I answer a rich card, I see its complete target and content, and my answe
 
 A Pro research offer takes no payment and changes nothing about my pagers. It sends my feedback only with my consent.
 
-## Strategic goals
+## Goals
+_Technically SK: A set of strategic metrics and rubrics to achieve long term_
 
 ### SG1 · Return to completed work, not an unseen question
 
@@ -74,7 +77,8 @@ An agent that is blocked or unsure about a risky step asks me for a quick go/no-
 
 Test whether owners need longer-running agents, for which work, and whether $2.99 a month fits that value. Clicks and surveys show interest, not revenue.
 
-## Strategic principles
+## Principles
+_Technically SK: a set of strategic metrics (rubrics) that apply to all internal decisions_
 
 ### SP1 · Make the usual answer easy and clear
 
@@ -99,3 +103,6 @@ Any agent whose client can send HTTPS requests or add an MCP server can use Agen
 ### SP6 · Feel native
 
 Use the platform's own components and conventions (lists, sheets, menus, alerts, notifications and the Camera) rather than custom ones, so the app is familiar and the system does the work. Behaviour, data and words are the same on every platform; how they are drawn follows each platform.
+
+## Strategic Design Decisions
+_Technically, SD: sometimes specific design decisions get made top down and are pinned in design even though they may seem objectively inferior decision to make autonomously given all the other requirements in the blueprint. i.e. this may not be a permanent set of laws like the rest, but a temporarily true design constraint or limitation we choose to apply as we explore the design space. (Lets just see what actually gets written here and review if useful)_

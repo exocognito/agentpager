@@ -128,13 +128,19 @@ struct AgentView: View {
 }
 
 struct OpenRow: View {
+    @Environment(AppModel.self) private var model
     var decision: Decision
     var answerable = true
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             Circle().fill(answerable ? Color.accentColor : Color(.systemGray3)).frame(width: 10, height: 10).padding(.top, 6)
             VStack(alignment: .leading, spacing: 2) {
-                Text(decision.title).font(.body.weight(.semibold)).lineLimit(2)
+                // One "x ago" on each open decision, top right, like Mail.
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(decision.title).font(.body.weight(.semibold)).lineLimit(2)
+                    Spacer(minLength: 0)
+                    Text(Wording.ago(decision.askedAt, now: model.now)).font(.footnote).foregroundStyle(.secondary).fixedSize()
+                }
                 if let detail = decision.detail {
                     Text(detail).font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
                 }
@@ -182,7 +188,12 @@ struct AnsweredRowView: View {
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             Group {
-                if let chosen { Text(chosen.emoji).font(.title3) } else { Image(systemName: "text.bubble").foregroundStyle(.secondary) }
+                // A brief's options carry keycaps only for older builds; this one marks them by letter.
+                if let chosen, !row.decision.card.isBrief, let emoji = chosen.emoji { Text(emoji).font(.title3) }
+                else if let chosen {
+                    Text(chosen.letter).font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+                        .frame(width: 26, height: 26).background(Color(.systemGray5), in: .circle)
+                } else { Image(systemName: "text.bubble").foregroundStyle(.secondary) }
             }
             .frame(width: 28)
             VStack(alignment: .leading, spacing: 2) {

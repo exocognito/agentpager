@@ -19,6 +19,23 @@ that phone key, so there is no link or emoji code. `GET /api/numbers` lists, for
 any of its numbers. The Registry stores numbers and keys only as digests. This relaxes SI2 for numbered pagers on
 purpose: the number is the owner's trust in the agents that can read it.
 
+## Decision briefs (dogfood)
+
+`card.type: "brief"` carries Markdown sections (the canvas Kit) and 2 to 4 lettered options; `attachments` carry
+Markdown pages and PNG or JPEG images. The Blueprint schema (`design/ui/components/cards/brief/schema.ts`) refuses a
+brief whole with the reason: HTML outside code, a recommendation or option block or Tradeoffs column for a letter
+that is no option, a link to a missing attachment, or a size over its limit. The decision keeps each attachment's
+name, type and size; the bytes live in their own table, immutable, and go when the pager ends. The phone reads one
+with `GET /api/sessions/<id>/cards/<decisionId>/files/<name>` and its phone key.
+
+Versions: a brief's options get their number's keycap as `emoji`, so an iPhone build from before briefs draws a
+brief as an emoji card instead of failing the whole pager. A deleted proposal deletes its attachments (a trigger), so
+a build from before briefs still clears them when a pager ends. But that build cannot read a stored brief at all:
+before rolling the server back past briefs, end the pagers that hold one, or they answer `InvalidInput` until they end.
+
+`fixtures/briefs/` holds the canvas's four examples (D1–D4) word for word. `scripts/briefs.ts <server> <pager number>`
+plays the agent over MCP: it opens a pager with the number, asks all four, then acknowledges each answer.
+
 ## Local configuration
 
 `PORT`, `AGENTPAGER_INSPECTOR_PORT`, and `AGENTPAGER_PERSIST` select the local listener, inspector and persistent storage (outside the worktree). `AGENTPAGER_UNPAIRED_MS` and `AGENTPAGER_SESSION_MS` are local-only compile-time settings; defaults are 60000 and 180000. The imported schema bounds these at 10000–60000 and 10000–180000. Local startup builds to a private temporary directory, so concurrent instances never race over a bundle or database. Production builds always compile the production 15-minute / 24-hour constants, regardless of these environment variables.

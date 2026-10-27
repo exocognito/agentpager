@@ -15,6 +15,7 @@ The words that mean something specific in this product. They name things; the pr
 | Target emoji | The one emoji on the pairing card that pairs the phone. Only the agent is told it. |
 | Card | One question from the agent, with the options the agent wrote. |
 | Option | One action the agent offers on a card. |
+| Brief | A card the agent writes as Markdown sections (Context, Options, Tradeoffs, Recommendation, Next steps, Small print), with lettered options; the phone draws every brief as the same headed template. |
 | Feedback | The owner's own words sent in place of an option. It closes the card. |
 | Draft | A choice or feedback the owner has prepared but not sent. |
 | Undo window | The short time after Send in which the owner can take an answer back. |

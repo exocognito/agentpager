@@ -8,6 +8,7 @@ import { BUILD, forward, type Env } from './env.ts';
 import { body, decode, emptyBody, iso, json, refusal, sha256, token } from './shared.ts';
 import { codeDocument, codePage, OLD_CONNECT, startDocument } from './start.ts';
 import { PushTarget } from './push.ts';
+import { AttachmentName } from '../../blueprint/design/ui/components/cards/brief/schema.ts';
 export { Session } from './session.ts';
 export { Registry } from './registry.ts';
 
@@ -96,6 +97,9 @@ async function api(request: Request, env: Env, origin: string): Promise<Response
       if (parts[4] === 'answer') return pass(sessionId, `/${method === 'GET' ? 'read' : 'answer'}/${decisionId}`);
       if (parts[4] === 'acknowledge' && method === 'POST') return pass(sessionId, `/ack/${decisionId}`);
     }
+    if (parts.length === 6 && parts[2] === 'cards' && parts[4] === 'files' && method === 'GET') {
+      return pass(sessionId, `/file/${decode(C.Token, parts[3])}/${decode(AttachmentName, parts[5])}`);
+    }
     if (method === 'POST' && (rest === 'end' || rest === 'finish' || rest === 'lifetime' || rest === 'push')) return pass(sessionId, `/${rest}`);
   }
   throw C.refuse.notFound();
@@ -107,7 +111,7 @@ const descriptions = (origin: string): Record<keyof typeof C.MCP_TOOLS, string> 
   start_session: `Start a pager on your owner's phone, on the AgentPager server ${origin}. lifetime is 24h (default), 7d or 30d. Then, in one message of your own (not only in a command's output), show your owner link.qrText in a fenced code block, the full link.url as text, and pairingCode.text verbatim as plain text. Never show agentKey; keep sessionId and agentKey for later turns. Then call ask_card right away: your owner sees it as soon as the phone pairs. Full guide: ${origin}/start`,
   join_session: `Join the pager your owner's phone made, using the code from their AgentPager link (${origin}/start/<code>); links from other servers will not work here. Only the first join works. Print pairingCode.text to your owner verbatim as plain text; never show agentKey, and keep sessionId and agentKey for later turns. Then call ask_card right away.`,
   page_owner: `Open a new pager on your owner's phone with the pager number they gave you (for example in AGENTS.md), on the AgentPager server ${origin}. It is paired already: there is no link or code to show. Open one pager for your piece of work and keep it for every question. lifetime is 24h (default), 7d or 30d. Never show agentKey or the number; keep sessionId and agentKey for later turns. Then call ask_card. Full guide: ${origin}/start`,
-  ask_card: 'Ask your owner one decision with 2 to 5 numbered options. Works before pairing (the phone shows it once paired). At most 10 open decisions per pager. Replies {decisionId}.',
+  ask_card: `Ask your owner one decision. A "generic" card has 2 to 5 numbered options, each with an emoji. A "brief" card is a Markdown decision brief with 2 to 4 lettered options (number 1 is A) and optional attachments: read "Decision briefs" in ${origin}/start before your first one. Works before pairing (the phone shows it once paired). At most 10 open decisions per pager. Replies {decisionId}.`,
   wait_for_card_answer: 'Hold a read for up to 50 seconds. Replies {status:"pending"} (read again) or {status:"answered", answer:{answerId, choice, ...}}. Keep reading while you have nothing better to do; if your turn ends, the answer waits for your next turn.',
   acknowledge_card: 'Acknowledge the exact answerId with your next steps; your owner sees them with a green tick. Only the first acknowledgement counts.',
   finish_session: 'End the pager when your work is done. Your key stops working.',

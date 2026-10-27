@@ -15,7 +15,8 @@ struct DecisionSheet: View {
         NavigationStack(path: $path) {
             Group {
                 if let d = model.decision(sessionId, decisionId) {
-                    if d.status == .open { choose(d) } else { ThreadContent(sessionId: sessionId, decision: d) }
+                    if d.status != .open { ThreadContent(sessionId: sessionId, decision: d) { path.append("page:" + $0) } }
+                    else if d.card.isBrief { brief(d) } else { choose(d) }
                 } else {
                     ContentUnavailableView("Decision Cleared", systemImage: "tray", description: Text("This decision is no longer on your pager."))
                 }
@@ -25,9 +26,13 @@ struct DecisionSheet: View {
                 ToolbarItem(placement: .principal) { Text(agentName).font(.subheadline).foregroundStyle(.secondary) }
                 ToolbarItem(placement: .topBarTrailing) { Button(role: .close) { model.sheet = nil }.accessibilityIdentifier("close-decision") }
             }
-            .navigationDestination(for: String.self) { _ in
+            .navigationDestination(for: String.self) { value in
                 if let d = model.decision(sessionId, decisionId) {
-                    AskChangesView(decision: d, text: $feedback) { model.send(sessionId: sessionId, decisionId: decisionId, choice: .feedback(feedback)) }
+                    if value.hasPrefix("page:") {
+                        BriefPageView(sessionId: sessionId, decision: d, name: String(value.dropFirst(5))) { path.append("page:" + $0) }
+                    } else {
+                        AskChangesView(decision: d, text: $feedback) { model.send(sessionId: sessionId, decisionId: decisionId, choice: .feedback(feedback)) }
+                    }
                 }
             }
         }
@@ -42,6 +47,13 @@ struct DecisionSheet: View {
         }
     }
 
+    private func brief(_ d: Decision) -> some View {
+        BriefView(sessionId: sessionId, decision: d, picked: $selection,
+                  askForChanges: { path.append("changes") },
+                  openPage: { path.append("page:" + $0) },
+                  send: { model.send(sessionId: sessionId, decisionId: decisionId, choice: .option($0)) })
+    }
+
     private func choose(_ d: Decision) -> some View {
         List {
             // A section header, not a clear row: insetGrouped rows clip to their rounded shape and shave the
@@ -51,7 +63,7 @@ struct DecisionSheet: View {
                 ForEach(d.card.options, id: \.number) { o in
                     Button { selection = o.number } label: {
                         HStack(alignment: .top, spacing: 12) {
-                            Text(o.emoji).font(.title3).frame(width: 28)
+                            Text(o.mark).font(.title3).frame(width: 28)
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(o.title).foregroundStyle(.primary)
                                 if let detail = o.detail { Text(detail).font(.subheadline).foregroundStyle(.secondary) }
@@ -158,12 +170,13 @@ struct ThreadSheet: View {
     @Environment(AppModel.self) private var model
     var sessionId: String
     var decisionId: String
+    @State private var path: [String] = []
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             Group {
                 if let d = model.decision(sessionId, decisionId) {
-                    ThreadContent(sessionId: sessionId, decision: d)
+                    ThreadContent(sessionId: sessionId, decision: d) { path.append($0) }
                 } else {
                     ContentUnavailableView("Decision Cleared", systemImage: "tray", description: Text("This decision is no longer on your pager."))
                 }
@@ -172,6 +185,9 @@ struct ThreadSheet: View {
             .toolbar {
                 ToolbarItem(placement: .principal) { Text(model.inboxes[sessionId]?.session.name ?? "").font(.subheadline).foregroundStyle(.secondary) }
                 ToolbarItem(placement: .topBarTrailing) { Button(role: .close) { model.sheet = nil } }
+            }
+            .navigationDestination(for: String.self) { name in
+                if let d = model.decision(sessionId, decisionId) { BriefPageView(sessionId: sessionId, decision: d, name: name) { path.append($0) } }
             }
         }
     }
@@ -182,11 +198,36 @@ struct ThreadContent: View {
     @Environment(AppModel.self) private var model
     var sessionId: String
     var decision: Decision
+    var openPage: (String) -> Void = { _ in }
 
     private var row: AnsweredRow? { model.answeredRows(sessionId).first { $0.decision.decisionId == decision.decisionId } }
     private var chosenNumber: Int? { if case .option(let n) = row?.choice { n } else { nil } }
 
     var body: some View {
+        if decision.card.isBrief {
+            // The brief stays readable under the answer; nothing on it can be chosen again (SI3).
+            BriefView(sessionId: sessionId, decision: decision, openPage: openPage, answered: AnyView(bubbles))
+        } else {
+            list
+        }
+    }
+
+    @ViewBuilder private var bubbles: some View {
+        if let row {
+            VStack(spacing: 10) {
+                Bubble(text: answerText(row), mine: true, caption: "You · " + Wording.time(decision.answer?.sentAt ?? model.now))
+                if let ack = decision.acknowledgement {
+                    Bubble(text: ack.nextSteps, mine: false, caption: "Your agent confirmed · " + Wording.time(ack.acknowledgedAt), onPlain: true)
+                } else {
+                    SendStatusLine(row: row)
+                        .font(.subheadline).foregroundStyle(Color(.secondaryLabel))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        }
+    }
+
+    private var list: some View {
         List {
             Section {} header: { DecisionHeader(decision: decision) }
             if let row {
@@ -207,7 +248,7 @@ struct ThreadContent: View {
             Section("Options") {
                 ForEach(decision.card.options, id: \.number) { o in
                     HStack(alignment: .top, spacing: 12) {
-                        Text(o.emoji).font(.title3).frame(width: 28)
+                        Text(o.mark).font(.title3).frame(width: 28)
                         VStack(alignment: .leading, spacing: 3) {
                             Text(o.title).fontWeight(o.number == chosenNumber ? .semibold : .regular)
                             if let detail = o.detail { Text(detail).font(.subheadline).foregroundStyle(.secondary) }
@@ -221,18 +262,15 @@ struct ThreadContent: View {
         .listStyle(.insetGrouped)
     }
 
-    private func answerText(_ row: AnsweredRow) -> String {
-        switch row.choice {
-        case .option(let n): decision.option(n).map { "\($0.emoji) \($0.title)" } ?? "Option \(n)"
-        case .feedback(let text): text
-        }
-    }
+    private func answerText(_ row: AnsweredRow) -> String { decision.choiceText(row.choice) }
 }
 
 struct Bubble: View {
     var text: String
     var mine: Bool
     var caption: String
+    // On a white page (a brief) the agent's bubble needs a grey of its own.
+    var onPlain = false
 
     var body: some View {
         VStack(alignment: mine ? .trailing : .leading, spacing: 4) {
@@ -240,7 +278,7 @@ struct Bubble: View {
                 .font(.body)
                 .padding(.horizontal, 14).padding(.vertical, 9)
                 .foregroundStyle(mine ? Color.white : Color(.label))
-                .background(mine ? Color.accentColor : Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 18))
+                .background(mine ? Color.accentColor : onPlain ? Color(.systemGray6) : Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 18))
             Text(caption).font(.caption).foregroundStyle(Color(.secondaryLabel)).padding(.horizontal, 6)
         }
         .frame(maxWidth: .infinity, alignment: mine ? .trailing : .leading)

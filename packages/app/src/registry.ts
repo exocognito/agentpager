@@ -67,7 +67,12 @@ export class Registry {
       const action = new URL(request.url).pathname.slice(1), data = await body(request);
       if (action === 'create') {
         const p = decode(Create, data);
-        if (this.row(p.pagerId)) throw C.refuse.pagerExists();
+        // The same phone making the same pager again (its reply was lost) gets the pager back; anyone else is refused.
+        const existing = this.row(p.pagerId);
+        if (existing) {
+          if (sameDigest(p.phoneHash, existing.phone_hash) && existing.public_key === p.publicKey && existing.fingerprint === p.fingerprint) return json({ pager: this.pager(existing) });
+          throw C.refuse.pagerExists();
+        }
         this.ctx.storage.sql.exec('INSERT INTO pagers_v2 VALUES (?, ?, ?, ?, 1, ?, ?, NULL, NULL, ?)', p.pagerId, p.fingerprint, p.publicKey, p.phoneHash, p.autoOff, this.offAt(p.autoOff, now), now);
         return json({ pager: this.pager(this.row(p.pagerId)) });
       }

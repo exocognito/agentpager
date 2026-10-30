@@ -23,3 +23,25 @@ nonisolated enum InboxCache {
 
     static func deleteAll() { try? FileManager.default.removeItem(at: url) }
 }
+
+// Answers sent but not yet confirmed by the server, so an app killed mid-send sends them again on its next launch.
+// Each keeps its requestId, so a resend the server already stored is a replay (I5).
+nonisolated enum SendCache {
+    private static var url: URL {
+        let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir.appending(path: "sends.json")
+    }
+
+    static func load() -> [String: PreparedAnswer] {
+        guard let data = try? Data(contentsOf: url) else { return [:] }
+        return (try? JSONDecoder().decode([String: PreparedAnswer].self, from: data)) ?? [:]
+    }
+
+    static func save(_ sends: [String: PreparedAnswer]) {
+        guard let data = try? JSONEncoder().encode(sends) else { return }
+        try? data.write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+    }
+
+    static func deleteAll() { try? FileManager.default.removeItem(at: url) }
+}

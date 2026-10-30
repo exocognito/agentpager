@@ -15,6 +15,9 @@ test('pagers and agents: the phone makes a pager, every connect is a new agent, 
     const made = await f.ok(C.PagerReply, '/api/pagers', create({ number: keys.number, publicKey: keys.publicKey, autoOff: 'never' }));
     assert.deepEqual({ ...made.pager, createdAt: '' }, { pagerId: keys.pagerId, on: true, autoOff: 'never', offAt: null, offSince: null, createdAt: '' });
     await f.refused(409, 'PagerExists', '/api/pagers', create({ number: keys.number, publicKey: keys.publicKey, autoOff: 'never' }, token()));
+    // The same phone making it again, as after a lost reply, gets the same pager back.
+    const again = await f.ok(C.PagerReply, '/api/pagers', create({ number: keys.number, publicKey: keys.publicKey, autoOff: 'never' }));
+    assert.deepEqual(again.pager, made.pager);
     assert.deepEqual((await f.pager(keys.pagerId, phone)).agents, []);
     await f.refused(401, 'Unauthorized', `/api/pagers/${keys.pagerId}`, { phone: token() });
     await f.refused(404, 'UnknownPager', `/api/pagers/${pagerKeys().pagerId}`, { phone });

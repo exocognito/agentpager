@@ -17,7 +17,7 @@ enum ActiveSheet: Identifiable, Hashable {
 
 // An answer the owner pressed Send on. It waits out the Undo window, then is sent with the same requestId
 // on every retry so the server can recognise a replay.
-struct PreparedAnswer: Identifiable, Hashable {
+struct PreparedAnswer: Identifiable, Hashable, Codable {
     var pagerId: String
     var agentId: String
     var decisionId: String
@@ -61,8 +61,12 @@ final class AppModel {
     var path: [Route] = []
     var sheet: ActiveSheet?
     var undo: PreparedAnswer?
-    var inFlight: [String: PreparedAnswer] = [:]
-    var notConfirmed: PreparedAnswer?
+    // Every answer sent and not yet confirmed, by decision. Kept on disk until the server shows it stored.
+    var inFlight: [String: PreparedAnswer] = [:] { didSet { if live { SendCache.save(inFlight) } } }
+    // The ones whose retries all failed, in order, until the owner retries or cancels them.
+    var notConfirmed: [PreparedAnswer] = []
+    // Sends running now, so an answer is never sent twice at once, and the alert waits for the last to finish.
+    private(set) var sendingNow: Set<String> = []
     var drafts: [String: Choice] = [:]
     // The pager the New pager sheet will create: its number shows before Create.
     var draft: LocalPager?
@@ -101,10 +105,11 @@ final class AppModel {
         self.server = Self.configuredServer()
         if live {
             // Here, not in the App's init: its @State model is built before that init's body runs.
-            if ProcessInfo.processInfo.arguments.contains("-resetKeys") { Keychain.deleteAll(); InboxCache.deleteAll() }
+            if ProcessInfo.processInfo.arguments.contains("-resetKeys") { Keychain.deleteAll(); InboxCache.deleteAll(); SendCache.deleteAll() }
             Keychain.deleteRetired()
             pagers = Keychain.all()
             inboxes = InboxCache.load()
+            inFlight = SendCache.load()
         }
     }
 
@@ -156,9 +161,12 @@ final class AppModel {
     func pollLoop() async {
         // Each return to the foreground gives the device token again, in case the server dropped one.
         pushGiven = []
+        await refreshAll()
+        // Answers kept from an earlier launch go again once the server has said which it already stored.
+        resumeSends()
         while !Task.isCancelled {
-            await refreshAll()
             try? await Task.sleep(for: .seconds(Self.pollSeconds))
+            await refreshAll()
         }
     }
 
@@ -202,9 +210,12 @@ final class AppModel {
             if inboxes[p.pagerId] != inbox { inboxes[p.pagerId] = inbox }
             let answered = Set(inbox.agents.flatMap { $0.answered.map(\.decisionId) })
             for (decisionId, a) in inFlight where a.pagerId == p.pagerId && answered.contains(decisionId) { inFlight[decisionId] = nil }
+            notConfirmed.removeAll { $0.pagerId == p.pagerId && answered.contains($0.decisionId) }
             return nil
         case .failure(let error):
-            if case .server(let status, _) = error, status == 404 || status == 401 {
+            // Only the server saying the pager is gone drops it: the keys can't be got back, and a 401 or 404 can
+            // also come from a proxy or a route that moved.
+            if error.tag == "UnknownPager" {
                 drop(p.pagerId)
                 return nil
             }
@@ -216,6 +227,8 @@ final class AppModel {
     func drop(_ pagerId: String) {
         Keychain.delete(pagerId)
         pagers.removeAll { $0.pagerId == pagerId }
+        inFlight = inFlight.filter { $0.value.pagerId != pagerId }
+        notConfirmed.removeAll { $0.pagerId == pagerId }
         let agents = Set(inboxes[pagerId]?.agents.map(\.agent.agentId) ?? [])
         inboxes[pagerId] = nil
         files = files.filter { !agents.contains(String($0.key.split(separator: "/").first ?? "")) }
@@ -290,7 +303,12 @@ final class AppModel {
             path = [.pager(p.pagerId)]
             Task { await givePushToken() }
         } catch {
-            createError = "Can’t reach your AgentPager server at \(server.absoluteString)."
+            // A refusal says why; only a pager the server never answered about is "can't reach".
+            if case .server(let status, let body) = error, status < 500 {
+                createError = body.message ?? "Your AgentPager server refused this pager (\(body.error))."
+            } else {
+                createError = "Can’t reach your AgentPager server at \(server.absoluteString)."
+            }
         }
     }
 
@@ -321,7 +339,7 @@ final class AppModel {
         guard let p = pager(pagerId) else { return }
         if live {
             do throws(APIError) { try await client.delete(p) } catch {
-                guard case .server(404, _) = error else { await refresh(pagerId); return }
+                guard error.tag == "UnknownPager" else { await refresh(pagerId); return }
             }
         }
         path = []
@@ -425,11 +443,12 @@ final class AppModel {
     func commit(_ p: PreparedAnswer) {
         inFlight[p.decisionId] = p
         drafts[p.decisionId] = nil
-        guard live, let pager = pager(p.pagerId) else { return }
+        guard live, let pager = pager(p.pagerId), !sendingNow.contains(p.requestId) else { return }
+        sendingNow.insert(p.requestId)
         let client = self.client
         let background = BackgroundTask.begin("send-answer")
         Task {
-            defer { background.end() }
+            defer { background.end(); sendingNow.remove(p.requestId) }
             for delay in Self.retryDelays {
                 if delay > 0 { try? await Task.sleep(for: .seconds(delay)) }
                 do throws(APIError) {
@@ -446,21 +465,34 @@ final class AppModel {
                     }
                 }
             }
-            notConfirmed = p
+            if !notConfirmed.contains(where: { $0.requestId == p.requestId }) { notConfirmed.append(p) }
         }
     }
 
+    // Answers kept from an earlier launch, or not yet sent from this server: sent again with the same requestId.
+    func resumeSends() {
+        for p in inFlight.values where !notConfirmed.contains(where: { $0.requestId == p.requestId }) { commit(p) }
+    }
+
     func retryNotConfirmed() {
-        guard let p = notConfirmed else { return }
-        notConfirmed = nil
-        commit(p)
+        let all = notConfirmed
+        notConfirmed = []
+        for p in all { commit(p) }
     }
 
     func cancelNotConfirmed() {
-        guard let p = notConfirmed else { return }
-        notConfirmed = nil
-        inFlight[p.decisionId] = nil
-        drafts[p.decisionId] = p.choice
+        for p in notConfirmed {
+            inFlight[p.decisionId] = nil
+            drafts[p.decisionId] = p.choice
+        }
+        notConfirmed = []
+    }
+
+    // "Your answer to “Book the train?” is not confirmed.", naming every answer the alert covers.
+    var notConfirmedText: String {
+        let titles = notConfirmed.map { p in "“" + (inboxes[p.pagerId]?.agents.lazy.flatMap(\.open).first { $0.decisionId == p.decisionId }?.title ?? "a decision") + "”" }
+        let list = titles.count > 1 ? titles.dropLast().joined(separator: ", ") + " and " + (titles.last ?? "") : titles.first ?? ""
+        return titles.count > 1 ? "Your answers to \(list) are not confirmed. Retry sends the same prepared answers." : "Your answer to \(list) is not confirmed. Retry sends the same prepared answer."
     }
 }
 

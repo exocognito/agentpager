@@ -21,6 +21,8 @@ const PagerState = Schema.Struct({ state: Schema.Literal('on', 'off', 'gone'), p
 type PagerState = typeof PagerState.Type;
 // Alerts are never delivered later than this.
 const ALERT_EXPIRY_MS = 24 * 3_600_000;
+// A warning that couldn't be sent (the Registry unreachable) is tried again this much later.
+const WARN_RETRY_MS = 60_000;
 
 // A card an agent sends as the retired emoji kind, told apart before the schema refuses it, so its reason says what to do.
 const emojiCard = (value: unknown) => typeof value === 'object' && value !== null && 'card' in value && typeof value.card === 'object' && value.card !== null && 'type' in value.card && value.card.type === 'generic';
@@ -61,18 +63,24 @@ export class Agent {
     this.schema();
   }
 
-  // The one alarm serves both clocks: the next answer due a warning, else housekeeping.
-  private afterwards = async () => {
+  // The one alarm serves both clocks: the next answer due a warning (not before notBefore), else housekeeping.
+  private afterwards = async (notBefore = 0) => {
     const m = this.meta();
     if (!m) { await this.ctx.storage.deleteAlarm(); return; }
     const due = this.ctx.storage.sql.exec<{ due: number | null }>('SELECT min(due) AS due FROM pickups').toArray()[0]?.due ?? null;
-    const next = Math.min(Date.parse(m.lastActivityAt) + clocks.idleMs, due ?? Infinity);
+    const next = Math.min(Date.parse(m.lastActivityAt) + clocks.idleMs, due === null ? Infinity : Math.max(due, notBefore));
     if (await this.ctx.storage.getAlarm() !== next) await this.ctx.storage.setAlarm(next);
   };
   // Housekeeping: an agent idle for clocks.idleMs is forgotten, and its pager stops listing it.
   async alarm() {
     const m = this.meta();
-    if (m && Date.now() < Date.parse(m.lastActivityAt) + clocks.idleMs) { await this.warn(m); await this.afterwards(); return; }
+    if (m && Date.now() < Date.parse(m.lastActivityAt) + clocks.idleMs) {
+      // Housekeeping stays armed whatever happens to a warning; one that fails stays queued for a later try.
+      let retry = 0;
+      try { await this.warn(m); } catch (error) { console.error('Agent warning failed', error instanceof Error ? error.message : 'unknown'); retry = Date.now() + WARN_RETRY_MS; }
+      await this.afterwards(retry);
+      return;
+    }
     if (m) {
       try { await registry(this.env, '/forget', { pagerId: m.pagerId, agentId: m.agentId }); }
       catch { /* The pager lists it until it is deleted; reading it then answers UnknownAgent, which the phone skips. */ }
@@ -82,21 +90,22 @@ export class Agent {
 
   // An answer no agent has collected clocks.pickupMs after Send: the owner hears once, by an alert while the pager is on
   // and on the decision row, that AgentPager can't reach the agent. Each answer is queued for this when it is stored,
-  // so answers from before the warning existed never get one. An error leaves the queue for the alarm's retry.
+  // so answers from before the warning existed never get one. An unreachable Registry leaves the queue as it was.
   private async warn(m: Meta) {
-    const ids = this.ctx.storage.sql.exec<{ decision_id: string }>('SELECT decision_id FROM pickups WHERE due <= ?', Date.now()).toArray().map(r => r.decision_id);
-    if (!ids.length) return;
+    const due = () => this.ctx.storage.sql.exec<{ decision_id: string }>('SELECT decision_id FROM pickups WHERE due <= ?', Date.now()).toArray().map(r => r.decision_id);
+    if (!due().length) return;
     let s: PagerState;
     try { s = await this.pagerState(m); } catch (error) { if (error instanceof C.Refusal) return; throw error; }
-    const due = this.tx(() => {
-      const at = iso();
+    // Read again: an agent may have collected one while the pager's state was asked, and collecting dequeues it.
+    const warned = this.tx(() => {
+      const ids = due(), at = iso();
       for (const id of ids) {
         this.ctx.storage.sql.exec('DELETE FROM pickups WHERE decision_id=?', id);
         this.ctx.storage.sql.exec('INSERT OR IGNORE INTO warnings VALUES (?, ?)', id, at);
       }
-      return ids.map(id => this.decision(id));
+      return ids;
     });
-    for (const d of due) await this.alertPhone(m, s.state === 'on' ? s.push ?? null : null, d.decisionId, 'warning', pickupBody(m, d.title));
+    for (const id of warned) await this.alertPhone(m, s.state === 'on' ? s.push ?? null : null, id, 'warning', pickupBody(m, this.decision(id).title));
   }
 
   private openCount() { return this.ctx.storage.sql.exec<{ n: number }>('SELECT count(*) AS n FROM proposals WHERE id NOT IN (SELECT decision_id FROM answers)').toArray()[0].n; }

@@ -13,7 +13,7 @@ export type Decision = { decisionId: string; title: string; detail?: string; rec
 export type Choice = { kind: "option"; number: number } | { kind: "feedback"; text: string };
 // From Send: Undo is open, then the answer is sending, then it waits for the agent, then the agent confirms. Waiting
 // turns to notPickedUp when the service warns that no agent has read the answer in time (I6); `who` names the agent
-// and its computer, "Claude Code on air".
+// and its computer and project, "Claude Code on air (blueprint)".
 export type SendState = { kind: "undo"; seconds: number } | { kind: "sending" } | { kind: "waiting" } | { kind: "notPickedUp"; who: string } | { kind: "confirmed"; nextSteps: string; at: Date };
 export type Answered = { decision: Decision; choice: Choice; sentAt: Date; state: SendState };
 

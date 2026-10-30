@@ -86,7 +86,7 @@ final class FlowTests: XCTestCase {
         app.buttons["send-option"].tap()
         wait(app.buttons["undo-button"], 3)
         let row = answeredRow("wake-lab", "Ship the fix tonight?")
-        waitUntil(5 + pickup + 15, "the warning") { row.label.contains("Claude Desktop on air hasn’t picked up your answer") }
+        waitUntil(5 + pickup + 15, "the warning") { row.label.contains("Claude Desktop on air (wake-lab) hasn’t picked up your answer") }
         shot("30-not-picked-up")
         row.tap()
         let bar = app.descendants(matching: .any)["agent-confirmation"]

@@ -6,7 +6,7 @@ import { WORDS, notPickedUp, sendingIn } from "./words.ts";
 
 // Send closes the decision sheet. Its row moves to Answered and shows where the answer is: Undo for 5 seconds,
 // then sending, then waiting for the agent, then a green tick beside the answer once the agent confirms. If no agent has
-// read the answer 3 minutes after Send, the wait turns to a warning naming the agent and its computer (I6).
+// read the answer 3 minutes after Send, the wait turns to a warning naming the agent, its computer and project (I6).
 const meta = {
   title: "iPhone/After you answer",
   component: AgentScreen,
@@ -49,9 +49,9 @@ export const Waiting: Story = {
 };
 export const NotPickedUp: Story = {
   name: "Not picked up",
-  args: { answered: [answeredUpdate({ kind: "notPickedUp", who: "Claude Code on air" }), confirmedFirst] },
+  args: { answered: [answeredUpdate({ kind: "notPickedUp", who: "Claude Code on air (blueprint)" }), confirmedFirst] },
   play: async ({ canvas }) => {
-    await expect(row(canvas)).toHaveTextContent(notPickedUp("Claude Code on air"));
+    await expect(row(canvas)).toHaveTextContent(notPickedUp("Claude Code on air (blueprint)"));
     await expect(row(canvas)).not.toHaveTextContent(WORDS.agentConfirmed);
   },
 };

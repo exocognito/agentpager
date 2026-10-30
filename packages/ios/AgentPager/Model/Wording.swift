@@ -41,9 +41,9 @@ enum Wording {
         return date.formatted(.dateTime.month(.abbreviated).day()) + ", " + time(date)
     }
 
-    // An answer no agent has read in time: who and where, so the owner knows which agent to go to.
+    // An answer no agent has read in time: who, where and on what, so the owner knows which agent to go to.
     static func notPickedUp(_ agent: AgentInfo) -> String {
-        "\(agent.app)\(agent.machine.map { " on " + $0 } ?? "") hasn’t picked up your answer. It may be asleep, closed or disconnected: check in with it directly."
+        "\(agent.app)\(agent.machine.map { " on " + $0 } ?? "") (\(agent.project)) hasn’t picked up your answer. It may be asleep, closed or disconnected: check in with it directly."
     }
 
     static func capitalized(_ text: String) -> String { text.prefix(1).uppercased() + text.dropFirst() }

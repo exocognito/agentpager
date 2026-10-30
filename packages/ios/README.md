@@ -34,7 +34,8 @@ decisions stay readable, and an open one shows "[name] pager is off · Turn on" 
 A **decision** is pushed full screen. Options, background pages and Ask for changes open as bottom sheets with a grab
 handle; images open full screen. Once answered, the bar is the closed record: the choice, then the agent's
 confirmation and next steps. Until it confirms, the bar says the phone is waiting for the agent; if no agent has
-read the answer 3 minutes after Send, it says so instead, naming the agent and its computer, until one does (I6).
+read the answer 3 minutes after Send, it says so instead, naming the agent, its computer and its project, until one
+does (I6).
 
 ## Alerts
 

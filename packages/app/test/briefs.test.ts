@@ -2,8 +2,6 @@ import { test } from 'node:test';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import path from 'node:path';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { fixture, assert, token, C, emojiCard } from './support.ts';
 import { briefNames, briefsDir, loadBrief } from '../fixtures/briefs/load.ts';
 
@@ -115,22 +113,6 @@ test('briefs: refused whole, with a reason that says what to fix', { timeout: 12
     await f.refused(401, 'Unauthorized', cards, { agent: token(), data: emojiCard });
     const inbox = (await f.pager(p.pagerId, p.phone)).agents[0];
     assert.equal(inbox.open.length, 0, 'nothing refused was stored');
-
-    // The same brief over MCP, as an agent's tool call.
-    const client = new Client({ name: 'AgentPager briefs', version: '1' });
-    await client.connect(new StreamableHTTPClientTransport(new URL(f.origin + '/mcp')));
-    const reply = await client.callTool({ name: 'ask', arguments: { agentId: s.agent.agentId, agentKey: s.agentKey, question: loadBrief('D1-pricing') } });
-    assert.notEqual(reply.isError, true, JSON.stringify(reply));
-    const tools = await client.listTools();
-    assert.match(tools.tools.find(t => t.name === 'ask')?.description ?? '', /brief/);
-    await client.close();
-    assert.equal((await f.pager(p.pagerId, p.phone)).agents[0].open[0].attachments?.length, 5);
-
-    // /start's own example, a brief's short form, asks as written.
-    const doc = await (await fetch(f.origin + '/start')).text();
-    const example = doc.match(/^A question: `(.*)`$/m)?.[1];
-    assert.ok(example, '/start has its example question');
-    await f.ok(C.Asked, cards, { agent: s.agentKey, data: JSON.parse(example) });
 
   } finally { await f.stop(); }
 });

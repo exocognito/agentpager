@@ -1,7 +1,4 @@
-import { JSONSchema, Schema } from 'effect';
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
-import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import { Schema } from 'effect';
 import * as C from './contract.ts';
 import { BUILD, forward, type Env } from './env.ts';
 import { body, decode, emptyBody, json, read, refusal, sha256, token } from './shared.ts';
@@ -106,68 +103,15 @@ async function api(request: Request, env: Env): Promise<Response> {
   throw C.refuse.notFound();
 }
 
-// Tool replies are the same JSON as the HTTP API's. Each description names this server, so an agent can tell
-// tools for another AgentPager server apart.
-const descriptions = (origin: string): Record<keyof typeof C.MCP_TOOLS, string> => ({
-  connect: `Connect to your owner's pager with the pager number they gave you (usually in AGENTS.md; it starts ap1_), on the AgentPager server ${origin}. You become a new agent on their phone: keep agentId and agentKey for every later call in this piece of work, and never show agentKey or the number. Connecting again adds another agent. app is who you are (Codex, Claude Code…); project is what you are working on, usually the repository's name: your owner's phone groups decisions by it. Then call ask. Full guide: ${origin}/start`,
-  ask: `Ask your owner one decision as a "brief" card: a Markdown decision brief with 2 to 4 lettered options (number 1 is A) and optional attachments. Read "Decision briefs" in ${origin}/start before your first one. At most 10 unanswered decisions per agent. When your owner has turned the pager off, it is refused with PagerOff and nothing is queued. Replies {decisionId}.`,
-  wait: 'Hold a read for up to 50 seconds. Replies {status:"pending"} (read again) or {status:"answered", answer:{answerId, choice, ...}}. A choice of kind "feedback" is your owner\'s note instead of an option: follow it, and ask a new card only if you still need a decision. On InternalError, read again after a few seconds; if it keeps failing for several minutes, stop and tell your owner. Keep reading while you have nothing better to do; if your turn ends, the answer waits for your next turn.',
-  ack: 'Acknowledge the exact answerId with your next steps; your owner sees them with a green tick. Only the first acknowledgement counts.',
-  status: "This agent's state, and whether its pager is on.",
-  finish: 'Tell your owner you are done with this piece of work. Your decisions stay on their phone; this agent asks nothing more.',
-});
-// A keyed tool call is decoded only as far as routing needs: the agent's and the decision's ids. The key goes on only
-// when well formed (a malformed key is no key, as over HTTP), and the question, acknowledgement and wait go on as
-// sent, so the agent checks the key before any of them (I4). tools/list still lists the full schemas.
-const Keyed = { agentId: C.Token, agentKey: Schema.optional(Schema.Unknown) };
-const AskCall = Schema.Struct({ ...Keyed, question: Schema.optional(Schema.Unknown) });
-// The decision id goes on as sent too, so a malformed one is refused only to the agent's own key.
-const WaitCall = Schema.Struct({ ...Keyed, decisionId: Schema.String, waitSeconds: Schema.optional(Schema.Unknown) });
-const AckCall = Schema.Struct({ ...Keyed, decisionId: Schema.String, acknowledgement: Schema.optional(Schema.Unknown) });
-const AgentCall = Schema.Struct(Keyed);
-const keyOf = (value: unknown) => Schema.is(C.Token)(value) ? value : undefined;
-async function mcp(request: Request, env: Env, origin: string) {
-  // Stateless JSON replies only: never let the SDK open a GET event stream.
-  if (request.method !== 'POST') {
-    return new Response(JSON.stringify({ jsonrpc: '2.0', id: null, error: { code: -32000, message: 'Method not allowed. Use POST.' } }), { status: 405, headers: { 'content-type': 'application/json', allow: 'POST' } });
-  }
-  const server = new Server({ name: 'AgentPager', version: BUILD }, { capabilities: { tools: {} } });
-  server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: Object.entries(C.MCP_TOOLS).map(([name, tool]) => ({ name, description: Object.entries(descriptions(origin)).find(([key]) => key === name)?.[1], inputSchema: { ...JSONSchema.fromAST(tool.input.ast, { definitions: {} }), type: 'object' } })) }));
-  server.setRequestHandler(CallToolRequestSchema, async (call) => {
-    const raw = call.params.arguments;
-    try {
-      let path: string, method = 'POST', data: unknown, agentKey: string | undefined, missing: string | undefined;
-      switch (call.params.name) {
-        case 'connect': { data = decode(C.MCP_TOOLS.connect.input, raw); path = '/api/agents'; break; }
-        case 'ask': { const p = decode(AskCall, raw); path = `/api/agents/${p.agentId}/cards`; data = p.question; agentKey = keyOf(p.agentKey); if (p.question === undefined) [missing, path, method] = ['question', `/api/agents/${p.agentId}`, 'GET']; break; }
-        // waitSeconds goes on as JSON, so the agent refuses a string or a fraction just as the schema would.
-        case 'wait': { const p = decode(WaitCall, raw); path = `/api/agents/${p.agentId}/cards/${encodeURIComponent(p.decisionId)}/answer?wait=${p.waitSeconds === undefined ? C.ANSWER_WAIT_MAX_SECONDS : encodeURIComponent(JSON.stringify(p.waitSeconds))}`; method = 'GET'; agentKey = keyOf(p.agentKey); break; }
-        case 'ack': { const p = decode(AckCall, raw); path = `/api/agents/${p.agentId}/cards/${encodeURIComponent(p.decisionId)}/acknowledge`; data = p.acknowledgement; agentKey = keyOf(p.agentKey); if (p.acknowledgement === undefined) [missing, path, method] = ['acknowledgement', `/api/agents/${p.agentId}`, 'GET']; break; }
-        case 'status': { const p = decode(AgentCall, raw); path = `/api/agents/${p.agentId}`; method = 'GET'; agentKey = keyOf(p.agentKey); break; }
-        case 'finish': { const p = decode(AgentCall, raw); path = `/api/agents/${p.agentId}/finish`; agentKey = keyOf(p.agentKey); break; }
-        default: throw C.refuse.invalid('Unknown tool. Read /start.');
-      }
-      let response: Response;
-      try { response = await api(new Request(origin + path, { method, headers: { ...(agentKey ? { authorization: `Bearer ${agentKey}` } : {}), 'content-type': 'application/json' }, body: data === undefined ? undefined : JSON.stringify(data) }), env); }
-      catch (error) { response = await failure(error); }
-      // A missing question or acknowledgement is named only once the agent has taken the key, by reading its status.
-      if (missing && response.ok) response = refusal(C.refuse.invalid(`${missing}: is missing`));
-      const result: unknown = await response.json();
-      return { ...(response.ok ? {} : { isError: true }), content: [{ type: 'text', text: JSON.stringify(result) }] };
-    } catch (error) { return { isError: true, content: [{ type: 'text', text: await refusal(error).text() }] }; }
-  });
-  const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
-  await server.connect(transport);
-  return transport.handleRequest(request);
-}
-
 const isBrowser = (request: Request) => request.headers.get('sec-fetch-dest') === 'document' ||
   ((request.headers.get('accept') ?? '').includes('text/html') && (request.headers.get('user-agent') ?? '').includes('Mozilla'));
 const text = (value: string, type: string, status = 200) => new Response(value, { status, headers: { 'content-type': `${type}; charset=utf-8` } });
 
 async function serve(request: Request, env: Env) {
   const u = new URL(request.url), origin = u.origin;
-  if (u.pathname === '/mcp') return mcp(request, env, origin);
+  // The hosted MCP server is retired (docs/v2/01-decisions.md): an agent that arrives there, or at /start, is told to
+  // install the agentpager command. The HTTP API stays as that command's transport.
+  if (u.pathname === '/mcp') return text(startDocument(origin), 'text/markdown', 410);
   if (u.pathname.startsWith('/api/')) return api(request, env);
   if (request.method !== 'GET' && request.method !== 'HEAD') return json({ error: 'MethodNotAllowed', message: 'Use GET.' }, 405);
   if (u.pathname === '/start') return text(startDocument(origin), 'text/markdown');

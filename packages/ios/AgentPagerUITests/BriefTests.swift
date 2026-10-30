@@ -35,7 +35,7 @@ final class BriefTests: XCTestCase {
         app.buttons["pager-settings"].tap()
         let line = app.staticTexts["connect-line"]
         wait(line, 30)
-        print("AGENTPAGER_NUMBER=\(line.label.split(separator: " ").last ?? "")")
+        print("AGENTPAGER_NUMBER=\(line.label.split(separator: " ").first { $0.hasPrefix("ap1_") } ?? "")")
     }
 
     func testBriefs() {

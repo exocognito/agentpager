@@ -41,7 +41,7 @@ const card = {
 const schema = (properties: object, required: string[]) => ({ type: 'object', additionalProperties: false, properties, required });
 
 export const TOOLS = [
-  { name: 'connect', description: 'Connect to your owner\'s pager with the number they gave you (usually in AGENTS.md). You become a new agent on their phone; keep its id for every later call in this piece of work. Connecting again adds another agent.', inputSchema: schema({ number: text('Your owner\'s pager number, starting ap1_.'), app: text('Who you are, such as Codex; detected when left out.'), project: text('What you are working on; the repository\'s name when left out.') }, ['number']) },
+  { name: 'connect', description: 'Connect to your owner\'s pager with the number they gave you (usually in AGENTS.md). You become a new agent on their phone; keep its id for every later call in this piece of work. Connecting again adds another agent.', inputSchema: schema({ number: text('Your owner\'s pager number, starting ap1_.'), app: text('Who you are, such as Codex; detected when left out.'), project: text('What you are working on; the repository\'s name when left out.'), server: text('Your owner\'s AgentPager server, when it is not https://agentpager.me (their instructions say so).') }, ['number']) },
   { name: 'rules', description: 'The card contract: how to write a decision your owner can answer on a phone. Read it before your first `ask`.', inputSchema: schema({ agent }, []) },
   { name: 'review', description: 'Returns your card with what a good card looks like. Give the result to a subagent to grade each point ok, good to fix or must fix; fix the must-fixes, use your judgement on the rest, then `ask`. One round.', inputSchema: schema({ card }, ['card']) },
   { name: 'ask', description: `Ask your owner one decision. Review it once first (see \`review\`). Only broken cards are refused here, with one line per problem. Then:\n\n${CONTRACT}`, inputSchema: schema({ agent, card }, ['agent', 'card']) },
@@ -57,7 +57,7 @@ const num = (v: unknown) => typeof v === 'number' ? v : undefined;
 export async function runTool(name: string, args: { [key: string]: unknown }, client?: string): Promise<op.Result> {
   const a = str(args.agent) ?? '', d = str(args.decision) ?? '';
   switch (name) {
-    case 'connect': return op.connect({ number: str(args.number), app: str(args.app), project: str(args.project), mcpClient: client });
+    case 'connect': return op.connect({ number: str(args.number), app: str(args.app), project: str(args.project), server: str(args.server), mcpClient: client });
     case 'rules': return op.rules(str(args.agent));
     case 'review': return op.review({ object: args.card });
     case 'ask': return op.ask(a, { object: args.card });

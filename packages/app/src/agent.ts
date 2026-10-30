@@ -156,7 +156,7 @@ export class Agent {
       const m = this.tx(() => { const m = this.agent(digest); if (m.finishedAt) throw C.refuse.finished(); return m; });
       const raw = await body(request);
       // Every new card is a brief (QuestionInput takes no other).
-      if (emojiCard(raw)) throw C.refuse.invalid('Emoji cards are retired. Send a brief (card.type "brief"); read "Decision briefs" in /start.');
+      if (emojiCard(raw)) throw C.refuse.invalid('Emoji cards are retired. Send a brief (card.type "brief"); with the agentpager command, agentpager rules prints the card format.');
       const question = decode(C.QuestionInput, raw);
       // Checked last before the write, so the switch is read as late as it can be.
       const push = await this.on(m);

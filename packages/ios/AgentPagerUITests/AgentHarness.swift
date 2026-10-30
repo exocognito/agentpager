@@ -1,7 +1,7 @@
 import XCTest
 
-// Plays the coding agent against the real local server: MCP tools over JSON-RPC at /mcp (stateless streamable
-// HTTP), plus the agent's HTTPS status route. Nothing is mocked.
+// Plays the coding agent against the real local server over its HTTP API, as the agentpager command does (the
+// hosted MCP server is retired). Nothing is mocked.
 struct ToolError: Error, CustomStringConvertible {
     var body: [String: Any]
     var tag: String { body["error"] as? String ?? "?" }
@@ -10,7 +10,6 @@ struct ToolError: Error, CustomStringConvertible {
 
 final class AgentHarness {
     let base: URL
-    private var nextId = 1
     var agentId = ""
     var agentKey = ""
 
@@ -22,7 +21,7 @@ final class AgentHarness {
     }
 
     private func http(_ method: String, _ path: String, headers: [String: String] = [:], body: Data? = nil, timeout: TimeInterval = 70) throws -> (Int, Data) {
-        var r = URLRequest(url: base.appendingPathComponent(path))
+        var r = URLRequest(url: URL(string: path, relativeTo: base)!.absoluteURL)
         r.httpMethod = method
         r.timeoutInterval = timeout
         for (k, v) in headers { r.setValue(v, forHTTPHeaderField: k) }
@@ -39,29 +38,24 @@ final class AgentHarness {
         return result!
     }
 
+    // One API call; a refusal throws its {error, message, ...} body.
     @discardableResult
-    func tool(_ name: String, _ arguments: [String: Any]) throws -> [String: Any] {
-        nextId += 1
-        let payload: [String: Any] = ["jsonrpc": "2.0", "id": nextId, "method": "tools/call", "params": ["name": name, "arguments": arguments]]
-        let (status, data) = try http("POST", "mcp", headers: ["content-type": "application/json", "accept": "application/json, text/event-stream"], body: try JSONSerialization.data(withJSONObject: payload))
-        guard status == 200, let envelope = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let result = envelope["result"] as? [String: Any],
-              let content = result["content"] as? [[String: Any]], let text = content.first?["text"] as? String else {
-            throw ToolError(body: ["error": "BadMCPReply", "status": status, "raw": String(decoding: data, as: UTF8.self)])
-        }
-        let value = (try? JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any]) ?? ["text": text]
-        if result["isError"] as? Bool == true { throw ToolError(body: value) }
+    func call(_ method: String, _ path: String, _ body: [String: Any]? = nil, timeout: TimeInterval = 70) throws -> [String: Any] {
+        var headers = ["content-type": "application/json"]
+        if !agentKey.isEmpty { headers["authorization"] = "Bearer \(agentKey)" }
+        let (status, data) = try http(method, path, headers: headers, body: try body.map { try JSONSerialization.data(withJSONObject: $0) }, timeout: timeout)
+        let value = (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? ["error": "BadReply", "raw": String(decoding: data, as: UTF8.self)]
+        if !(200..<300).contains(status) { throw ToolError(body: value) }
         return value
     }
 
     // Connects with the owner's pager number: a new agent on that pager.
     func connect(number: String, app: String = "Codex", project: String = "flow") throws {
-        let r = try tool("connect", ["number": number, "app": app, "project": project])
+        agentKey = ""
+        let r = try call("POST", "api/agents", ["number": number, "app": app, "project": project])
         agentId = (r["agent"] as! [String: Any])["agentId"] as! String
         agentKey = r["agentKey"] as! String
     }
-
-    var creds: [String: Any] { ["agentId": agentId, "agentKey": agentKey] }
 
     // Every card is a brief: here its short form, each option's title on its answer button.
     func ask(_ title: String, detail: String? = nil, options: [String], recommended: Int? = nil) throws -> String {
@@ -73,31 +67,23 @@ final class AgentHarness {
         if let recommended { card["recommended"] = recommended }
         var question: [String: Any] = ["title": title, "card": card]
         if let detail { question["detail"] = detail }
-        var args = creds
-        args["question"] = question
-        return try tool("ask", args)["decisionId"] as! String
+        return try call("POST", "api/agents/\(agentId)/cards", question)["decisionId"] as! String
     }
 
     // Returns the answer object, or nil while pending.
     func waitForAnswer(_ decisionId: String, seconds: Int = 20) throws -> [String: Any]? {
-        var args = creds
-        args["decisionId"] = decisionId
-        args["waitSeconds"] = seconds
-        let r = try tool("wait", args)
+        let r = try call("GET", "api/agents/\(agentId)/cards/\(decisionId)/answer?wait=\(seconds)")
         return r["status"] as? String == "answered" ? r["answer"] as? [String: Any] : nil
     }
 
     func acknowledge(_ decisionId: String, answerId: String, nextSteps: String) throws {
-        var args = creds
-        args["decisionId"] = decisionId
-        args["acknowledgement"] = ["answerId": answerId, "nextSteps": nextSteps]
-        try tool("ack", args)
+        try call("POST", "api/agents/\(agentId)/cards/\(decisionId)/acknowledge", ["answerId": answerId, "nextSteps": nextSteps])
     }
 
-    func finish() throws { try tool("finish", creds) }
+    func finish() throws { try call("POST", "api/agents/\(agentId)/finish") }
 
-    // Whether the agent's pager is on, from the status tool.
-    func pagerOn() throws -> Bool { ((try tool("status", creds))["pager"] as! [String: Any])["on"] as! Bool }
+    // Whether the agent's pager is on, from the status route.
+    func pagerOn() throws -> Bool { ((try call("GET", "api/agents/\(agentId)"))["pager"] as! [String: Any])["on"] as! Bool }
 
     static func date(_ text: String) -> Date {
         let f = ISO8601DateFormatter()

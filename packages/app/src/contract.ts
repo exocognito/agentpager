@@ -59,17 +59,6 @@ export const Finished = Schema.Struct({ finishedAt: Timestamp });
 export const Asked = Schema.Struct({ decisionId: Token });
 export const AnswerStatus = Schema.Union(Schema.Struct({ status: Schema.Literal('pending') }), Schema.Struct({ status: Schema.Literal('answered'), answer: Answer }));
 
-// MCP: the same operations as the agentpager binary's (docs/v2/03-binary-surface.md §3).
-const AgentCall = { agentId: Token, agentKey: Token };
-export const MCP_TOOLS = {
-  connect: { input: ConnectInput, result: Connected },
-  ask: { input: Schema.Struct({ ...AgentCall, question: QuestionInput }).annotations(strict), result: Asked },
-  wait: { input: Schema.Struct({ ...AgentCall, decisionId: Token, waitSeconds: Schema.optional(Schema.Number.pipe(Schema.int(), Schema.between(1, ANSWER_WAIT_MAX_SECONDS))) }).annotations(strict), result: AnswerStatus },
-  ack: { input: Schema.Struct({ ...AgentCall, decisionId: Token, acknowledgement: AcknowledgementInput }).annotations(strict), result: Acknowledgement },
-  status: { input: Schema.Struct(AgentCall).annotations(strict), result: AgentStatus },
-  finish: { input: Schema.Struct(AgentCall).annotations(strict), result: Finished },
-} as const;
-
 export const AGENT_AUTH_HEADER = 'authorization';
 export const PHONE_AUTH_HEADER = 'x-phone-key';
 

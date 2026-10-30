@@ -9,7 +9,7 @@ pnpm start:app
 # http://localhost:8787
 ```
 
-The front page runs the Blueprint's imported React marketing screen; the owner's side of the product is the iPhone app in `../ios`, and the old web app address `/app` redirects to the front page. `/start` tells agents how to connect, ask, wait and acknowledge. The HTTPS API and the stateless MCP server share one SQLite-backed Durable Object per agent (`Agent`) and one `Registry` for pagers. No accounts, and no action execution.
+The front page runs the Blueprint's imported React marketing screen; the owner's side of the product is the iPhone app in `../ios`, and the old web app address `/app` redirects to the front page. `/start` and the retired `/mcp` tell an arriving agent to install the `agentpager` command (`../cli`), whose transport is the HTTPS API. The API uses one SQLite-backed Durable Object per agent (`Agent`) and one `Registry` for pagers. No accounts, and no action execution.
 
 ## Pagers and agents (v2, `docs/v2/`)
 
@@ -20,7 +20,7 @@ on or off (`POST /api/pagers/<id>/settings {on?, autoOff?}`); auto-off (`never`,
 off state. `GET /api/pagers/<id>` returns the pager and every agent on it with its open and answered decisions.
 `POST /api/pagers/<id>/delete` deletes it and its agents.
 
-An **agent** is whatever connected with the number: `POST /api/agents {number, app, project}` (MCP `connect`) makes a
+An **agent** is whatever connected with the number: `POST /api/agents {number, app, project}` (`agentpager connect`) makes a
 new one every time, with its own key. It has no lifetime; housekeeping forgets it 30 days after its last activity.
 While its pager is off, every call but status is refused `PagerOff` and nothing is queued; the phone's answers too.
 
@@ -36,7 +36,7 @@ with `GET /api/agents/<id>/cards/<decisionId>/files/<name>` and its phone key.
 A brief's options also get their number's keycap as `emoji`.
 
 `fixtures/briefs/` holds the canvas's four examples (D1–D4) word for word. `scripts/briefs.ts <server> <pager number>`
-plays the agent over MCP: it connects with the number, asks all four, then acknowledges each answer.
+plays the agent over the HTTP API: it connects with the number, asks all four, then acknowledges each answer.
 
 ## Local configuration
 
@@ -49,7 +49,7 @@ BLUEPRINT_EVIDENCE_DIR=/tmp/agentpager-proof \
   node --test --experimental-strip-types --test-concurrency=4 packages/app/test/**/*.test.ts
 ```
 
-Every test file starts isolated workerd instances with its own ports and persistence. Their local clocks are declared in `fixture(...)` calls. Browser tests use real Chromium (390 and 1280 px); HTTPS and official MCP SDK callers use real endpoints. Transport-loss tests let the request reach the real service, then discard its reply. Nothing replaces the service or its storage.
+Every test file starts isolated workerd instances with its own ports and persistence. Their local clocks are declared in `fixture(...)` calls. Browser tests use real Chromium (390 and 1280 px); HTTPS callers use real endpoints (the MCP server's tests are the binary's, in `../cli`). Transport-loss tests let the request reach the real service, then discard its reply. Nothing replaces the service or its storage.
 
 The proof writes screenshots, browser traces, JSON exchanges, latency samples, storage counts, Worker logs and process-group exit records to `BLUEPRINT_EVIDENCE_DIR`. Node's TAP/summary reports every test. 
 
@@ -70,7 +70,7 @@ Alerts go through Apple's push service with the owner's APNs key (D7). Deploymen
 
 ## Enforcement
 
-- Strict imported schemas decode UTF-8 requests before writes. The MCP byte gate refuses invalid UTF-8 before the SDK can normalize it; a refusal-only credential check preserves authorization precedence (I4): a wrong key wins over invalid input. Inputs are not trimmed or truncated.
+- Strict imported schemas decode UTF-8 requests before writes; a wrong key wins over invalid input (I4). Inputs are not trimmed or truncated.
 - Agent and phone keys are stored only as SHA-256 digests and compared in constant time. SQL keys and update-denying triggers keep proposals, answers, acknowledgements and attachments immutable.
 - Every agent call that sends something asks the Registry for its pager's state first; a deleted pager's agent forgets itself on its next call.
 - The app lint disallows `any`, type assertions and suppressions in derived TypeScript; the entire pinned design remains under the existing strict typecheck.

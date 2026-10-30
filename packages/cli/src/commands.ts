@@ -43,10 +43,12 @@ function decisionOf(a: AgentFile, ref: string) {
   return /^[A-Za-z0-9_-]{32}$/.test(ref) ? { short: ref, id: ref, title: 'this decision', options: [] } : null;
 }
 
-export async function connect(input: { number?: string; app?: string; project?: string; mcpClient?: string }): Promise<Result> {
+// --server names a server other than agentpager.me; the agent file keeps it for every later call, CLI or MCP.
+export async function connect(input: { number?: string; app?: string; project?: string; server?: string; mcpClient?: string }): Promise<Result> {
   const number = input.number || process.env.AGENTPAGER_PAGER;
   if (!number) return refused('No pager number. Pass the one your owner gave you, or set AGENTPAGER_PAGER.');
-  const pager = pagerOf(number), base = server();
+  if (input.server !== undefined && !/^https?:\/\/[^\s/]+/.test(input.server)) return refused('--server takes the server\'s address, such as https://agentpager.me.');
+  const pager = pagerOf(number), base = input.server ? input.server.replace(/\/+$/, '') : server();
   const app = input.app || detectApp(input.mcpClient), project = input.project || detectProject();
   if (!pager) return refused('Not connected. This pager number is not in use. Ask your owner for their current one.');
   const cannot = writable();

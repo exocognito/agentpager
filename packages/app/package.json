@@ -10,7 +10,6 @@
     "dogfood": "node scripts/dogfood.mjs"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "1.26.0",
     "@xstate/react": "6.1.0",
     "effect": "3.22.1",
     "react": "19.2.8",

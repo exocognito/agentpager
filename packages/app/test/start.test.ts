@@ -4,27 +4,28 @@ import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fixture, assert, token, sha, pause } from './support.ts';
 
-test('/start documents connect, ask, wait, acknowledge and off; numbers only', { timeout: 180_000 }, async () => {
+test('/start and /mcp tell an arriving agent to install the agentpager command; numbers only', { timeout: 180_000 }, async () => {
   const f = await fixture('start-pages');
   try {
     const general = await fetch(f.origin + '/start');
     assert.equal(general.status, 200); assert.match(general.headers.get('content-type') ?? '', /text\/markdown/);
     const doc = await general.text();
-    for (const needle of ['connect {number, app, project}', 'ask {agentId, agentKey, question}', 'wait {agentId', 'ack {agentId', '`status`', '`finish`', 'ap1_', 'Decision briefs', '"type":"brief"', ':::option A', `${f.origin}/mcp`, `${f.origin}/api/agents`, 'PagerOff', 'PagerDeleted', 'InternalError', 'Ask for changes']) assert.ok(doc.includes(needle), needle);
-    for (const gone of ['start_session', 'join_session', 'page_owner', 'pairingCode', 'link.qrText', 'session', 'lifetime']) assert.equal(doc.includes(gone), false, gone);
-    // v1 links and numbers are gone.
-    for (const old of [`/start/${token()}`, '/start?connect=x', `/api/start/${token()}`, `/api/numbers/${token()}/pagers`, '/api/sessions']) {
-      const r = await fetch(f.origin + old, old.startsWith('/api/') ? { method: 'POST', body: '{}' } : {});
-      assert.ok(r.status === 404 || old === '/start?connect=x', `${old}: ${r.status}`); await r.arrayBuffer();
+    for (const needle of ['agentpager connect <number>', 'agentpager setup', 'retired']) assert.ok(doc.includes(needle), needle);
+    for (const gone of ['curl', '/api/', 'agentKey', 'session', 'pairing']) assert.equal(doc.includes(gone), false, gone);
+    // The hosted MCP server is retired: any request there gets the same page, as 410.
+    for (const init of [{ method: 'GET' }, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} }) }]) {
+      const mcp = await fetch(f.origin + '/mcp', init);
+      assert.equal(mcp.status, 410); assert.equal(await mcp.text(), doc);
     }
-
+    // v1 links and numbers are gone.
+    for (const old of [`/start/${token()}`, `/api/start/${token()}`, `/api/numbers/${token()}/pagers`, '/api/sessions']) {
+      const r = await fetch(f.origin + old, old.startsWith('/api/') ? { method: 'POST', body: '{}' } : {});
+      assert.equal(r.status, 404, old); await r.arrayBuffer();
+    }
     const app = await fetch(f.origin + '/app', { redirect: 'manual' }); assert.equal(app.status, 302, 'the old web app address leads to the front page'); assert.equal(app.headers.get('location'), f.origin + '/'); await app.arrayBuffer();
-    for (const p of ['/', '/app', '/start', '/missing', '/api/missing']) {
+    for (const p of ['/', '/app', '/start', '/mcp', '/missing', '/api/missing']) {
       const r = await fetch(f.origin + p); assert.equal(r.headers.get('x-agentpager-build'), sha, p); assert.equal(r.headers.get('cache-control'), 'no-store'); await r.arrayBuffer();
     }
-    const mcpGet = await fetch(f.origin + '/mcp'); assert.equal(mcpGet.status, 405); await mcpGet.arrayBuffer();
-    const note = await fetch(f.origin + '/mcp', { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream' }, body: JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) });
-    assert.equal(note.status, 202);
     await f.artifact('start.md', doc);
   } finally { await f.stop(); }
 });

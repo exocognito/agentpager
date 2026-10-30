@@ -52,7 +52,7 @@ xcrun simctl push booted me.agentpager.app.dev alert.apns
 ## Tests
 
 `AgentPagerUITests` drive the app in the Simulator against a running server (`pnpm start:app`), playing the agent
-over MCP (`connect`, `ask`, `wait`, `ack`, `status`, `finish`). `FlowTests` covers making a pager, two agents on it,
+over its HTTP API, as the `agentpager` command does. `FlowTests` covers making a pager, two agents on it,
 answering, the Undo window, Ask for changes, Answer Not Confirmed, off and on, finish and delete:
 
 ```sh
@@ -77,7 +77,7 @@ titled by their first heading, images one after another show as a strip of thumb
 swipes, Mermaid flowcharts are drawn on the phone (anything else shows its source).
 
 `BriefTests` plays the owner for the canvas's four examples and keeps every screenshot in the test result. A real
-agent asks them first, over MCP, from `../app`:
+agent asks them first, over the HTTP API, from `../app`:
 
 ```sh
 # 1. Makes the "Shop" pager if there is none, and prints its number (AGENTPAGER_NUMBER=…)

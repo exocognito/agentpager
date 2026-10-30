@@ -60,8 +60,8 @@ export async function runTool(name: string, args: { [key: string]: unknown }, cl
     case 'connect': return op.connect({ number: str(args.number), app: str(args.app), project: str(args.project), server: str(args.server), mcpClient: client });
     case 'rules': return op.rules(str(args.agent));
     case 'review': return op.review({ object: args.card });
-    case 'ask': return op.ask(a, { object: args.card });
-    case 'wait': return op.wait(a, d, { seconds: num(args.seconds) });
+    case 'ask': return op.ask(a, { object: args.card }, client);
+    case 'wait': return op.wait(a, d, { seconds: num(args.seconds), client });
     case 'ack': return op.ack(a, d, str(args.nextSteps) ?? '');
     case 'status': return op.status(a);
     case 'history': return op.history(a, num(args.limit));

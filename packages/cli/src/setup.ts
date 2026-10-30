@@ -1,18 +1,14 @@
 import { execFileSync } from 'node:child_process';
-import { chmodSync, existsSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import type { Result } from './commands.ts';
+import { self } from './detect.ts';
 
 // Writes the MCP server entry for every harness found: Claude Code and Codex through their own commands, Claude
 // Desktop and Cursor through their config files. Idempotent. `--print` says what it would change and changes nothing.
 const has = (bin: string) => { try { execFileSync('which', [bin], { stdio: 'ignore' }); return true; } catch { return false; } };
 // The entry names this binary by its absolute path: GUI apps (Claude Desktop, Cursor) don't get the shell's PATH.
-// The compiled binary is process.execPath; run from source, the agentpager on PATH, else the bare name.
-function self(): string {
-  if (path.basename(process.execPath) === 'agentpager') return process.execPath;
-  try { return realpathSync(execFileSync('which', ['agentpager'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()); } catch { return 'agentpager'; }
-}
 const ENTRY = { command: self(), args: ['mcp'] };
 const run = (bin: string, args: string[]) => { try { return execFileSync(bin, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }); } catch { return null; } };
 

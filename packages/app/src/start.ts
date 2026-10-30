@@ -15,11 +15,11 @@ If \`agentpager\` isn't installed, there is no download yet: build it from the A
     mkdir -p ~/.local/bin && ln -sf ~/agentpager/packages/cli/dist/agentpager ~/.local/bin/agentpager
     ~/.local/bin/agentpager version && ~/.local/bin/agentpager setup    # setup adds its MCP server to Claude, Codex, Cursor
 
-If \`~/.local/bin\` isn't on your PATH, call it as \`~/.local/bin/agentpager\`. If you can't install or run it here (no access to the repository, no Bun, or a sandbox that blocks it), stop and tell your owner that the agentpager command needs installing on this machine. Don't work around it.
+If \`~/.local/bin\` isn't on your PATH, call it as \`~/.local/bin/agentpager\` wherever these steps and its replies say \`agentpager\`. If you can't install or run it here (no access to the repository, no Bun, or a sandbox that blocks it), stop and tell your owner that the agentpager command needs installing on this machine. Don't work around it.
 
 Then connect with the pager number your owner gave you and follow what it says:
 
-    agentpager connect <number>${server}
+    ~/.local/bin/agentpager connect <number>${server}
 
 If this machine blocks outbound requests, add ${host} to its allow list first.
 `;

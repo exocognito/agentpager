@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -27,5 +27,10 @@ test('the compiled binary connects, reports status and serves MCP', { timeout: 1
     const r = await client.callTool({ name: 'connect', arguments: { number: p.number, project: 'binary' } });
     const content = Array.isArray(r.content) ? r.content : [];
     assert.match(String(content[0]?.text), /\(project binary, as Claude Code\)/);
+    // setup names the binary by its full path, so a GUI app without the shell's PATH can start it.
+    const home = mkdtempSync(path.join(tmpdir(), 'agentpager-bin-setup-'));
+    mkdirSync(path.join(home, '.cursor'));
+    execFileSync(bin, ['setup'], { env: { HOME: home, PATH: '/usr/bin:/bin' }, encoding: 'utf8' });
+    assert.deepEqual(JSON.parse(readFileSync(path.join(home, '.cursor', 'mcp.json'), 'utf8')).mcpServers.agentpager, { command: realpathSync(bin), args: ['mcp'] });
   } finally { await client.close(); await f.stop(); }
 });

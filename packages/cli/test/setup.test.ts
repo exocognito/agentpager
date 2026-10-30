@@ -17,7 +17,7 @@ test('setup adds the MCP entry to Claude Desktop and Cursor configs, idempotentl
   const run = (...args: string[]) => execFileSync(process.execPath, ['--experimental-strip-types', main, 'setup', ...args], { env: { HOME: home, PATH: '/usr/bin:/bin' }, encoding: 'utf8' });
   assert.match(run('--print'), /Claude Desktop: .* would add[\s\S]*Cursor: .* would add/);
   assert.equal(JSON.parse(readFileSync(desktop, 'utf8')).mcpServers.agentpager, undefined, '--print changed nothing');
-  assert.match(run(), /Claude Desktop: .* added the agentpager MCP server \(restart Claude Desktop\)/);
+  assert.match(run(), /Claude Desktop: .* added the agentpager MCP server \(agentpager mcp\) \(restart Claude Desktop\)/);
   const config = JSON.parse(readFileSync(desktop, 'utf8'));
   assert.deepEqual(config, { mcpServers: { other: { command: 'other' }, agentpager: { command: 'agentpager', args: ['mcp'] } }, theme: 'dark' }, 'other settings kept');
   assert.equal(statSync(desktop).mode & 0o777, 0o600, 'its permissions kept');

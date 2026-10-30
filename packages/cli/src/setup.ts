@@ -44,7 +44,7 @@ function jsonConfig(file: string, print: boolean): string | null {
       return `${file}: couldn't write it (${e instanceof Error && 'code' in e ? String(e.code) : 'write failed'}). Add "agentpager": ${JSON.stringify(ENTRY)} to its mcpServers yourself`;
     }
   }
-  return `${file}: ${print ? 'would add' : 'added'} the agentpager MCP server`;
+  return `${file}: ${print ? 'would add' : 'added'} the agentpager MCP server (${ENTRY.command} mcp)`;
 }
 
 export function setup(print: boolean): Result {

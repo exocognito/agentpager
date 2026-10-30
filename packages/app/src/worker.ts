@@ -83,8 +83,16 @@ async function api(request: Request, env: Env): Promise<Response> {
       const { hash } = await ownPager(env, request, pagerId);
       await emptyBody(request);
       const { agentIds } = decode(Deleted, await relay(await registry(env, '/delete', { pagerId, phoneHash: hash })).json());
-      // An agent that misses this finds its pager gone on its next call, and forgets itself then.
-      await Promise.all(agentIds.map(id => forward(env.AGENT, id, '/forget', { method: 'POST', headers: {} }).catch(() => undefined)));
+      // Each agent forgets everything now, tried three times. One that still misses it finds its pager gone on its
+      // next call or attachment read, and forgets itself then; housekeeping forgets it in any case.
+      await Promise.all(agentIds.map(async id => {
+        for (let tries = 1; tries <= 3; tries++) {
+          const done = await forward(env.AGENT, id, '/forget', { method: 'POST', headers: {} }).then(r => r.ok, () => false);
+          if (done) return;
+          if (tries === 3) console.error('An agent of a deleted pager did not forget itself yet');
+          else await new Promise(r => setTimeout(r, 500 * tries));
+        }
+      }));
       return json({ ok: true });
     }
   }

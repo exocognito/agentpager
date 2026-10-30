@@ -89,16 +89,16 @@ export class Agent {
   }
   // The pager's state, asked of the Registry on every call that sends something. A deleted pager takes its agents
   // with it: one that missed being told forgets itself here.
-  private async pagerState(m: Meta): Promise<PagerState> {
+  private async pagerState(m: Meta, by: 'agent' | 'phone' = 'agent'): Promise<PagerState> {
     const reply = await registry(this.env, '/state', { pagerId: m.pagerId });
     if (!reply.ok) throw new Error(`Registry refused the pager state: ${reply.status}`);
     const s = decode(PagerState, await reply.json());
-    if (s.state === 'gone') { await this.forget(); throw C.refuse.pagerDeleted(); }
+    if (s.state === 'gone') { await this.forget(); throw by === 'agent' ? C.refuse.pagerDeleted() : C.refuse.unknownPager(); }
     return s;
   }
   // Off means nothing gets through and nothing is queued.
-  private async on(m: Meta) {
-    const s = await this.pagerState(m);
+  private async on(m: Meta, by: 'agent' | 'phone' = 'agent') {
+    const s = await this.pagerState(m, by);
     if (s.state === 'off') throw C.refuse.pagerOff();
     return s.push ?? null;
   }
@@ -183,7 +183,8 @@ export class Agent {
       const until = Date.now() + seconds * 1000;
       for (;;) {
         const d = this.tx(() => { this.agent(digest); return this.decision(id); });
-        if (d.answer) return json({ status: 'answered', answer: d.answer });
+        // The pager may have been turned off during the wait: the answer is delivered only while it is on.
+        if (d.answer) { await this.on(this.tx(() => this.agent(digest))); return json({ status: 'answered', answer: d.answer }); }
         if (Date.now() >= until) return json({ status: 'pending' });
         await new Promise(r => setTimeout(r, Math.min(100, until - Date.now())));
       }
@@ -228,7 +229,8 @@ export class Agent {
     // One attachment of a decision, for the phone: its bytes, with the type the agent declared and the schema checked.
     if (action === 'file') {
       const digest = await phoneDigest(request);
-      this.tx(() => this.phone(digest));
+      // Readable while the pager is off, never once it is deleted.
+      await this.pagerState(this.tx(() => this.phone(digest)), 'phone');
       const id = decode(C.Token, param), name = decode(AttachmentName, url.pathname.split('/').filter(Boolean)[2] ?? '');
       const file = this.tx(() => {
         this.phone(digest);
@@ -241,7 +243,7 @@ export class Agent {
     }
     if (action === 'answer') {
       const digest = await phoneDigest(request);
-      await this.on(this.tx(() => this.phone(digest)));
+      await this.on(this.tx(() => this.phone(digest)), 'phone');
       const id = decode(C.Token, param), input = decode(C.AnswerInput, await body(request));
       const canonical = JSON.stringify({ requestId: input.requestId, choice: input.choice.kind === 'option' ? { kind: 'option', number: input.choice.number } : { kind: 'feedback', text: input.choice.text } });
       return json(this.tx(() => {

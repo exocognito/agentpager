@@ -53,6 +53,7 @@ Every command takes `--json` for machine output. Exit codes: 0 done, 2 refused, 
 
 `--app` and `--project` are rarely needed:
 - **App** ("who asked" on the phone): from the harness's environment when it is identifiable (Claude Code, Codex, pi, Cursor each set a marker; the list is in the code and verified against each harness at build time), else the parent process name, else "Agent". Shown on every decision row. A harness identified positively (§6: Claude Code, Claude Desktop) is named by the binary even when the agent passes an app; a Desktop chat passes "Claude".
+- **Machine** (where the agent runs, named when the phone warns that no agent read an answer): this computer's short hostname, sent on `connect` when it passes the server's label rules. Never asked for. A server from before this field refuses it, so the server deploys first.
 - **Project** (the group on the phone): the git repository's name (`basename` of `git rev-parse --show-toplevel`), else the working folder's name. `--project` overrides and is remembered on the agent file, so a coordinator working on one huge repo can say `--project "billing refactor"` once.
 
 ## 3. MCP tools

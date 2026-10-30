@@ -10,7 +10,7 @@ const sha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).tri
 await mkdir(path.join(out, 'public/assets'), { recursive: true });
 await build({ entryPoints: [path.join(root, 'src/browser.tsx')], outfile: path.join(out, 'public/assets/app.js'), bundle: true, format: 'esm', platform: 'browser', minify: true, jsx: 'automatic', define: { 'process.env.NODE_ENV': '"production"' } });
 await writeFile(path.join(out, 'public/index.html'), '<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>AgentPager</title><link rel="stylesheet" href="/assets/app.css"><style>html,body{margin:0;padding:0}</style><div id="root"></div><script type="module" src="/assets/app.js"></script></html>');
-await build({ entryPoints: [path.join(root, 'src/worker.ts')], outfile: path.join(out, 'worker.js'), bundle: true, format: 'esm', platform: 'browser', target: 'es2022', jsx: 'automatic', loader: { '.css': 'empty' }, define: { __BUILD_SHA__: JSON.stringify(sha), __LOCAL_AUTO_OFF_MS__: local ? process.env.AGENTPAGER_AUTO_OFF_MS || '0' : '0', __LOCAL_IDLE_MS__: local ? process.env.AGENTPAGER_IDLE_MS || '0' : '0', 'process.env.NODE_ENV': '"production"' } });
+await build({ entryPoints: [path.join(root, 'src/worker.ts')], outfile: path.join(out, 'worker.js'), bundle: true, format: 'esm', platform: 'browser', target: 'es2022', jsx: 'automatic', loader: { '.css': 'empty' }, define: { __BUILD_SHA__: JSON.stringify(sha), __LOCAL_AUTO_OFF_MS__: local ? process.env.AGENTPAGER_AUTO_OFF_MS || '0' : '0', __LOCAL_IDLE_MS__: local ? process.env.AGENTPAGER_IDLE_MS || '0' : '0', __LOCAL_PICKUP_MS__: local ? process.env.AGENTPAGER_PICKUP_MS || '0' : '0', 'process.env.NODE_ENV': '"production"' } });
 const config = {
   name: 'ownerpager', main: './worker.js', compatibility_date: '2026-09-24',
   assets: { directory: './public', binding: 'ASSETS', run_worker_first: true },
@@ -29,4 +29,4 @@ const config = {
   workers_dev: false,
 };
 await writeFile(path.join(out, 'wrangler.json'), JSON.stringify(config, null, 2));
-console.log(`Built ${sha} (${local && (process.env.AGENTPAGER_AUTO_OFF_MS || process.env.AGENTPAGER_IDLE_MS) ? 'local clocks' : 'production clocks'}) at ${out}`);
+console.log(`Built ${sha} (${local && (process.env.AGENTPAGER_AUTO_OFF_MS || process.env.AGENTPAGER_IDLE_MS || process.env.AGENTPAGER_PICKUP_MS) ? 'local clocks' : 'production clocks'}) at ${out}`);

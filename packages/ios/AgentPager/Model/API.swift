@@ -26,11 +26,13 @@ nonisolated struct PagerState: Codable, Hashable, Sendable {
     var createdAt: Date
 }
 
-// Something that connected to a pager: who asked, and the project its decisions are grouped under.
+// Something that connected to a pager: who asked, the project its decisions are grouped under, and the computer it
+// runs on when it said.
 nonisolated struct AgentInfo: Codable, Hashable, Sendable {
     var agentId: String
     var app: String
     var project: String
+    var machine: String?
     var createdAt: Date
     var finishedAt: Date?
     var lastActivityAt: Date
@@ -126,6 +128,9 @@ nonisolated struct Decision: Codable, Hashable, Identifiable, Sendable {
     var attachments: [AttachmentInfo]?
     var askedAt: Date
     var answer: Answer?
+    // When an agent first read the answer, and when the service warned that none had. Neither means received (I6).
+    var collectedAt: Date?
+    var warnedAt: Date?
     var acknowledgement: Acknowledgement?
     var id: String { decisionId }
 

@@ -164,6 +164,12 @@ extension Sample {
             d.askedAt = asked
             m.inboxes[work]?.agents[0].answered.insert(d, at: 0)
             m.path = [.pager(work), .decision(pagerId: work, agentId: codex, decisionId: d.decisionId)]
+        case "notpickedup":
+            var d = answered(m11Decision("m11late00000000000000000000001x"), .option(1), at: now.addingTimeInterval(-240), ack: nil)
+            d.warnedAt = now.addingTimeInterval(-60)
+            m.inboxes[work]?.agents[0].agent.machine = "air"
+            m.inboxes[work]?.agents[0].answered.insert(d, at: 0)
+            m.path = [.pager(work), .decision(pagerId: work, agentId: codex, decisionId: d.decisionId)]
         case "undo": m.path = [.pager(work)]; m.undo = PreparedAnswer(pagerId: work, agentId: codex, decisionId: m11, requestId: "r", choice: .option(1), deadline: .now.addingTimeInterval(3600))
         case "notconfirmed":
             let p = PreparedAnswer(pagerId: work, agentId: codex, decisionId: m11, requestId: "r", choice: .option(1), deadline: .now)

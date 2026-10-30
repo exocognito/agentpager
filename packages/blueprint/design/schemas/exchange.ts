@@ -67,9 +67,13 @@ export const Decision = Schema.Struct({
   attachments: Schema.optional(Schema.Array(AttachmentInfo)),
   askedAt: Timestamp,
   answer: Schema.optional(Answer),
+  // When an agent first read the answer, and when the owner was told none had (I6: neither means received).
+  collectedAt: Schema.optional(Timestamp),
+  warnedAt: Schema.optional(Timestamp),
   acknowledgement: Schema.optional(Acknowledgement),
 }).pipe(
   Schema.filter(briefLinks),
+  Schema.filter((d) => (d.collectedAt === undefined && d.warnedAt === undefined) || d.answer !== undefined || "only an answer is collected or warned about"),
   Schema.filter(
     (d) =>
       (d.status === "open") ===

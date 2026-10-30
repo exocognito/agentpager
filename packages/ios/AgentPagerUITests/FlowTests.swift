@@ -69,6 +69,38 @@ final class FlowTests: XCTestCase {
         return row
     }
 
+    // I6: an answer no agent picks up in time gets a warning naming the agent and its computer; reading it later goes
+    // back to waiting, and only the acknowledgement confirms. The warning takes 3 min against a production clock, so
+    // this needs a server started with a short one (AGENTPAGER_PICKUP_MS=5000 pnpm start:app) and
+    // TEST_RUNNER_AGENTPAGER_PICKUP_SECONDS=5; otherwise it is skipped.
+    func testAnswerNotPickedUp() throws {
+        guard let pickup = ProcessInfo.processInfo.environment["AGENTPAGER_PICKUP_SECONDS"].flatMap(Double.init) else {
+            throw XCTSkip("needs a server with a short pickup clock")
+        }
+        launch()
+        let number = makePager("Late")
+        try agent.connect(number: number, app: "Claude Desktop", project: "wake-lab", machine: "air")
+        let late = try agent.ask("Ship the fix tonight?", options: ["Ship tonight", "Wait for review"])
+        open("Ship the fix tonight?")
+        app.buttons["tile-A"].tap()
+        app.buttons["send-option"].tap()
+        wait(app.buttons["undo-button"], 3)
+        let row = answeredRow("wake-lab", "Ship the fix tonight?")
+        waitUntil(5 + pickup + 15, "the warning") { row.label.contains("Claude Desktop on air hasn’t picked up your answer") }
+        shot("30-not-picked-up")
+        row.tap()
+        let bar = app.descendants(matching: .any)["agent-confirmation"]
+        wait(bar)
+        shot("31-not-picked-up-decision")
+        back()
+
+        guard let answer = try agent.waitForAnswer(late, seconds: 5) else { return XCTFail("no answer") }
+        let again = app.buttons["answered-Ship the fix tonight?"] // back on the project's answered list
+        waitUntil(8, "back to waiting once the agent read it") { again.label.contains("Waiting for Claude Desktop") }
+        try agent.acknowledge(late, answerId: answer["answerId"] as! String, nextSteps: "Shipping it at 22:00.")
+        waitUntil(8, "green tick") { again.label.contains("Agent confirmed") }
+    }
+
     // Make a pager -> an agent connects with its number -> ask -> answer -> wait -> acknowledge -> the closed record.
     func testPagerJourney() throws {
         launch()

@@ -42,7 +42,7 @@ export type AgentCreds = { agent: { agentId: string }; agentKey: string };
 
 // Each test file starts its own workerd. Zero is the production clock; a test that crosses auto-off or housekeeping
 // in real time sets a short one.
-export async function fixture(name: string, clocks = { autoOffMs: 0, idleMs: 0 }) {
+export async function fixture(name: string, clocks: { autoOffMs: number; idleMs: number; pickupMs?: number } = { autoOffMs: 0, idleMs: 0 }) {
   const evidence = path.join(process.env.BLUEPRINT_EVIDENCE_DIR || path.join(tmpdir(), 'agentpager-evidence'), name);
   await mkdir(evidence, { recursive: true });
   const directory = await mkdtemp(path.join(tmpdir(), `agentpager-${name}-`));
@@ -52,7 +52,7 @@ export async function fixture(name: string, clocks = { autoOffMs: 0, idleMs: 0 }
   let child: ChildProcess | undefined;
   const log = createWriteStream(path.join(evidence, 'server.log'));
   async function launch() {
-    child = spawn(process.execPath, ['scripts/start.mjs'], { cwd: app, detached: true, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, PORT: String(serverPort), AGENTPAGER_INSPECTOR_PORT: String(inspector), AGENTPAGER_PERSIST: persist, AGENTPAGER_BUILD_DIR: path.join(directory, 'build'), AGENTPAGER_AUTO_OFF_MS: String(clocks.autoOffMs), AGENTPAGER_IDLE_MS: String(clocks.idleMs) } });
+    child = spawn(process.execPath, ['scripts/start.mjs'], { cwd: app, detached: true, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, PORT: String(serverPort), AGENTPAGER_INSPECTOR_PORT: String(inspector), AGENTPAGER_PERSIST: persist, AGENTPAGER_BUILD_DIR: path.join(directory, 'build'), AGENTPAGER_AUTO_OFF_MS: String(clocks.autoOffMs), AGENTPAGER_IDLE_MS: String(clocks.idleMs), AGENTPAGER_PICKUP_MS: String(clocks.pickupMs ?? 0) } });
     child.stdout?.pipe(log, { end: false }); child.stderr?.pipe(log, { end: false });
     try { await until(async () => (await fetch(origin + '/start')).status, s => s === 200, 90_000); } catch (e) { await stop(); throw e; }
   }
@@ -88,7 +88,7 @@ export async function fixture(name: string, clocks = { autoOffMs: 0, idleMs: 0 }
     const made = await ok(C.PagerReply, '/api/pagers', { phone, data: { number: keys.number, publicKey: keys.publicKey, autoOff } });
     return { ...keys, phone, pager: made.pager };
   }
-  const connect = (number: string, app = 'Codex', project = 'acceptance') => ok(C.Connected, '/api/agents', { data: { number, app, project } });
+  const connect = (number: string, app = 'Codex', project = 'acceptance', machine?: string) => ok(C.Connected, '/api/agents', { data: { number, app, project, ...(machine ? { machine } : {}) } });
   // A pager on a fresh phone, and one agent connected to it.
   async function connected(app?: string, project?: string) {
     const p = await makePager();

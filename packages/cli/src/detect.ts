@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { realpathSync } from 'node:fs';
-import { homedir } from 'node:os';
+import { homedir, hostname } from 'node:os';
 import path from 'node:path';
 
 // Who asked ("Codex") and the project its decisions are grouped under on the phone (docs/v2/03-binary-surface.md §2).
@@ -32,6 +32,13 @@ export function detectApp(mcpClient?: string): string {
     for (const [re, app] of NAMES) if (re.test(path.basename(parent))) return app;
   } catch { /* no ps: the default */ }
   return 'Agent';
+}
+
+// The computer, by its short hostname ("air"), so the phone can say where an agent that went quiet is. Nothing when
+// the name wouldn't pass the server's label rules (blank or over 60 characters).
+export function detectMachine(): string | undefined {
+  const name = hostname().split('.')[0]?.trim() ?? '';
+  return name && name.length <= 60 && !/[<>]/.test(name) ? name : undefined;
 }
 
 // The git repository's name, else the working folder's.

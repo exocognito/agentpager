@@ -26,11 +26,12 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         return .newData
     }
 
-    // With the app open the list updates by itself, so only a decision on a pager not on screen shows a banner.
+    // With the app open the list updates by itself, so only a decision, or the warning that an answer wasn't picked up,
+    // on a pager not on screen shows a banner.
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
         let info = notification.request.content.userInfo
         Task { await model.refreshAll() }
-        guard info["kind"] as? String == "decision", let pagerId = info["pagerId"] as? String, model.path.last != .pager(pagerId) else { return [] }
+        guard ["decision", "warning"].contains(info["kind"] as? String ?? ""), let pagerId = info["pagerId"] as? String, model.path.last != .pager(pagerId) else { return [] }
         return [.banner, .list, .sound]
     }
 

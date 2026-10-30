@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import { chmodSync, copyFileSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { hostname, tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
@@ -59,7 +59,8 @@ test('the binary: connect, refusals, ask, wait, ack, status, history, off, finis
     assert.equal(asked.code, 0, asked.text);
     const d = String((asked.json as { decision: string }).decision);
     assert.equal(asked.text, `Sent. Your owner sees it as:\n  Which M11 guarantee should we build?\n  Two real alternatives: a smaller fix with occasional manual recovery, or precise automatic recovery.\nDecision ${d}. Wait for the answer with: agentpager wait --agent ${id} ${d}`);
-    const seen = (await f.pager(p.pagerId, p.phone)).agents.find(a => a.open.length)?.open[0];
+    const asker = (await f.pager(p.pagerId, p.phone)).agents.find(a => a.open.length), seen = asker?.open[0];
+    assert.equal(asker?.agent.machine, hostname().split('.')[0], 'the phone sees which computer asked');
     assert.ok(seen && seen.card.type === 'brief');
     const brief = seen.card;
     assert.deepEqual(seen.attachments?.map(a => a.name).sort(), ['background.md', 'flow.png', 'warning.png']);

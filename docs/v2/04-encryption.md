@@ -35,7 +35,7 @@ The number is an address, not a credential. It lives in AGENTS.md (decided 29 Oc
 Agent → phone, encrypted to the **pager** public key:
 - the **card**: one JSON blob `{title, detail, card, attachmentNames}`;
 - each **attachment**'s bytes, one blob each, so the phone fetches them lazily;
-- the **agent's identity** at connect: `{app, project, name}` (so the server doesn't learn what the agent is working on);
+- the **agent's identity** at connect: `{app, project, name, machine}` (so the server doesn't learn what the agent is working on, or on which computer);
 - the **acknowledgement**: `{nextSteps}`.
 
 Phone → agent, encrypted to the **agent** public key:
@@ -75,6 +75,8 @@ The push payload is at most 4 KB, so it carries a small **preview** envelope, no
 A **Notification Service Extension** in the app: reads the pager key from the App Group Keychain, decrypts `preview`, sets the title to the question and the subtitle to `detail`, body to the app name. If it fails (no key, corrupt blob, the 30-second budget), iOS shows the generic "New decision", which is still correct. The extension never touches the network, so it works offline.
 
 For acknowledgements the preview is `{nextSteps}` with kind `acknowledgement`, title "Codex confirmed".
+
+The warning that no agent read an answer within 3 minutes (kind `warning`, C17 behavior 6) is the server's own alert, written today with the agent's app, project and machine. Under encryption the server can't name them, so it sends the generic "An answer hasn't been picked up" with the decision's ids, and the extension names the agent from the identity the phone already decrypted.
 
 Apple sees: "AgentPager · New decision" plus ciphertext.
 

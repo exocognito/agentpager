@@ -106,7 +106,7 @@ struct AnsweredDecisionRow: View {
                     Text(asked.agent.app + " · " + (model.choice(d).map { d.choiceText($0) } ?? "")).lineLimit(1)
                 }
                 .font(.subheadline).foregroundStyle(.secondary)
-                if state != .confirmed { SendStatusLine(decision: d, app: asked.agent.app).font(.subheadline).foregroundStyle(.secondary) }
+                if state != .confirmed { SendStatusLine(decision: d, agent: asked.agent).font(.subheadline).foregroundStyle(.secondary) }
             }
         }
         .padding(.vertical, 2)
@@ -131,11 +131,12 @@ struct ChoiceBadge: View {
     }
 }
 
-// Before the agent confirms: a countdown while Undo is open, then sending, then waiting for the agent.
+// Before the agent confirms: a countdown while Undo is open, then sending, then waiting for the agent, or the warning
+// that it hasn't picked the answer up.
 struct SendStatusLine: View {
     @Environment(AppModel.self) private var model
     var decision: Decision
-    var app: String
+    var agent: AgentInfo
 
     var body: some View {
         HStack(spacing: 7) {
@@ -144,9 +145,12 @@ struct SendStatusLine: View {
                 TimelineView(.periodic(from: .now, by: 1)) { context in
                     Text("Sending in \(max(1, Int(u.deadline.timeIntervalSince(context.date).rounded(.up))))s").monospacedDigit()
                 }
+            } else if model.rowState(decision) == .notPickedUp {
+                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                Text(Wording.notPickedUp(agent)).fixedSize(horizontal: false, vertical: true)
             } else {
                 ProgressView().controlSize(.mini)
-                Text(model.rowState(decision) == .sending ? "Sending…" : "Waiting for \(app)…")
+                Text(model.rowState(decision) == .sending ? "Sending…" : "Waiting for \(agent.app)…")
             }
         }
     }

@@ -1,5 +1,6 @@
 import { Schema } from 'effect';
 import type { Env } from './env.ts';
+import { PICKUP_MS } from './contract.ts';
 import { optionMark, type Card } from '../../blueprint/design/ui/components/cards/schemas.ts';
 
 // Alerts through Apple's push service (C17::get-paged). The phone gives each pager it holds its device token, and
@@ -69,6 +70,12 @@ export async function alert(env: Env, to: PushTarget, a: Alert): Promise<Outcome
     console.error('APNs alert failed', error instanceof Error ? error.name : 'unknown');
     return 'failed';
   }
+}
+
+// The warning when no agent has collected an answer: who, where and what, so the owner knows which agent to go to.
+export function pickupBody(agent: { app: string; project: string; machine?: string }, title: string) {
+  const who = `${agent.app}${agent.machine ? ` on ${agent.machine}` : ''} (${agent.project})`;
+  return `${who} hasn’t picked up your answer to “${title}” after ${PICKUP_MS / 60_000} min. AgentPager can’t reach it: it may be asleep, closed or disconnected. Check in with it directly.`;
 }
 
 // The alert body: the question, then its detail and the recommended option, which show when the alert is expanded.

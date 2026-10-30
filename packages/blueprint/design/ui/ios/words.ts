@@ -167,6 +167,7 @@ export const endConfirmTitle = (name: string) => `End ${shortName(name)}’s pag
 export const endedText = (name: string) => `${shortName(name)} can’t page you anymore, and its decisions have been cleared.`;
 export const pairedText = (name: string, ends: string) => `${name} can now page you. Pager ends in ${ends}.`;
 export const sendingIn = (seconds: number) => `Sending in ${seconds}s`;
+export const notPickedUp = (who: string) => `${who} hasn’t picked up your answer. It may be asleep, closed or disconnected: check in with it directly.`;
 export const youAt = (at: string) => `You · ${at}`;
 export const agentConfirmedAt = (at: string) => `Your agent confirmed · ${at}`;
 export const serverNow = (status: string) => `Your pagers and pager number are kept per server. Now: ${status}.`;

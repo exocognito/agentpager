@@ -1,6 +1,6 @@
 import type { Answered, Decision, Pager, SendState } from "./fixtures.ts";
-import { ActionSheet, Alert, BackButton, CheckIcon, Chevron, ClockIcon, EndedIcon, GlassButton, MoreIcon, NavBar, NoteIcon, Phone, Section, Spinner, Unavailable, XCircleIcon } from "./kit.tsx";
-import { END_REASON, LIFETIME, LIFETIMES, WORDS, endConfirmTitle, endedText, exactEnd, remaining, sendingIn, subtitle } from "./words.ts";
+import { ActionSheet, Alert, BackButton, CheckIcon, Chevron, ClockIcon, EndedIcon, GlassButton, MoreIcon, NavBar, NoteIcon, Phone, Section, Spinner, Unavailable, WarningIcon, XCircleIcon } from "./kit.tsx";
+import { END_REASON, LIFETIME, LIFETIMES, WORDS, endConfirmTitle, endedText, exactEnd, notPickedUp, remaining, sendingIn, subtitle } from "./words.ts";
 
 export type AgentOverlay = "menu" | "endsMenu" | "endConfirm" | "notConfirmed";
 type Props = { pager: Pager; open?: Decision[]; answered?: Answered[]; now: Date; timeZone?: string; overlay?: AgentOverlay; undoSeconds?: number; dark?: boolean };
@@ -97,9 +97,11 @@ function AnswerEmoji({ answered }: { answered: Answered }) {
   return <span className="emoji" aria-hidden="true">{answered.decision.options.find((o) => o.number === choice.number)?.emoji}</span>;
 }
 
-// Before the agent confirms: a countdown while Undo is open, then sending, then waiting for the agent.
+// Before the agent confirms: a countdown while Undo is open, then sending, then waiting for the agent, or the warning
+// that no agent has picked the answer up.
 export function SendStatus({ state }: { state: SendState }) {
   if (state.kind === "confirmed") return null;
+  if (state.kind === "notPickedUp") return <span className="cell-status"><WarningIcon />{notPickedUp(state.who)}</span>;
   return (
     <span className="cell-status">
       {state.kind === "undo" ? <ClockIcon /> : <Spinner />}

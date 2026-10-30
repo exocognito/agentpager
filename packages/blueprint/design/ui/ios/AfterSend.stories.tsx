@@ -2,10 +2,11 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, within } from "storybook/test";
 import { AgentScreen } from "./AgentScreen.tsx";
 import { NOW, OPEN_AFTER_SEND, TIME_ZONE, answeredUpdate, claude, confirmedFirst, confirmedUpdate } from "./fixtures.ts";
-import { WORDS, sendingIn } from "./words.ts";
+import { WORDS, notPickedUp, sendingIn } from "./words.ts";
 
 // Send closes the decision sheet. Its row moves to Answered and shows where the answer is: Undo for 5 seconds,
-// then sending, then waiting for the agent, then a green tick beside the answer once the agent confirms.
+// then sending, then waiting for the agent, then a green tick beside the answer once the agent confirms. If no agent has
+// read the answer 3 minutes after Send, the wait turns to a warning naming the agent and its computer (I6).
 const meta = {
   title: "iPhone/After you answer",
   component: AgentScreen,
@@ -44,6 +45,14 @@ export const Waiting: Story = {
   args: { answered: [answeredUpdate({ kind: "waiting" }), confirmedFirst] },
   play: async ({ canvas }) => {
     await expect(row(canvas)).toHaveTextContent(WORDS.waitingForAgent);
+  },
+};
+export const NotPickedUp: Story = {
+  name: "Not picked up",
+  args: { answered: [answeredUpdate({ kind: "notPickedUp", who: "Claude Code on air" }), confirmedFirst] },
+  play: async ({ canvas }) => {
+    await expect(row(canvas)).toHaveTextContent(notPickedUp("Claude Code on air"));
+    await expect(row(canvas)).not.toHaveTextContent(WORDS.agentConfirmed);
   },
 };
 export const Confirmed: Story = {

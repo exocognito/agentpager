@@ -38,7 +38,7 @@ Browser tests require Chromium; if missing, `pnpm exec playwright install chromi
 
 ## Build the product
 
-Runs use the [simple loop](https://github.com/exocognito/blueprint/blob/main/src/process/simple-loop.md). The app imports `@agentpager/blueprint` via `workspace:*`, through the subpaths its [`package.json`](packages/blueprint/package.json) `exports` lists. It supplies the Worker, the Durable Object behind the session store tag, the card API layer and routing. Routes, auth headers and error statuses are in the design's `ROUTES`, `MCP`, `AGENT_AUTH_HEADER`, `PHONE_AUTH_HEADER` and `HTTP_STATUS` constants; [D1](packages/blueprint/design/dependencies/D1-cloudflare.md) names the build header. `/start` is the design's document, exported as `/start`: the product serves `startDocument(origin)` as it is, and C2's proof checks the served body against it. Test fixtures stay outside package exports.
+Runs use the [simple loop](https://github.com/exocognito/blueprint/blob/main/src/process/simple-loop.md). The app imports `@agentpager/blueprint` via `workspace:*`, through the subpaths its [`package.json`](packages/blueprint/package.json) `exports` lists. It supplies the Worker, the Durable Object behind the session store tag, the card API layer and routing. Since v2 (`docs/v2/`), the HTTP API's routes, auth headers and error statuses are in `packages/app/src/worker.ts` and `contract.ts`, ahead of the Blueprint update; [D1](packages/blueprint/design/dependencies/D1-cloudflare.md) names the build header. `/start` and the retired `/mcp` send an arriving agent to the `agentpager` command (`packages/cli`). Test fixtures stay outside package exports.
 
 ## Reset deployed data
 

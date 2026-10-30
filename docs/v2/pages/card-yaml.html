@@ -1,0 +1,170 @@
+<title>One Card, Yaml to Phone</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+:root{--bg:#f5f7fa;--surface:#fff;--sunk:#eef1f5;--fg:#18202b;--muted:#5b6676;--line:#d8dee7;--accent:#1f5fd6;--accent-soft:#e3ecfc;
+ --c1:#1f5fd6;--c2:#9a3b9a;--c3:#17703a;--c4:#b25e00;--c5:#b42318;--c6:#00707a;
+ --display:"IBM Plex Sans Condensed",system-ui,sans-serif;--body:"IBM Plex Sans",system-ui,sans-serif;--mono:"IBM Plex Mono",ui-monospace,Menlo,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f141b;--surface:#161d27;--sunk:#1c2532;--fg:#e4e9f0;--muted:#97a3b4;--line:#2a3544;--accent:#7aa7ff;--accent-soft:#1d2b45;
+ --c1:#7aa7ff;--c2:#d98ad9;--c3:#6fd497;--c4:#f0a955;--c5:#ff8b7e;--c6:#5fd0da;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0f141b;--surface:#161d27;--sunk:#1c2532;--fg:#e4e9f0;--muted:#97a3b4;--line:#2a3544;--accent:#7aa7ff;--accent-soft:#1d2b45;
+ --c1:#7aa7ff;--c2:#d98ad9;--c3:#6fd497;--c4:#f0a955;--c5:#ff8b7e;--c6:#5fd0da;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.55;padding:32px max(16px,env(safe-area-inset-right)) 64px max(16px,env(safe-area-inset-left))}
+.wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:24px}
+h1,h2{font-family:var(--display);margin:0;line-height:1.15;text-wrap:balance}
+h1{font-size:32px;font-weight:700}
+h2{font-size:20px;font-weight:600}
+p{margin:0;max-width:70ch}
+.lede{color:var(--muted);font-size:16px}
+.eyebrow{font-family:var(--mono);font-size:12px;color:var(--accent);letter-spacing:.04em}
+code{font-family:var(--mono);font-size:.88em}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:24px;align-items:start}
+@media (max-width:900px){.grid{grid-template-columns:1fr}}
+.yaml{background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.yaml .src{padding:8px 14px;border-bottom:1px solid var(--line);background:var(--sunk);font-family:var(--mono);font-size:11.5px;color:var(--muted);display:flex;justify-content:space-between}
+.yaml pre{margin:0;padding:14px;font-family:var(--mono);font-size:12.6px;line-height:1.55;white-space:pre-wrap;word-break:break-word}
+.k{color:var(--muted)}
+.s{border-left:3px solid;padding-left:8px;margin-left:-11px;display:block}
+.s1{border-color:var(--c1)}.s2{border-color:var(--c2)}.s3{border-color:var(--c3)}.s4{border-color:var(--c4)}.s5{border-color:var(--c5)}.s6{border-color:var(--c6)}
+.tag{display:inline-block;font-family:var(--display);font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:1px 7px;border-radius:999px;color:#fff;margin-left:6px;vertical-align:middle}
+.t1{background:var(--c1)}.t2{background:var(--c2)}.t3{background:var(--c3)}.t4{background:var(--c4)}.t5{background:var(--c5)}.t6{background:var(--c6)}
+.phones{display:flex;flex-direction:column;gap:18px;position:sticky;top:16px}
+.phone{display:flex;flex-direction:column;gap:6px}
+.phone img{width:100%;border-radius:18px;border:1px solid var(--line);display:block;background:#f2f2f7}
+.phone figcaption{font-size:12.5px;color:var(--muted);line-height:1.4}
+.phone figcaption b{color:var(--fg);font-weight:600}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;vertical-align:baseline}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:16px 18px;display:flex;flex-direction:column;gap:10px}
+.panel ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;max-width:72ch}
+table{border-collapse:collapse;font-size:13.5px;width:100%}
+th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:var(--display);font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+</style>
+<div class="wrap">
+<header style="display:flex;flex-direction:column;gap:10px">
+  <div class="eyebrow">AgentPager v2 · the card format</div>
+  <h1>One card, from <code>card.yaml</code> to the phone</h1>
+  <p class="lede">The whole card is structure. Each key lands in exactly one place on the phone; the colours show where. Prose inside a field can use bullets, bold and links to attachments, nothing else.</p>
+</header>
+
+<div class="grid">
+<div class="yaml">
+  <div class="src"><span>card.yaml</span><span>the 10:17pm M11 decision, rewritten</span></div>
+<pre><span class="s s1"><span class="k">title:</span> Which M11 guarantee should we build?<span class="tag t1">inbox · header</span>
+<span class="k">detail:</span> Two real alternatives: a smaller fix with occasional manual recovery, or precise automatic recovery.</span>
+
+<span class="s s2"><span class="k">context:</span><span class="tag t2">decision screen</span>
+  <span class="k">heading:</span> a lost reply
+  <span class="k">summary:</span> |
+    The service hands the agent job A, but the reply is lost on the way. When the agent
+    asks again it gets job B, and A is stuck. We don't know how often this happens in
+    production.
+  <span class="k">more:</span><span class="tag t2">bottom sheet</span>
+    <span class="k">title:</span> How the mix-up happens
+    <span class="k">body:</span> |
+      Every few seconds the agent asks the service "is there work for me?". Usually the
+      answer is "no", and that's normal.
+
+      Sometimes the service says "yes, here is job A" but the reply never arrives: the
+      connection dropped on the way back. The service has already marked A as running.
+      The agent, having heard nothing, asks again, and this time gets job B.
+
+      Now A sits marked as running forever, with nobody working on it. That's the stuck
+      job you'd see on the page.
+
+      ![Flowchart](flow.png)
+
+      We don't know how often this happens in production. Option A makes the stuck state
+      visible so you can clear it by hand; option B makes the service remember the
+      hand-off so a retry gets A back.</span>
+
+<span class="s s3"><span class="k">options:</span><span class="tag t3">buttons · columns · options sheet</span>
+  <span class="k">- label:</span> Small + manual
+    <span class="k">title:</span> Smaller fix with manual recovery
+    <span class="k">prioritizes:</span> less code and state, accepting an occasional Cancel or Run again after a connection failure
+    <span class="k">changes:</span> |
+      - Stop automatically repeating an unresolved Run.
+      - Report an unanswered work-taking call as unknown, not empty.
+      - Keep normal idle waits, live-run recovery and Cancel.
+    <span class="k">why:</span> |
+      - No permanent receipt store and no new endpoint.
+      - Fixes the one path that looked empty but wasn't.
+    <span class="k">why_not:</span> |
+      - After a connection failure you may have to inspect the page, Cancel a stuck job, or press Run again.
+    <span class="k">assumes:</span> |
+      - Lost replies are rare enough that manual recovery is acceptable.
+    <span class="k">looks_like:</span> warning.png
+  <span class="k">- label:</span> Precise + automatic
+    <span class="k">title:</span> Precise automatic recovery
+    <span class="k">prioritizes:</span> never leaving a job stuck, at the cost of durable request identities and more code
+    <span class="k">changes:</span> |
+      - Every hand-off gets a stored id and result; a retry with the same id gets the same job back.
+      - A stuck job is recovered automatically from the stored acceptance.
+    <span class="k">why:</span> |
+      - Stuck jobs recover on their own; you never touch them.
+    <span class="k">why_not:</span> |
+      - Stored ids and results for the life of the page, more code, and a second place a bug can hide.
+    <span class="k">assumes:</span> |
+      - Lost replies are common enough to be worth the machinery.</span>
+
+<span class="s s4"><span class="k">tradeoffs:</span><span class="tag t4">options table</span>
+  <span class="k">- concern:</span> Lost connection
+    <span class="k">A:</span> "yellow: May need inspection, Cancel or Run again"
+    <span class="k">B:</span> "green: Recover original job or stored acceptance automatically"
+  <span class="k">- concern:</span> Complexity
+    <span class="k">A:</span> "green: No permanent receipts or new endpoint"
+    <span class="k">B:</span> "yellow: Durable request identities and more code"
+  <span class="k">- concern:</span> Idle waits
+    <span class="k">A:</span> "green: Normal idle waits stay"
+    <span class="k">B:</span> "green: Normal idle waits stay; no permanent empty history"</span>
+
+<span class="s s5"><span class="k">recommendation:</span><span class="tag t5">recommendation card</span>
+  <span class="k">option:</span> A
+  <span class="k">why:</span> Fix the misleading timeout and stop risky automatic repeats; accept occasional manual recovery instead of building precise replay.
+  <span class="k">changes_my_mind:</span> If stuck jobs turn out to be frequent, pick B.</span>
+
+<span class="s s6"><span class="k">next_steps:</span><span class="tag t6">next steps row</span>
+  <span class="k">heading:</span> build only the chosen one
+  <span class="k">A:</span> Ship the warning and Cancel this week.
+  <span class="k">B:</span> Design the id and storage first, about a week.
+  <span class="k">if_no_answer:</span> Nothing changes; stuck jobs stay invisible.</span>
+
+<span class="k">attachments:</span> [warning.png, flow.png]</pre>
+</div>
+
+<aside class="phones">
+  <figure class="phone"><img src="shots/Main.png" alt="Pager screen with the decision listed under its project"><figcaption><b>Pager</b> · <span class="dot" style="background:var(--c1)"></span>title as the row; detail is the push notification's second line</figcaption></figure>
+  <figure class="phone"><img src="shots/Decision-Full.png" alt="Decision screen"><figcaption><b>Decision</b> · <span class="dot" style="background:var(--c2)"></span>context.summary, then "How the mix-up happens" row from context.more · <span class="dot" style="background:var(--c4)"></span>tradeoffs as the Options table, columns from options.title · <span class="dot" style="background:var(--c5)"></span>recommendation · <span class="dot" style="background:var(--c6)"></span>next_steps.heading · <span class="dot" style="background:var(--c3)"></span>options.label on the buttons</figcaption></figure>
+  <figure class="phone"><img src="shots/Options-Sheet.png" alt="Options bottom sheet"><figcaption><b>Options sheet</b> · <span class="dot" style="background:var(--c3)"></span>each option's title, prioritizes, changes, why, why_not, assumes, looks_like</figcaption></figure>
+  <figure class="phone"><img src="shots/Context-Sheet.png" alt="Background page bottom sheet"><figcaption><b>Background sheet</b> · <span class="dot" style="background:var(--c2)"></span>context.more.title and body</figcaption></figure>
+</aside>
+</div>
+
+<section class="panel">
+  <h2>What this changes, and what it doesn't</h2>
+  <ul>
+    <li><b>Yes, the whole card is structure.</b> Today the agent writes a markdown "brief" with <code>## Context</code>, <code>::::option A</code> blocks and a <code>## Tradeoffs</code> table using <code>:green[…]</code> cells, and the phone parses the headings back out. The phone already renders fixed slots; the markdown was just a lossy way of filling them. YAML names the slots directly, so a reviewer can check each one and nothing can land in the wrong place (rule 10 becomes structural).</li>
+    <li><b>Prose fields keep light markdown:</b> paragraphs, bullets, bold, and <code>![…](file)</code> for an attached image. No headings, no tables, no HTML. The phone's renderer already handles exactly this.</li>
+    <li><b>Tradeoff cells are <code>"rating: text"</code>,</b> rating one of green, yellow, orange, red. Quoted because of the colon. Every option must have a cell in every row; the binary refuses a row with a missing option (mechanical).</li>
+    <li><b>The phone doesn't change for this.</b> The binary compiles the YAML into today's JSON and markdown brief before encrypting, so the app keeps its parser and the Stage 1 build is unaffected. Later the app can take the structure directly and drop the markdown parser, which is a nice simplification but not needed for the rollout.</li>
+    <li><b>Lost: free-form briefs.</b> Today's "small decision uses fewer sections" is replaced by optional keys: <code>context.more</code>, <code>looks_like</code>, <code>tradeoffs</code> and <code>next_steps</code> may be omitted on a small decision. <code>changes</code>/<code>why</code>/<code>why_not</code>/<code>assumes</code> are graded by the reviewer, not required by the binary.</li>
+    <li><b>Mechanical checks get simpler and stronger:</b> required keys present, 2–4 options, <code>recommendation.option</code> names one of them, every tradeoff row covers every option, every image named is attached, size limits. No parsing of prose at all.</li>
+  </ul>
+  <table>
+    <thead><tr><th>Key</th><th>Required</th><th>On the phone</th></tr></thead>
+    <tbody>
+      <tr><td><code>title</code></td><td>yes, ≤ 100 chars, a question</td><td>Row in the pager list; push notification title; screen header</td></tr>
+      <tr><td><code>detail</code></td><td>yes, ≤ 280</td><td>Push notification body</td></tr>
+      <tr><td><code>context.heading</code> / <code>summary</code></td><td>summary yes</td><td>The Context card at the top of the decision</td></tr>
+      <tr><td><code>context.more</code></td><td>no</td><td>One tappable row under Context, opening a bottom sheet</td></tr>
+      <tr><td><code>options[].label</code> / <code>title</code> / <code>prioritizes</code></td><td>yes; label ≤ 20</td><td>Buttons; table column headers; options sheet header</td></tr>
+      <tr><td><code>options[].changes</code> / <code>why</code> / <code>why_not</code> / <code>assumes</code> / <code>looks_like</code></td><td>no (review point 9)</td><td>Options sheet, one page per option</td></tr>
+      <tr><td><code>tradeoffs[]</code></td><td>no (review point 10)</td><td>The Options table with rated cells</td></tr>
+      <tr><td><code>recommendation.option</code> / <code>why</code> / <code>changes_my_mind</code></td><td>option and why</td><td>Recommendation card; ✶ on the option</td></tr>
+      <tr><td><code>next_steps</code></td><td>no (review point 11)</td><td>Next steps row</td></tr>
+      <tr><td><code>attachments</code></td><td>when referenced</td><td>Files next to the card; images open full screen</td></tr>
+    </tbody>
+  </table>
+</section>
+</div>

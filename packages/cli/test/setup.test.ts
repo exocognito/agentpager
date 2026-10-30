@@ -21,4 +21,9 @@ test('setup adds the MCP entry to Claude Desktop and Cursor configs, idempotentl
   assert.deepEqual(config, { mcpServers: { other: { command: 'other' }, agentpager: { command: 'agentpager', args: ['mcp'] } }, theme: 'dark' }, 'other settings kept');
   assert.deepEqual(JSON.parse(readFileSync(path.join(home, '.cursor', 'mcp.json'), 'utf8')).mcpServers.agentpager, { command: 'agentpager', args: ['mcp'] });
   assert.match(run(), /Claude Desktop: .* already set up[\s\S]*Cursor: .* already set up/);
+  // A config that isn't plain JSON is left alone, byte for byte.
+  const commented = '// mine\n{ "mcpServers": { "other": { "command": "other" } }, }\n';
+  writeFileSync(desktop, commented);
+  assert.match(run(), /Claude Desktop: .* it isn't plain JSON, so it was left alone\. Add "agentpager": \{"command":"agentpager","args":\["mcp"\]\} to its mcpServers yourself/);
+  assert.equal(readFileSync(desktop, 'utf8'), commented);
 });

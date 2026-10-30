@@ -3,7 +3,7 @@ import { call, get, type Reply } from './client.ts';
 import { compile, type Source } from './card.ts';
 import { detectApp, detectProject } from './detect.ts';
 import { REVIEW, SHORT, EXAMPLE, rulesText } from './rules.ts';
-import { agentIds, appendHistory, loadAgent, pagerOf, readHistory, saveAgent, server, shortId, type AgentFile } from './store.ts';
+import { agentIds, appendHistory, home, loadAgent, pagerOf, readHistory, saveAgent, server, shortId, updateAgent, writable, type AgentFile } from './store.ts';
 
 // The operations, shared by the CLI and the MCP server, with their replies word for word
 // (docs/v2/03-binary-surface.md §4), so a model reads the same words whichever way it arrived.
@@ -17,7 +17,9 @@ export const REMINDER_MS = 2 * 3_600_000, REMINDER_CARDS = 5;
 const WAIT_SECONDS = 50;
 
 const unknownAgent = (id: string): Result => ({ code: 6, text: `No agent ${id} on this machine. Run \`agentpager agents\` to list them, or connect again.` });
-const unreachable = (base: string, why: string): Result => ({ code: 5, text: `Can't reach ${base} (${why}). Nothing was sent.\nIf this machine blocks outbound requests, add ${new URL(base).host} to its allow list and try again.` });
+const host = (base: string) => { try { return new URL(base).host || base; } catch { return base; } };
+const unreachable = (base: string, why: string): Result => ({ code: 5, text: `Can't reach ${base} (${why}). Nothing was sent.\nIf this machine blocks outbound requests, add ${host(base)} to its allow list and try again.` });
+const unwritable = (why: string): Result => refused(`Can't write ${home()} (${why}). Nothing was sent. Set AGENTPAGER_HOME to a folder this agent can write, and try again.`);
 const offNotSent = 'Not sent. This pager is turned off and your message was not delivered. Nothing is queued:\nask again once your owner turns it on, or ask them for another pager number.';
 // A refusal from the server, in the words of the command that met it.
 function refusal(r: Exclude<Reply, { ok: true }>, base: string, off = offNotSent): Result {
@@ -34,10 +36,11 @@ const quote = (s: string, max = 60) => {
   const cut = s.slice(0, max - 1), space = cut.lastIndexOf(' ');
   return (space > max / 2 ? cut.slice(0, space) : cut).replace(/[\s,;:]+$/, '') + '…';
 };
-// A decision by its short id (d_2x8w) or the server's.
+// A decision by its short id (d_2x8w) or the server's, even one this machine failed to record.
 function decisionOf(a: AgentFile, ref: string) {
   const short = a.decisions[ref] ? ref : Object.keys(a.decisions).find(k => a.decisions[k].id === ref);
-  return short ? { short, ...a.decisions[short] } : null;
+  if (short) return { short, ...a.decisions[short] };
+  return /^[A-Za-z0-9_-]{32}$/.test(ref) ? { short: ref, id: ref, title: 'this decision', options: [] } : null;
 }
 
 export async function connect(input: { number?: string; app?: string; project?: string; mcpClient?: string }): Promise<Result> {
@@ -46,6 +49,8 @@ export async function connect(input: { number?: string; app?: string; project?: 
   const pager = pagerOf(number), base = server();
   const app = input.app || detectApp(input.mcpClient), project = input.project || detectProject();
   if (!pager) return refused('Not connected. This pager number is not in use. Ask your owner for their current one.');
+  const cannot = writable();
+  if (cannot) return unwritable(cannot);
   const r = await call(base, 'POST', '/api/agents', { data: { number, app, project } });
   if (!r.ok) {
     if (r.error === 'NumberInvalid') return refused('Not connected. This pager number is not in use. Ask your owner for their current one.');
@@ -54,7 +59,8 @@ export async function connect(input: { number?: string; app?: string; project?: 
   const agentId = String(get(r.value, 'agent', 'agentId')), agentKey = String(get(r.value, 'agentKey'));
   const id = shortId('ap-', taken => loadAgent(taken) !== null);
   const now = new Date().toISOString();
-  saveAgent({ id, server: base, pager, agentId, agentKey, app, project, createdAt: now, rulesShownAt: now, cardsSinceRules: 0, decisions: {} });
+  try { saveAgent({ id, server: base, pager, agentId, agentKey, app, project, createdAt: now, rulesShownAt: now, cardsSinceRules: 0, decisions: {} }); }
+  catch (e) { return refused(`Connected, but this machine couldn't save the agent (${e instanceof Error && 'code' in e ? String(e.code) : 'write failed'}). Your owner's phone shows an agent you can't use; set AGENTPAGER_HOME to a folder you can write, and connect again.`); }
   return done([
     `Connected as agent ${id} on your owner's pager (project ${project}, as ${app}).`,
     `Your owner's phone shows you as a new agent. Use --agent ${id} for every question in`,
@@ -66,7 +72,7 @@ export async function connect(input: { number?: string; app?: string; project?: 
 export function rules(agent?: string): Result {
   const a = agent ? loadAgent(agent) : null;
   if (agent && !a) return unknownAgent(agent);
-  if (a) saveAgent({ ...a, rulesShownAt: new Date().toISOString(), cardsSinceRules: 0 });
+  if (a) updateAgent(a.id, x => { x.rulesShownAt = new Date().toISOString(); x.cardsSinceRules = 0; });
   return done(rulesText());
 }
 
@@ -86,20 +92,27 @@ export async function ask(agent: string, card: Source): Promise<Result> {
   const compiled = compile(card);
   if (!compiled.ok) return refused(compiled.problems.join('\n'));
   const brief = compiled.brief;
+  const cannot = writable();
+  if (cannot) return unwritable(cannot);
   const r = await call(a.server, 'POST', `/api/agents/${a.agentId}/cards`, { key: a.agentKey, data: brief });
   if (!r.ok) return refusal(r, a.server);
   const id = String(get(r.value, 'decisionId'));
-  const short = shortId('d_', taken => taken in a.decisions);
   const now = new Date();
-  a.decisions[short] = { id, title: brief.title, options: brief.card.options.map(o => o.label) };
-  appendHistory(a.pager, { at: now.toISOString(), event: 'asked', agent: a.id, app: a.app, project: a.project, decision: short, title: brief.title, detail: brief.detail, options: brief.card.options.map(o => o.label), recommended: brief.card.recommended });
+  let short = id, reminder: string | null = null;
+  try {
+    updateAgent(a.id, x => {
+      short = shortId('d_', taken => taken in x.decisions);
+      x.decisions[short] = { id, title: brief.title, options: brief.card.options.map(o => o.label) };
+      const cards = x.cardsSinceRules + 1, since = x.rulesShownAt ? now.getTime() - Date.parse(x.rulesShownAt) : Infinity;
+      if (since > REMINDER_MS || cards >= REMINDER_CARDS) {
+        reminder = since > REMINDER_MS ? `It's been ${Number.isFinite(since) ? Math.floor(since / 3_600_000) + ' hours' : 'a while'} since you last read the card contract.` : `That's ${cards} cards since you last read the card contract.`;
+        x.rulesShownAt = now.toISOString(); x.cardsSinceRules = 0;
+      } else x.cardsSinceRules = cards;
+    });
+    appendHistory(a.pager, { at: now.toISOString(), event: 'asked', agent: a.id, app: a.app, project: a.project, decision: short, title: brief.title, detail: brief.detail, options: brief.card.options.map(o => o.label), recommended: brief.card.recommended });
+  } catch { /* Sent, but not recorded here: the reply gives the server's id, which wait and ack also take. */ }
   const lines = ['Sent. Your owner sees it as:', `  ${brief.title}`, `  ${brief.detail}`, `Decision ${short}. Wait for the answer with: agentpager wait --agent ${a.id} ${short}`];
-  const cards = a.cardsSinceRules + 1, since = a.rulesShownAt ? now.getTime() - Date.parse(a.rulesShownAt) : Infinity;
-  if (since > REMINDER_MS || cards >= REMINDER_CARDS) {
-    const why = since > REMINDER_MS ? `It's been ${Number.isFinite(since) ? Math.floor(since / 3_600_000) + ' hours' : 'a while'} since you last read the card contract.` : `That's ${cards} cards since you last read the card contract.`;
-    lines.push('', `${why} The short version:`, `  ${SHORT}`);
-    saveAgent({ ...a, rulesShownAt: now.toISOString(), cardsSinceRules: 0 });
-  } else saveAgent({ ...a, cardsSinceRules: cards });
+  if (reminder) lines.push('', `${reminder} The short version:`, `  ${SHORT}`);
   return done(lines.join('\n'), { decision: short });
 }
 
@@ -118,10 +131,10 @@ export async function wait(agent: string, ref: string, opts: { seconds?: number;
     }
     const choice = get(r.value, 'answer', 'choice'), sentAt = String(get(r.value, 'answer', 'sentAt'));
     if (!d.answered) {
-      const fresh = loadAgent(a.id) ?? a;
-      fresh.decisions[d.short] = { ...fresh.decisions[d.short], answered: true };
-      saveAgent(fresh);
-      appendHistory(a.pager, { at: sentAt, event: 'answered', agent: a.id, decision: d.short, ...(get(choice, 'kind') === 'option' ? { choice: get(choice, 'number') } : { note: get(choice, 'text') }) });
+      try {
+        updateAgent(a.id, x => { if (x.decisions[d.short]) x.decisions[d.short].answered = true; });
+        appendHistory(a.pager, { at: sentAt, event: 'answered', agent: a.id, decision: d.short, ...(get(choice, 'kind') === 'option' ? { choice: get(choice, 'number') } : { note: get(choice, 'text') }) });
+      } catch { /* not recorded here; the answer is still the server's */ }
     }
     if (get(choice, 'kind') === 'option') {
       const n = Number(get(choice, 'number')), letter = String.fromCharCode(64 + n);
@@ -148,10 +161,10 @@ export async function ack(agent: string, ref: string, nextSteps: string): Promis
   if (get(read.value, 'status') !== 'answered') return refused(`Your owner hasn't answered "${d.title}" yet. Wait first: agentpager wait --agent ${a.id} ${d.short}`);
   const r = await call(a.server, 'POST', `/api/agents/${a.agentId}/cards/${d.id}/acknowledge`, { key: a.agentKey, data: { answerId: get(read.value, 'answer', 'answerId'), nextSteps } });
   if (!r.ok) return refusal(r, a.server);
-  const fresh = loadAgent(a.id) ?? a;
-  fresh.decisions[d.short] = { ...fresh.decisions[d.short], answered: true, acknowledged: true };
-  saveAgent(fresh);
-  appendHistory(a.pager, { at: String(get(r.value, 'acknowledgedAt')), event: 'acknowledged', agent: a.id, decision: d.short, nextSteps });
+  try {
+    updateAgent(a.id, x => { if (x.decisions[d.short]) Object.assign(x.decisions[d.short], { answered: true, acknowledged: true }); });
+    appendHistory(a.pager, { at: String(get(r.value, 'acknowledgedAt')), event: 'acknowledged', agent: a.id, decision: d.short, nextSteps });
+  } catch { /* not recorded here; the acknowledgement is still the server's */ }
   return done(`Acknowledged. Your owner sees "${quote(nextSteps)}" with a green tick on that decision.`);
 }
 
@@ -172,11 +185,11 @@ export async function status(agent: string): Promise<Result> {
 }
 
 // This machine's decisions on the agent's pager, newest first. Never printed unasked.
-export function history(agent: string, limit = 20): Result {
+export function history(agent: string, limit?: number): Result {
   const a = loadAgent(agent);
   if (!a) return unknownAgent(agent);
-  const events = readHistory(a.pager);
-  const asked = events.filter(e => e.event === 'asked').reverse().slice(0, limit);
+  const events = readHistory(a.pager), n = limit !== undefined && Number.isFinite(limit) && limit >= 1 ? Math.min(Math.floor(limit), 1000) : 20;
+  const asked = events.filter(e => e.event === 'asked').reverse().slice(0, n);
   const byDecision = (event: string, d: string) => events.find(e => e.event === event && e.decision === d && e.agent === events.find(x => x.event === 'asked' && x.decision === d)?.agent);
   const lines = asked.map(e => {
     const answer = byDecision('answered', e.decision), ackd = byDecision('acknowledged', e.decision);

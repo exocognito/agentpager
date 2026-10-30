@@ -1,5 +1,5 @@
 import { test } from 'node:test';
-import { copyFileSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { chmodSync, copyFileSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -132,4 +132,44 @@ test('the binary: connect, refusals, ask, wait, ack, status, history, off, finis
     assert.match((await op.agents()).text, new RegExp(`${id}  pager ${p.pagerId.slice(0, 8)}  atomic-pages · Codex`));
     void token;
   } finally { await client.close(); await f.stop(); }
+});
+
+test('round 1 of review: concurrent asks, an unwritable home, empty attachments, unsafe cells, fences, bad config', { timeout: 240_000 }, async () => {
+  const f = await fixture('cli-edges');
+  const home = mkdtempSync(path.join(tmpdir(), 'agentpager-cli-')), work = mkdtempSync(path.join(tmpdir(), 'agentpager-card-'));
+  process.env.AGENTPAGER_HOME = home; process.env.AGENTPAGER_SERVER = f.origin; delete process.env.AGENTPAGER_PAGER;
+  const op = await import('../src/commands.ts');
+  const small = (title: string) => `title: ${title}\ndetail: Where to eat.\ncontext:\n  summary: Friday is booked.\noptions:\n  - {label: Sushi, title: Sushi, prioritizes: fish}\n  - {label: Pasta, title: Pasta, prioritizes: carbs}\nrecommendation: {option: B, why: Closer.}\n`;
+  try {
+    const p = await f.makePager();
+    const id = String(((await op.connect({ number: p.number, app: 'Codex', project: 'edges' })).json as { agent: string }).agent);
+
+    // Two asks at once on one agent (helpers sharing its id): both decisions stay waitable.
+    const [one, two] = await Promise.all([op.ask(id, { yaml: small('One?'), dir: work }), op.ask(id, { yaml: small('Two?'), dir: work })]);
+    for (const r of [one, two]) assert.equal((await op.wait(id, String((r.json as { decision: string }).decision), { seconds: 1 })).text.startsWith('Pending.'), true);
+
+    // A home it can't write: refused before anything is sent, so the phone shows no stray agent.
+    const agentsBefore = (await f.pager(p.pagerId, p.phone)).agents.length;
+    chmodSync(path.join(home, 'agents'), 0o500);
+    const locked = await op.connect({ number: p.number, app: 'Codex', project: 'edges' });
+    assert.equal(locked.code, 2); assert.match(locked.text, /^Can't write .* \(EACCES\)\. Nothing was sent\./);
+    assert.match((await op.ask(id, { yaml: small('Locked?'), dir: work })).text, /^Can't write .*Nothing was sent\./);
+    chmodSync(path.join(home, 'agents'), 0o700);
+    assert.equal((await f.pager(p.pagerId, p.phone)).agents.length, agentsBefore);
+
+    // Cards: an inline attachment with no content, a line break or "|" in a table field, a fenced diff kept whole.
+    const empty = await op.ask(id, { object: { title: 'Look?', detail: 'A mock.', context: { summary: '![Mock](a.png)' }, options: [{ label: 'A', title: 'A', prioritizes: 'a' }, { label: 'B', title: 'B', prioritizes: 'b' }], recommendation: { option: 'A', why: 'A.' }, attachments: [{ name: 'a.png', type: 'image/png' }] } });
+    assert.equal(empty.text, 'Attachment a.png has no content: give its base64 (or text for a .md page).');
+    const unsafe = small('Table?').replace('title: Sushi,', 'title: "Sushi\\nbar",') + 'tradeoffs:\n  - {concern: Cost, A: "green: Cheap | quick", B: "red: [dear]"}\n';
+    assert.deepEqual((await op.ask(id, { yaml: unsafe, dir: work })).text.split('\n'), ['options[0].title must be one line.', 'tradeoffs[0].A has a "|", which would break the Options table; use "/" or words.', 'tradeoffs[0].B has a square bracket, which would end its rating early; use parentheses.']);
+    const { compile } = await import('../src/card.ts');
+    const fenced = compile({ yaml: small('Diff?').replace('  - {label: Sushi, title: Sushi, prioritizes: fish}', '  - label: Sushi\n    title: Sushi\n    prioritizes: fish\n    changes: |\n      - One line.\n\n      ```diff menu.ts\n      -old\n      +new\n\n      ```'), dir: work });
+    assert.ok(fenced.ok && fenced.brief.card.markdown.includes('### What A changes\n- One line.\n\n```diff menu.ts\n-old\n+new\n\n```'), fenced.ok ? fenced.brief.card.markdown : fenced.problems.join());
+
+    // history with a nonsense limit reads as the default; a server that isn't a URL is refused, not a crash.
+    assert.match(op.history(id, Number('abc')).text, /Two\?|One\?/);
+    process.env.AGENTPAGER_SERVER = 'not a url';
+    const bad = await op.connect({ number: p.number, app: 'Codex', project: 'edges' });
+    assert.equal(bad.code, 5); assert.match(bad.text, /^Can't reach not a url \(/);
+  } finally { process.env.AGENTPAGER_SERVER = f.origin; await f.stop(); }
 });

@@ -33,18 +33,22 @@ const count = (s: string) => [...new Intl.Segmenter(undefined, { granularity: 'g
 const number = (n: number) => n.toLocaleString('en-US');
 const typeOf = (name: string) => name.endsWith('.md') ? 'text/markdown' : name.endsWith('.png') ? 'image/png' : /\.jpe?g$/.test(name) ? 'image/jpeg' : null;
 
-// Prose: paragraphs and "- " bullets, hard-wrapped lines joined, so the phone reflows them.
+// Prose: paragraphs and "- " bullets, hard-wrapped lines joined, so the phone reflows them. A fenced block (a diff,
+// a Mermaid flowchart) passes through line for line.
 export function prose(text: string): string {
   const out: string[] = [];
-  for (const block of text.trim().split(/\n\s*\n/)) {
-    const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
-    const items: string[] = [];
-    for (const line of lines) {
-      if (/^[-*] /.test(line) || /^!\[[^\]]*\]\([^)]+\)$/.test(line) || items.length === 0) items.push(line);
-      else items[items.length - 1] += ' ' + line;
-    }
-    out.push(items.join('\n'));
+  let items: string[] = [], fence: string[] | null = null;
+  const flush = () => { if (items.length) out.push(items.join('\n')); items = []; };
+  for (const raw of text.replace(/\s+$/, '').split('\n')) {
+    const line = raw.trim();
+    if (fence) { fence.push(raw.replace(/^\s{0,4}/, '')); if (/^(```|~~~)\s*$/.test(line)) { out.push(fence.join('\n')); fence = null; } continue; }
+    if (/^(```|~~~)/.test(line)) { flush(); fence = [line]; continue; }
+    if (!line) { flush(); continue; }
+    if (/^[-*] /.test(line) || /^!\[[^\]]*\]\([^)]+\)$/.test(line) || items.length === 0) items.push(line);
+    else items[items.length - 1] += ' ' + line;
   }
+  flush();
+  if (fence) out.push(fence.join('\n'));
   return out.join('\n\n');
 }
 const images = (text: string) => [...text.matchAll(/!\[[^\]]*\]\(([^)\s]+)\)/g)].map(m => m[1]);
@@ -70,9 +74,11 @@ export function load(source: Source): { card: unknown; files: Map<string, Attach
     for (const name of listed) {
       if (typeof name !== 'string') continue;
       const type = typeOf(name), file = path.join(source.dir, name);
-      try { statSync(file); } catch { files.set(name, null); continue; }
-      if (type === 'text/markdown') files.set(name, { name, type, text: readFileSync(file, 'utf8') });
-      else if (type) files.set(name, { name, type, base64: readFileSync(file).toString('base64') });
+      try {
+        if (!statSync(file).isFile()) { files.set(name, null); continue; }
+        if (type === 'text/markdown') files.set(name, { name, type, text: readFileSync(file, 'utf8') });
+        else if (type) files.set(name, { name, type, base64: readFileSync(file).toString('base64') });
+      } catch { files.set(name, null); }
     }
   } else {
     card = source.object;
@@ -84,6 +90,8 @@ export function load(source: Source): { card: unknown; files: Map<string, Attach
       if (type === 'text/markdown' && typeof a.text === 'string') files.set(a.name, { name: a.name, type, text: a.text });
       else if (type === 'text/markdown' && typeof a.base64 === 'string') files.set(a.name, { name: a.name, type, text: Buffer.from(a.base64, 'base64').toString('utf8') });
       else if ((type === 'image/png' || type === 'image/jpeg') && typeof a.base64 === 'string') files.set(a.name, { name: a.name, type, base64: a.base64 });
+      // Named but with nothing in it: refused as missing, never sent without it.
+      else if (type) files.set(a.name, null);
     }
   }
   return { card, files, problems };
@@ -102,6 +110,13 @@ export function compile(source: Source): Compiled {
   const unknown = (value: Fields, allowed: readonly string[], where: string) => {
     for (const key of Object.keys(value)) if (!allowed.includes(key)) problems.push(`${where}${key} is not a card key.`);
   };
+  // Fields that become one line, a button or a table cell: no line breaks, and nothing that breaks the table.
+  const line = (value: string | undefined, where: string, cell = false) => {
+    if (value === undefined) return;
+    if (/\n/.test(value)) problems.push(`${where} must be one line.`);
+    else if (cell && /[|]/.test(value)) problems.push(`${where} has a "|", which would break the Options table; use "/" or words.`);
+    else if (cell && /[[\]]/.test(value)) problems.push(`${where} has a square bracket, which would end its rating early; use parentheses.`);
+  };
   const limit = (value: string | undefined, max: number, where: string) => {
     if (value !== undefined && count(value) > max) problems.push(`${where} is ${number(count(value))} characters; the limit is ${number(max)}.`);
   };
@@ -116,6 +131,7 @@ export function compile(source: Source): Compiled {
   unknown(c, KEYS.card, '');
   const title = text(c.title, 'title', true), detail = text(c.detail, 'detail', true);
   limit(title, LIMITS.title, 'title'); limit(detail, LIMITS.detail, 'detail');
+  line(title, 'title'); line(detail, 'detail');
   plain(title, 'title'); plain(detail, 'detail');
 
   const context = isRecord(c.context) ? c.context : {};
@@ -140,6 +156,7 @@ export function compile(source: Source): Compiled {
     unknown(o, KEYS.option, `${where}.`);
     const label = text(o.label, `${where}.label`, true), t = text(o.title, `${where}.title`, true), p = text(o.prioritizes, `${where}.prioritizes`, true);
     limit(label, LIMITS.label, `${where}.label`); limit(p, LIMITS.prioritizes, `${where}.prioritizes`);
+    line(label, `${where}.label`); line(t, `${where}.title`, true); line(p, `${where}.prioritizes`);
     const story: { -readonly [k in keyof typeof STORY]?: string } = {};
     for (const key of Object.keys(STORY) as (keyof typeof STORY)[]) { story[key] = text(o[key], `${where}.${key}`, false); plain(story[key], `${where}.${key}`); }
     const looks = text(o.looks_like, `${where}.looks_like`, false);
@@ -152,6 +169,7 @@ export function compile(source: Source): Compiled {
     const where = `tradeoffs[${i}]`;
     if (!isRecord(row)) { problems.push(`${where} must have a concern and a cell per option.`); return null; }
     const concern = text(row.concern, `${where}.concern`, true);
+    line(concern, `${where}.concern`, true);
     const cells: string[] = [];
     for (const key of Object.keys(row)) if (key !== 'concern' && !letters.includes(key)) problems.push(/^[A-Z]$/.test(key) ? `${where} has a cell for ${key}, which is not an option.` : `${where}.${key} is not a card key.`);
     for (const l of letters) {
@@ -159,7 +177,9 @@ export function compile(source: Source): Compiled {
       if (cell === undefined) { problems.push(`${where} has no cell for ${l}.`); continue; }
       const m = cell.match(/^(\w+):\s*(.+)$/s);
       if (!m || !RATINGS.some(r => r === m[1])) { problems.push(`${where}.${l} must start with green, yellow, orange or red and a colon.`); continue; }
-      cells.push(`:${m[1]}[${m[2].replace(/\s+/g, ' ').replaceAll('|', '/').replaceAll(']', ')')}]`);
+      const before = problems.length;
+      line(m[2], `${where}.${l}`, true);
+      if (problems.length === before) cells.push(`:${m[1]}[${m[2]}]`);
     }
     return { concern: concern ?? '', cells };
   });
@@ -189,7 +209,7 @@ export function compile(source: Source): Compiled {
   if (c.attachments !== undefined && !Array.isArray(c.attachments)) problems.push('attachments must be a list of file names.');
   for (const name of listed) {
     if (!typeOf(name)) problems.push(`Attachment ${name} must end in .md, .png or .jpg.`);
-    else if (files.get(name) === null) problems.push(`Attachment ${name} is listed but there is no such file next to card.yaml.`);
+    else if (files.get(name) === null) problems.push('object' in source ? `Attachment ${name} has no content: give its base64 (or text for a .md page).` : `Attachment ${name} is listed but there is no such file next to card.yaml.`);
   }
   const named: [string, string][] = [];
   const scan = (value: string | undefined, where: string) => { for (const n of images(value ?? '')) named.push([n, where]); };
@@ -226,8 +246,8 @@ export function compile(source: Source): Compiled {
   });
   const live = rows.filter((r): r is NonNullable<typeof r> => !!r);
   if (live.length) {
-    md.push('', '## Tradeoffs', `| | ${ok.map((o, i) => `${letter(i)} ${o.title.replaceAll('|', '/')}`).join(' | ')} |`, `|---|${ok.map(() => '---').join('|')}|`);
-    for (const r of live) md.push(`| ${r.concern.replaceAll('|', '/')} | ${r.cells.join(' | ')} |`);
+    md.push('', '## Tradeoffs', `| | ${ok.map((o, i) => `${letter(i)} ${o.title}`).join(' | ')} |`, `|---|${ok.map(() => '---').join('|')}|`);
+    for (const r of live) md.push(`| ${r.concern} | ${r.cells.join(' | ')} |`);
   }
   md.push('', `## Recommendation: ${letter(recommended - 1)}`, `**Why:** ${prose(why ?? '').replace(/\n+/g, ' ')}`);
   if (changesMind) md.push(`**Assumes:** ${prose(changesMind).replace(/\n+/g, ' ')}`);

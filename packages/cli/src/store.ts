@@ -1,4 +1,4 @@
-import { appendFileSync, chmodSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { appendFileSync, chmodSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { randomInt } from 'node:crypto';
 import { homedir } from 'node:os';
 import path from 'node:path';
@@ -44,6 +44,25 @@ export function saveAgent(a: AgentFile) {
   writeFileSync(temp, JSON.stringify(a, null, 2) + '\n', { mode: 0o600 });
   chmodSync(temp, 0o600);
   renameSync(temp, file);
+}
+// Several agents (a coordinator and its helpers) may share one id: each change re-reads the file and is applied to
+// what is there now, so one's write never drops another's decision.
+export function updateAgent(id: string, change: (a: AgentFile) => void): AgentFile | null {
+  const a = loadAgent(id);
+  if (!a) return null;
+  change(a);
+  saveAgent(a);
+  return a;
+}
+// Checked before anything is sent, so a machine that can't keep the agent's key never creates an agent it can't use.
+export function writable(): string | null {
+  try {
+    mkdirSync(agentsDir(), { recursive: true, mode: 0o700 });
+    const probe = path.join(agentsDir(), `.probe-${process.pid}`);
+    writeFileSync(probe, '', { mode: 0o600 });
+    rmSync(probe);
+    return null;
+  } catch (e) { return e instanceof Error && 'code' in e ? String(e.code) : 'not writable'; }
 }
 export function loadAgent(id: string): AgentFile | null {
   if (!/^ap-[a-z0-9]{4}$/.test(id)) return null;

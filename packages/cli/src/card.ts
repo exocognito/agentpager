@@ -1,11 +1,15 @@
 import { readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { parse } from 'yaml';
+import { Either, ParseResult, Schema } from 'effect';
+import { QuestionInput } from '../../blueprint/design/schemas/exchange.ts';
 import { briefProblem, missingAttachment, attachmentTypes, IMAGE_MAX_BYTES, ATTACHMENTS_MAX, ATTACHMENTS_MAX_BYTES, BRIEF_MAX_CHARACTERS } from '../../blueprint/design/ui/components/cards/brief/schema.ts';
 
 // card.yaml (docs/v2/02-writing-rules.md §2): the whole card as structure, each key landing in one place on the
 // phone. `ask` refuses only what is mechanically certain (R1–R4 here; R5 and R6 come from the server), one line per
-// problem, and compiles the rest to the brief the server and phone read today.
+// problem, and compiles the rest to the brief the server and phone read today. The brief is then held to the server's
+// own QuestionInput, so nothing the server would refuse leaves this machine: once cards are end-to-end encrypted the
+// server can't read them to refuse them.
 
 export const LIMITS = { title: 100, detail: 280, prioritizes: 280, label: 20, markdown: BRIEF_MAX_CHARACTERS, page: 20_000, image: IMAGE_MAX_BYTES, attachments: ATTACHMENTS_MAX, attachmentBytes: ATTACHMENTS_MAX_BYTES };
 const RATINGS = ['green', 'yellow', 'orange', 'red'] as const;
@@ -282,5 +286,23 @@ export function compile(source: Source): Compiled {
   if (count(markdown) > LIMITS.markdown) return { ok: false, problems: [`The card is ${number(count(markdown))} characters as a brief; the limit is ${number(LIMITS.markdown)}. Move detail into an attached page.`] };
   const wrong = briefProblem(markdown, ok.length, recommended) ?? missingAttachment(markdown, attachmentTypes(all));
   if (wrong) return { ok: false, problems: [`The card doesn't compile: ${wrong}.`] };
-  return { ok: true, brief: { title: title ?? '', detail: detail ?? '', card: { type: 'brief', recommended, options: ok.map((o, i) => ({ number: i + 1, title: o.title, label: o.label, prioritizes: o.prioritizes })), markdown }, ...(all.length ? { attachments: all } : {}) } };
+  const brief: Brief = { title: title ?? '', detail: detail ?? '', card: { type: 'brief', recommended, options: ok.map((o, i) => ({ number: i + 1, title: o.title, label: o.label, prioritizes: o.prioritizes })), markdown }, ...(all.length ? { attachments: all } : {}) };
+  const refused = serverProblems(brief, more ? pageName : null);
+  return refused.length ? { ok: false, problems: refused } : { ok: true, brief };
+}
+
+// What QuestionInput refuses, one line each, at the card.yaml key it came from: card.options.0.title is
+// options[0].title. The brief has the server's shape by construction, so its problems are refinements (a limit, an
+// attachment's name or bytes); the type issues beside them come from trying an attachment as the other kind.
+function serverProblems(brief: Brief, page: string | null): string[] {
+  const decoded = Schema.decodeUnknownEither(QuestionInput)(brief);
+  if (Either.isRight(decoded)) return [];
+  const issues = ParseResult.ArrayFormatter.formatErrorSync(decoded.left), refinements = issues.filter(i => i._tag === 'Refinement');
+  const where = ([first, second, third, fourth]: ReadonlyArray<PropertyKey>) => {
+    if (first === 'title' || first === 'detail') return first;
+    if (first === 'card' && second === 'options' && typeof third === 'number' && typeof fourth === 'string') return `options[${third}].${fourth}`;
+    if (first === 'attachments' && typeof second === 'number') { const name = brief.attachments?.[second]?.name; return name === page ? 'context.more' : `Attachment ${name}`; }
+    return first === 'attachments' ? 'attachments' : "The card doesn't compile";
+  };
+  return [...new Set((refinements.length ? refinements : issues).map(i => `${where(i.path)}: ${i.message}.`))];
 }

@@ -2,6 +2,8 @@ import { appendFileSync, chmodSync, mkdirSync, readdirSync, readFileSync, rename
 import { randomInt } from 'node:crypto';
 import { homedir } from 'node:os';
 import path from 'node:path';
+import { Either, ParseResult, Schema } from 'effect';
+import { Token } from '../../app/src/contract.ts';
 
 // Everything the binary keeps lives under ~/.agentpager (AGENTPAGER_HOME moves it), never in the project:
 //   config.json            { "server": "https://agentpager.me" }, optional
@@ -10,13 +12,18 @@ import path from 'node:path';
 export const DEFAULT_SERVER = 'https://agentpager.me';
 export const home = () => process.env.AGENTPAGER_HOME || path.join(homedir(), '.agentpager');
 
-export type AgentFile = {
-  id: string; server: string; pager: string; agentId: string; agentKey: string;
-  app: string; project: string; createdAt: string;
-  rulesShownAt: string | null; cardsSinceRules: number;
+const AgentFile = Schema.mutable(Schema.Struct({
+  id: Schema.String, server: Schema.String, pager: Schema.String, agentId: Token, agentKey: Token,
+  app: Schema.String, project: Schema.String, createdAt: Schema.String,
+  rulesShownAt: Schema.NullOr(Schema.String), cardsSinceRules: Schema.Number,
   // Short decision ids for the agent (d_2x8w): the server's id, the question and its option labels, and how far it got.
-  decisions: { [short: string]: { id: string; title: string; options: string[]; askedAt?: string; answered?: boolean; acknowledged?: boolean } };
-};
+  // askedAt came later, so a file from before it still loads.
+  decisions: Schema.mutable(Schema.Record({ key: Schema.String, value: Schema.mutable(Schema.Struct({
+    id: Schema.String, title: Schema.String, options: Schema.mutable(Schema.Array(Schema.String)),
+    askedAt: Schema.optional(Schema.String), answered: Schema.optional(Schema.Boolean), acknowledged: Schema.optional(Schema.Boolean),
+  })) })),
+}));
+export type AgentFile = typeof AgentFile.Type;
 
 export function server(): string {
   if (process.env.AGENTPAGER_SERVER) return process.env.AGENTPAGER_SERVER.replace(/\/+$/, '');
@@ -81,9 +88,22 @@ export function writable(): string | null {
     return null;
   } catch (e) { return e instanceof Error && 'code' in e ? String(e.code) : 'not writable'; }
 }
+// A file that is there but isn't an agent file is refused by its id, never taken for a missing agent or written over,
+// and never quoted: it holds the agent's key. Fields it doesn't know (a newer binary's) are kept.
+export class UnreadableAgent extends Error {}
 export function loadAgent(id: string): AgentFile | null {
   if (!/^ap-[a-z0-9]{4}$/.test(id)) return null;
-  try { return JSON.parse(readFileSync(agentPath(id), 'utf8')); } catch { return null; }
+  let why: string;
+  try {
+    const decoded = Schema.decodeUnknownEither(AgentFile, { onExcessProperty: 'preserve' })(JSON.parse(readFileSync(agentPath(id), 'utf8')));
+    if (Either.isRight(decoded)) return decoded.right;
+    const field = ParseResult.ArrayFormatter.formatErrorSync(decoded.left)[0]?.path.map(String).join('.');
+    why = field ? `${field} is missing or wrong` : 'not an agent file';
+  } catch (e) {
+    if (e instanceof Error && 'code' in e && e.code === 'ENOENT') return null;
+    why = e instanceof SyntaxError ? 'not JSON' : e instanceof Error && 'code' in e ? String(e.code) : 'unreadable';
+  }
+  throw new UnreadableAgent(`Can't read agent ${id}'s file, ${agentPath(id)} (${why}). Connect again for a new agent.`);
 }
 export function agentIds(): string[] {
   try { return readdirSync(agentsDir()).filter(f => /^ap-[a-z0-9]{4}\.json$/.test(f)).map(f => f.slice(0, -5)).sort(); } catch { return []; }

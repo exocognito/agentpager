@@ -182,16 +182,16 @@ nonisolated struct BriefDocument: Sendable {
         close()
     }
 
-    // The main screen's sections: Tradeoffs shows as "Decision Options" and takes in anything written under
+    // The main screen's sections: Tradeoffs shows as "Options" and takes in anything written under
     // Options outside its option blocks; the option blocks themselves open on the Options screen. A brief with
-    // no Tradeoffs shows its Options heading as "Decision Options" instead.
+    // no Tradeoffs shows its Options heading as "Options" instead.
     var screen: [Section] {
         let intro = sections.first { $0.kind == .options }?.blocks ?? []
         let tradeoffs = sections.first { $0.kind == .tradeoffs }?.id
         return sections.compactMap { s in
             switch s.kind {
-            case .options: tradeoffs == nil ? Section(id: s.id, title: "Decision Options", kind: .tradeoffs, blocks: s.blocks) : nil
-            case .tradeoffs: Section(id: s.id, title: "Decision Options", kind: .tradeoffs, blocks: s.id == tradeoffs ? intro + s.blocks : s.blocks)
+            case .options: tradeoffs == nil ? Section(id: s.id, title: "Options", kind: .tradeoffs, blocks: s.blocks) : nil
+            case .tradeoffs: Section(id: s.id, title: "Options", kind: .tradeoffs, blocks: s.id == tradeoffs ? intro + s.blocks : s.blocks)
             default: s
             }
         }

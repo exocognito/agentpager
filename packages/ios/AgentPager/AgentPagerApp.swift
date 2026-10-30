@@ -10,10 +10,9 @@ struct AgentPagerApp: App {
         WindowGroup {
             RootView()
                 .environment(model)
-                .onOpenURL { model.handle(url: $0) }
                 .task(id: scenePhase == .active) {
                     // Foreground: refresh about every 3 s. A closed app hears its agents through alerts (Alerts.swift).
-                    if scenePhase == .active { await model.pollLoop() }
+                    if scenePhase == .active { model.reloadServer(); await model.pollLoop() }
                 }
                 .onChange(of: scenePhase) { _, phase in
                     if phase != .active { model.flushUndo() }
@@ -22,21 +21,28 @@ struct AgentPagerApp: App {
     }
 }
 
+// Pagers → a pager → its detail, a decision, or a project's answered decisions. No Settings screen: the server
+// address is in the Settings app.
 struct RootView: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
         @Bindable var model = model
         NavigationStack(path: $model.path) {
-            AgentsListView()
+            PagersView()
                 .navigationDestination(for: Route.self) { route in
                     switch route {
-                    case .agent(let id): AgentView(sessionId: id)
+                    case .pager(let id): PagerView(pagerId: id)
+                    case .pagerDetail(let id): PagerDetailView(pagerId: id)
+                    case .decision(let p, let a, let d): DecisionView(pagerId: p, agentId: a, decisionId: d)
+                    case .answered(let p, let project): AnsweredListView(pagerId: p, project: project)
                     }
                 }
         }
         .sheet(item: $model.sheet) { sheet in
-            SheetContent(sheet: sheet)
+            switch sheet {
+            case .newPager: NewPagerSheet().environment(model)
+            }
         }
         .overlay(alignment: .bottom) {
             if let undo = model.undo { UndoPill(answer: undo) }
@@ -46,27 +52,6 @@ struct RootView: View {
             Button("Retry") { model.retryNotConfirmed() }.keyboardShortcut(.defaultAction)
         } message: {
             Text("Your answer is not confirmed. Retry sends the same prepared answer.")
-        }
-    }
-}
-
-struct SheetContent: View {
-    @Environment(AppModel.self) private var model
-    var sheet: ActiveSheet
-
-    var body: some View {
-        switch sheet {
-        case .connect:
-            ConnectSheet()
-        case .pairing(let target):
-            let phoneKey = target.sessionId.flatMap { model.key($0)?.phoneKey } ?? randomToken()
-            PairingSheet(flow: model.demoFlow ?? PairingFlow(target: target, phoneKey: phoneKey))
-        case .decision(let s, let d):
-            DecisionSheet(sessionId: s, decisionId: d)
-        case .thread(let s, let d):
-            ThreadSheet(sessionId: s, decisionId: d)
-        case .settings:
-            SettingsSheet()
         }
     }
 }

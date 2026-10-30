@@ -1,11 +1,11 @@
 import Foundation
 
-// The app's words: agents and their pagers, never sessions. Subtitles are "Status · time" everywhere.
+// The app's words: pagers, agents and decisions, never sessions. A pager is active or off; the verb is "turn off".
 enum Wording {
     static func remaining(until end: Date, now: Date) -> String {
         let seconds = max(0, end.timeIntervalSince(now))
         let minutes = Int(seconds / 60)
-        if minutes < 60 { return "\(max(minutes, 0))m" }
+        if minutes < 60 { return "\(max(minutes, 1))m" }
         let hours = Int((seconds / 3600).rounded())
         if hours < 48 { return "\(hours)h" }
         return "\(Int((seconds / 86400).rounded()))d"
@@ -19,38 +19,27 @@ enum Wording {
         return "\(Int(seconds / 86400))d ago"
     }
 
-    static func subtitle(_ s: PagerSummary, now: Date) -> String {
-        switch s.status {
-        case .ended: return "Pager ended · " + ago(s.endedAt ?? now, now: now)
-        case .unpaired, .waiting: return "Pager not paired · Ends in " + remaining(until: s.endsAt ?? now, now: now)
-        case .active: return "Pager active · Ends in " + remaining(until: s.endsAt ?? now, now: now)
-        }
-    }
-
-    static func exactEnd(_ date: Date) -> String {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "en_US_POSIX")
-        f.dateFormat = "MMM d 'at' h:mm a"
-        return "Pager ends " + f.string(from: date)
+    // "Active · Stays on", "Active · Turns off in 18h", "Off since yesterday".
+    static func status(_ s: PagerState, now: Date) -> String {
+        if s.on { return s.offAt.map { "Active · Turns off in " + remaining(until: $0, now: now) } ?? "Active · Stays on" }
+        guard let since = s.offSince else { return "Off" }
+        let calendar = Calendar.current
+        if calendar.isDateInToday(since) { return "Off since " + time(since) }
+        if calendar.isDateInYesterday(since) { return "Off since yesterday" }
+        return "Off since " + since.formatted(.dateTime.month(.abbreviated).day())
     }
 
     static func time(_ date: Date) -> String {
         date.formatted(date: .omitted, time: .shortened)
     }
 
-    // "Claude Code · blueprint" -> "Claude Code"
-    static func shortName(_ name: String) -> String {
-        name.components(separatedBy: " · ").first ?? name
+    // "8:39 AM", "yesterday, 8:39 AM", "Oct 27, 8:39 AM".
+    static func when(_ date: Date) -> String {
+        let calendar = Calendar.current
+        if calendar.isDateInToday(date) { return time(date) }
+        if calendar.isDateInYesterday(date) { return "yesterday, " + time(date) }
+        return date.formatted(.dateTime.month(.abbreviated).day()) + ", " + time(date)
     }
 
-    // The pairing window is the pager's first 15 minutes, so a phone-made link has less left by the time its agent joins.
-    static func pairingHint(until end: Date?, now: Date) -> String {
-        guard let end else { return "Pair within 15 minutes, or this pager ends." }
-        let minutes = max(1, Int((end.timeIntervalSince(now) / 60).rounded(.up)))
-        return "Pair within \(minutes) minute\(minutes == 1 ? "" : "s"), or this pager ends."
-    }
-    static let lastTry = "Last try. If it’s wrong, this pager ends."
-    static func wrong(_ triesLeft: Int) -> String {
-        triesLeft == 1 ? lastTry : "Those don’t match. \(triesLeft) tries left."
-    }
+    static func capitalized(_ text: String) -> String { text.prefix(1).uppercased() + text.dropFirst() }
 }

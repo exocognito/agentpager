@@ -1,33 +1,46 @@
 import Foundation
 import Security
+import CryptoKit
 
-// One phone key per pager. The app keeps no list of its own: the Agents list is whatever the server reports
-// for the keys held here, and a key the server no longer knows is dropped.
-nonisolated struct PagerKey: Codable, Hashable, Sendable, Identifiable {
-    var sessionId: String
+// A pager this phone made. Its key pair, id and number are made here; the server keeps only the public key and a
+// digest of the phone key. The name lives only on this phone. The app keeps no other list: the Pagers screen is the
+// pagers held here, and one the server no longer knows is dropped.
+nonisolated struct LocalPager: Codable, Hashable, Sendable, Identifiable {
+    var pagerId: String
+    var number: String
     var phoneKey: String
+    var privateKey: Data
+    var name: String
     var server: String
-    var madeByPhone: Bool
-    var linkCode: String?
-    var linkURL: String?
     var createdAt: Date
-    var id: String { sessionId }
+    var id: String { pagerId }
+
+    var publicKey: String {
+        (try? Curve25519.KeyAgreement.PrivateKey(rawRepresentation: privateKey)).map { base64url($0.publicKey.rawRepresentation) } ?? ""
+    }
+
+    // The number is `ap1_` and base64url of the pager id (16 bytes) and the first 8 bytes of the SHA-256 of its public
+    // key (docs/v2/04-encryption.md §2), so a server can't swap the key.
+    static func make(name: String, server: String) -> LocalPager {
+        let key = Curve25519.KeyAgreement.PrivateKey()
+        var id = [UInt8](repeating: 0, count: 16)
+        _ = SecRandomCopyBytes(kSecRandomDefault, id.count, &id)
+        let fingerprint = Array(SHA256.hash(data: key.publicKey.rawRepresentation)).prefix(8)
+        return LocalPager(pagerId: id.map { String(format: "%02x", $0) }.joined(), number: "ap1_" + base64url(Data(id + fingerprint)),
+                          phoneKey: randomToken(), privateKey: key.rawRepresentation, name: name, server: server, createdAt: Date())
+    }
 }
 
-// The phone's pager number on one server. Every pager an agent opens with it shares this phone key; `seen` lists the
-// pagers already taken from the server's listing, so one the server later forgets is not added again.
-nonisolated struct PagerNumber: Codable, Hashable, Sendable {
-    var server: String
-    var phoneKey: String
-    var number: String
-    var seen: [String]
+nonisolated func base64url(_ data: Data) -> String {
+    data.base64EncodedString().replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "")
 }
 
 nonisolated enum Keychain {
-    static let service = "me.agentpager.app.pagers"
-    static let numberService = "me.agentpager.app.number"
+    static let service = "me.agentpager.app.pagers.v2"
+    // v1's pager keys and number. v2 is a fresh install: they are deleted at launch.
+    static let retired = ["me.agentpager.app.pagers", "me.agentpager.app.number"]
 
-    static func all() -> [PagerKey] {
+    static func all() -> [LocalPager] {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -36,31 +49,15 @@ nonisolated enum Keychain {
         ]
         var result: CFTypeRef?
         guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess, let items = result as? [Data] else { return [] }
-        return items.compactMap { try? JSONDecoder().decode(PagerKey.self, from: $0) }.sorted { $0.createdAt > $1.createdAt }
+        return items.compactMap { try? JSONDecoder().decode(LocalPager.self, from: $0) }.sorted { $0.createdAt < $1.createdAt }
     }
 
-    static func save(_ key: PagerKey) { write(key, service: service, account: key.sessionId) }
-
-    static func number(server: String) -> PagerNumber? {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: numberService,
-            kSecAttrAccount as String: server,
-            kSecReturnData as String: true,
-        ]
-        var result: CFTypeRef?
-        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess, let data = result as? Data else { return nil }
-        return try? JSONDecoder().decode(PagerNumber.self, from: data)
-    }
-
-    static func save(_ number: PagerNumber) { write(number, service: numberService, account: number.server) }
-
-    private static func write(_ value: some Encodable, service: String, account: String) {
-        guard let data = try? JSONEncoder().encode(value) else { return }
+    static func save(_ pager: LocalPager) {
+        guard let data = try? JSONEncoder().encode(pager) else { return }
         let match: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
+            kSecAttrAccount as String: pager.pagerId,
         ]
         let update: [String: Any] = [kSecValueData as String: data]
         if SecItemUpdate(match as CFDictionary, update as CFDictionary) == errSecItemNotFound {
@@ -71,18 +68,20 @@ nonisolated enum Keychain {
         }
     }
 
-    static func delete(_ sessionId: String) {
+    static func delete(_ pagerId: String) {
         let match: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: sessionId,
+            kSecAttrAccount as String: pagerId,
         ]
         SecItemDelete(match as CFDictionary)
     }
 
+    static func deleteRetired() {
+        for s in retired { SecItemDelete([kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: s] as CFDictionary) }
+    }
+
     static func deleteAll() {
-        for s in [service, numberService] {
-            SecItemDelete([kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: s] as CFDictionary)
-        }
+        for s in retired + [service] { SecItemDelete([kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: s] as CFDictionary) }
     }
 }

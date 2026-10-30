@@ -12,9 +12,9 @@ settings:
     CODE_SIGN_STYLE: Automatic
     # Sam's paid Apple Developer team (alerts need it, D7); kept here so xcodegen does not drop it.
     DEVELOPMENT_TEAM: X3M532E87A
-    # The dogfood server. Change it here, or in the app's Server screen, or with the launch argument
-    # -AgentPagerServerURL http://host:8787
-    AGENTPAGER_SERVER_URL: "http://192.168.4.99:8787"
+    # The server this build uses. Change it here, in the Settings app (AgentPager → Server, for self-hosters), or with
+    # the launch argument -AgentPagerServerURL http://host:8787
+    AGENTPAGER_SERVER_URL: "https://agentpager.me"
 targets:
   AgentPager:
     type: application
@@ -49,10 +49,6 @@ targets:
           UIApplicationSupportsMultipleScenes: false
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
-        CFBundleURLTypes:
-          - CFBundleURLName: me.agentpager.app.start
-            CFBundleURLSchemes:
-              - agentpager
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
         NSLocalNetworkUsageDescription: AgentPager connects to your AgentPager server on this network.

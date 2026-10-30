@@ -150,6 +150,10 @@ export const CheckIcon = ({ size = 20, className = "check", label }: IconProps) 
 export const ClockIcon = ({ size = 16 }: IconProps) => (
   <svg width={size} height={size} viewBox="0 0 22 22" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8.5" /><path d="M11 6.5V11l3 2" /></svg>
 );
+// exclamationmark.triangle.fill, for an answer no agent has picked up
+export const WarningIcon = ({ size = 16 }: IconProps) => (
+  <svg className="warning" width={size} height={size} viewBox="0 0 22 22" fill="currentColor" aria-hidden="true"><path d="M9.3 2.9a2 2 0 0 1 3.4 0l7.6 13.4a2 2 0 0 1-1.7 3H3.4a2 2 0 0 1-1.7-3Z" /><path d="M11 7.5v5M11 15.6v.1" stroke="#fff" strokeWidth="2" strokeLinecap="round" /></svg>
+);
 // square.and.arrow.up
 export const ShareIcon = () => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3v12M7.5 7.5 12 3l4.5 4.5M5 11v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-8" /></svg>

@@ -27,7 +27,8 @@ struct PreparedAnswer: Identifiable, Hashable {
     var id: String { requestId }
 }
 
-enum RowState: Hashable { case sending, waiting, confirmed }
+// notPickedUp: the service warned that no agent had read the answer in time, and none has since (I6).
+enum RowState: Hashable { case sending, waiting, notPickedUp, confirmed }
 
 // A decision with who asked it.
 struct Asked: Identifiable, Hashable {
@@ -377,7 +378,8 @@ final class AppModel {
     }
     func rowState(_ d: Decision) -> RowState {
         if sending(d.decisionId) || d.answer == nil { return .sending }
-        return d.acknowledgement == nil ? .waiting : .confirmed
+        if d.acknowledgement != nil { return .confirmed }
+        return d.warnedAt != nil && d.collectedAt == nil ? .notPickedUp : .waiting
     }
 
     // A brief's attachments, kept in memory once read: a decision never changes (SI8). They go with the pager

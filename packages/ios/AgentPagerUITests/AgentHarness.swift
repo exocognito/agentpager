@@ -49,10 +49,12 @@ final class AgentHarness {
         return value
     }
 
-    // Connects with the owner's pager number: a new agent on that pager.
-    func connect(number: String, app: String = "Codex", project: String = "flow") throws {
+    // Connects with the owner's pager number: a new agent on that pager, on the computer named, if any.
+    func connect(number: String, app: String = "Codex", project: String = "flow", machine: String? = nil) throws {
         agentKey = ""
-        let r = try call("POST", "api/agents", ["number": number, "app": app, "project": project])
+        var input = ["number": number, "app": app, "project": project]
+        if let machine { input["machine"] = machine }
+        let r = try call("POST", "api/agents", input)
         agentId = (r["agent"] as! [String: Any])["agentId"] as! String
         agentKey = r["agentKey"] as! String
     }

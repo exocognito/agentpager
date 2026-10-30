@@ -40,7 +40,7 @@ plays the agent over the HTTP API: it connects with the number, asks all four, t
 
 ## Local configuration
 
-`PORT`, `AGENTPAGER_INSPECTOR_PORT`, and `AGENTPAGER_PERSIST` select the local listener, inspector and persistent storage (outside the worktree). `AGENTPAGER_AUTO_OFF_MS` (every auto-off choice) and `AGENTPAGER_IDLE_MS` (housekeeping) are local-only compile-time clocks, so tests cross them in real time; zero or unset is the production value. Local startup builds to a private temporary directory, so concurrent instances never race over a bundle or database. Production builds always compile the production clocks.
+`PORT`, `AGENTPAGER_INSPECTOR_PORT`, and `AGENTPAGER_PERSIST` select the local listener, inspector and persistent storage (outside the worktree). `AGENTPAGER_AUTO_OFF_MS` (every auto-off choice), `AGENTPAGER_IDLE_MS` (housekeeping) and `AGENTPAGER_PICKUP_MS` (the warning when no agent collects an answer) are local-only compile-time clocks, so tests cross them in real time; zero or unset is the production value. Local startup builds to a private temporary directory, so concurrent instances never race over a bundle or database. Production builds always compile the production clocks.
 
 ## Acceptance proof
 

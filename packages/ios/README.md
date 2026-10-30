@@ -33,12 +33,15 @@ decisions stay readable, and an open one shows "[name] pager is off · Turn on" 
 
 A **decision** is pushed full screen. Options, background pages and Ask for changes open as bottom sheets with a grab
 handle; images open full screen. Once answered, the bar is the closed record: the choice, then the agent's
-confirmation and next steps.
+confirmation and next steps. Until it confirms, the bar says the phone is waiting for the agent; if no agent has
+read the answer 3 minutes after Send, it says so instead, naming the agent, its computer and its project, until one
+does (I6).
 
 ## Alerts
 
 When an agent asks, the phone alerts with who asked and the question, even with the app closed; tapping the alert
-opens that decision (C17). The app asks to send alerts once there is a pager, and gives its device token to each
+opens that decision (C17). If no agent reads an answer within 3 minutes of Send, one more alert says so, naming the
+agent and its computer (`kind` `warning`). The app asks to send alerts once there is a pager, and gives its device token to each
 pager. Only the deployed server (`https://agentpager.me`) sends alerts: a server on the Mac cannot reach Apple's push
 service. Builds from Xcode use Apple's sandbox service.
 
@@ -64,7 +67,7 @@ TEST_RUNNER_AGENTPAGER_SERVER_URL=http://<mac-ip>:8787 TEST_RUNNER_SCREENSHOT_DI
 `-failSends N` (launch argument) makes the next N answer attempts fail, to show the "Answer Not Confirmed" alert.
 `-demo <state>` launches on the mocks' sample data with no network, for screenshots to compare with `docs/v2/mocks/`:
 `pagers` (default), `pager`, `detail`, `new`, `decision`, `selected`, `options`, `page`, `changes`, `off`, `answered`,
-`undo`, `notconfirmed`, `empty`.
+`undo`, `notconfirmed`, `notpickedup`, `empty`.
 
 ## Decision briefs
 

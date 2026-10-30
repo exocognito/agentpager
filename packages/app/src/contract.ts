@@ -11,6 +11,8 @@ export const MAX_OPEN_DECISIONS = 10;
 export const ANSWER_WAIT_MAX_SECONDS = 50;
 // Housekeeping: an agent is forgotten this long after its last activity.
 export const AGENT_IDLE_MS = 30 * 24 * 3_600_000;
+// An answer no agent has collected this long after Send gets one alert, and the phone says so (I6).
+export const PICKUP_MS = 3 * 60_000;
 
 // A pager turns off by itself after this long on, or never.
 export const AUTO_OFF = { '24h': 24 * 3_600_000, '7d': 7 * 24 * 3_600_000, '30d': 30 * 24 * 3_600_000 } as const;
@@ -35,8 +37,9 @@ export const Pager = Schema.Struct({
   offAt: Schema.NullOr(Timestamp), offSince: Schema.NullOr(Timestamp), createdAt: Timestamp,
 });
 export type Pager = typeof Pager.Type;
+// machine: the computer it runs on, by its short hostname, when the agent said.
 export const Agent = Schema.Struct({
-  agentId: Token, app: Label, project: Label, createdAt: Timestamp, finishedAt: Schema.NullOr(Timestamp),
+  agentId: Token, app: Label, project: Label, machine: Schema.optional(Label), createdAt: Timestamp, finishedAt: Schema.NullOr(Timestamp),
   lastActivityAt: Timestamp, openCount: Count,
 });
 export type Agent = typeof Agent.Type;
@@ -44,7 +47,7 @@ export type Agent = typeof Agent.Type;
 // Requests.
 export const CreatePagerInput = Schema.Struct({ number: PagerNumber, publicKey: PublicKey, autoOff: AutoOff }).annotations(strict);
 export const PagerSettingsInput = Schema.Struct({ on: Schema.optional(Schema.Boolean), autoOff: Schema.optional(AutoOff) }).annotations(strict);
-export const ConnectInput = Schema.Struct({ number: Schema.String, app: Label, project: Label }).annotations(strict);
+export const ConnectInput = Schema.Struct({ number: Schema.String, app: Label, project: Label, machine: Schema.optional(Label) }).annotations(strict);
 
 // Responses.
 export const PagerReply = Schema.Struct({ pager: Pager });

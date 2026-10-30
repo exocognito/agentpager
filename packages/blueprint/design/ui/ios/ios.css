@@ -112,6 +112,8 @@
 .ios .chev { color: var(--label3); }
 .ios .check { color: var(--tint); }
 .ios .confirmed { color: var(--green); }
+.ios .warning { color: var(--orange); flex: none; }
+.ios .cell-status:has(.warning) { align-items: flex-start; }
 .ios .dot { width: 10px; height: 10px; border-radius: 5px; flex-shrink: 0; }
 .ios .cell.top .dot { margin-top: 6px; }
 .ios .dot.blue { background: var(--tint); }

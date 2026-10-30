@@ -11,15 +11,15 @@ const Payload = Schema.Struct({
     alert: Schema.Struct({ title: Schema.String, body: Schema.String }), sound: Schema.Literal('default'), 'thread-id': Schema.String,
     'content-available': Schema.Literal(1), 'interruption-level': Schema.Literal('time-sensitive', 'active'),
   }),
-  kind: Schema.Literal('decision', 'acknowledgement'), pagerId: Schema.String, agentId: Schema.String, decisionId: Schema.String,
+  kind: Schema.Literal('decision', 'acknowledgement', 'warning'), pagerId: Schema.String, agentId: Schema.String, decisionId: Schema.String,
 });
 type Delivery = { device: string; headers: Record<string, string>; payload: typeof Payload.Type };
 const Ok = Schema.Struct({ ok: Schema.Literal(true) });
 
-test('alerts: a pager whose phone gave its token alerts when an agent asks and acknowledges', { timeout: 180_000 }, async () => {
+async function apple() {
   const { privateKey, publicKey } = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
   const deliveries: Delivery[] = [], replies = new Map<string, { status: number; reason: string }>();
-  const apple = createServer((req, res) => {
+  const server = createServer((req, res) => {
     let raw = '';
     req.on('data', chunk => { raw += chunk; });
     req.on('end', () => {
@@ -33,16 +33,20 @@ test('alerts: a pager whose phone gave its token alerts when an agent asks and a
       res.writeHead(reply.status); res.end(reply.status === 200 ? '' : JSON.stringify({ reason: reply.reason }));
     });
   });
-  await new Promise<void>(r => apple.listen(0, '127.0.0.1', r));
-  const address = apple.address(); if (!address || typeof address === 'string') throw new Error('port');
+  await new Promise<void>(r => server.listen(0, '127.0.0.1', r));
+  const address = server.address(); if (!address || typeof address === 'string') throw new Error('port');
   // The key as it sits in the vault: one line, its breaks turned to spaces.
   process.env.APNS_KEY_P8 = privateKey.export({ type: 'pkcs8', format: 'pem' }).toString().replace(/\n/g, ' ');
   process.env.APNS_KEY_ID = 'KEY1234567'; process.env.APNS_TEAM_ID = 'TEAM123456'; process.env.APNS_TOPIC = 'me.agentpager.app.dev';
   process.env.APNS_ORIGIN = `http://127.0.0.1:${address.port}`;
-  const f = await fixture('push');
-  const device = () => Array.from({ length: 64 }, () => '0123456789abcdef'[Math.floor(Math.random() * 16)]).join('');
-  const register = (pagerId: string, phone: string, deviceToken: string) => f.ok(Ok, `/api/pagers/${pagerId}/push`, { phone, data: { token: deviceToken, environment: 'sandbox' } });
-  const sent = (to: string) => deliveries.filter(d => d.device === to);
+  return { replies, sent: (to: string) => deliveries.filter(d => d.device === to), close: () => server.close() };
+}
+const device = () => Array.from({ length: 64 }, () => '0123456789abcdef'[Math.floor(Math.random() * 16)]).join('');
+const registered = (f: Awaited<ReturnType<typeof fixture>>) => (pagerId: string, phone: string, deviceToken: string) => f.ok(Ok, `/api/pagers/${pagerId}/push`, { phone, data: { token: deviceToken, environment: 'sandbox' } });
+
+test('alerts: a pager whose phone gave its token alerts when an agent asks and acknowledges', { timeout: 180_000 }, async () => {
+  const { replies, sent, close } = await apple();
+  const f = await fixture('push'), register = registered(f);
   try {
     const p = await f.makePager(), mine = device();
     await f.refused(401, 'Unauthorized', `/api/pagers/${p.pagerId}/push`, { phone: token(), data: { token: mine, environment: 'sandbox' } });
@@ -98,6 +102,58 @@ test('alerts: a pager whose phone gave its token alerts when an agent asks and a
     assert.equal(sent(fresh).length, 1);
   } finally {
     await f.stop();
-    apple.close();
+    close();
+  }
+});
+
+// I6: an answer no agent collects within the pickup time gets one alert and a warning on its decision; collecting
+// it later takes the warning off but is never an acknowledgement. Local pickup time 3 s; the words say 3 min.
+test('not picked up: one alert and a warning when no agent collects an answer in time', { timeout: 180_000 }, async () => {
+  const { sent, close } = await apple();
+  const f = await fixture('pickup', { autoOffMs: 0, idleMs: 0, pickupMs: 3_000 }), register = registered(f);
+  const decision = async (pagerId: string, phone: string, decisionId: string) => (await f.pager(pagerId, phone)).agents.flatMap(x => x.answered).find(d => d.decisionId === decisionId);
+  try {
+    const p = await f.makePager(), mine = device();
+    await register(p.pagerId, p.phone, mine);
+    const a = await f.connect(p.number, 'Claude Desktop', 'wake-lab', 'air');
+    assert.equal((await f.pager(p.pagerId, p.phone)).agents[0]?.agent.machine, 'air', 'the phone sees which computer');
+
+    // Collected in time: no warning, ever.
+    const quick = await f.ask(a, 'Collected in time?');
+    await f.answer(a.agent.agentId, p.phone, quick.decisionId);
+    assert.equal((await f.read(a, quick.decisionId)).status, 'answered');
+    // Not collected: one alert after the pickup time, and the decision says when.
+    const slow = await f.ask(a, 'Ship it?');
+    const receipt = await f.answer(a.agent.agentId, p.phone, slow.decisionId);
+    const warning = (await until(async () => sent(mine).filter(d => d.payload.kind === 'warning'), w => w.length === 1, 30_000))[0];
+    assert.deepEqual(warning.payload.aps.alert, { title: 'Claude Desktop · wake-lab', body: 'Claude Desktop on air (wake-lab) hasn’t picked up your answer to “Ship it?” after 3 min. AgentPager can’t reach it: it may be asleep, closed or disconnected. Check in with it directly.' });
+    assert.equal(warning.payload.decisionId, slow.decisionId);
+    assert.equal(warning.payload.aps['interruption-level'], 'active');
+    assert.equal(warning.headers['apns-collapse-id'], slow.decisionId);
+    const warned = await decision(p.pagerId, p.phone, slow.decisionId);
+    assert.ok(warned?.warnedAt && !warned.collectedAt, 'warned, not collected');
+    assert.ok(Date.parse(warned.warnedAt) - Date.parse(receipt.sentAt) >= 3_000, 'not before the pickup time');
+    assert.equal(warned.status, 'answered');
+    const collected = await decision(p.pagerId, p.phone, quick.decisionId);
+    assert.ok(collected?.collectedAt && !collected.warnedAt, 'collected, never warned');
+    assert.equal(collected.status, 'answered', 'collected is not acknowledged');
+
+    // Collected late: the warning stays on record, the collection is added, and nothing more alerts.
+    await f.read(a, slow.decisionId);
+    const late = await decision(p.pagerId, p.phone, slow.decisionId);
+    assert.ok(late?.warnedAt && late.collectedAt, 'warned, then collected');
+    await new Promise(r => setTimeout(r, 4_000));
+    assert.equal(sent(mine).filter(d => d.payload.kind === 'warning').length, 1, 'one alert per answer');
+
+    // While the pager is off no agent can read the answer, so there is nothing to warn about.
+    const off = await f.ask(a, 'While it turns off?');
+    await f.answer(a.agent.agentId, p.phone, off.decisionId);
+    await f.settings(p.pagerId, p.phone, { on: false });
+    await new Promise(r => setTimeout(r, 6_000));
+    assert.equal((await decision(p.pagerId, p.phone, off.decisionId))?.warnedAt, undefined, 'no warning while off');
+    assert.equal(sent(mine).filter(d => d.payload.kind === 'warning').length, 1, 'no alert while off');
+  } finally {
+    await f.stop();
+    close();
   }
 });

@@ -11,8 +11,10 @@ export type Pager = { sessionId: string; name: string; status: PagerStatus; life
 export type Option = { number: number; emoji: string; title: string; detail?: string };
 export type Decision = { decisionId: string; title: string; detail?: string; recommended?: number; options: Option[] };
 export type Choice = { kind: "option"; number: number } | { kind: "feedback"; text: string };
-// From Send: Undo is open, then the answer is sending, then it waits for the agent, then the agent confirms.
-export type SendState = { kind: "undo"; seconds: number } | { kind: "sending" } | { kind: "waiting" } | { kind: "confirmed"; nextSteps: string; at: Date };
+// From Send: Undo is open, then the answer is sending, then it waits for the agent, then the agent confirms. Waiting
+// turns to notPickedUp when the service warns that no agent has read the answer in time (I6); `who` names the agent
+// and its computer and project, "Claude Code on air (blueprint)".
+export type SendState = { kind: "undo"; seconds: number } | { kind: "sending" } | { kind: "waiting" } | { kind: "notPickedUp"; who: string } | { kind: "confirmed"; nextSteps: string; at: Date };
 export type Answered = { decision: Decision; choice: Choice; sentAt: Date; state: SendState };
 
 export const claude: Pager = { sessionId: "p1", name: "Claude Code · blueprint", status: "active", lifetime: "24h", endsAt: minutes(24 * 60), openCount: 3 };

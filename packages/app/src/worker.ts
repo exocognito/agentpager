@@ -85,7 +85,7 @@ async function api(request: Request, env: Env): Promise<Response> {
     const input = decode(C.ConnectInput, await body(request));
     const { pagerId, fingerprint: named } = parseNumber(input.number), agentId = token();
     const linked = decode(Linked, await relay(await registry(env, '/connect', { pagerId, fingerprint: named, agentId })).json());
-    return forward(env.AGENT, agentId, '/open', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ agentId, pagerId, phoneHash: linked.phoneHash, app: input.app, project: input.project }) });
+    return forward(env.AGENT, agentId, '/open', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ agentId, pagerId, phoneHash: linked.phoneHash, app: input.app, project: input.project, machine: input.machine }) });
   }
   if (parts[0] === 'agents' && parts.length >= 2) {
     const agentId = decode(C.Token, parts[1]), rest = parts.slice(2).join('/');

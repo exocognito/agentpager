@@ -248,7 +248,7 @@ struct ClosedBar: View {
                         Text(ack.nextSteps).font(.body).fixedSize(horizontal: false, vertical: true)
                     }
                 } else {
-                    SendStatusLine(decision: d, app: asked.agent.app).font(.subheadline).foregroundStyle(.secondary)
+                    SendStatusLine(decision: d, agent: asked.agent).font(.subheadline).foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 0)
             }

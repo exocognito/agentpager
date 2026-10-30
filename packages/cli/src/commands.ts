@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { call, get, type Reply } from './client.ts';
 import { compile, type Source } from './card.ts';
-import { HARNESS_APP, detectApp, detectProject, harness, self, type Harness } from './detect.ts';
+import { HARNESS_APP, detectApp, detectMachine, detectProject, harness, self, type Harness } from './detect.ts';
 import { REVIEW, SHORT, EXAMPLE, rulesText } from './rules.ts';
 import { agentIds, appendHistory, home, loadAgent, pagerOf, readHistory, saveAgent, server, shortId, updateAgent, writable, type AgentFile } from './store.ts';
 
@@ -72,7 +72,8 @@ export async function connect(input: { number?: string; app?: string; project?: 
   if (!pager) return refused('Not connected. This pager number is not in use. Ask your owner for their current one.');
   const cannot = writable();
   if (cannot) return unwritable(cannot);
-  const r = await call(base, 'POST', '/api/agents', { data: { number, app, project } });
+  const machine = detectMachine();
+  const r = await call(base, 'POST', '/api/agents', { data: { number, app, project, ...(machine ? { machine } : {}) } });
   if (!r.ok) {
     if (r.error === 'NumberInvalid') return refused('Not connected. This pager number is not in use. Ask your owner for their current one.');
     return refusal(r, base, 'Not connected. This pager is turned off and your message was not delivered.\nAsk your owner to turn it on, or for another pager number.');

@@ -41,7 +41,7 @@ const ROWS = [
   ["4 · Inside an agent", pick(agent, AgentStories, ["Decisions", "NoDecisionsYet", "Menu", "EndsMenu", "EndConfirm", "EndedAgentFinished", "EndedTimedOut", "EndedByYou", "EndedPairingFailed"])],
   ["5 · Answering a decision", pick(decision, DecisionStories, ["OptionChosen", "NothingChosen", "AskForChanges", "AskForChangesWithHtml", "Cleared"])],
   ["6 · After you answer", [
-    ...pick(after, AfterSendStories, ["Undo", "Sending", "NotConfirmed", "Waiting", "Confirmed"]),
+    ...pick(after, AfterSendStories, ["Undo", "Sending", "NotConfirmed", "Waiting", "NotPickedUp", "Confirmed"]),
     ...pick(decision, DecisionStories, ["ThreadUndo", "ThreadSending", "ThreadWaiting", "ThreadConfirmed", "ThreadFeedback"]),
   ]],
 ] as const;

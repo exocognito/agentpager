@@ -1,0 +1,13 @@
+{
+  "name": "@agentpager/cli",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "sh scripts/build.sh",
+    "test": "node --test --experimental-strip-types test/*.test.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.26.0",
+    "yaml": "2.9.1"
+  }
+}

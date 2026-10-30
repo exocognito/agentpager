@@ -82,10 +82,12 @@ final class FlowTests: XCTestCase {
                                  options: ["Send now", "Send at 9:00 tomorrow", "Don’t send it"], recommended: 1)
         let other = AgentHarness(base: AgentHarness.server)
         try other.connect(number: number, app: "Claude Code", project: "agentpager")
+        try AgentHarness(base: AgentHarness.server).connect(number: number, app: "pi", project: "quiet")
         _ = try other.ask("Option detail: bottom sheet or full screen?", options: ["Bottom sheet", "Full screen"])
         wait(app.buttons["open-Send Maya the update?"], 8)
         wait(app.buttons["open-Option detail: bottom sheet or full screen?"], 8)
         XCTAssertTrue(app.staticTexts["ATOMIC-PAGES"].exists || app.staticTexts["atomic-pages"].exists, "grouped by project")
+        XCTAssertFalse(app.staticTexts["QUIET"].exists || app.staticTexts["quiet"].exists, "an agent that hasn't asked anything adds no project")
         shot("04-pager-open")
         back()
         waitUntil(5, "the badge counts both agents' open decisions") { app.buttons["pager-Work"].label.contains("3 open") }

@@ -16,6 +16,8 @@ test('the binary: connect, refusals, ask, wait, ack, status, history, off, finis
   const f = await fixture('cli');
   const home = mkdtempSync(path.join(tmpdir(), 'agentpager-cli-')), work = mkdtempSync(path.join(tmpdir(), 'agentpager-card-'));
   process.env.AGENTPAGER_HOME = home; process.env.AGENTPAGER_SERVER = f.origin; delete process.env.AGENTPAGER_PAGER;
+  // An agent the binary can't name gets the words every agent gets (wait.test.ts has Claude's).
+  delete process.env.CLAUDECODE;
   const op = await import('../src/commands.ts');
   const client = new Client({ name: 'codex-mcp-client', version: '1' });
   try {

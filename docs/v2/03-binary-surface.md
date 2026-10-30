@@ -1,4 +1,4 @@
-# The `agentpager` binary: commands, MCP tools and replies (draft 6, 30 Oct 2026)
+# The `agentpager` binary: commands, MCP tools and replies (draft 7, 30 Oct 2026)
 
 Design item 2. One Bun-compiled executable per platform, installed by `curl -fsSL agentpager.me/install | sh`. It is the only thing an agent talks to: CLI for terminals and scripts, a stdio MCP server for Claude Desktop, Claude Code, Codex and Cursor. Both expose the same operations and the same words.
 
@@ -36,7 +36,7 @@ The last two fields are the binary's own memory of when this agent last saw the 
 | `agentpager example > card.yaml` | Writes the example card to start from. | File. |
 | `agentpager review <card.yaml>` | Prints the card with what good looks like and the reviewer instructions, as one block for a subagent, which grades each point ok / good to fix / must fix. Judges nothing itself. | Text. |
 | `agentpager ask --agent <id> <card.yaml \| ->` | Mechanical checks only (YAML parses, required keys, 2–4 options, tradeoff rows cover every option, attachments present, sizes, open-decision cap, pager off); refuses with one line per problem. Otherwise compiles to the JSON brief, encrypts, sends; appends the short contract when a reminder is due. Appends to history. | §4. |
-| `agentpager wait --agent <id> <decision> [--forever]` | Waits up to 50 s for the answer (the server's long-poll); `--forever` keeps waiting in 50 s rounds. Appends the answer to history. | §4. |
+| `agentpager wait --agent <id> <decision> [--forever]` | Waits up to 50 s for the answer (the server's long-poll); `--forever` keeps waiting in 50 s rounds, and through an unreachable or restarting server, retrying every 10 s. Appends the answer to history. | §4, §6. |
 | `agentpager ack --agent <id> <decision> "<next steps>"` | Acknowledges the exact answer with what happens next. | §4. |
 | `agentpager status --agent <id>` | Pager state, open decisions, unacknowledged answers. | Table or `--json`. |
 | `agentpager history --agent <id> [--limit N] [--json]` | This machine's decisions on the agent's pager, newest first: when, who asked, the question, the options, the answer, the acknowledgement. Optional; never printed unasked (§5). | Table or JSON lines. |
@@ -52,7 +52,7 @@ Every command takes `--json` for machine output. Exit codes: 0 done, 2 refused, 
 ### Detecting app and project
 
 `--app` and `--project` are rarely needed:
-- **App** ("who asked" on the phone): from the harness's environment when it is identifiable (Claude Code, Codex, pi, Cursor each set a marker; the list is in the code and verified against each harness at build time), else the parent process name, else "Agent". Shown on every decision row.
+- **App** ("who asked" on the phone): from the harness's environment when it is identifiable (Claude Code, Codex, pi, Cursor each set a marker; the list is in the code and verified against each harness at build time), else the parent process name, else "Agent". Shown on every decision row. A harness identified positively (§6: Claude Code, Claude Desktop) is named by the binary even when the agent passes an app; a Desktop chat passes "Claude".
 - **Project** (the group on the phone): the git repository's name (`basename` of `git rev-parse --show-toplevel`), else the working folder's name. `--project` overrides and is remembered on the agent file, so a coordinator working on one huge repo can say `--project "billing refactor"` once.
 
 ## 3. MCP tools
@@ -119,6 +119,7 @@ ask again once your owner turns it on, or ask them for another pager number.
 Pending. Your owner hasn't answered "Which M11 guarantee should we build?" yet.
 Keep waiting: agentpager wait --agent ap-7f3k d_4k2m
 ```
+Claude Code and Claude Desktop get their own last line on `ask` and their own pending replies (§6).
 
 **wait, option chosen**
 ```
@@ -176,6 +177,28 @@ Claude Code's shell tool defaults to a 2-minute limit and Codex similar; cloud s
 - `wait` returns after at most 50 seconds by default and says how to call it again. An agent loops; a harness that backgrounds long commands can use `--forever`.
 - The MCP `wait` tool takes `seconds` up to 50 for the same reason.
 - The answer never expires on the server while the agent exists, so a wait that gets cut off loses nothing.
+
+Two harnesses get their own words for waiting, because an answer reaches each one differently (tested 29–30 Oct 2026). The binary picks them when it positively identifies the harness. Over MCP, it goes by the client's name: `claude-code` is Claude Code and `local-agent-mode-<server>` is a Claude Desktop chat. From a shell, it needs `CLAUDECODE=1` with no other harness's marker around it. Everyone else, including Codex, pi and Cursor, gets the replies in §4 unchanged.
+
+**Claude Code** wakes when a background command ends. The last line of `ask` says:
+```
+Decision d_2x8w. Wait for the answer in the background: run `/Users/me/.agentpager/bin/agentpager wait --agent ap-7f3k d_2x8w --forever` as a background command, then carry on or end your turn. It ends when your owner answers, and you get the answer then.
+```
+A pending `wait` repeats the recipe: `Keep waiting in the background: run …`. The path is this binary's own, because an MCP-configured binary needn't be on PATH.
+
+**A Claude Desktop chat** is reached only while its turn lasts. It reaches this computer's tools through a link that drops a dozen times a day and comes back within seconds. The chat also has a cloud shell where the binary isn't installed, so the words name the tool. The last lines of `ask`:
+```
+Decision d_2x8w. Don't end your turn until it's answered: the answer reaches you only while you're working.
+Other work that doesn't need it? Do it, and call the agentpager wait tool (agent ap-7f3k, decision d_2x8w) with seconds 1 between steps.
+Nothing else to do? Call wait without seconds (it holds 50 s), again and again, until it returns the answer.
+If a wait call fails or the wait tool disappears, the link to this computer dropped; it comes back by itself within seconds: run sleep 10 in your shell, then call wait again, up to 10 times.
+```
+A pending reply after a quick check says to carry on and check again after the next step, then call `wait` without seconds once the work runs out. After a full hold it says to call again now. Both end with the line about the dropped link. Two hours after `ask`, by the agent file's `askedAt`, the reply says to stop instead:
+```
+Pending. Your owner hasn't answered "Which M11 guarantee should we build?" in 2 hours.
+Stop waiting: end your turn and tell your owner you stopped waiting for this decision. Their answer stays on the
+server; call wait (agent ap-7f3k, decision d_2x8w) for it when you're next working.
+```
 
 ## 7. Open questions for Sam
 

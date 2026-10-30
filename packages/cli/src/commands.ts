@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { call, get, type Reply } from './client.ts';
 import { compile, type Source } from './card.ts';
-import { detectApp, detectProject } from './detect.ts';
+import { HARNESS_APP, detectApp, detectProject, harness, self, type Harness } from './detect.ts';
 import { REVIEW, SHORT, EXAMPLE, rulesText } from './rules.ts';
 import { agentIds, appendHistory, home, loadAgent, pagerOf, readHistory, saveAgent, server, shortId, updateAgent, writable, type AgentFile } from './store.ts';
 
@@ -15,6 +15,10 @@ const refused = (text: string): Result => ({ code: 2, text });
 // The contract is reprinted inside an `ask` reply on the binary's own clock, not the model's memory.
 export const REMINDER_MS = 2 * 3_600_000, REMINDER_CARDS = 5;
 const WAIT_SECONDS = 50;
+// A Claude Desktop chat stops waiting this long after asking; an answer after that gets the phone's warning instead.
+export const DESKTOP_WAIT_MS = 2 * 3_600_000;
+// How long `wait --forever` pauses before trying an unreachable server again.
+const RETRY_MS = 10_000;
 
 const unknownAgent = (id: string): Result => ({ code: 6, text: `No agent ${id} on this machine. Run \`agentpager agents\` to list them, or connect again.` });
 const host = (base: string) => { try { return new URL(base).host || base; } catch { return base; } };
@@ -36,6 +40,18 @@ const quote = (s: string, max = 60) => {
   const cut = s.slice(0, max - 1), space = cut.lastIndexOf(' ');
   return (space > max / 2 ? cut.slice(0, space) : cut).replace(/[\s,;:]+$/, '') + '…';
 };
+// How to wait, in the words of the harness that is waiting (docs/v2/03-binary-surface.md §6). Claude Code wakes when
+// a background command ends. A Claude Desktop chat is reached only while its turn lasts, through a link to this
+// computer that drops and comes back by itself. Every other agent gets the words in 'Keep waiting'.
+const background = (id: string, short: string) => `run \`${self()} wait --agent ${id} ${short} --forever\` as a background command, then carry on or end your turn. It ends when your owner answers, and you get the answer then.`;
+const relink = 'If a wait call fails or the wait tool disappears, the link to this computer dropped; it comes back by itself within seconds: run sleep 10 in your shell, then call wait again, up to 10 times.';
+const waitHow = (h: Harness, id: string, short: string) => h === 'claude-code' ? `Wait for the answer in the background: ${background(id, short)}` : [
+  'Don\'t end your turn until it\'s answered: the answer reaches you only while you\'re working.',
+  `Other work that doesn't need it? Do it, and call the agentpager wait tool (agent ${id}, decision ${short}) with seconds 1 between steps.`,
+  'Nothing else to do? Call wait without seconds (it holds 50 s), again and again, until it returns the answer.',
+  relink,
+].join('\n');
+
 // A decision by its short id (d_2x8w) or the server's, even one this machine failed to record.
 function decisionOf(a: AgentFile, ref: string) {
   const short = a.decisions[ref] ? ref : Object.keys(a.decisions).find(k => a.decisions[k].id === ref);
@@ -49,7 +65,10 @@ export async function connect(input: { number?: string; app?: string; project?: 
   if (!number) return refused('No pager number. Pass the one your owner gave you, or set AGENTPAGER_PAGER.');
   if (input.server !== undefined && !/^https?:\/\/[^\s/]+/.test(input.server)) return refused('--server takes the server\'s address, such as https://agentpager.me.');
   const pager = pagerOf(number), base = input.server ? input.server.replace(/\/+$/, '') : server();
-  const app = input.app || detectApp(input.mcpClient), project = input.project || detectProject();
+  // A harness the binary identifies names itself: a Claude Desktop chat passes app "Claude" (lab, 30 Oct 2026), and the
+  // phone has to say where the agent is.
+  const known = harness(input.mcpClient);
+  const app = known ? HARNESS_APP[known] : input.app || detectApp(input.mcpClient), project = input.project || detectProject();
   if (!pager) return refused('Not connected. This pager number is not in use. Ask your owner for their current one.');
   const cannot = writable();
   if (cannot) return unwritable(cannot);
@@ -92,7 +111,7 @@ export function review(card: Source): Result {
   return done(`${REVIEW}\n\n--- card.yaml ---\n${text.trimEnd()}\n`);
 }
 
-export async function ask(agent: string, card: Source): Promise<Result> {
+export async function ask(agent: string, card: Source, client?: string): Promise<Result> {
   const a = loadAgent(agent);
   if (!a) return unknownAgent(agent);
   const compiled = compile(card);
@@ -110,7 +129,7 @@ export async function ask(agent: string, card: Source): Promise<Result> {
     let chosen = '';
     updateAgent(a.id, x => {
       chosen = shortId('d_', taken => taken in x.decisions);
-      x.decisions[chosen] = { id, title: brief.title, options: brief.card.options.map(o => o.label) };
+      x.decisions[chosen] = { id, title: brief.title, options: brief.card.options.map(o => o.label), askedAt: now.toISOString() };
       const cards = x.cardsSinceRules + 1, since = x.rulesShownAt ? now.getTime() - Date.parse(x.rulesShownAt) : Infinity;
       if (since > REMINDER_MS || cards >= REMINDER_CARDS) {
         reminder = since > REMINDER_MS ? `It's been ${Number.isFinite(since) ? Math.floor(since / 3_600_000) + ' hours' : 'a while'} since you last read the card contract.` : `That's ${cards} cards since you last read the card contract.`;
@@ -120,12 +139,13 @@ export async function ask(agent: string, card: Source): Promise<Result> {
     if (chosen) short = chosen;
     appendHistory(a.pager, { at: now.toISOString(), event: 'asked', agent: a.id, app: a.app, project: a.project, decision: short, title: brief.title, detail: brief.detail, options: brief.card.options.map(o => o.label), recommended: brief.card.recommended });
   } catch { /* Sent, but not recorded here: the reply gives the server's id, which wait and ack also take. */ }
-  const lines = ['Sent. Your owner sees it as:', `  ${brief.title}`, `  ${brief.detail}`, `Decision ${short}. Wait for the answer with: agentpager wait --agent ${a.id} ${short}`];
+  const h = harness(client);
+  const lines = ['Sent. Your owner sees it as:', `  ${brief.title}`, `  ${brief.detail}`, h ? `Decision ${short}. ${waitHow(h, a.id, short)}` : `Decision ${short}. Wait for the answer with: agentpager wait --agent ${a.id} ${short}`];
   if (reminder) lines.push('', `${reminder} The short version:`, `  ${SHORT}`);
   return done(lines.join('\n'), { decision: short });
 }
 
-export async function wait(agent: string, ref: string, opts: { seconds?: number; forever?: boolean } = {}): Promise<Result> {
+export async function wait(agent: string, ref: string, opts: { seconds?: number; forever?: boolean; client?: string } = {}): Promise<Result> {
   const a = loadAgent(agent);
   if (!a) return unknownAgent(agent);
   const d = decisionOf(a, ref);
@@ -134,10 +154,12 @@ export async function wait(agent: string, ref: string, opts: { seconds?: number;
   const seconds = Math.min(Math.floor(opts.seconds ?? WAIT_SECONDS), WAIT_SECONDS);
   for (;;) {
     const r = await call(a.server, 'GET', `/api/agents/${a.agentId}/cards/${d.id}/answer?wait=${seconds}`, { key: a.agentKey, timeoutMs: (seconds + 20) * 1000 });
+    // Waiting forever outlasts a dropped network or a server restart; a refusal still ends it.
+    if (!r.ok && opts.forever && (r.status === 0 || r.status >= 500)) { await new Promise(res => setTimeout(res, RETRY_MS)); continue; }
     if (!r.ok) return refusal(r, a.server);
     if (get(r.value, 'status') !== 'answered') {
       if (opts.forever) continue;
-      return done(`Pending. Your owner hasn't answered "${d.title}" yet.\nKeep waiting: agentpager wait --agent ${a.id} ${d.short}`, { status: 'pending' });
+      return pending(a, d, opts.seconds !== undefined && seconds < WAIT_SECONDS, harness(opts.client));
     }
     const choice = get(r.value, 'answer', 'choice'), sentAt = String(get(r.value, 'answer', 'sentAt'));
     if (!d.answered) {
@@ -158,6 +180,23 @@ export async function wait(agent: string, ref: string, opts: { seconds?: number;
       `what you'll do: agentpager ack --agent ${a.id} ${d.short} "<next steps>"`,
     ].join('\n'), { status: 'answered', note });
   }
+}
+
+export function pending(a: AgentFile, d: { short: string; title: string; askedAt?: string }, quick: boolean, h: Harness | null): Result {
+  const head = `Pending. Your owner hasn't answered "${d.title}" yet.`;
+  if (h === 'claude-code') return done(`${head}\nKeep waiting in the background: ${background(a.id, d.short)}`, { status: 'pending' });
+  if (h !== 'claude-desktop') return done(`${head}\nKeep waiting: agentpager wait --agent ${a.id} ${d.short}`, { status: 'pending' });
+  if (d.askedAt && Date.now() - Date.parse(d.askedAt) >= DESKTOP_WAIT_MS) return done([
+    `Pending. Your owner hasn't answered "${d.title}" in ${DESKTOP_WAIT_MS / 3_600_000} hours.`,
+    'Stop waiting: end your turn and tell your owner you stopped waiting for this decision. Their answer stays on the',
+    `server; call wait (agent ${a.id}, decision ${d.short}) for it when you're next working.`,
+  ].join('\n'), { status: 'pending', stop: true });
+  return done([
+    head,
+    quick ? 'Carry on with your other work and check again after your next step. When you run out of work, call wait without seconds and keep calling it. Don\'t end your turn.'
+      : 'Call wait again now, and keep calling it until it returns the answer. Don\'t end your turn.',
+    relink,
+  ].join('\n'), { status: 'pending' });
 }
 
 export async function ack(agent: string, ref: string, nextSteps: string): Promise<Result> {

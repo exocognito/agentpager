@@ -15,7 +15,7 @@ export type AgentFile = {
   app: string; project: string; createdAt: string;
   rulesShownAt: string | null; cardsSinceRules: number;
   // Short decision ids for the agent (d_2x8w): the server's id, the question and its option labels, and how far it got.
-  decisions: { [short: string]: { id: string; title: string; options: string[]; answered?: boolean; acknowledged?: boolean } };
+  decisions: { [short: string]: { id: string; title: string; options: string[]; askedAt?: string; answered?: boolean; acknowledged?: boolean } };
 };
 
 export function server(): string {

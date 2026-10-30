@@ -213,6 +213,7 @@ struct OffBar: View {
             }
             .padding(.leading, 16).padding(.trailing, 8).padding(.vertical, 8)
             .background(Color(.systemGray6), in: .rect(cornerRadius: 16))
+            .accessibilityElement(children: .contain)
             .accessibilityIdentifier("pager-off-bar")
         }
         .barStyle()

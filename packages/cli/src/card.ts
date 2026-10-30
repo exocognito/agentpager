@@ -83,7 +83,11 @@ export function load(source: Source): { card: unknown; files: Map<string, Attach
       const type = typeOf(name), file = path.join(source.dir, name);
       try {
         if (!statSync(file).isFile()) { files.set(name, null); continue; }
-        if (type === 'text/markdown') files.set(name, { name, type, text: readFileSync(file, 'utf8') });
+        if (type === 'text/markdown') {
+          const bytes = readFileSync(file);
+          try { files.set(name, { name, type, text: new TextDecoder('utf-8', { fatal: true }).decode(bytes) }); }
+          catch { problems.push(`Attachment ${name} isn't UTF-8 text.`); }
+        }
         else if (type) files.set(name, { name, type, base64: readFileSync(file).toString('base64') });
       } catch { files.set(name, null); }
     }
@@ -128,7 +132,7 @@ export function compile(source: Source): Compiled {
     if (value === undefined) return;
     if (/\n/.test(value)) problems.push(`${where} must be one line.`);
     else if (cell && /[|]/.test(value)) problems.push(`${where} has a "|", which would break the Options table; use "/" or words.`);
-    else if (cell && /[[\]]/.test(value)) problems.push(`${where} has a square bracket, which would end its rating early; use parentheses.`);
+    else if (cell && /[[\]]/.test(value)) problems.push(`${where} has a square bracket; use parentheses.`);
   };
   const limit = (value: string | undefined, max: number, where: string) => {
     if (value !== undefined && count(value) > max) problems.push(`${where} is ${number(count(value))} characters; the limit is ${number(max)}.`);
@@ -152,11 +156,13 @@ export function compile(source: Source): Compiled {
   if (c.context !== undefined && !isRecord(c.context)) problems.push('context must be a set of keys: heading, summary, more.');
   if (isRecord(c.context)) unknown(c.context, KEYS.context, 'context.');
   const heading = text(context.heading, 'context.heading', false), summary = text(context.summary, 'context.summary', true);
+  line(heading, 'context.heading'); limit(heading, LIMITS.title, 'context.heading');
   plain(summary, 'context.summary');
   const more = isRecord(context.more) ? context.more : undefined;
   if (context.more !== undefined && !more) problems.push('context.more must have a title and a body.');
   if (more) unknown(more, KEYS.more, 'context.more.');
   const moreTitle = more ? text(more.title, 'context.more.title', true) : undefined, moreBody = more ? text(more.body, 'context.more.body', true) : undefined;
+  line(moreTitle, 'context.more.title', true); limit(moreTitle, LIMITS.title, 'context.more.title');
   plain(moreBody, 'context.more.body');
 
   const options = Array.isArray(c.options) ? c.options : [];
@@ -170,7 +176,7 @@ export function compile(source: Source): Compiled {
     unknown(o, KEYS.option, `${where}.`);
     const label = text(o.label, `${where}.label`, true), t = text(o.title, `${where}.title`, true), p = text(o.prioritizes, `${where}.prioritizes`, true);
     limit(label, LIMITS.label, `${where}.label`); limit(p, LIMITS.prioritizes, `${where}.prioritizes`);
-    line(label, `${where}.label`); line(t, `${where}.title`, true); line(p, `${where}.prioritizes`);
+    line(label, `${where}.label`, true); line(t, `${where}.title`, true); line(p, `${where}.prioritizes`);
     const story: { -readonly [k in keyof typeof STORY]?: string } = {};
     for (const key of Object.keys(STORY) as (keyof typeof STORY)[]) { story[key] = text(o[key], `${where}.${key}`, false); plain(story[key], `${where}.${key}`); }
     const looks = text(o.looks_like, `${where}.looks_like`, false);
@@ -212,6 +218,8 @@ export function compile(source: Source): Compiled {
   if (c.next_steps !== undefined && !next) problems.push('next_steps must have a line per option and if_no_answer.');
   const nextLines: string[] = [];
   if (next) {
+    const nextHeading = text(next.heading, 'next_steps.heading', false);
+    line(nextHeading, 'next_steps.heading'); limit(nextHeading, LIMITS.title, 'next_steps.heading');
     for (const key of Object.keys(next)) if (!['heading', 'if_no_answer', ...letters].includes(key)) problems.push(/^[A-Z]$/.test(key) ? `next_steps.${key} names no option.` : `next_steps.${key} is not a card key.`);
     for (const l of letters) { const line = text(next[l], `next_steps.${l}`, false); if (line) nextLines.push(`**After ${l}:** ${prose(line).replace(/\n+/g, ' ')}`); }
     const none = text(next.if_no_answer, 'next_steps.if_no_answer', false);

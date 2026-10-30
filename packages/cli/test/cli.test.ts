@@ -178,9 +178,15 @@ test('review rounds: concurrent asks, an unwritable home, attachments, unsafe ce
     assert.equal((await page({ type: 'image/png', base64: 'aGk=' })).text, 'Attachment notes.md is declared image/png but its name says text/markdown.');
     assert.equal((await page({ type: 'text/markdown', base64: Buffer.from([0xff, 0xfe, 0x00]).toString('base64') })).text, "Attachment notes.md isn't UTF-8 text.");
     const reviewed = op.review({ object: { title: 'Look?', attachments: [{ name: 'a.png', type: 'image/png', base64: readFileSync(png).toString('base64') }] } }).text;
-    assert.match(reviewed, /"base64": "\([\d,]+ characters, not shown\)"/);
+    assert.ok(reviewed.includes('"attachments": [\n    {\n      "name": "a.png",\n      "type": "image/png"\n    }\n  ]') && !reviewed.includes('base64'), reviewed);
+    assert.equal(op.review({ object: undefined }).text, 'Give the card to review.');
+    // Structure can't be injected through a one-line field, and a page on disk must be UTF-8.
+    const injected = small('Headings?').replace('label: Sushi,', 'label: "Sushi ]",').replace('  summary: Friday is booked.', '  summary: Friday is booked.\n  more: {title: "How ] it works", body: Why.}') + 'next_steps:\n  heading: "after\\n## Options"\n  A: Eat.\n';
+    assert.deepEqual((await op.ask(id, { yaml: injected, dir: work })).text.split('\n'), ['context.more.title has a square bracket; use parentheses.', 'options[0].label has a square bracket; use parentheses.', 'next_steps.heading must be one line.']);
+    writeFileSync(path.join(work, 'bad.md'), Buffer.from([0x23, 0x20, 0xff, 0xfe]));
+    assert.equal((await op.ask(id, { yaml: small('Bad page?') + 'attachments: [bad.md]\n', dir: work })).text, "Attachment bad.md isn't UTF-8 text.");
     const unsafe = small('Table?').replace('title: Sushi,', 'title: "Sushi\\nbar",') + 'tradeoffs:\n  - {concern: Cost, A: "green: Cheap | quick", B: "red: [dear]"}\n';
-    assert.deepEqual((await op.ask(id, { yaml: unsafe, dir: work })).text.split('\n'), ['options[0].title must be one line.', 'tradeoffs[0].A has a "|", which would break the Options table; use "/" or words.', 'tradeoffs[0].B has a square bracket, which would end its rating early; use parentheses.']);
+    assert.deepEqual((await op.ask(id, { yaml: unsafe, dir: work })).text.split('\n'), ['options[0].title must be one line.', 'tradeoffs[0].A has a "|", which would break the Options table; use "/" or words.', 'tradeoffs[0].B has a square bracket; use parentheses.']);
     const { compile } = await import('../src/card.ts');
     const fenced = compile({ yaml: small('Diff?').replace('  - {label: Sushi, title: Sushi, prioritizes: fish}', '  - label: Sushi\n    title: Sushi\n    prioritizes: fish\n    changes: |\n      - One line.\n\n      ```python\n      # a comment, not a heading\n      def f():\n          return 1\n\n      ```'), dir: work });
     assert.ok(fenced.ok && fenced.brief.card.markdown.includes('### What A changes\n- One line.\n\n```python\n# a comment, not a heading\ndef f():\n    return 1\n\n```'), fenced.ok ? fenced.brief.card.markdown : fenced.problems.join());

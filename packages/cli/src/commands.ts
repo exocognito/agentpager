@@ -83,9 +83,10 @@ export const example = (): Result => done(EXAMPLE);
 export function review(card: Source): Result {
   let text: string;
   if ('file' in card) { try { text = readFileSync(card.file, 'utf8'); } catch { return refused(`There is no card at ${card.file}.`); } }
-  // An MCP card's attachment bytes are named, not printed: the reviewer grades the card, and the bytes would fill
-  // its context.
-  else text = 'yaml' in card ? card.yaml : JSON.stringify(card.object, (key, value) => (key === 'base64' || key === 'text') && typeof value === 'string' && value.length > 200 ? `(${value.length.toLocaleString('en-US')} characters, not shown)` : value, 2);
+  // An MCP card's attachments are named, never printed, as card.yaml names its files: the reviewer grades the card.
+  else if ('object' in card && card.object === undefined) return refused('Give the card to review.');
+  else text = 'yaml' in card ? card.yaml : JSON.stringify(card.object, (key, value) => key === 'attachments' && Array.isArray(value)
+    ? value.map(a => typeof a === 'object' && a !== null && 'name' in a ? { name: a.name, ...('type' in a ? { type: a.type } : {}) } : a) : value, 2);
   return done(`${REVIEW}\n\n--- card.yaml ---\n${text.trimEnd()}\n`);
 }
 
@@ -101,17 +102,20 @@ export async function ask(agent: string, card: Source): Promise<Result> {
   if (!r.ok) return refusal(r, a.server);
   const id = String(get(r.value, 'decisionId'));
   const now = new Date();
+  // The short id is given out only once it is recorded; otherwise the reply names the server's id.
   let short = id, reminder: string | null = null;
   try {
+    let chosen = '';
     updateAgent(a.id, x => {
-      short = shortId('d_', taken => taken in x.decisions);
-      x.decisions[short] = { id, title: brief.title, options: brief.card.options.map(o => o.label) };
+      chosen = shortId('d_', taken => taken in x.decisions);
+      x.decisions[chosen] = { id, title: brief.title, options: brief.card.options.map(o => o.label) };
       const cards = x.cardsSinceRules + 1, since = x.rulesShownAt ? now.getTime() - Date.parse(x.rulesShownAt) : Infinity;
       if (since > REMINDER_MS || cards >= REMINDER_CARDS) {
         reminder = since > REMINDER_MS ? `It's been ${Number.isFinite(since) ? Math.floor(since / 3_600_000) + ' hours' : 'a while'} since you last read the card contract.` : `That's ${cards} cards since you last read the card contract.`;
         x.rulesShownAt = now.toISOString(); x.cardsSinceRules = 0;
       } else x.cardsSinceRules = cards;
     });
+    if (chosen) short = chosen;
     appendHistory(a.pager, { at: now.toISOString(), event: 'asked', agent: a.id, app: a.app, project: a.project, decision: short, title: brief.title, detail: brief.detail, options: brief.card.options.map(o => o.label), recommended: brief.card.recommended });
   } catch { /* Sent, but not recorded here: the reply gives the server's id, which wait and ack also take. */ }
   const lines = ['Sent. Your owner sees it as:', `  ${brief.title}`, `  ${brief.detail}`, `Decision ${short}. Wait for the answer with: agentpager wait --agent ${a.id} ${short}`];

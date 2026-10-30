@@ -74,7 +74,10 @@ export async function serve() {
   const server = new Server({ name: 'agentpager', version: VERSION }, { capabilities: { tools: {} } });
   server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }));
   server.setRequestHandler(CallToolRequestSchema, async request => {
-    const result = await runTool(request.params.name, request.params.arguments ?? {}, server.getClientVersion()?.name);
+    // Any failure is a one-line refusal, never a protocol error.
+    let result: op.Result;
+    try { result = await runTool(request.params.name, request.params.arguments ?? {}, server.getClientVersion()?.name); }
+    catch (e) { result = { code: 2, text: `Refused: ${e instanceof Error ? e.message : 'the tool failed'}` }; }
     return { ...(result.code === 0 ? {} : { isError: true }), content: [{ type: 'text', text: result.text }] };
   });
   await server.connect(new StdioServerTransport());

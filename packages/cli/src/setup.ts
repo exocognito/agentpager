@@ -1,13 +1,19 @@
 import { execFileSync } from 'node:child_process';
-import { chmodSync, existsSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import type { Result } from './commands.ts';
 
 // Writes the MCP server entry for every harness found: Claude Code and Codex through their own commands, Claude
 // Desktop and Cursor through their config files. Idempotent. `--print` says what it would change and changes nothing.
-const ENTRY = { command: 'agentpager', args: ['mcp'] };
 const has = (bin: string) => { try { execFileSync('which', [bin], { stdio: 'ignore' }); return true; } catch { return false; } };
+// The entry names this binary by its absolute path: GUI apps (Claude Desktop, Cursor) don't get the shell's PATH.
+// The compiled binary is process.execPath; run from source, the agentpager on PATH, else the bare name.
+function self(): string {
+  if (path.basename(process.execPath) === 'agentpager') return process.execPath;
+  try { return realpathSync(execFileSync('which', ['agentpager'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()); } catch { return 'agentpager'; }
+}
+const ENTRY = { command: self(), args: ['mcp'] };
 const run = (bin: string, args: string[]) => { try { return execFileSync(bin, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }); } catch { return null; } };
 
 const isObject = (v: unknown): v is { [key: string]: unknown } => typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -45,13 +51,13 @@ export function setup(print: boolean): Result {
   const home = homedir(), lines: string[] = [];
   if (has('claude')) {
     if (run('claude', ['mcp', 'get', 'agentpager'])) lines.push('Claude Code: already set up');
-    else if (print) lines.push('Claude Code: would run claude mcp add --scope user agentpager -- agentpager mcp');
-    else lines.push(run('claude', ['mcp', 'add', '--scope', 'user', 'agentpager', '--', 'agentpager', 'mcp']) === null ? 'Claude Code: claude mcp add failed; run it by hand' : 'Claude Code: added the agentpager MCP server');
+    else if (print) lines.push(`Claude Code: would run claude mcp add --scope user agentpager -- ${ENTRY.command} mcp`);
+    else lines.push(run('claude', ['mcp', 'add', '--scope', 'user', 'agentpager', '--', ENTRY.command, 'mcp']) === null ? 'Claude Code: claude mcp add failed; run it by hand' : 'Claude Code: added the agentpager MCP server');
   }
   if (has('codex')) {
     if (run('codex', ['mcp', 'get', 'agentpager'])) lines.push('Codex: already set up');
-    else if (print) lines.push('Codex: would run codex mcp add agentpager -- agentpager mcp');
-    else lines.push(run('codex', ['mcp', 'add', 'agentpager', '--', 'agentpager', 'mcp']) === null ? 'Codex: codex mcp add failed; run it by hand' : 'Codex: added the agentpager MCP server');
+    else if (print) lines.push(`Codex: would run codex mcp add agentpager -- ${ENTRY.command} mcp`);
+    else lines.push(run('codex', ['mcp', 'add', 'agentpager', '--', ENTRY.command, 'mcp']) === null ? 'Codex: codex mcp add failed; run it by hand' : 'Codex: added the agentpager MCP server');
   }
   const desktop = jsonConfig(path.join(home, 'Library', 'Application Support', 'Claude', 'claude_desktop_config.json'), print);
   if (desktop) lines.push('Claude Desktop: ' + desktop + (print ? '' : ' (restart Claude Desktop)'));

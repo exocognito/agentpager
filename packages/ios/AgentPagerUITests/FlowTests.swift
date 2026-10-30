@@ -41,7 +41,7 @@ final class FlowTests: XCTestCase {
         let detail = app.staticTexts["connect-line"]
         wait(detail)
         if let shots { shot("\(shots)-detail") }
-        let number = String(detail.label.split(separator: " ").last ?? "")
+        let number = String(detail.label.split(separator: " ").first { $0.hasPrefix("ap1_") } ?? "")
         XCTAssertTrue(number.hasPrefix("ap1_") && number.count == 36, number)
         back()
         return number

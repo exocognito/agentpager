@@ -9,7 +9,7 @@ import type { Source } from './card.ts';
 // agentpager: the CLI, and with `mcp` the stdio MCP server (docs/v2/03-binary-surface.md).
 const HELP = `agentpager: send your owner decisions on their phone, and get their answers.
 
-  agentpager connect [<number>] [--app <name>] [--project <name>]
+  agentpager connect [<number>] [--app <name>] [--project <name>] [--server <url>]
   agentpager rules [--agent <id>]           the card contract, the card.yaml template, an example
   agentpager example > card.yaml            a complete card to start from
   agentpager review <card.yaml>             your card with what good looks like, for a subagent to grade
@@ -54,7 +54,7 @@ async function run(argv: string[]): Promise<op.Result> {
   const agent = f('agent') ?? '';
   const needsAgent = (r: () => Promise<op.Result> | op.Result) => agent ? r() : { code: 2 as const, text: `Say which agent: agentpager ${command} --agent <id>. Your agents: agentpager agents` };
   switch (command) {
-    case 'connect': return op.connect({ number: rest[0], app: f('app'), project: f('project') });
+    case 'connect': return op.connect({ number: rest[0], app: f('app'), project: f('project'), server: f('server') });
     case 'rules': return op.rules(f('agent'));
     case 'example': return op.example();
     case 'review': { const c = card(rest[0]); return !c ? { code: 2, text: 'Say which card: agentpager review card.yaml' } : isResult(c) ? c : op.review(c); }

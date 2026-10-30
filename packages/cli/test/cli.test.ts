@@ -199,6 +199,12 @@ test('review rounds: concurrent asks, an unwritable home, attachments, unsafe ce
 
     // history with a nonsense limit reads as the default; a server that isn't a URL is refused, not a crash.
     assert.match(op.history(id, Number('abc')).text, /Two\?|One\?/);
+    // --server names another server, and the agent keeps it.
+    process.env.AGENTPAGER_SERVER = 'http://127.0.0.1:9';
+    const elsewhere = await op.connect({ number: p.number, app: 'Codex', project: 'edges', server: f.origin + '/' });
+    assert.equal(elsewhere.code, 0, elsewhere.text);
+    assert.match((await op.status(String((elsewhere.json as { agent: string }).agent))).text, /Pager: on/);
+    assert.equal((await op.connect({ number: p.number, server: 'agentpager.me' })).text, "--server takes the server's address, such as https://agentpager.me.");
     process.env.AGENTPAGER_SERVER = 'not a url';
     const bad = await op.connect({ number: p.number, app: 'Codex', project: 'edges' });
     assert.equal(bad.code, 5); assert.match(bad.text, /^Can't reach not a url \(/);

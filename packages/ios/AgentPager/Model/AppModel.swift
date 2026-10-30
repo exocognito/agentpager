@@ -142,9 +142,11 @@ final class AppModel {
     }
 
     // What the owner gives agents, copied as one block (docs/v2/01-decisions.md, App structure).
+    // A pager on another server names it in the command, since the agentpager command defaults to agentpager.me.
     func instructions(_ p: LocalPager) -> String {
         let host = URL(string: p.server).map { url in (url.host() ?? p.server) + (url.port.map { ":\($0)" } ?? "") } ?? p.server
-        return "When I'm away and you need my decision, use \(host) MCP or CLI to send me decisions:\n$ agentpager connect \(p.number)"
+        let server = p.server == "https://agentpager.me" ? "" : "AGENTPAGER_SERVER=\(p.server) "
+        return "When I'm away and you need my decision, use \(host) MCP or CLI to send me decisions:\n$ \(server)agentpager connect \(p.number)"
     }
 
     // MARK: Polling

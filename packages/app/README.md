@@ -49,7 +49,7 @@ BLUEPRINT_EVIDENCE_DIR=/tmp/agentpager-proof \
   node --test --experimental-strip-types --test-concurrency=4 packages/app/test/**/*.test.ts
 ```
 
-Every test file starts isolated workerd instances with its own ports and persistence. Their local clocks are declared in `fixture(...)` calls. Browser tests use real Chromium (390 and 1280 px); HTTPS and official MCP SDK callers use real endpoints. Transport-loss tests let the request reach the real service, then discard its reply. Nothing replaces the service or its storage.
+Every test file starts isolated workerd instances with its own ports and persistence. Their local clocks are declared in `fixture(...)` calls. Browser tests use real Chromium (390 and 1280 px); HTTPS callers use real endpoints (the MCP server's tests are the binary's, in `../cli`). Transport-loss tests let the request reach the real service, then discard its reply. Nothing replaces the service or its storage.
 
 The proof writes screenshots, browser traces, JSON exchanges, latency samples, storage counts, Worker logs and process-group exit records to `BLUEPRINT_EVIDENCE_DIR`. Node's TAP/summary reports every test. 
 

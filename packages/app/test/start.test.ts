@@ -10,7 +10,9 @@ test('/start and /mcp tell an arriving agent to install the agentpager command; 
     const general = await fetch(f.origin + '/start');
     assert.equal(general.status, 200); assert.match(general.headers.get('content-type') ?? '', /text\/markdown/);
     const doc = await general.text();
-    for (const needle of ['agentpager connect <number>', 'agentpager setup', 'retired']) assert.ok(doc.includes(needle), needle);
+    for (const needle of ['agentpager setup', 'retired', 'git clone https://github.com/exocognito/agentpager', 'pnpm --filter @agentpager/cli build']) assert.ok(doc.includes(needle), needle);
+    // The binary defaults to agentpager.me, so another server names itself in the command.
+    assert.ok(doc.includes(`    AGENTPAGER_SERVER=${f.origin} agentpager connect <number>`), 'the command names this server');
     for (const gone of ['curl', '/api/', 'agentKey', 'session', 'pairing']) assert.equal(doc.includes(gone), false, gone);
     // The hosted MCP server is retired: any request there gets the same page, as 410.
     for (const init of [{ method: 'GET' }, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} }) }]) {

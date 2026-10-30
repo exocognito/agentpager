@@ -63,22 +63,26 @@ export class Agent {
     this.schema();
   }
 
-  // The one alarm serves both clocks: the next answer due a warning (not before notBefore), else housekeeping.
-  private afterwards = async (notBefore = 0) => {
+  // The one alarm serves both clocks: the next answer due a warning, else housekeeping.
+  private afterwards = async () => {
     const m = this.meta();
     if (!m) { await this.ctx.storage.deleteAlarm(); return; }
     const due = this.ctx.storage.sql.exec<{ due: number | null }>('SELECT min(due) AS due FROM pickups').toArray()[0]?.due ?? null;
-    const next = Math.min(Date.parse(m.lastActivityAt) + clocks.idleMs, due === null ? Infinity : Math.max(due, notBefore));
+    const next = Math.min(Date.parse(m.lastActivityAt) + clocks.idleMs, due ?? Infinity);
     if (await this.ctx.storage.getAlarm() !== next) await this.ctx.storage.setAlarm(next);
   };
   // Housekeeping: an agent idle for clocks.idleMs is forgotten, and its pager stops listing it.
   async alarm() {
     const m = this.meta();
     if (m && Date.now() < Date.parse(m.lastActivityAt) + clocks.idleMs) {
-      // Housekeeping stays armed whatever happens to a warning; one that fails stays queued for a later try.
-      let retry = 0;
-      try { await this.warn(m); } catch (error) { console.error('Agent warning failed', error instanceof Error ? error.message : 'unknown'); retry = Date.now() + WARN_RETRY_MS; }
-      await this.afterwards(retry);
+      // Housekeeping stays armed whatever happens to a warning. One that fails stays queued, due again a minute
+      // later, so a request in between doesn't bring it forward.
+      try { await this.warn(m); } catch (error) {
+        console.error('Agent warning failed', error instanceof Error ? error.message : 'unknown');
+        const now = Date.now();
+        this.ctx.storage.sql.exec('UPDATE pickups SET due = ? WHERE due <= ?', now + WARN_RETRY_MS, now);
+      }
+      await this.afterwards();
       return;
     }
     if (m) {
@@ -97,15 +101,17 @@ export class Agent {
     let s: PagerState;
     try { s = await this.pagerState(m); } catch (error) { if (error instanceof C.Refusal) return; throw error; }
     // Read again: an agent may have collected one while the pager's state was asked, and collecting dequeues it.
+    // While the pager is off no agent can read an answer, so there is nothing to warn about.
+    const on = s.state === 'on';
     const warned = this.tx(() => {
       const ids = due(), at = iso();
       for (const id of ids) {
         this.ctx.storage.sql.exec('DELETE FROM pickups WHERE decision_id=?', id);
-        this.ctx.storage.sql.exec('INSERT OR IGNORE INTO warnings VALUES (?, ?)', id, at);
+        if (on) this.ctx.storage.sql.exec('INSERT OR IGNORE INTO warnings VALUES (?, ?)', id, at);
       }
-      return ids;
+      return on ? ids : [];
     });
-    for (const id of warned) await this.alertPhone(m, s.state === 'on' ? s.push ?? null : null, id, 'warning', pickupBody(m, this.decision(id).title));
+    for (const id of warned) await this.alertPhone(m, s.push ?? null, id, 'warning', pickupBody(m, this.decision(id).title));
   }
 
   private openCount() { return this.ctx.storage.sql.exec<{ n: number }>('SELECT count(*) AS n FROM proposals WHERE id NOT IN (SELECT decision_id FROM answers)').toArray()[0].n; }

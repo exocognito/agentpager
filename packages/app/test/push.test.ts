@@ -145,11 +145,12 @@ test('not picked up: one alert and a warning when no agent collects an answer in
     await new Promise(r => setTimeout(r, 4_000));
     assert.equal(sent(mine).filter(d => d.payload.kind === 'warning').length, 1, 'one alert per answer');
 
-    // While the pager is off nothing alerts, though the decision still records the warning.
+    // While the pager is off no agent can read the answer, so there is nothing to warn about.
     const off = await f.ask(a, 'While it turns off?');
     await f.answer(a.agent.agentId, p.phone, off.decisionId);
     await f.settings(p.pagerId, p.phone, { on: false });
-    await until(async () => decision(p.pagerId, p.phone, off.decisionId), d => !!d?.warnedAt, 30_000);
+    await new Promise(r => setTimeout(r, 6_000));
+    assert.equal((await decision(p.pagerId, p.phone, off.decisionId))?.warnedAt, undefined, 'no warning while off');
     assert.equal(sent(mine).filter(d => d.payload.kind === 'warning').length, 1, 'no alert while off');
   } finally {
     await f.stop();

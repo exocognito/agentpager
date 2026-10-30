@@ -7,7 +7,6 @@ import { BUILD, forward, type Env } from './env.ts';
 import { body, decode, emptyBody, json, read, refusal, sha256, token } from './shared.ts';
 import { startDocument } from './start.ts';
 import { PushTarget } from './push.ts';
-import { AttachmentName } from '../../blueprint/design/ui/components/cards/brief/schema.ts';
 export { Agent } from './agent.ts';
 export { Registry } from './registry.ts';
 
@@ -95,14 +94,13 @@ async function api(request: Request, env: Env): Promise<Response> {
     const agentId = decode(C.Token, parts[1]), rest = parts.slice(2).join('/');
     if (rest === '' && method === 'GET') return pass(agentId, '/status');
     if (rest === 'cards' && method === 'POST') return pass(agentId, '/ask');
+    // The decision id and file name go on as sent: the agent decodes them after the key (I4).
     if (parts.length === 5 && parts[2] === 'cards') {
-      const decisionId = decode(C.Token, parts[3]);
+      const decisionId = parts[3];
       if (parts[4] === 'answer') return pass(agentId, `/${method === 'GET' ? 'read' : 'answer'}/${decisionId}`);
       if (parts[4] === 'acknowledge' && method === 'POST') return pass(agentId, `/ack/${decisionId}`);
     }
-    if (parts.length === 6 && parts[2] === 'cards' && parts[4] === 'files' && method === 'GET') {
-      return pass(agentId, `/file/${decode(C.Token, parts[3])}/${decode(AttachmentName, parts[5])}`);
-    }
+    if (parts.length === 6 && parts[2] === 'cards' && parts[4] === 'files' && method === 'GET') return pass(agentId, `/file/${parts[3]}/${parts[5]}`);
     if (rest === 'finish' && method === 'POST') return pass(agentId, '/finish');
   }
   throw C.refuse.notFound();
@@ -123,8 +121,9 @@ const descriptions = (origin: string): Record<keyof typeof C.MCP_TOOLS, string> 
 // sent, so the agent checks the key before any of them (I4). tools/list still lists the full schemas.
 const Keyed = { agentId: C.Token, agentKey: Schema.optional(Schema.Unknown) };
 const AskCall = Schema.Struct({ ...Keyed, question: Schema.optional(Schema.Unknown) });
-const WaitCall = Schema.Struct({ ...Keyed, decisionId: C.Token, waitSeconds: Schema.optional(Schema.Unknown) });
-const AckCall = Schema.Struct({ ...Keyed, decisionId: C.Token, acknowledgement: Schema.optional(Schema.Unknown) });
+// The decision id goes on as sent too, so a malformed one is refused only to the agent's own key.
+const WaitCall = Schema.Struct({ ...Keyed, decisionId: Schema.String, waitSeconds: Schema.optional(Schema.Unknown) });
+const AckCall = Schema.Struct({ ...Keyed, decisionId: Schema.String, acknowledgement: Schema.optional(Schema.Unknown) });
 const AgentCall = Schema.Struct(Keyed);
 const keyOf = (value: unknown) => Schema.is(C.Token)(value) ? value : undefined;
 async function mcp(request: Request, env: Env, origin: string) {
@@ -142,8 +141,8 @@ async function mcp(request: Request, env: Env, origin: string) {
         case 'connect': { data = decode(C.MCP_TOOLS.connect.input, raw); path = '/api/agents'; break; }
         case 'ask': { const p = decode(AskCall, raw); path = `/api/agents/${p.agentId}/cards`; data = p.question; agentKey = keyOf(p.agentKey); if (p.question === undefined) [missing, path, method] = ['question', `/api/agents/${p.agentId}`, 'GET']; break; }
         // waitSeconds goes on as JSON, so the agent refuses a string or a fraction just as the schema would.
-        case 'wait': { const p = decode(WaitCall, raw); path = `/api/agents/${p.agentId}/cards/${p.decisionId}/answer?wait=${p.waitSeconds === undefined ? C.ANSWER_WAIT_MAX_SECONDS : encodeURIComponent(JSON.stringify(p.waitSeconds))}`; method = 'GET'; agentKey = keyOf(p.agentKey); break; }
-        case 'ack': { const p = decode(AckCall, raw); path = `/api/agents/${p.agentId}/cards/${p.decisionId}/acknowledge`; data = p.acknowledgement; agentKey = keyOf(p.agentKey); if (p.acknowledgement === undefined) [missing, path, method] = ['acknowledgement', `/api/agents/${p.agentId}`, 'GET']; break; }
+        case 'wait': { const p = decode(WaitCall, raw); path = `/api/agents/${p.agentId}/cards/${encodeURIComponent(p.decisionId)}/answer?wait=${p.waitSeconds === undefined ? C.ANSWER_WAIT_MAX_SECONDS : encodeURIComponent(JSON.stringify(p.waitSeconds))}`; method = 'GET'; agentKey = keyOf(p.agentKey); break; }
+        case 'ack': { const p = decode(AckCall, raw); path = `/api/agents/${p.agentId}/cards/${encodeURIComponent(p.decisionId)}/acknowledge`; data = p.acknowledgement; agentKey = keyOf(p.agentKey); if (p.acknowledgement === undefined) [missing, path, method] = ['acknowledgement', `/api/agents/${p.agentId}`, 'GET']; break; }
         case 'status': { const p = decode(AgentCall, raw); path = `/api/agents/${p.agentId}`; method = 'GET'; agentKey = keyOf(p.agentKey); break; }
         case 'finish': { const p = decode(AgentCall, raw); path = `/api/agents/${p.agentId}/finish`; agentKey = keyOf(p.agentKey); break; }
         default: throw C.refuse.invalid('Unknown tool. Read /start.');

@@ -89,11 +89,11 @@ export class Agent {
   }
   // The pager's state, asked of the Registry on every call that sends something. A deleted pager takes its agents
   // with it: one that missed being told forgets itself here.
-  private async pagerState(m: Meta, by: 'agent' | 'phone' = 'agent'): Promise<PagerState> {
+  private async pagerState(m: Meta, by: 'agent' | 'phone' | 'connect' = 'agent'): Promise<PagerState> {
     const reply = await registry(this.env, '/state', { pagerId: m.pagerId });
     if (!reply.ok) throw new Error(`Registry refused the pager state: ${reply.status}`);
     const s = decode(PagerState, await reply.json());
-    if (s.state === 'gone') { await this.forget(); throw by === 'agent' ? C.refuse.pagerDeleted() : C.refuse.unknownPager(); }
+    if (s.state === 'gone') { await this.forget(); throw by === 'agent' ? C.refuse.pagerDeleted() : by === 'phone' ? C.refuse.unknownPager() : C.refuse.numberInvalid(); }
     return s;
   }
   // Off means nothing gets through and nothing is queued.
@@ -138,6 +138,9 @@ export class Agent {
       const agentKey = token(), now = iso();
       const m: Meta = { agentId: input.agentId, pagerId: input.pagerId, app: input.app, project: input.project, createdAt: now, finishedAt: null, lastActivityAt: now, agentHash: await sha256(agentKey), phoneHash: input.phoneHash };
       this.tx(() => { if (this.meta()) throw C.refuse.invalid('This agent already exists.'); this.save(m); });
+      // A pager deleted while this agent was connecting may have queued its erasure before it existed: checked once
+      // it does, a gone pager erases it here.
+      await this.pagerState(m, 'connect');
       const message = `Connected as a new agent on your owner's pager (${m.app}, project ${m.project}). Your owner's phone shows you as a new agent. Use this agentId and agentKey for every question in this piece of work; connecting again adds another agent.`;
       return json(decode(C.Connected, { agent: this.summary(m), agentKey, message }));
     }

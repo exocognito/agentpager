@@ -20,6 +20,8 @@ test('a wrong key wins over invalid input, over HTTP and MCP', { timeout: 180_00
       ['read with a bad wait', `/api/agents/${aid}/cards/${did}/answer?wait=forever`, { method: 'GET' }],
       ['acknowledge without an answer id', `/api/agents/${aid}/cards/${did}/acknowledge`, { data: { nextSteps: 'Go.' } }],
       ['finish with a field', `/api/agents/${aid}/finish`, { data: { now: true } }],
+      ['read a malformed decision id', `/api/agents/${aid}/cards/not-a-decision/answer`, { method: 'GET' }],
+      ['acknowledge a malformed decision id', `/api/agents/${aid}/cards/not-a-decision/acknowledge`, { data: { answerId: did, nextSteps: 'Go.' } }],
     ];
     for (const [label, route, opts] of agentCalls) {
       await f.refused(401, 'Unauthorized', route, { ...opts, agent: token() }).catch(e => { throw new Error(`${label}: ${e}`); });
@@ -30,10 +32,16 @@ test('a wrong key wins over invalid input, over HTTP and MCP', { timeout: 180_00
       ['an unknown auto-off', `/api/pagers/${p.pagerId}/settings`, { autoOff: 'forever' }],
       ['a malformed device token', `/api/pagers/${p.pagerId}/push`, { token: 1 }],
       ['delete with a field', `/api/pagers/${p.pagerId}/delete`, { now: true }],
+      ['answer a malformed decision id', `/api/agents/${aid}/cards/not-a-decision/answer`, { requestId: token(), choice: { kind: 'option', number: 1 } }],
     ];
     for (const [label, route, data] of phoneCalls) {
       await f.refused(401, 'Unauthorized', route, { data, phone: token() }).catch(e => { throw new Error(`${label}: ${e}`); });
       await f.refused(400, 'InvalidInput', route, { data, phone: p.phone }).catch(e => { throw new Error(`${label}, right key: ${e}`); });
+    }
+    // A malformed attachment name or decision id is refused only to the pager's own phone key.
+    for (const route of [`/api/agents/${aid}/cards/${did}/files/..%2Fpager`, `/api/agents/${aid}/cards/not-a-decision/files/a.png`]) {
+      await f.refused(401, 'Unauthorized', route, { phone: token() });
+      await f.refused(400, 'InvalidInput', route, { phone: p.phone });
     }
     // A phone makes a pager only with a key.
     await f.refused(401, 'Unauthorized', '/api/pagers', { data: { autoOff: 'forever' } });
@@ -55,6 +63,11 @@ test('a wrong key wins over invalid input, over HTTP and MCP', { timeout: 180_00
     assert.equal(await tool('wait', { agentId: aid, agentKey: token(), decisionId: did, waitSeconds: 0 }), 'Unauthorized');
     assert.equal(await tool('wait', { agentId: aid, agentKey: a.agentKey, decisionId: did, waitSeconds: 0 }), 'InvalidInput');
     assert.equal(await tool('wait', { agentId: aid, agentKey: a.agentKey, decisionId: did, waitSeconds: '5' }), 'InvalidInput');
+    // So does a malformed decision id.
+    assert.equal(await tool('wait', { agentId: aid, agentKey: token(), decisionId: 'not/a decision' }), 'Unauthorized');
+    assert.equal(await tool('wait', { agentId: aid, agentKey: a.agentKey, decisionId: 'not/a decision' }), 'InvalidInput');
+    assert.equal(await tool('ack', { agentId: aid, agentKey: token(), decisionId: 'nope', acknowledgement: { answerId: did, nextSteps: 'Go.' } }), 'Unauthorized');
+    assert.equal(await tool('ack', { agentId: aid, agentKey: a.agentKey, decisionId: 'nope', acknowledgement: { answerId: did, nextSteps: 'Go.' } }), 'InvalidInput');
     // A malformed key is no key, and a missing field is named only to the agent itself.
     assert.equal(await tool('ask', { agentId: aid, agentKey: 'short', question: bad }), 'Unauthorized');
     assert.equal(await tool('ask', { agentId: aid, agentKey: token() }), 'Unauthorized');

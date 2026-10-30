@@ -347,7 +347,7 @@ final class AppModel {
     }
 
     // Decisions grouped by project. Projects with open decisions come first, the one waiting longest on top; then the
-    // rest, the most recently answered on top.
+    // rest, the most recently answered on top. A project whose agents haven't asked anything yet has no group.
     func groups(_ pagerId: String) -> [ProjectGroup] {
         var byProject: [String: ProjectGroup] = [:]
         for a in agents(pagerId) {
@@ -357,7 +357,7 @@ final class AppModel {
             byProject[a.agent.project] = g
         }
         let answeredAt = { (x: Asked) in x.decision.answer?.sentAt ?? .distantFuture }
-        let all = byProject.values.map { g in
+        let all = byProject.values.filter { !$0.open.isEmpty || !$0.answered.isEmpty }.map { g in
             ProjectGroup(project: g.project, open: g.open.sorted { $0.decision.askedAt < $1.decision.askedAt }, answered: g.answered.sorted { answeredAt($0) > answeredAt($1) })
         }
         return all.sorted { a, b in

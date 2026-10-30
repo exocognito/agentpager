@@ -3,7 +3,7 @@ import XCTest
 // The decision-brief dogfood on a real phone or the Simulator: the owner's side of the canvas's four examples
 // (D1–D4), with every screenshot kept in the test result. A real agent asks them first, from the Mac:
 //   node --experimental-strip-types packages/app/scripts/briefs.ts http://<mac-ip>:8787 <pager number>
-// testPagerNumber prints this phone's number for that line (AGENTPAGER_NUMBER=…).
+// testPagerNumber makes the "Shop" pager if there is none and prints its number for that line (AGENTPAGER_NUMBER=…).
 final class BriefTests: XCTestCase {
     private var app: XCUIApplication!
 
@@ -18,26 +18,35 @@ final class BriefTests: XCTestCase {
         }
     }
 
-    // AGENTPAGER_BRIEF_RESET=1 starts with no pagers (and a new number): for the Simulator, never a phone in use.
+    // AGENTPAGER_BRIEF_RESET=1 starts with no pagers: for the Simulator, never a phone in use.
     func testPagerNumber() {
         if ProcessInfo.processInfo.environment["AGENTPAGER_BRIEF_RESET"] == "1" { app.launchArguments.append("-resetKeys") }
         launch()
-        app.buttons["settings-button"].firstMatch.tap()
-        let number = app.staticTexts["pager-number"]
-        wait(number, 30)
-        waitUntil(30, "a pager number") { number.label.count == 32 }
-        print("AGENTPAGER_NUMBER=\(number.label)")
+        if !app.buttons["pager-Shop"].exists {
+            app.buttons["new-pager"].tap()
+            let field = app.textFields["new-pager-name"]
+            wait(field)
+            field.typeText("Shop")
+            app.buttons["create-pager"].tap()
+            wait(app.navigationBars["Shop"], 30)
+        } else {
+            app.buttons["pager-Shop"].tap()
+        }
+        app.buttons["pager-settings"].tap()
+        let line = app.staticTexts["connect-line"]
+        wait(line, 30)
+        print("AGENTPAGER_NUMBER=\(line.label.split(separator: " ").last ?? "")")
     }
 
     func testBriefs() {
         launch()
-        let agent = app.buttons["agent-Claude Code · shop"].firstMatch
-        wait(agent, 60)
-        agent.tap()
+        let pager = app.buttons["pager-Shop"].firstMatch
+        wait(pager, 60)
+        pager.tap()
         wait(app.buttons["open-Which pricing page layout should I build?"], 30)
         shot("00-inbox")
 
-        // D1, a visual choice: see B on the Options screen (what it changes and why first, then its images, which
+        // D1, a visual choice: see B on the Options sheet (what it changes and why first, then its images, which
         // open full screen and swipe), pick B (its column outlined), read the background, send B.
         open("Which pricing page layout should I build?")
         shot("D1-1-top")
@@ -47,9 +56,9 @@ final class BriefTests: XCTestCase {
         showOption("B")
         shot("D1-3-option-B")
         let page = app.scrollViews["option-page-B"]
-        let changes = page.staticTexts["What B ✶ changes"], why = page.staticTexts["Why choose B ✶"]
+        let changes = page.staticTexts["What B changes"], why = page.staticTexts["Why choose B"]
         wait(changes, 10)
-        XCTAssertTrue(why.exists && page.staticTexts["Why pass on B ✶"].exists && page.staticTexts["Assumptions B ✶ makes"].exists)
+        XCTAssertTrue(why.exists && page.staticTexts["Why pass on B"].exists && page.staticTexts["Assumptions B makes"].exists)
         let thumb = page.buttons["image-b-table.png"]
         for _ in 0..<6 where !thumb.isHittable { page.swipeUp() }
         XCTAssertLessThan(why.frame.maxY, thumb.frame.minY, "what B changes and why come before its images")
@@ -66,16 +75,16 @@ final class BriefTests: XCTestCase {
         shot("D1-3d-image-2-of-2")
         app.navigationBars["2 of 2"].buttons.firstMatch.tap()
         waitUntil(10, "the viewer closed") { !app.navigationBars["2 of 2"].exists && changes.exists }
-        back()
+        closeSheet()
         tap("fold-smallprint")
         tap("tile-B")
         reveal(app.buttons["open-options"])
         shot("D1-4-B-picked")
         tap("link-background.md")
-        wait(app.navigationBars["Background"], 20)
+        wait(app.navigationBars["Why the pricing page matters"], 20)
         RunLoop.current.run(until: Date().addingTimeInterval(1.5))
         shot("D1-5-background")
-        back()
+        closeSheet()
         sendPicked("Which pricing page layout should I build?", "D1")
 
         // D2, a technical choice: see B (the diagram and diff), swipe to C, open the design notes, pick C, send C.
@@ -90,11 +99,11 @@ final class BriefTests: XCTestCase {
         let notes = app.scrollViews["option-page-C"].buttons["link-design.md"]
         for _ in 0..<6 where !notes.isHittable { app.scrollViews["option-page-C"].swipeUp() }
         notes.tap()
-        wait(app.navigationBars["Notes"], 20)
+        wait(app.navigationBars["Three ways to handle a timeout"], 20)
         RunLoop.current.run(until: Date().addingTimeInterval(1.5))
         shot("D2-3-design-notes")
         back()
-        back()
+        closeSheet()
         tap("fold-smallprint")
         tap("tile-C")
         shot("D2-4-C-picked")
@@ -105,7 +114,7 @@ final class BriefTests: XCTestCase {
         tap("open-options")
         showOption("C")
         shot("D3-1-option-C")
-        back()
+        closeSheet()
         tap("tile-B")
         shot("D3-2-B-picked")
         sendPicked("How should the support bot handle refunds?", "D3")
@@ -115,7 +124,7 @@ final class BriefTests: XCTestCase {
         shot("D4-1-top")
         tap("open-options")
         shot("D4-2-options")
-        back()
+        closeSheet()
         app.buttons["ask-for-changes"].tap()
         let field = app.textViews["feedback-text"]
         wait(field, 10)
@@ -124,16 +133,17 @@ final class BriefTests: XCTestCase {
         app.buttons["send-feedback"].tap()
         confirmed("Delete 14 merged preview branches?", "D4")
 
-        // Answered, the brief stays readable, and its Options screen opens on the option sent.
+        // Answered, the brief stays readable, and its Options sheet opens on the option sent.
+        app.buttons["answered-shop"].tap()
         app.buttons["answered-Which pricing page layout should I build?"].tap()
         RunLoop.current.run(until: Date().addingTimeInterval(1.5))
         shot("D1-7-answered")
         tap("open-options")
-        waitUntil(10, "the Options screen opening on B") { segment("B").isSelected }
+        waitUntil(10, "the Options sheet opening on B") { segment("B").isSelected }
         shot("D1-8-answered-options")
     }
 
-    // The Options screen's segmented control shows another option; it never chooses one.
+    // The Options sheet's segmented control shows another option; it never chooses one.
     private func segment(_ letter: String) -> XCUIElement {
         app.segmentedControls.firstMatch.buttons.element(boundBy: Int(letter.unicodeScalars.first!.value) - 65)
     }
@@ -150,12 +160,19 @@ final class BriefTests: XCTestCase {
         RunLoop.current.run(until: Date().addingTimeInterval(0.8))
     }
 
+    // Swipes a bottom sheet down by its grab handle, back to the decision.
+    private func closeSheet() {
+        let top = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.1))
+        top.press(forDuration: 0.1, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.95)))
+        RunLoop.current.run(until: Date().addingTimeInterval(1))
+    }
+
     private func any(_ id: String) -> XCUIElement { app.descendants(matching: .any)[id].firstMatch }
 
     private func launch() {
         app.launch()
         app.tap() // lets the interruption monitor see an alert that is already up
-        wait(app.navigationBars["Agents"], 30)
+        wait(app.navigationBars["Pagers"], 30)
     }
 
     private func open(_ title: String) {
@@ -195,11 +212,16 @@ final class BriefTests: XCTestCase {
         confirmed(title, name)
     }
 
-    // Sent once Undo closes; confirmed when the agent's acknowledgement arrives.
+    // Sent once Undo closes; confirmed when the agent's acknowledgement arrives. The decision is then in the
+    // project's "N answered" list.
     private func confirmed(_ title: String, _ name: String) {
+        let group = app.buttons["answered-shop"]
+        wait(group, 30)
+        group.tap()
         let row = app.buttons["answered-\(title)"]
         wait(row, 30)
         waitUntil(40, "\(name) confirmed by the agent") { row.label.contains("Agent confirmed") }
         shot("\(name)-confirmed")
+        back()
     }
 }

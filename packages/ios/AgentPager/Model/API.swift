@@ -1,53 +1,52 @@
 import Foundation
 
-// Wire types for the AgentPager server. The server owns every clock; the phone only shows its times.
+// Wire types for the AgentPager server (v2: pagers and agents). The server owns every clock; the phone only shows its times.
 
-nonisolated enum Lifetime: String, Codable, CaseIterable, Identifiable, Sendable {
-    case day = "24h", week = "7d", month = "30d"
+// When a pager turns off by itself: never, or this long after it was turned on.
+nonisolated enum AutoOff: String, Codable, CaseIterable, Identifiable, Sendable {
+    case never, day = "24h", week = "7d", month = "30d"
     var id: String { rawValue }
     var label: String {
         switch self {
-        case .day: "24 Hours"
-        case .week: "7 Days"
-        case .month: "30 Days"
-        }
-    }
-    var note: String {
-        switch self {
-        case .day: "The pager ends 24 hours after your agent connects, unless you or your agent end it sooner."
-        case .week: "The pager ends 7 days after your agent connects, unless you or your agent end it sooner."
-        case .month: "The pager ends 30 days after your agent connects, unless you or your agent end it sooner."
+        case .never: "Never"
+        case .day: "After 24 hours"
+        case .week: "After 7 days"
+        case .month: "After 30 days"
         }
     }
 }
 
-nonisolated enum PagerStatus: String, Codable, Sendable { case waiting, unpaired, active, ended }
-
-nonisolated enum EndReason: String, Codable, Sendable {
-    case timedOut, ownerEnded, agentFinished, pairingFailed
-    var sentence: String {
-        switch self {
-        case .timedOut: "It reached its end time."
-        case .ownerEnded: "You ended it."
-        case .agentFinished: "Your agent finished and ended it."
-        case .pairingFailed: "Pairing failed after 3 wrong codes."
-        }
-    }
+// What the server knows of a pager: whether it is on, and when it turns off or turned off. The name is the phone's.
+nonisolated struct PagerState: Codable, Hashable, Sendable {
+    var pagerId: String
+    var on: Bool
+    var autoOff: AutoOff
+    var offAt: Date?
+    var offSince: Date?
+    var createdAt: Date
 }
 
-nonisolated struct PagerSummary: Codable, Hashable, Sendable {
-    var sessionId: String
-    var name: String?
-    var status: PagerStatus
-    var lifetime: Lifetime?
-    var createdAt: Date?
-    var pairedAt: Date?
-    var endsAt: Date?
-    var triesLeft: Int?
-    var openCount: Int?
-    var lastActivityAt: Date?
-    var endedAt: Date?
-    var endReason: EndReason?
+// Something that connected to a pager: who asked, and the project its decisions are grouped under.
+nonisolated struct AgentInfo: Codable, Hashable, Sendable {
+    var agentId: String
+    var app: String
+    var project: String
+    var createdAt: Date
+    var finishedAt: Date?
+    var lastActivityAt: Date
+    var openCount: Int
+}
+
+nonisolated struct AgentInbox: Codable, Hashable, Sendable {
+    var agent: AgentInfo
+    var open: [Decision]
+    var answered: [Decision]
+}
+
+// One read of a pager: its state and every agent on it with its decisions.
+nonisolated struct PagerInbox: Codable, Hashable, Sendable {
+    var pager: PagerState
+    var agents: [AgentInbox]
 }
 
 // A generic card's option has an emoji and maybe detail; a brief's option has a letter (number 1 is A), a label
@@ -140,35 +139,14 @@ nonisolated struct Decision: Codable, Hashable, Identifiable, Sendable {
     }
 }
 
-nonisolated struct Inbox: Codable, Hashable, Sendable {
-    var session: PagerSummary
-    var open: [Decision]
-    var answered: [Decision]
-}
-
 nonisolated struct Receipt: Codable, Sendable { var decisionId: String; var answerId: String; var sentAt: Date }
-nonisolated struct PaletteEntry: Codable, Hashable, Sendable { var emoji: String; var name: String }
-nonisolated struct StartInfo: Codable, Sendable {
-    var status: PagerStatus
-    var name: String?
-    var palette: [PaletteEntry]
-    var triesLeft: Int
-    var endsAt: Date
-    var lifetime: Lifetime?
-}
-nonisolated struct LinkInfo: Codable, Hashable, Sendable { var code: String; var url: String }
-nonisolated struct CreatedPager: Codable, Sendable { var session: PagerSummary; var link: LinkInfo }
-nonisolated struct SessionEnvelope: Codable, Sendable { var session: PagerSummary }
-nonisolated struct NumberMade: Codable, Sendable { var number: String }
-nonisolated struct NumberPagers: Codable, Sendable { var sessionIds: [String] }
+nonisolated struct PagerReply: Codable, Sendable { var pager: PagerState }
 nonisolated struct Done: Codable, Sendable { var ok: Bool }
 
 nonisolated struct ErrorBody: Codable, Sendable {
     var error: String
     var message: String?
     var reason: String?
-    var triesLeft: Int?
-    var endReason: EndReason?
 }
 
 nonisolated enum APIError: Error, Sendable {
@@ -229,46 +207,34 @@ nonisolated struct APIClient: Sendable {
         return data
     }
 
-    // Phone routes.
-    func createPager(lifetime: Lifetime, phoneKey: String) async throws(APIError) -> CreatedPager {
-        try await request("POST", "api/pagers", phoneKey: phoneKey, body: ["lifetime": lifetime.rawValue])
+    // Phone routes. Each pager has its own phone key.
+    func createPager(_ p: LocalPager, autoOff: AutoOff) async throws(APIError) -> PagerReply {
+        try await request("POST", "api/pagers", phoneKey: p.phoneKey, body: ["number": p.number, "publicKey": p.publicKey, "autoOff": autoOff.rawValue])
     }
-    // A new number retires this phone key's old one at once.
-    func makeNumber(phoneKey: String) async throws(APIError) -> NumberMade {
-        try await request("POST", "api/numbers", phoneKey: phoneKey)
+    func pager(_ p: LocalPager) async throws(APIError) -> PagerInbox {
+        try await request("GET", "api/pagers/\(p.pagerId)", phoneKey: p.phoneKey)
     }
-    func numberPagers(phoneKey: String) async throws(APIError) -> NumberPagers {
-        try await request("GET", "api/numbers", phoneKey: phoneKey)
+    func setOn(_ p: LocalPager, _ on: Bool) async throws(APIError) -> PagerReply {
+        struct Body: Encodable, Sendable { var on: Bool }
+        return try await request("POST", "api/pagers/\(p.pagerId)/settings", phoneKey: p.phoneKey, body: Body(on: on))
     }
-    func inbox(_ key: PagerKey) async throws(APIError) -> Inbox {
-        try await request("GET", "api/sessions/\(key.sessionId)/cards", phoneKey: key.phoneKey)
+    func setAutoOff(_ p: LocalPager, _ autoOff: AutoOff) async throws(APIError) -> PagerReply {
+        try await request("POST", "api/pagers/\(p.pagerId)/settings", phoneKey: p.phoneKey, body: ["autoOff": autoOff.rawValue])
     }
-    func answer(_ key: PagerKey, decisionId: String, requestId: String, choice: Choice) async throws(APIError) -> Receipt {
+    func delete(_ p: LocalPager) async throws(APIError) {
+        let _: Done = try await request("POST", "api/pagers/\(p.pagerId)/delete", phoneKey: p.phoneKey)
+    }
+    // Where this phone gets alerts for the pager's agents.
+    func push(_ p: LocalPager, token: String, environment: String) async throws(APIError) {
+        let _: Done = try await request("POST", "api/pagers/\(p.pagerId)/push", phoneKey: p.phoneKey, body: ["token": token, "environment": environment])
+    }
+    func answer(_ p: LocalPager, agentId: String, decisionId: String, requestId: String, choice: Choice) async throws(APIError) -> Receipt {
         struct Body: Encodable, Sendable { var requestId: String; var choice: Choice }
-        return try await request("POST", "api/sessions/\(key.sessionId)/cards/\(decisionId)/answer", phoneKey: key.phoneKey, body: Body(requestId: requestId, choice: choice))
+        return try await request("POST", "api/agents/\(agentId)/cards/\(decisionId)/answer", phoneKey: p.phoneKey, body: Body(requestId: requestId, choice: choice))
     }
     // One attachment of a brief, as the agent sent it.
-    func file(_ key: PagerKey, decisionId: String, name: String) async throws(APIError) -> Data {
-        try await raw("GET", "api/sessions/\(key.sessionId)/cards/\(decisionId)/files/\(name)", phoneKey: key.phoneKey, timeout: 30)
-    }
-    func end(_ key: PagerKey) async throws(APIError) -> SessionEnvelope {
-        try await request("POST", "api/sessions/\(key.sessionId)/end", phoneKey: key.phoneKey)
-    }
-    func setLifetime(_ key: PagerKey, _ lifetime: Lifetime) async throws(APIError) -> SessionEnvelope {
-        try await request("POST", "api/sessions/\(key.sessionId)/lifetime", phoneKey: key.phoneKey, body: ["lifetime": lifetime.rawValue])
-    }
-    // Where this phone gets alerts: given to each pager it holds, and to its pager number for pagers agents open later.
-    func push(_ key: PagerKey, token: String, environment: String) async throws(APIError) {
-        let _: Done = try await request("POST", "api/sessions/\(key.sessionId)/push", phoneKey: key.phoneKey, body: ["token": token, "environment": environment])
-    }
-    func numberPush(phoneKey: String, token: String, environment: String) async throws(APIError) {
-        let _: Done = try await request("POST", "api/numbers/push", phoneKey: phoneKey, body: ["token": token, "environment": environment])
-    }
-    func startInfo(code: String) async throws(APIError) -> StartInfo {
-        try await request("GET", "api/start/\(code)")
-    }
-    func pair(code: String, emojis: [String], phoneKey: String) async throws(APIError) -> SessionEnvelope {
-        try await request("POST", "api/start/\(code)/pair", phoneKey: phoneKey, body: ["code": emojis])
+    func file(_ p: LocalPager, agentId: String, decisionId: String, name: String) async throws(APIError) -> Data {
+        try await raw("GET", "api/agents/\(agentId)/cards/\(decisionId)/files/\(name)", phoneKey: p.phoneKey, timeout: 30)
     }
 }
 

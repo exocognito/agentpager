@@ -1,4 +1,4 @@
-// Dogfood server: production lifetimes (15 min window, 24h/7d/30d, 7-day tombstones), listening on every
+// Dogfood server: production clocks (auto-off after 24h/7d/30d, agents forgotten after 30 idle days), listening on every
 // interface so a phone on the same Wi-Fi can reach it, with data kept across restarts in ~/.agentpager-dogfood.
 import { spawn, execFileSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
@@ -9,7 +9,7 @@ const persist = process.env.AGENTPAGER_PERSIST || path.join(homedir(), '.agentpa
 mkdirSync(persist, { recursive: true });
 let lan = '';
 try { lan = execFileSync('ipconfig', ['getifaddr', 'en0'], { encoding: 'utf8' }).trim(); } catch { /* not on Wi-Fi en0 */ }
-const env = { ...process.env, PORT: port, AGENTPAGER_IP: '0.0.0.0', AGENTPAGER_PERSIST: persist, AGENTPAGER_UNPAIRED_MS: '0', AGENTPAGER_SESSION_MS: '0', AGENTPAGER_RETAIN_MS: '0' };
+const env = { ...process.env, PORT: port, AGENTPAGER_IP: '0.0.0.0', AGENTPAGER_PERSIST: persist, AGENTPAGER_AUTO_OFF_MS: '0', AGENTPAGER_IDLE_MS: '0' };
 console.log(`AgentPager dogfood server: http://${lan || '<this Mac\'s LAN IP>'}:${port}  (data in ${persist})`);
 console.log(`Agents: read http://${lan || 'localhost'}:${port}/start   MCP: http://${lan || 'localhost'}:${port}/mcp`);
 const child = spawn(process.execPath, ['scripts/start.mjs'], { cwd: path.dirname(path.dirname(new URL(import.meta.url).pathname)), env, stdio: 'inherit' });

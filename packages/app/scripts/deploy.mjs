@@ -45,11 +45,11 @@ try {
   console.log('Verified custom domain, DNS:', JSON.stringify(dns.map(d => ({ type: d.type, name: d.name, proxied: d.proxied }))));
   const namespaces = await cf(`/accounts/${account}/workers/durable_objects/namespaces`);
   const placement = namespaces.filter(n => n.script === 'ownerpager');
-  for (const name of ['Session', 'Registry']) if (!placement.some(n => n.class === name && n.use_sqlite === true)) throw new Error(`${name} is not a SQLite namespace on ownerpager.`);
+  for (const name of ['Agent', 'Registry']) if (!placement.some(n => n.class === name && n.use_sqlite === true)) throw new Error(`${name} is not a SQLite namespace on ownerpager.`);
   console.log('Durable Object placement:', JSON.stringify(placement));
   const settings = await cf(`/accounts/${account}/workers/scripts/ownerpager/settings`);
   const bindings = settings.bindings.filter(b => b.type === 'durable_object_namespace');
-  for (const [name, className] of [['SESSION', 'Session'], ['REGISTRY', 'Registry']]) if (!bindings.some(b => b.name === name && b.class_name === className && placement.some(n => n.id === b.namespace_id && n.class === className))) throw new Error(`Incorrect ${name} binding.`);
+  for (const [name, className] of [['AGENT', 'Agent'], ['REGISTRY', 'Registry']]) if (!bindings.some(b => b.name === name && b.class_name === className && placement.some(n => n.id === b.namespace_id && n.class === className))) throw new Error(`Incorrect ${name} binding.`);
   console.log('Bindings:', JSON.stringify(bindings));
   if (!settings.bindings.some(b => b.type === 'secret_text' && b.name === 'APNS_KEY_P8')) throw new Error('The Worker secret APNS_KEY_P8 is missing, so no alerts go out.');
   for (let n = 0; n < 30; n++) {

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import { createServer } from 'node:http';
 import { generateKeyPairSync, verify } from 'node:crypto';
 import { Schema } from 'effect';
-import { fixture, assert, token, C, until, decode } from './support.ts';
+import { fixture, assert, token, until, decode, question } from './support.ts';
 
 // A stand-in for Apple's push service: it records each alert, checks the provider token, and answers each device
 // token as `replies` says (200 unless set).
@@ -11,12 +11,12 @@ const Payload = Schema.Struct({
     alert: Schema.Struct({ title: Schema.String, body: Schema.String }), sound: Schema.Literal('default'), 'thread-id': Schema.String,
     'content-available': Schema.Literal(1), 'interruption-level': Schema.Literal('time-sensitive', 'active'),
   }),
-  kind: Schema.Literal('decision', 'acknowledgement'), sessionId: Schema.String, decisionId: Schema.String,
+  kind: Schema.Literal('decision', 'acknowledgement'), pagerId: Schema.String, agentId: Schema.String, decisionId: Schema.String,
 });
 type Delivery = { device: string; headers: Record<string, string>; payload: typeof Payload.Type };
 const Ok = Schema.Struct({ ok: Schema.Literal(true) });
 
-test('alerts: a paired phone that gave its token is alerted when its agent asks and acknowledges', { timeout: 180_000 }, async () => {
+test('alerts: a pager whose phone gave its token alerts when an agent asks and acknowledges', { timeout: 180_000 }, async () => {
   const { privateKey, publicKey } = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
   const deliveries: Delivery[] = [], replies = new Map<string, { status: number; reason: string }>();
   const apple = createServer((req, res) => {
@@ -41,33 +41,34 @@ test('alerts: a paired phone that gave its token is alerted when its agent asks 
   process.env.APNS_ORIGIN = `http://127.0.0.1:${address.port}`;
   const f = await fixture('push');
   const device = () => Array.from({ length: 64 }, () => '0123456789abcdef'[Math.floor(Math.random() * 16)]).join('');
-  const register = (sessionId: string, phone: string, deviceToken: string) => f.ok(Ok, `/api/sessions/${sessionId}/push`, { phone, data: { token: deviceToken, environment: 'sandbox' } });
+  const register = (pagerId: string, phone: string, deviceToken: string) => f.ok(Ok, `/api/pagers/${pagerId}/push`, { phone, data: { token: deviceToken, environment: 'sandbox' } });
   const sent = (to: string) => deliveries.filter(d => d.device === to);
   try {
-    const { s, phone, session } = await f.paired('Claude Code · alerts');
-    const mine = device();
-    await f.refused(401, 'Unauthorized', `/api/sessions/${session.sessionId}/push`, { phone: token(), data: { token: mine, environment: 'sandbox' } });
-    await f.refused(400, 'InvalidInput', `/api/sessions/${session.sessionId}/push`, { phone, data: { token: 'not-hex', environment: 'sandbox' } });
-    await f.refused(400, 'InvalidInput', `/api/sessions/${session.sessionId}/push`, { phone, data: { token: mine, environment: 'staging' } });
-    await register(session.sessionId, phone, mine);
+    const p = await f.makePager(), mine = device();
+    await f.refused(401, 'Unauthorized', `/api/pagers/${p.pagerId}/push`, { phone: token(), data: { token: mine, environment: 'sandbox' } });
+    await f.refused(400, 'InvalidInput', `/api/pagers/${p.pagerId}/push`, { phone: p.phone, data: { token: 'not-hex', environment: 'sandbox' } });
+    await f.refused(400, 'InvalidInput', `/api/pagers/${p.pagerId}/push`, { phone: p.phone, data: { token: mine, environment: 'staging' } });
+    // The phone gives its token to the pager once; every agent that connects later alerts with it.
+    await register(p.pagerId, p.phone, mine);
+    const a = await f.connect(p.number, 'Claude Code', 'alerts');
 
-    // A decision: time sensitive, titled with the agent's name, the question first, collapsing on the decision.
-    const asked = await f.ask(s, 'Ship it?');
+    // A decision: time sensitive, titled with who asked and the project, the question first, collapsing on the decision.
+    const asked = await f.ask(a, 'Ship it?');
     const [decisionAlert] = await until(async () => sent(mine), d => d.length === 1);
     const aps = decisionAlert.payload.aps;
     assert.deepEqual(aps.alert, { title: 'Claude Code · alerts', body: 'Ship it?\nRecommended: B. Second plan' });
     assert.equal(aps['interruption-level'], 'time-sensitive');
-    assert.equal(aps['thread-id'], session.sessionId);
-    assert.deepEqual([decisionAlert.payload.kind, decisionAlert.payload.sessionId, decisionAlert.payload.decisionId], ['decision', session.sessionId, asked.decisionId]);
+    assert.equal(aps['thread-id'], p.pagerId);
+    assert.deepEqual([decisionAlert.payload.kind, decisionAlert.payload.pagerId, decisionAlert.payload.agentId, decisionAlert.payload.decisionId], ['decision', p.pagerId, a.agent.agentId, asked.decisionId]);
     assert.equal(decisionAlert.headers['apns-topic'], 'me.agentpager.app.dev');
     assert.equal(decisionAlert.headers['apns-push-type'], 'alert');
     assert.equal(decisionAlert.headers['apns-collapse-id'], asked.decisionId);
-    const status = await f.ok(C.AgentStatus, `/api/sessions/${session.sessionId}`, { agent: s.agentKey });
-    assert.equal(Number(decisionAlert.headers['apns-expiration']), Math.floor(Date.parse(status.session.endsAt) / 1000), 'never delivered after the pager ends');
+    const expires = Number(decisionAlert.headers['apns-expiration']) * 1000 - Date.now();
+    assert.ok(expires > 23 * 3_600_000 && expires <= 24 * 3_600_000, 'never delivered more than a day late');
 
     // The agent's acknowledgement carries its words and is not time sensitive.
-    const receipt = await f.answer(session.sessionId, phone, asked.decisionId);
-    await f.ack(s, asked.decisionId, receipt.answerId, 'Shipping now.');
+    const receipt = await f.answer(a.agent.agentId, p.phone, asked.decisionId);
+    await f.ack(a, asked.decisionId, receipt.answerId, 'Shipping now.');
     const ackAlert = (await until(async () => sent(mine), d => d.length === 2))[1];
     assert.deepEqual(ackAlert.payload.aps.alert, { title: 'Claude Code · alerts', body: 'Shipping now.' });
     assert.equal(ackAlert.payload.aps['interruption-level'], 'active');
@@ -75,48 +76,26 @@ test('alerts: a paired phone that gave its token is alerted when its agent asks 
 
     // Apple failing an alert never refuses the agent.
     replies.set(mine, { status: 500, reason: 'InternalServerError' });
-    await f.ask(s, 'Still there?');
+    await f.ask(a, 'Still there?');
     await until(async () => sent(mine), d => d.length === 3);
 
     // A token Apple says is gone is dropped: no more alerts until the phone gives one again.
     replies.set(mine, { status: 410, reason: 'Unregistered' });
-    await f.ask(s, 'Gone?');
+    await f.ask(a, 'Gone?');
     await until(async () => sent(mine), d => d.length === 4);
-    await f.ask(s, 'Anyone?');
+    await f.ask(a, 'Anyone?');
     assert.equal(sent(mine).length, 4, 'no alert after Apple said the token is gone');
     const fresh = device();
-    await register(session.sessionId, phone, fresh);
-    await f.ask(s, 'Back?');
-    await until(async () => sent(fresh), d => d.length === 1);
+    await register(p.pagerId, p.phone, fresh);
+    const b = await f.connect(p.number, 'Codex', 'second agent');
+    await f.ask(b, 'Back?');
+    const back = await until(async () => sent(fresh), d => d.length === 1);
+    assert.equal(back[0].payload.aps.alert.title, 'Codex · second agent');
 
-    // A phone-made link: the phone may give its token before an agent joins, but alerts start only once paired.
-    const early = device(), owner = token();
-    const made = await f.phoneCreate(owner);
-    await register(made.session.sessionId, owner, early);
-    const joined = await f.join(made.link.code, 'Codex · early');
-    const agent = { session: joined.session, agentKey: joined.agentKey };
-    await f.ask(agent, 'Before pairing?');
-    if (!joined.pairingCode) throw new Error('no pairing code');
-    await f.pair(made.link.code, owner, joined.pairingCode.emojis);
-    await f.ask(agent, 'After pairing?');
-    const earlyAlerts = await until(async () => sent(early), d => d.length === 1);
-    assert.equal(earlyAlerts[0].payload.aps.alert.body.split('\n')[0], 'After pairing?');
-
-    // The pager number: the phone gives its token once, and every pager an agent opens with the number alerts on
-    // its first question, before the phone has seen that pager.
-    const numberKey = token(), viaNumber = device();
-    await f.refused(401, 'Unauthorized', '/api/numbers/push', { phone: numberKey, data: { token: viaNumber, environment: 'sandbox' } });
-    const { number } = await f.ok(C.NumberMade, '/api/numbers', { method: 'POST', phone: numberKey });
-    await f.ok(Ok, '/api/numbers/push', { phone: numberKey, data: { token: viaNumber, environment: 'sandbox' } });
-    const opened = await f.ok(C.Paged, `/api/numbers/${number}/pagers`, { data: { name: 'Pi · by number' } });
-    await f.ask(opened, 'First question?');
-    const numbered = await until(async () => sent(viaNumber), d => d.length === 1);
-    assert.equal(numbered[0].payload.sessionId, opened.session.sessionId);
-    assert.equal(numbered[0].payload.aps.alert.title, 'Pi · by number');
-
-    // Ending a pager forgets its token with everything else.
-    await f.ok(C.SessionReply, `/api/sessions/${session.sessionId}/end`, { method: 'POST', phone });
-    await f.refused(410, 'PagerEnded', `/api/sessions/${session.sessionId}/push`, { phone, data: { token: fresh, environment: 'sandbox' } });
+    // Off: nothing is sent, so nothing alerts.
+    await f.settings(p.pagerId, p.phone, { on: false });
+    await f.refused(409, 'PagerOff', `/api/agents/${b.agent.agentId}/cards`, { agent: b.agentKey, data: question('While off?') });
+    assert.equal(sent(fresh).length, 1);
   } finally {
     await f.stop();
     apple.close();

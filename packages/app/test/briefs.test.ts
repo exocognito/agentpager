@@ -10,7 +10,7 @@ import { briefNames, briefsDir, loadBrief } from '../fixtures/briefs/load.ts';
 // Decision briefs: an agent sends Markdown with lettered options and attachments; the phone reads the decision
 // and fetches each attachment by name. The Frame's refusals are whole, with the reason.
 
-// The pager objects' stored databases, read after the server stops.
+// The agent objects' stored databases, read after the server stops.
 function attachmentRows(persist: string) {
   const files: string[] = [];
   const walk = (dir: string) => { for (const name of readdirSync(dir)) { const p = path.join(dir, name); if (statSync(p).isDirectory()) walk(p); else if (p.endsWith('.sqlite')) files.push(p); } };
@@ -18,12 +18,12 @@ function attachmentRows(persist: string) {
   return files.map(file => new DatabaseSync(file)).filter(db => db.prepare("SELECT 1 FROM sqlite_master WHERE name='attachments'").get());
 }
 const count = (db: DatabaseSync) => Number(db.prepare('SELECT count(*) AS n FROM attachments').get()?.n);
-test('briefs: the four canvas examples ask, read back as sent, answer, and go with the pager', { timeout: 180_000 }, async () => {
+test('briefs: the four canvas examples ask, read back as sent, answer, and go with the pager when it is deleted', { timeout: 180_000 }, async () => {
   const f = await fixture('briefs');
   try {
-    const { s, phone } = await f.paired('Claude Code · shop');
-    const sessionId = s.session.sessionId;
-    const cards = `/api/sessions/${sessionId}/cards`;
+    const { p, a: s } = await f.connected('Claude Code', 'shop');
+    const phone = p.phone, agentId = s.agent.agentId;
+    const cards = `/api/agents/${agentId}/cards`;
     const asked = new Map<string, string>();
     for (const name of briefNames()) {
       const r = await f.ok(C.Asked, cards, { agent: s.agentKey, data: loadBrief(name) });
@@ -31,7 +31,7 @@ test('briefs: the four canvas examples ask, read back as sent, answer, and go wi
     }
     assert.deepEqual([...asked.keys()], ['D1-pricing', 'D2-checkout', 'D3-refunds', 'D4-branches']);
 
-    const inbox = await f.inbox(sessionId, phone);
+    const inbox = (await f.pager(p.pagerId, phone)).agents[0];
     await f.artifact('inbox.json', inbox);
     assert.equal(inbox.open.length, 4);
     for (const d of inbox.open) {
@@ -64,27 +64,27 @@ test('briefs: the four canvas examples ask, read back as sent, answer, and go wi
     assert.equal((await file(d2, '..%2Fpager')).status, 400);
 
     // Answers are by number: 3 is C.
-    const receipt = await f.answer(sessionId, phone, d2, { kind: 'option', number: 3 });
+    const receipt = await f.answer(agentId, phone, d2, { kind: 'option', number: 3 });
     const read = await f.read(s, d2);
     assert.equal(read.status, 'answered');
     if (read.status === 'answered') assert.deepEqual(read.answer.choice, { kind: 'option', number: 3 });
     await f.ack(s, d2, receipt.answerId, 'Holding timed-out orders and emailing when they settle.');
 
-    // Ending the pager takes the attachments with it.
-    await f.ok(C.SessionReply, `/api/sessions/${sessionId}/end`, { phone, data: {} });
-    assert.equal((await file(d2, 'design.md')).status, 410);
+    // Deleting the pager takes the attachments with it.
+    await f.request(`/api/pagers/${p.pagerId}/delete`, { method: 'POST', phone });
+    assert.equal((await file(d2, 'design.md')).status, 404);
     await f.stop();
     const stores = attachmentRows(f.persist);
-    assert.ok(stores.length > 0, 'the pager object has an attachments table');
-    for (const db of stores) { assert.equal(count(db), 0, 'no attachment bytes after the end'); db.close(); }
+    assert.ok(stores.length > 0, 'the agent object has an attachments table');
+    for (const db of stores) { assert.equal(count(db), 0, 'no attachment bytes after the delete'); db.close(); }
   } finally { await f.stop(); }
 });
 
 test('briefs: refused whole, with a reason that says what to fix', { timeout: 120_000 }, async () => {
   const f = await fixture('briefs-refused');
   try {
-    const { s, phone } = await f.paired('Claude Code · shop');
-    const cards = `/api/sessions/${s.session.sessionId}/cards`;
+    const { p, a: s } = await f.connected('Claude Code', 'shop');
+    const cards = `/api/agents/${s.agent.agentId}/cards`;
     const base = loadBrief('D4-branches');
     const card = (patch: Record<string, unknown>) => ({ ...base, card: { ...(typeof base.card === 'object' ? base.card : {}), ...patch } });
     const markdown = String((typeof base.card === 'object' && base.card !== null && 'markdown' in base.card) ? base.card.markdown : '');
@@ -113,18 +113,18 @@ test('briefs: refused whole, with a reason that says what to fix', { timeout: 12
       assert.match(e.reason ?? '', reason, `${label}: ${e.reason}`);
     }
     await f.refused(401, 'Unauthorized', cards, { agent: token(), data: emojiCard });
-    const inbox = await f.inbox(s.session.sessionId, phone);
+    const inbox = (await f.pager(p.pagerId, p.phone)).agents[0];
     assert.equal(inbox.open.length, 0, 'nothing refused was stored');
 
     // The same brief over MCP, as an agent's tool call.
     const client = new Client({ name: 'AgentPager briefs', version: '1' });
     await client.connect(new StreamableHTTPClientTransport(new URL(f.origin + '/mcp')));
-    const reply = await client.callTool({ name: 'ask_card', arguments: { sessionId: s.session.sessionId, agentKey: s.agentKey, question: loadBrief('D1-pricing') } });
+    const reply = await client.callTool({ name: 'ask', arguments: { agentId: s.agent.agentId, agentKey: s.agentKey, question: loadBrief('D1-pricing') } });
     assert.notEqual(reply.isError, true, JSON.stringify(reply));
     const tools = await client.listTools();
-    assert.match(tools.tools.find(t => t.name === 'ask_card')?.description ?? '', /brief/);
+    assert.match(tools.tools.find(t => t.name === 'ask')?.description ?? '', /brief/);
     await client.close();
-    assert.equal((await f.inbox(s.session.sessionId, phone)).open[0].attachments?.length, 5);
+    assert.equal((await f.pager(p.pagerId, p.phone)).agents[0].open[0].attachments?.length, 5);
 
     // /start's own example, a brief's short form, asks as written.
     const doc = await (await fetch(f.origin + '/start')).text();
@@ -132,12 +132,5 @@ test('briefs: refused whole, with a reason that says what to fix', { timeout: 12
     assert.ok(example, '/start has its example question');
     await f.ok(C.Asked, cards, { agent: s.agentKey, data: JSON.parse(example) });
 
-    // A build from before briefs ends a pager by deleting its proposals only; the attachments still go with them.
-    await f.stop();
-    const [db] = attachmentRows(f.persist).filter(d => count(d) > 0);
-    assert.equal(count(db), 5);
-    db.exec('DELETE FROM proposals');
-    assert.equal(count(db), 0, 'deleting a proposal deletes its attachments');
-    db.close();
   } finally { await f.stop(); }
 });

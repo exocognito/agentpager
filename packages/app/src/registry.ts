@@ -1,77 +1,136 @@
 import type { DurableObjectState } from '@cloudflare/workers-types';
 import { Schema } from 'effect';
-import { Token, Timestamp } from './contract.ts';
-import { Refusal } from './contract.ts';
-import { body, decode, json, refusal } from './shared.ts';
+import * as C from './contract.ts';
+import { body, decode, iso, json, refusal, sameDigest } from './shared.ts';
 import { PushTarget } from './push.ts';
-import type { Env } from './env.ts';
+import { clocks, forward, type Env } from './env.ts';
 
 const Digest = Schema.String.pipe(Schema.pattern(/^[a-f0-9]{64}$/));
-const Put = Schema.Struct({ codeHash: Digest, sessionId: Token, expiresAt: Timestamp });
-const Key = Schema.Struct({ codeHash: Digest });
-const NumberPut = Schema.Struct({ numberHash: Digest, phoneHash: Digest });
-const NumberPage = Schema.Struct({ numberHash: Digest, sessionId: Token, expiresAt: Timestamp });
-const PhoneKey = Schema.Struct({ phoneHash: Digest });
-const NumberPush = Schema.Struct({ phoneHash: Digest, push: PushTarget });
+const Fingerprint = Schema.String.pipe(Schema.pattern(/^[a-f0-9]{16}$/));
+const Create = Schema.Struct({ pagerId: C.PagerId, fingerprint: Fingerprint, publicKey: C.PublicKey, phoneHash: Digest, autoOff: C.AutoOff });
+const Phone = Schema.Struct({ pagerId: C.PagerId, phoneHash: Digest });
+const Settings = Schema.Struct({ ...Phone.fields, on: Schema.optional(Schema.Boolean), autoOff: Schema.optional(C.AutoOff) });
+const Push = Schema.Struct({ ...Phone.fields, push: PushTarget });
+const Connect = Schema.Struct({ pagerId: C.PagerId, fingerprint: Fingerprint, agentId: C.Token });
+const Id = Schema.Struct({ pagerId: C.PagerId });
+const PushGone = Schema.Struct({ pagerId: C.PagerId, token: Schema.String });
+const Forget = Schema.Struct({ pagerId: C.PagerId, agentId: C.Token });
 
-// Maps a link code's SHA-256 to its pager for the pairing window only. The plain code is never stored.
-// Also keeps each phone key's one pager number and the pagers agents opened with it, as digests, and where that
-// phone gets alerts, which each pager opened with the number starts with.
+type Row = { pager_id: string; fingerprint: string; public_key: string; phone_hash: string; enabled: number; auto_off: string; off_at: number | null; off_since: number | null; push: string | null; created_at: number };
+
+// The pagers: each phone-made pager's public key, its phone key as a digest, whether it is on, when it turns off by
+// itself, and where its phone gets alerts. Also which agents connected to each, so the phone can read them and a
+// deleted pager can take them with it. No names: those live only on the phone.
 export class Registry {
   constructor(private ctx: DurableObjectState, private env: Env) {
-    void this.env;
-    // Old pairing and connect tables held plain tokens; old links fail by design.
-    ctx.storage.sql.exec(`DROP TABLE IF EXISTS ap_links_v1; DROP TABLE IF EXISTS ap_connects_v1;
-      CREATE TABLE IF NOT EXISTS links_v2 (code_hash TEXT PRIMARY KEY, session_id TEXT NOT NULL, expires_at INTEGER NOT NULL);
-      CREATE TABLE IF NOT EXISTS numbers_v1 (phone_hash TEXT PRIMARY KEY, number_hash TEXT NOT NULL UNIQUE);
-      CREATE TABLE IF NOT EXISTS number_pagers_v1 (phone_hash TEXT NOT NULL, session_id TEXT NOT NULL, expires_at INTEGER NOT NULL, PRIMARY KEY (phone_hash, session_id));
-      CREATE TABLE IF NOT EXISTS number_push_v1 (phone_hash TEXT PRIMARY KEY, json TEXT NOT NULL);`);
+    // v1 links and numbers fail by design: v2 is a fresh install.
+    ctx.storage.sql.exec(`DROP TABLE IF EXISTS links_v2; DROP TABLE IF EXISTS numbers_v1; DROP TABLE IF EXISTS number_pagers_v1; DROP TABLE IF EXISTS number_push_v1;
+      CREATE TABLE IF NOT EXISTS pagers_v2 (pager_id TEXT PRIMARY KEY, fingerprint TEXT NOT NULL, public_key TEXT NOT NULL, phone_hash TEXT NOT NULL,
+        enabled INTEGER NOT NULL, auto_off TEXT NOT NULL, off_at INTEGER, off_since INTEGER, push TEXT, created_at INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS pager_agents_v2 (pager_id TEXT NOT NULL, agent_id TEXT NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY (pager_id, agent_id));
+      CREATE TABLE IF NOT EXISTS erase_v2 (agent_id TEXT PRIMARY KEY);`);
   }
+  // A deleted pager's agents still to forget everything. Each is tried now; any left are tried again every minute
+  // until done. Until then the agent finds its pager gone on any call, and forgets itself.
+  private async erase() {
+    const ids = this.ctx.storage.sql.exec<{ agent_id: string }>('SELECT agent_id FROM erase_v2').toArray().map(r => r.agent_id);
+    await Promise.all(ids.map(async id => {
+      const done = await forward(this.env.AGENT, id, '/forget', { method: 'POST', headers: {} }).then(r => r.ok, () => false);
+      if (done) this.ctx.storage.sql.exec('DELETE FROM erase_v2 WHERE agent_id=?', id);
+    }));
+    if (this.ctx.storage.sql.exec('SELECT 1 FROM erase_v2 LIMIT 1').toArray().length) await this.ctx.storage.setAlarm(Date.now() + 60_000);
+    else await this.ctx.storage.deleteAlarm();
+  }
+  async alarm() { await this.erase(); }
+  private row(pagerId: string) { return this.ctx.storage.sql.exec<Row>('SELECT * FROM pagers_v2 WHERE pager_id=?', pagerId).toArray()[0]; }
+  // Only the pager's own phone key reads or changes it.
+  private mine(p: { pagerId: string; phoneHash: string }) {
+    const row = this.row(p.pagerId);
+    if (!row) throw C.refuse.unknownPager();
+    if (!sameDigest(p.phoneHash, row.phone_hash)) throw C.refuse.unauthorized();
+    return row;
+  }
+  private pager(row: Row): C.Pager {
+    return decode(C.Pager, { pagerId: row.pager_id, on: row.enabled === 1, autoOff: row.auto_off, offAt: row.off_at === null ? null : iso(row.off_at), offSince: row.off_since === null ? null : iso(row.off_since), createdAt: iso(row.created_at) });
+  }
+  private agents(pagerId: string) {
+    return this.ctx.storage.sql.exec<{ agent_id: string }>('SELECT agent_id FROM pager_agents_v2 WHERE pager_id=? ORDER BY created_at, rowid', pagerId).toArray().map(r => r.agent_id);
+  }
+  // Turned on now: it turns off by itself after its auto-off time, if it has one.
+  private offAt(autoOff: C.AutoOff, now: number) { return autoOff === 'never' ? null : now + clocks.autoOffMs(autoOff); }
+
   async fetch(request: Request): Promise<Response> {
     try {
       const now = Date.now();
-      this.ctx.storage.sql.exec('DELETE FROM links_v2 WHERE expires_at <= ?', now);
-      this.ctx.storage.sql.exec('DELETE FROM number_pagers_v1 WHERE expires_at <= ?', now);
+      // Auto-off lands in the same state as the switch: off since the time it was due.
+      this.ctx.storage.sql.exec('UPDATE pagers_v2 SET enabled=0, off_since=off_at, off_at=NULL WHERE enabled=1 AND off_at IS NOT NULL AND off_at <= ?', now);
       const action = new URL(request.url).pathname.slice(1), data = await body(request);
-      // A phone key holds one number; a new one replaces it, so the old number stops opening pagers at once.
-      if (action === 'number-put') {
-        const p = decode(NumberPut, data);
-        this.ctx.storage.sql.exec('INSERT OR REPLACE INTO numbers_v1 VALUES (?, ?)', p.phoneHash, p.numberHash);
-        return json({ ok: true });
+      if (action === 'create') {
+        const p = decode(Create, data);
+        if (this.row(p.pagerId)) throw C.refuse.pagerExists();
+        this.ctx.storage.sql.exec('INSERT INTO pagers_v2 VALUES (?, ?, ?, ?, 1, ?, ?, NULL, NULL, ?)', p.pagerId, p.fingerprint, p.publicKey, p.phoneHash, p.autoOff, this.offAt(p.autoOff, now), now);
+        return json({ pager: this.pager(this.row(p.pagerId)) });
       }
-      if (action === 'number-page') {
-        const p = decode(NumberPage, data);
-        const row = this.ctx.storage.sql.exec<{ phone_hash: string }>('SELECT phone_hash FROM numbers_v1 WHERE number_hash=?', p.numberHash).toArray()[0];
-        if (!row) return json({ phoneHash: null });
-        this.ctx.storage.sql.exec('INSERT INTO number_pagers_v1 VALUES (?, ?, ?)', row.phone_hash, p.sessionId, Date.parse(p.expiresAt));
-        const push = this.ctx.storage.sql.exec<{ json: string }>('SELECT json FROM number_push_v1 WHERE phone_hash=?', row.phone_hash).toArray()[0];
-        // `push` only when there is one: a Worker from before alerts refuses fields it does not know (see worker.ts).
-        return json({ phoneHash: row.phone_hash, ...(push ? { push: decode(PushTarget, JSON.parse(push.json)) } : {}) });
-      }
-      // Only a phone key that holds a number keeps a token here.
-      if (action === 'number-push') {
-        const p = decode(NumberPush, data);
-        if (!this.ctx.storage.sql.exec('SELECT 1 FROM numbers_v1 WHERE phone_hash=?', p.phoneHash).toArray().length) throw new Refusal('Unauthorized', 'This phone key has no pager number.');
-        this.ctx.storage.sql.exec('INSERT OR REPLACE INTO number_push_v1 VALUES (?, ?)', p.phoneHash, JSON.stringify(p.push));
-        return json({ ok: true });
-      }
-      // Listed by phone key, not number, so a pager opened just before a change of number still reaches the phone.
-      if (action === 'number-list') {
-        const p = decode(PhoneKey, data);
-        const rows = this.ctx.storage.sql.exec<{ session_id: string }>('SELECT session_id FROM number_pagers_v1 WHERE phone_hash=? ORDER BY rowid DESC', p.phoneHash).toArray();
-        return json({ sessionIds: rows.map(r => r.session_id) });
-      }
-      if (action === 'put') {
-        const p = decode(Put, data);
-        this.ctx.storage.sql.exec('INSERT OR REPLACE INTO links_v2 VALUES (?, ?, ?)', p.codeHash, p.sessionId, Date.parse(p.expiresAt));
-        return json({ ok: true });
-      }
-      const k = decode(Key, data);
       if (action === 'get') {
-        const row = this.ctx.storage.sql.exec<{ session_id: string }>('SELECT session_id FROM links_v2 WHERE code_hash=? AND expires_at > ?', k.codeHash, now).toArray()[0];
-        return json({ sessionId: row ? row.session_id : null });
+        const row = this.mine(decode(Phone, data));
+        return json({ pager: this.pager(row), agentIds: this.agents(row.pager_id) });
       }
-      if (action === 'delete') { this.ctx.storage.sql.exec('DELETE FROM links_v2 WHERE code_hash=?', k.codeHash); return json({ ok: true }); }
+      if (action === 'settings') {
+        const p = decode(Settings, data);
+        let row = this.mine(p);
+        if (p.autoOff !== undefined) {
+          // Counted from now while on; an off pager keeps the choice for when it is turned on.
+          this.ctx.storage.sql.exec('UPDATE pagers_v2 SET auto_off=?, off_at=? WHERE pager_id=?', p.autoOff, row.enabled === 1 ? this.offAt(p.autoOff, now) : null, p.pagerId);
+          row = this.mine(p);
+        }
+        if (p.on === true && row.enabled === 0) this.ctx.storage.sql.exec('UPDATE pagers_v2 SET enabled=1, off_since=NULL, off_at=? WHERE pager_id=?', this.offAt(decode(C.AutoOff, row.auto_off), now), p.pagerId);
+        if (p.on === false && row.enabled === 1) this.ctx.storage.sql.exec('UPDATE pagers_v2 SET enabled=0, off_since=?, off_at=NULL WHERE pager_id=?', now, p.pagerId);
+        return json({ pager: this.pager(this.mine(p)) });
+      }
+      if (action === 'push') {
+        const p = decode(Push, data);
+        this.mine(p);
+        this.ctx.storage.sql.exec('UPDATE pagers_v2 SET push=? WHERE pager_id=?', JSON.stringify(p.push), p.pagerId);
+        return json({ ok: true });
+      }
+      // Apple says a token is gone: drop it, unless the phone has given a new one since.
+      if (action === 'push-gone') {
+        const p = decode(PushGone, data), row = this.row(p.pagerId);
+        if (row?.push && decode(PushTarget, JSON.parse(row.push)).token === p.token) this.ctx.storage.sql.exec('UPDATE pagers_v2 SET push=NULL WHERE pager_id=?', p.pagerId);
+        return json({ ok: true });
+      }
+      // Deleting a pager deletes its agents and their decisions from the service: they are queued to forget
+      // everything in the same transaction that deletes the pager.
+      if (action === 'delete') {
+        const row = this.mine(decode(Phone, data));
+        this.ctx.storage.transactionSync(() => {
+          for (const id of this.agents(row.pager_id)) this.ctx.storage.sql.exec('INSERT OR IGNORE INTO erase_v2 VALUES (?)', id);
+          this.ctx.storage.sql.exec('DELETE FROM pager_agents_v2 WHERE pager_id=?', row.pager_id);
+          this.ctx.storage.sql.exec('DELETE FROM pagers_v2 WHERE pager_id=?', row.pager_id);
+        });
+        await this.erase();
+        return json({ ok: true });
+      }
+      // An agent connects with the number: the fingerprint must match, and the pager must be on.
+      if (action === 'connect') {
+        const p = decode(Connect, data), row = this.row(p.pagerId);
+        if (!row || row.fingerprint !== p.fingerprint) throw C.refuse.numberInvalid();
+        if (row.enabled !== 1) throw C.refuse.pagerOff();
+        this.ctx.storage.sql.exec('INSERT INTO pager_agents_v2 VALUES (?, ?, ?)', p.pagerId, p.agentId, now);
+        return json({ phoneHash: row.phone_hash });
+      }
+      // What an agent checks before each call: is its pager on, and where do alerts go.
+      if (action === 'state') {
+        const row = this.row(decode(Id, data).pagerId);
+        if (!row) return json({ state: 'gone' });
+        return json({ state: row.enabled === 1 ? 'on' : 'off', push: row.push ? decode(PushTarget, JSON.parse(row.push)) : null });
+      }
+      // Housekeeping forgot an agent.
+      if (action === 'forget') {
+        const p = decode(Forget, data);
+        this.ctx.storage.sql.exec('DELETE FROM pager_agents_v2 WHERE pager_id=? AND agent_id=?', p.pagerId, p.agentId);
+        return json({ ok: true });
+      }
       return json({ error: 'NotFound' }, 404);
     } catch (error) { return refusal(error); }
   }

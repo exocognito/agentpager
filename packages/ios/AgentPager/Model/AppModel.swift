@@ -3,37 +3,23 @@ import Observation
 import UIKit
 import UserNotifications
 
-enum Route: Hashable { case agent(String) }
-
-// A pairing sheet is opened either for an agent-made link (deep link: no key yet) or for the phone's own link
-// once an agent has joined it (the phone already holds the key).
-struct PairingTarget: Hashable {
-    var code: String
-    var sessionId: String?
+enum Route: Hashable {
+    case pager(String)
+    case pagerDetail(String)
+    case decision(pagerId: String, agentId: String, decisionId: String)
+    case answered(pagerId: String, project: String)
 }
 
 enum ActiveSheet: Identifiable, Hashable {
-    case connect
-    case pairing(PairingTarget)
-    case decision(sessionId: String, decisionId: String)
-    case thread(sessionId: String, decisionId: String)
-    case settings
-
-    var id: String {
-        switch self {
-        case .connect: "connect"
-        case .pairing(let t): "pairing-\(t.code)"
-        case .decision(_, let d): "decision-\(d)"
-        case .thread(_, let d): "thread-\(d)"
-        case .settings: "settings"
-        }
-    }
+    case newPager
+    var id: String { "new-pager" }
 }
 
 // An answer the owner pressed Send on. It waits out the Undo window, then is sent with the same requestId
 // on every retry so the server can recognise a replay.
 struct PreparedAnswer: Identifiable, Hashable {
-    var sessionId: String
+    var pagerId: String
+    var agentId: String
     var decisionId: String
     var requestId: String
     var choice: Choice
@@ -43,12 +29,19 @@ struct PreparedAnswer: Identifiable, Hashable {
 
 enum RowState: Hashable { case sending, waiting, confirmed }
 
-struct AnsweredRow: Identifiable, Hashable {
+// A decision with who asked it.
+struct Asked: Identifiable, Hashable {
+    var agent: AgentInfo
     var decision: Decision
-    var choice: Choice
-    var state: RowState
-    var sendsAt: Date? = nil // set while Undo is open
     var id: String { decision.decisionId }
+}
+
+// One project's decisions on a pager: open ones oldest first, answered ones newest first.
+struct ProjectGroup: Identifiable, Hashable {
+    var project: String
+    var open: [Asked]
+    var answered: [Asked]
+    var id: String { project }
 }
 
 @Observable
@@ -58,9 +51,9 @@ final class AppModel {
     static let retryDelays: [Double] = [0, 1.5, 3, 6]
 
     var server: URL
-    var keys: [PagerKey] = []
-    // Saved on every change, so an ended pager's decisions stay readable (see InboxCache).
-    var inboxes: [String: Inbox] = [:] { didSet { if live { InboxCache.save(inboxes) } } }
+    var pagers: [LocalPager] = []
+    // Saved on every change, so the last read of each pager shows while the server can't be reached.
+    var inboxes: [String: PagerInbox] = [:] { didSet { if live { InboxCache.save(inboxes) } } }
     var now = Date()
     var lastSuccess: Date?
     var lastFailure: String?
@@ -70,12 +63,13 @@ final class AppModel {
     var inFlight: [String: PreparedAnswer] = [:]
     var notConfirmed: PreparedAnswer?
     var drafts: [String: Choice] = [:]
-    var connectError: String?
-    var connectBusy = false
-    var pagerNumber: PagerNumber?
-    var numberError: String?
-    var numberBusy = false
-    private var autoPaired: Set<String> = []
+    // The pager the New pager sheet will create: its number shows before Create.
+    var draft: LocalPager?
+    var draftAutoOff: AutoOff = .never
+    // `-demo` only: a decision sheet to open on launch, for screenshots.
+    var demoSheet: DecisionView.Sheet?
+    var createError: String?
+    var createBusy = false
     // Alerts (Alerts.swift).
     var deviceToken: String? { didSet { if deviceToken != oldValue { Task { await givePushToken() } } } }
     private var pushGiven: Set<String> = []
@@ -96,7 +90,6 @@ final class AppModel {
         return entitlements["aps-environment"] as? String == "production" ? "production" : "sandbox"
         #endif
     }()
-    var demoFlow: PairingFlow?
     let live: Bool
     // Debug only: `-failSends N` makes the next N answer attempts fail as if the network dropped,
     // so the "Answer Not Confirmed" alert can be exercised in the Simulator.
@@ -108,58 +101,50 @@ final class AppModel {
         if live {
             // Here, not in the App's init: its @State model is built before that init's body runs.
             if ProcessInfo.processInfo.arguments.contains("-resetKeys") { Keychain.deleteAll(); InboxCache.deleteAll() }
-            keys = Keychain.all()
-            pagerNumber = Keychain.number(server: server.absoluteString)
+            Keychain.deleteRetired()
+            pagers = Keychain.all()
             inboxes = InboxCache.load()
         }
     }
 
+    // The Settings app's Server field (advanced, for self-hosters) if set, else this build's default.
     static func configuredServer() -> URL {
         let override = UserDefaults.standard.string(forKey: "AgentPagerServerURL")
         let built = Bundle.main.object(forInfoDictionaryKey: "AgentPagerServerURL") as? String
-        for text in [override, built, "http://localhost:8787"] {
-            if let text, let url = URL(string: text.trimmingCharacters(in: .whitespaces)), url.scheme != nil, url.host() != nil { return url }
+        for text in [override, built, "https://agentpager.me"] {
+            if let text, let url = URL(string: text.trimmingCharacters(in: .whitespaces).trimmingCharacters(in: CharacterSet(charactersIn: "/"))), ["http", "https"].contains(url.scheme ?? ""), url.host() != nil { return url }
         }
-        return URL(string: "http://localhost:8787")!
+        return URL(string: "https://agentpager.me")!
     }
 
-    func setServer(_ text: String) -> Bool {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        guard let url = URL(string: trimmed), let scheme = url.scheme, ["http", "https"].contains(scheme), url.host() != nil else { return false }
-        UserDefaults.standard.set(trimmed, forKey: "AgentPagerServerURL")
-        server = url
-        pagerNumber = Keychain.number(server: url.absoluteString)
-        numberError = nil
+    // The owner may change the server in the Settings app while this app is in the background.
+    func reloadServer() {
+        let configured = Self.configuredServer()
+        guard configured != server else { return }
+        server = configured
         lastSuccess = nil
         lastFailure = nil
-        Task { await refreshAll() }
-        return true
+        path = []
     }
 
     var client: APIClient { APIClient(base: server) }
-    var myKeys: [PagerKey] { keys.filter { $0.server == server.absoluteString } }
-    func key(_ sessionId: String) -> PagerKey? { myKeys.first { $0.sessionId == sessionId } }
+    // Pagers are kept per server: each number names the server it was made on.
+    var myPagers: [LocalPager] { pagers.filter { $0.server == server.absoluteString } }
+    func pager(_ pagerId: String) -> LocalPager? { myPagers.first { $0.pagerId == pagerId } }
+    func state(_ pagerId: String) -> PagerState? { inboxes[pagerId]?.pager }
+    func isOn(_ pagerId: String) -> Bool { state(pagerId)?.on ?? true }
+    var loadedOnce: Bool { lastSuccess != nil || myPagers.isEmpty || !live }
 
-    // MARK: Agents list
-
-    // Every pager the server reports for our keys, except a phone-made link no agent has joined yet:
-    // that one lives in the Connect sheet.
-    var listed: [PagerSummary] {
-        myKeys.compactMap { inboxes[$0.sessionId]?.session }.filter { $0.status != .waiting && $0.name != nil }
-    }
-    var active: [PagerSummary] { listed.filter { $0.status != .ended } }
-    var ended: [PagerSummary] { listed.filter { $0.status == .ended }.sorted { ($0.endedAt ?? .distantPast) > ($1.endedAt ?? .distantPast) } }
-    var loadedOnce: Bool { lastSuccess != nil || myKeys.isEmpty || !live }
-
-    // True only while polls are failing; the Agents list shows its status pill only then.
+    // True only while polls are failing; the Pagers screen says so only then.
     var serverTrouble: Bool { lastFailure != nil && (lastSuccess.map { now.timeIntervalSince($0) > 10 } ?? true) }
-
     var statusLine: String {
-        if serverTrouble { return lastSuccess.map { "Can’t Reach Server · Updated " + Wording.ago($0, now: now) } ?? "Can’t Reach Server" }
-        guard let last = lastSuccess else { return "Updating…" }
-        let age = now.timeIntervalSince(last)
-        if age < 60 { return "Updated Just Now" }
-        return "Updated " + Wording.ago(last, now: now)
+        lastSuccess.map { "Can’t Reach Server · Updated " + Wording.ago($0, now: now) } ?? "Can’t Reach Server"
+    }
+
+    // What the owner gives agents, copied as one block (docs/v2/01-decisions.md, App structure).
+    func instructions(_ p: LocalPager) -> String {
+        let host = URL(string: p.server).map { url in (url.host() ?? p.server) + (url.port.map { ":\($0)" } ?? "") } ?? p.server
+        return "When I'm away and you need my decision, use \(host) MCP or CLI to send me decisions:\n$ agentpager connect \(p.number)"
     }
 
     // MARK: Polling
@@ -176,85 +161,47 @@ final class AppModel {
     func refreshAll() async {
         now = Date()
         guard live else { return }
-        let numberFailure = await takeNumberPagers()
         let stored = Keychain.all()
-        if stored != keys { keys = stored }
+        if stored != pagers { pagers = stored }
         let client = self.client
-        let mine = myKeys
-        let results = await withTaskGroup(of: (PagerKey, Result<Inbox, APIError>).self) { group in
-            for key in mine {
+        let mine = myPagers
+        let results = await withTaskGroup(of: (LocalPager, Result<PagerInbox, APIError>).self) { group in
+            for p in mine {
                 group.addTask {
-                    do throws(APIError) { return (key, .success(try await client.inbox(key))) } catch { return (key, .failure(error)) }
+                    do throws(APIError) { return (p, .success(try await client.pager(p))) } catch { return (p, .failure(error)) }
                 }
             }
-            var all: [(PagerKey, Result<Inbox, APIError>)] = []
+            var all: [(LocalPager, Result<PagerInbox, APIError>)] = []
             for await r in group { all.append(r) }
             return all
         }
-        var failed = numberFailure
-        for (key, result) in results { if let f = apply(key, result) { failed = f } }
+        var failed: String?
+        for (p, result) in results { if let f = apply(p, result) { failed = f } }
         now = Date()
-        // An ended pager stays on this phone, read only, for 24 hours after it ended.
-        for key in myKeys {
-            if let s = inboxes[key.sessionId]?.session, s.status == .ended, let ended = s.endedAt, now.timeIntervalSince(ended) >= InboxCache.keepEnded {
-                drop(key.sessionId)
-            }
-        }
         if failed == nil { lastSuccess = now; if lastFailure != nil { lastFailure = nil } } else { lastFailure = failed }
         await askForAlertsOnce()
         await givePushToken()
         await showWaitingOnIcon()
     }
 
-    // Pagers agents opened with the pager number join the list in the same poll. Returns a failure description.
-    private func takeNumberPagers() async -> String? {
-        guard let phoneKey = pagerNumber?.phoneKey else { return nil }
-        let listed: NumberPagers
-        do throws(APIError) { listed = try await client.numberPagers(phoneKey: phoneKey) } catch {
-            if case .transport(let text) = error { return text }
-            return error.tag
-        }
-        // Re-read after the request: the number may have changed meanwhile, and that change must not be undone.
-        guard var n = pagerNumber, n.phoneKey == phoneKey else { return nil }
-        let fresh = listed.sessionIds.filter { !n.seen.contains($0) }
-        guard !fresh.isEmpty else { return nil }
-        for id in fresh where key(id) == nil {
-            Keychain.save(PagerKey(sessionId: id, phoneKey: n.phoneKey, server: n.server, madeByPhone: false, linkCode: nil, linkURL: nil, createdAt: Date()))
-        }
-        n.seen += fresh
-        Keychain.save(n)
-        pagerNumber = n
-        return nil
-    }
-
-    func refresh(_ sessionId: String) async {
-        guard live, let key = key(sessionId) else { return }
-        do throws(APIError) { _ = apply(key, .success(try await client.inbox(key))) } catch { _ = apply(key, .failure(error)) }
+    func refresh(_ pagerId: String) async {
+        guard live, let p = pager(pagerId) else { return }
+        do throws(APIError) { _ = apply(p, .success(try await client.pager(p))) } catch { _ = apply(p, .failure(error)) }
         now = Date()
     }
 
-    // Returns a failure description for transport problems; drops keys the server no longer knows.
-    private func apply(_ key: PagerKey, _ result: Result<Inbox, APIError>) -> String? {
+    // Returns a failure description for transport problems; drops pagers the server no longer knows.
+    private func apply(_ p: LocalPager, _ result: Result<PagerInbox, APIError>) -> String? {
         switch result {
-        case .success(var inbox):
-            // The server deleted an ended pager's decisions; keep the phone's last copy of them, unchanged.
-            if inbox.session.status == .ended, inbox.open.isEmpty, inbox.answered.isEmpty, let last = inboxes[key.sessionId] {
-                inbox.open = last.open
-                inbox.answered = last.answered
-            }
+        case .success(let inbox):
             // Assign only on change: every assignment re-renders, which would disturb an open menu.
-            if inboxes[key.sessionId] != inbox { inboxes[key.sessionId] = inbox }
-            for (decisionId, p) in inFlight where p.sessionId == key.sessionId {
-                if inbox.answered.contains(where: { $0.decisionId == decisionId }) { inFlight[decisionId] = nil }
-            }
-            if key.madeByPhone, inbox.session.status == .unpaired, !autoPaired.contains(key.sessionId), let code = key.linkCode {
-                autoPaired.insert(key.sessionId)
-                sheet = .pairing(PairingTarget(code: code, sessionId: key.sessionId))
-            }
+            if inboxes[p.pagerId] != inbox { inboxes[p.pagerId] = inbox }
+            let answered = Set(inbox.agents.flatMap { $0.answered.map(\.decisionId) })
+            for (decisionId, a) in inFlight where a.pagerId == p.pagerId && answered.contains(decisionId) { inFlight[decisionId] = nil }
             return nil
         case .failure(let error):
             if case .server(let status, _) = error, status == 404 || status == 401 {
-                drop(key.sessionId)
+                drop(p.pagerId)
                 return nil
             }
             if case .transport(let text) = error { return text }
@@ -262,234 +209,194 @@ final class AppModel {
         }
     }
 
+    func drop(_ pagerId: String) {
+        Keychain.delete(pagerId)
+        pagers.removeAll { $0.pagerId == pagerId }
+        let agents = Set(inboxes[pagerId]?.agents.map(\.agent.agentId) ?? [])
+        inboxes[pagerId] = nil
+        files = files.filter { !agents.contains(String($0.key.split(separator: "/").first ?? "")) }
+        path.removeAll { route in
+            switch route {
+            case .pager(let id), .pagerDetail(let id), .decision(let id, _, _), .answered(let id, _): id == pagerId
+            }
+        }
+    }
+
     // MARK: Alerts
 
-    // Asked once, when the first pager is paired.
+    // Asked once, when there is a pager to be paged on.
     private func askForAlertsOnce() async {
-        guard !askedForAlerts, active.contains(where: { $0.status == .active }) else { return }
+        guard !askedForAlerts, !myPagers.isEmpty else { return }
         askedForAlerts = true
         let center = UNUserNotificationCenter.current()
         guard await center.notificationSettings().authorizationStatus == .notDetermined else { return }
         _ = try? await center.requestAuthorization(options: [.alert, .sound, .badge])
     }
 
-    // Gives the device token to the pager number and to each pager not yet given it. A request that does not reach
-    // the server is tried again on the next refresh; one the server refuses is not.
+    // Gives the device token to each pager not yet given it. A request that does not reach the server is tried again
+    // on the next refresh; one the server refuses is not.
     func givePushToken() async {
         guard live, let token = deviceToken else { return }
         let client = self.client, environment = Self.pushEnvironment
-        if let n = pagerNumber, n.server == server.absoluteString, pushGiven.insert("number \(n.phoneKey) \(token)").inserted {
-            do throws(APIError) { try await client.numberPush(phoneKey: n.phoneKey, token: token, environment: environment) } catch {
-                if error.isTransport { pushGiven.remove("number \(n.phoneKey) \(token)") }
-            }
-        }
-        for key in myKeys where inboxes[key.sessionId]?.session.status != .ended {
-            guard pushGiven.insert("\(key.sessionId) \(token)").inserted else { continue }
-            do throws(APIError) { try await client.push(key, token: token, environment: environment) } catch {
-                if error.isTransport { pushGiven.remove("\(key.sessionId) \(token)") }
+        for p in myPagers {
+            guard pushGiven.insert("\(p.pagerId) \(token)").inserted else { continue }
+            do throws(APIError) { try await client.push(p, token: token, environment: environment) } catch {
+                if error.isTransport { pushGiven.remove("\(p.pagerId) \(token)") }
             }
         }
     }
 
-    // The app icon shows how many decisions are waiting on paired pagers.
+    // The app icon shows how many decisions are waiting on pagers that are on.
     private func showWaitingOnIcon() async {
-        let waiting = myKeys.compactMap { inboxes[$0.sessionId] }.filter { $0.session.status == .active }.reduce(0) { $0 + $1.open.count }
+        let waiting = myPagers.filter { isOn($0.pagerId) }.reduce(0) { $0 + openCount($1.pagerId) }
         guard waiting != badge else { return }
         badge = waiting
         try? await UNUserNotificationCenter.current().setBadgeCount(waiting)
     }
 
-    // Tapping an alert opens its decision: the decision sheet while it is open, its thread once answered.
-    func openAlert(sessionId: String, decisionId: String) async {
+    // Tapping an alert opens its decision.
+    func openAlert(pagerId: String, agentId: String, decisionId: String) async {
         await refreshAll()
-        guard key(sessionId) != nil else { return }
-        path = [.agent(sessionId)]
-        guard let d = decision(sessionId, decisionId) else { return }
-        sheet = d.answer == nil ? .decision(sessionId: sessionId, decisionId: decisionId) : .thread(sessionId: sessionId, decisionId: decisionId)
+        guard pager(pagerId) != nil else { return }
+        path = [.pager(pagerId)]
+        if asked(pagerId, agentId, decisionId) != nil { path.append(.decision(pagerId: pagerId, agentId: agentId, decisionId: decisionId)) }
     }
 
-    func drop(_ sessionId: String) {
-        Keychain.delete(sessionId)
-        keys.removeAll { $0.sessionId == sessionId }
-        inboxes[sessionId] = nil
-        files = files.filter { !$0.key.hasPrefix(sessionId + "/") }
-        path.removeAll { $0 == .agent(sessionId) }
+    // MARK: Pagers
+
+    func startNewPager() {
+        draft = LocalPager.make(name: "", server: server.absoluteString)
+        createError = nil
+        sheet = .newPager
     }
 
-    // MARK: Connect an Agent (phone-made link)
-
-    var connectKey: PagerKey? {
-        myKeys.first { k in
-            guard k.madeByPhone, k.linkURL != nil else { return false }
-            if let s = inboxes[k.sessionId]?.session { return s.status == .waiting }
-            return Date().timeIntervalSince(k.createdAt) < 14 * 60
-        }
-    }
-    var connectLifetime: Lifetime {
-        connectKey.flatMap { inboxes[$0.sessionId]?.session.lifetime } ?? .day
-    }
-
-    func ensureConnectLink() async {
-        guard live, connectKey == nil, !connectBusy else { return }
-        connectBusy = true
-        connectError = nil
-        defer { connectBusy = false }
-        let phoneKey = randomToken()
+    func createPager(name: String, autoOff: AutoOff) async {
+        guard var p = draft, !createBusy else { return }
+        p.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        createBusy = true
+        createError = nil
+        defer { createBusy = false }
         do throws(APIError) {
-            let made = try await client.createPager(lifetime: .day, phoneKey: phoneKey)
-            let key = PagerKey(sessionId: made.session.sessionId, phoneKey: phoneKey, server: server.absoluteString, madeByPhone: true, linkCode: made.link.code, linkURL: made.link.url, createdAt: Date())
-            Keychain.save(key)
-            keys = Keychain.all()
-            inboxes[key.sessionId] = Inbox(session: made.session, open: [], answered: [])
+            let made = live ? try await client.createPager(p, autoOff: autoOff) : PagerReply(pager: PagerState(pagerId: p.pagerId, on: true, autoOff: autoOff, createdAt: Date()))
+            if live { Keychain.save(p) }
+            pagers.append(p)
+            inboxes[p.pagerId] = PagerInbox(pager: made.pager, agents: [])
+            draft = nil
+            sheet = nil
+            path = [.pager(p.pagerId)]
+            Task { await givePushToken() }
         } catch {
-            connectError = "Can’t reach your AgentPager server at \(server.absoluteString)."
+            createError = "Can’t reach your AgentPager server at \(server.absoluteString)."
         }
     }
 
-    func setConnectLifetime(_ lifetime: Lifetime) async {
-        guard let key = connectKey else { return }
-        await setLifetime(key.sessionId, lifetime)
+    // The name lives only on this phone.
+    func rename(_ pagerId: String, _ name: String) {
+        guard let i = pagers.firstIndex(where: { $0.pagerId == pagerId }) else { return }
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, pagers[i].name != trimmed else { return }
+        pagers[i].name = trimmed
+        if live { Keychain.save(pagers[i]) }
     }
 
-    // MARK: Pager number
-
-    // What the owner pastes into AGENTS.md.
-    var numberInstructions: String? {
-        guard let n = pagerNumber else { return nil }
-        return "When you need a decision from me, page me on AgentPager: read \(server.appending(path: "start").absoluteString), then open a pager with my pager number \(n.number). Open one pager for your piece of work and keep it for every question."
+    func setOn(_ pagerId: String, _ on: Bool) async {
+        guard let p = pager(pagerId) else { return }
+        guard live else { inboxes[pagerId]?.pager.on = on; inboxes[pagerId]?.pager.offSince = on ? nil : Date(); return }
+        do throws(APIError) { inboxes[pagerId]?.pager = try await client.setOn(p, on).pager } catch { await refresh(pagerId) }
+        await showWaitingOnIcon()
     }
 
-    func ensureNumber() async {
-        guard live, pagerNumber == nil, !numberBusy else { return }
-        await makeNumber(replacing: nil)
+    func setAutoOff(_ pagerId: String, _ autoOff: AutoOff) async {
+        guard let p = pager(pagerId) else { return }
+        guard live else { inboxes[pagerId]?.pager.autoOff = autoOff; return }
+        do throws(APIError) { inboxes[pagerId]?.pager = try await client.setAutoOff(p, autoOff).pager } catch { await refresh(pagerId) }
     }
 
-    // The old number stops working at once. The phone key stays, so pagers already open keep working and the
-    // server's listing carries over.
-    func rotateNumber() async {
-        guard live, let n = pagerNumber, !numberBusy else { return }
-        await makeNumber(replacing: n)
+    // Deleted from the service with its agents and decisions, then from this phone.
+    func deletePager(_ pagerId: String) async {
+        guard let p = pager(pagerId) else { return }
+        if live {
+            do throws(APIError) { try await client.delete(p) } catch {
+                guard case .server(404, _) = error else { await refresh(pagerId); return }
+            }
+        }
+        path = []
+        drop(pagerId)
     }
 
-    private func makeNumber(replacing old: PagerNumber?) async {
-        numberBusy = true
-        numberError = nil
-        defer { numberBusy = false }
-        let phoneKey = old?.phoneKey ?? randomToken(), base = server.absoluteString
-        do throws(APIError) {
-            let made = try await client.makeNumber(phoneKey: phoneKey)
-            // The server has retired the old number, so keep the new one for `base` even if the owner switched
-            // servers meanwhile; show it only if `base` is still current.
-            let seen = Keychain.number(server: base).flatMap { $0.phoneKey == phoneKey ? $0.seen : nil } ?? []
-            let n = PagerNumber(server: base, phoneKey: phoneKey, number: made.number, seen: seen)
-            Keychain.save(n)
-            if server.absoluteString == base { pagerNumber = n; Task { await givePushToken() } }
-        } catch {
-            if server.absoluteString == base { numberError = "Can’t reach your AgentPager server at \(base)." }
+    // MARK: Decisions
+
+    func agents(_ pagerId: String) -> [AgentInbox] { inboxes[pagerId]?.agents ?? [] }
+    func agent(_ agentId: String) -> AgentInfo? { inboxes.values.lazy.flatMap(\.agents).first { $0.agent.agentId == agentId }?.agent }
+    private func pagerOf(_ agentId: String) -> LocalPager? {
+        myPagers.first { p in agents(p.pagerId).contains { $0.agent.agentId == agentId } }
+    }
+    private func sending(_ decisionId: String) -> Bool { undo?.decisionId == decisionId || inFlight[decisionId] != nil }
+
+    func asked(_ pagerId: String, _ agentId: String, _ decisionId: String) -> Asked? {
+        guard let a = agents(pagerId).first(where: { $0.agent.agentId == agentId }),
+              let d = (a.open + a.answered).first(where: { $0.decisionId == decisionId }) else { return nil }
+        return Asked(agent: a.agent, decision: d)
+    }
+
+    func openCount(_ pagerId: String) -> Int {
+        agents(pagerId).reduce(0) { n, a in n + a.open.filter { !sending($0.decisionId) }.count }
+    }
+
+    // Decisions grouped by project. Projects with open decisions come first, the one waiting longest on top; then the
+    // rest, the most recently answered on top.
+    func groups(_ pagerId: String) -> [ProjectGroup] {
+        var byProject: [String: ProjectGroup] = [:]
+        for a in agents(pagerId) {
+            var g = byProject[a.agent.project] ?? ProjectGroup(project: a.agent.project, open: [], answered: [])
+            for d in a.open { if sending(d.decisionId) { g.answered.append(Asked(agent: a.agent, decision: d)) } else { g.open.append(Asked(agent: a.agent, decision: d)) } }
+            g.answered += a.answered.map { Asked(agent: a.agent, decision: $0) }
+            byProject[a.agent.project] = g
+        }
+        let answeredAt = { (x: Asked) in x.decision.answer?.sentAt ?? .distantFuture }
+        let all = byProject.values.map { g in
+            ProjectGroup(project: g.project, open: g.open.sorted { $0.decision.askedAt < $1.decision.askedAt }, answered: g.answered.sorted { answeredAt($0) > answeredAt($1) })
+        }
+        return all.sorted { a, b in
+            switch (a.open.first, b.open.first) {
+            case let (x?, y?): return x.decision.askedAt < y.decision.askedAt
+            case (.some, nil): return true
+            case (nil, .some): return false
+            case (nil, nil): return (a.answered.first.map(answeredAt) ?? .distantPast) > (b.answered.first.map(answeredAt) ?? .distantPast)
+            }
         }
     }
 
-    // MARK: Pairing
-
-    func handle(url: URL) {
-        guard url.scheme == "agentpager", url.host() == "start" else { return }
-        let parts = url.pathComponents.filter { $0 != "/" }
-        guard let code = parts.first, code.count == 32 else { return }
-        let mine = myKeys.first { $0.linkCode == code }
-        sheet = .pairing(PairingTarget(code: code, sessionId: mine?.sessionId))
+    // The owner's answer: the one sent, or one still in its Undo window or on its way.
+    func choice(_ d: Decision) -> Choice? {
+        if let u = undo, u.decisionId == d.decisionId { return u.choice }
+        return inFlight[d.decisionId]?.choice ?? d.answer?.choice
     }
-
-    func paired(_ summary: PagerSummary, code: String, phoneKey: String) {
-        if key(summary.sessionId) == nil {
-            Keychain.save(PagerKey(sessionId: summary.sessionId, phoneKey: phoneKey, server: server.absoluteString, madeByPhone: false, linkCode: code, linkURL: nil, createdAt: Date()))
-            keys = Keychain.all()
-        }
-        autoPaired.insert(summary.sessionId)
-        // Now, not at the next poll: the owner may leave the app straight after pairing.
-        Task { await givePushToken() }
-        inboxes[summary.sessionId] = Inbox(session: summary, open: inboxes[summary.sessionId]?.open ?? [], answered: inboxes[summary.sessionId]?.answered ?? [])
-        Task {
-            try? await Task.sleep(for: .seconds(1.5))
-            if case .pairing = sheet { sheet = nil }
-            path = [.agent(summary.sessionId)]
-            await refresh(summary.sessionId)
-        }
-    }
-
-    func pairingFailed(sessionId: String?) {
-        if let sessionId { Task { await refresh(sessionId) } }
-    }
-
-    // MARK: Agent screen
-
-    func openDecisions(_ sessionId: String) -> [Decision] {
-        (inboxes[sessionId]?.open ?? []).filter { d in undo?.decisionId != d.decisionId && inFlight[d.decisionId] == nil }
-    }
-
-    func answeredRows(_ sessionId: String) -> [AnsweredRow] {
-        guard let inbox = inboxes[sessionId] else { return [] }
-        var rows: [AnsweredRow] = []
-        for d in inbox.open {
-            if let u = undo, u.decisionId == d.decisionId { rows.append(AnsweredRow(decision: d, choice: u.choice, state: .sending, sendsAt: u.deadline)) }
-            else if let p = inFlight[d.decisionId] { rows.append(AnsweredRow(decision: d, choice: p.choice, state: .sending)) }
-        }
-        for d in inbox.answered {
-            guard let a = d.answer else { continue }
-            rows.append(AnsweredRow(decision: d, choice: a.choice, state: d.acknowledgement == nil ? .waiting : .confirmed))
-        }
-        return rows
-    }
-
-    func decision(_ sessionId: String, _ decisionId: String) -> Decision? {
-        guard let inbox = inboxes[sessionId] else { return nil }
-        return (inbox.open + inbox.answered).first { $0.decisionId == decisionId }
+    func rowState(_ d: Decision) -> RowState {
+        if sending(d.decisionId) || d.answer == nil { return .sending }
+        return d.acknowledgement == nil ? .waiting : .confirmed
     }
 
     // A brief's attachments, kept in memory once read: a decision never changes (SI8). They go with the pager
     // when the phone drops it.
-    @ObservationIgnored private var files: [String: Data] = [:]
-    func attachment(_ sessionId: String, _ decisionId: String, _ name: String) async throws(APIError) -> Data {
-        let id = sessionId + "/" + decisionId + "/" + name
+    @ObservationIgnored var files: [String: Data] = [:]
+    func attachment(_ agentId: String, _ decisionId: String, _ name: String) async throws(APIError) -> Data {
+        let id = agentId + "/" + decisionId + "/" + name
         if let data = files[id] { return data }
-        guard live, let key = key(sessionId) else { throw .transport("This phone holds no key for the pager.") }
-        let data = try await client.file(key, decisionId: decisionId, name: name)
+        guard live, let p = pagerOf(agentId) else { throw .transport("This phone holds no key for the pager.") }
+        let data = try await client.file(p, agentId: agentId, decisionId: decisionId, name: name)
         files[id] = data
         return data
     }
 
-    func setLifetime(_ sessionId: String, _ lifetime: Lifetime) async {
-        guard live, let key = key(sessionId) else { return }
-        do throws(APIError) {
-            let env = try await client.setLifetime(key, lifetime)
-            if var inbox = inboxes[sessionId] { inbox.session = env.session; inboxes[sessionId] = inbox }
-            else { inboxes[sessionId] = Inbox(session: env.session, open: [], answered: []) }
-        } catch {
-            await refresh(sessionId)
-        }
-    }
-
-    func endPager(_ sessionId: String) async {
-        guard live, let key = key(sessionId) else { return }
-        if undo?.sessionId == sessionId { undo = nil }
-        do throws(APIError) {
-            let env = try await client.end(key)
-            // The reply carries only the ended session; keep the phone's copy of the decisions (see InboxCache).
-            let last = inboxes[sessionId]
-            inboxes[sessionId] = Inbox(session: env.session, open: last?.open ?? [], answered: last?.answered ?? [])
-            path = []
-        } catch {
-            await refresh(sessionId)
-        }
-    }
-
     // MARK: Answering
 
-    func send(sessionId: String, decisionId: String, choice: Choice) {
+    func send(pagerId: String, agentId: String, decisionId: String, choice: Choice) {
         if let pending = undo { undo = nil; commit(pending) }
-        let p = PreparedAnswer(sessionId: sessionId, decisionId: decisionId, requestId: randomToken(), choice: choice, deadline: Date().addingTimeInterval(Self.undoSeconds))
+        let p = PreparedAnswer(pagerId: pagerId, agentId: agentId, decisionId: decisionId, requestId: randomToken(), choice: choice, deadline: Date().addingTimeInterval(Self.undoSeconds))
         drafts[decisionId] = choice
         undo = p
-        sheet = nil
+        if case .decision(_, _, decisionId)? = path.last { path.removeLast() }
         Task {
             try? await Task.sleep(for: .seconds(Self.undoSeconds))
             if undo?.requestId == p.requestId { undo = nil; commit(p) }
@@ -499,7 +406,8 @@ final class AppModel {
     func undoSend() {
         guard let p = undo else { return }
         undo = nil
-        sheet = .decision(sessionId: p.sessionId, decisionId: p.decisionId)
+        let route = Route.decision(pagerId: p.pagerId, agentId: p.agentId, decisionId: p.decisionId)
+        if path.last != route { path.append(route) }
     }
 
     // Leaving the app during the Undo window sends the answer at once.
@@ -512,7 +420,7 @@ final class AppModel {
     func commit(_ p: PreparedAnswer) {
         inFlight[p.decisionId] = p
         drafts[p.decisionId] = nil
-        guard live, let key = key(p.sessionId) else { return }
+        guard live, let pager = pager(p.pagerId) else { return }
         let client = self.client
         let background = BackgroundTask.begin("send-answer")
         Task {
@@ -521,17 +429,14 @@ final class AppModel {
                 if delay > 0 { try? await Task.sleep(for: .seconds(delay)) }
                 do throws(APIError) {
                     if failSends > 0 { failSends -= 1; throw APIError.transport("simulated failure") }
-                    _ = try await client.answer(key, decisionId: p.decisionId, requestId: p.requestId, choice: p.choice)
-                    await refresh(p.sessionId)
-                    if inFlight[p.decisionId]?.requestId == p.requestId, inboxes[p.sessionId]?.answered.contains(where: { $0.decisionId == p.decisionId }) == true {
-                        inFlight[p.decisionId] = nil
-                    }
+                    _ = try await client.answer(pager, agentId: p.agentId, decisionId: p.decisionId, requestId: p.requestId, choice: p.choice)
+                    await refresh(p.pagerId)
                     return
                 } catch {
                     if !error.isTransport {
-                        // AlreadyAnswered, an ended pager and the like: the server's state wins.
+                        // AlreadyAnswered, a pager turned off and the like: the server's state wins.
                         inFlight[p.decisionId] = nil
-                        await refresh(p.sessionId)
+                        await refresh(p.pagerId)
                         return
                     }
                 }

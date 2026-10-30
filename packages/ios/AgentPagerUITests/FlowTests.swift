@@ -11,287 +11,191 @@ final class FlowTests: XCTestCase {
         agent = AgentHarness(base: AgentHarness.server)
         app = XCUIApplication()
         app.launchArguments += ["-resetKeys", "-AgentPagerServerURL", AgentHarness.server.absoluteString]
-    }
-
-    // The first paired pager asks for alerts (C17::get-paged). While the prompt is up the app is inactive and does
-    // not refresh, so allow alerts before waiting on the app. Asked once per install, so usually there is none.
-    private func allowAlerts() {
-        let allow = XCUIApplication(bundleIdentifier: "com.apple.springboard").alerts.buttons["Allow"]
-        if allow.waitForExistence(timeout: 3) { allow.tap() }
+        // Alerts ask once per install, once there is a pager; the prompt can come up while the test runs.
+        addUIInterruptionMonitor(withDescription: "system alert") { alert in
+            for label in ["Allow", "OK"] where alert.buttons[label].exists { alert.buttons[label].tap(); return true }
+            return false
+        }
     }
 
     private func launch(extra: [String] = []) {
         app.launchArguments += extra
         app.launch()
-        wait(app.navigationBars["Agents"])
+        wait(app.navigationBars["Pagers"])
     }
 
-    // Menus animate in; a tap during the animation is dropped.
-    private func tapMenuItem(_ item: XCUIElement) {
-        wait(item, 5)
+    // Makes a pager on the phone and lands on its screen. Returns its number, read from the detail screen.
+    @discardableResult
+    private func makePager(_ name: String, shots: String? = nil) -> String {
+        app.buttons["new-pager"].tap()
+        let field = app.textFields["new-pager-name"]
+        wait(field)
+        field.typeText(name)
+        let line = app.staticTexts["connect-line"]
+        wait(line)
+        if let shots { shot("\(shots)-new-pager") }
+        app.buttons["create-pager"].tap()
+        wait(app.navigationBars[name], 10)
+        app.tap() // lets the interruption monitor see the alerts prompt
+        app.buttons["pager-settings"].tap()
+        let detail = app.staticTexts["connect-line"]
+        wait(detail)
+        if let shots { shot("\(shots)-detail") }
+        let number = String(detail.label.split(separator: " ").last ?? "")
+        XCTAssertTrue(number.hasPrefix("ap1_") && number.count == 36, number)
+        back()
+        return number
+    }
+
+    private func back() {
+        app.navigationBars.buttons.element(boundBy: 0).tap()
         RunLoop.current.run(until: Date().addingTimeInterval(0.8))
-        item.tap()
-        RunLoop.current.run(until: Date().addingTimeInterval(0.5))
     }
 
-    private func enter(_ names: [String], prefix: String? = nil) {
-        for (i, name) in names.enumerated() {
-            app.buttons["palette-\(name)"].tap()
-            if let prefix, i == 1 { shot("\(prefix)-two") }
-        }
+    private func open(_ title: String) {
+        let row = app.buttons["open-\(title)"]
+        wait(row, 10)
+        row.tap()
+        wait(app.buttons["tile-A"])
     }
 
-    private func wrongNames(_ s: AgentHarness.Started) -> [String] {
-        // A palette emoji that is not the third code emoji makes the whole code wrong.
-        let other = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'palette-' AND NOT (identifier == %@)", "palette-\(s.names[2])")).firstMatch
-        let otherName = String(other.identifier.dropFirst("palette-".count))
-        return [s.names[0], s.names[1], otherName]
+    // The pager screen's "N answered" row for a project, then the decision's row in it.
+    private func answeredRow(_ project: String, _ title: String) -> XCUIElement {
+        let group = app.buttons["answered-\(project)"]
+        wait(group, 10)
+        group.tap()
+        let row = app.buttons["answered-\(title)"]
+        wait(row, 10)
+        return row
     }
 
-    private func pairAgentLink(_ name: String, shots: String? = nil) throws -> AgentHarness.Started {
-        let s = try agent.start(name: name)
-        XCTAssertEqual(s.emojis.count, 3)
-        XCTAssertTrue(s.text.contains(s.emojis.joined(separator: " ")), s.text)
-        app.open(URL(string: "agentpager://start/\(s.code)")!)
-        wait(app.buttons["pair-button"])
-        wait(app.buttons["palette-\(s.names[0])"])
-        if let shots { shot("\(shots)-empty") }
-        enter(s.names, prefix: shots)
-        if let shots { shot("\(shots)-ready") }
-        app.buttons["pair-button"].tap()
-        wait(app.staticTexts["Paired"], 8)
-        if let shots { shot("\(shots)-paired") }
-        wait(app.buttons["agent-menu"], 6) // Paired closes itself and lands on the agent screen.
-        allowAlerts()
-        return s
-    }
-
-    // Agent-made link: start_session -> deep link -> code -> paired -> ask_card -> answer -> wait -> ack -> green tick.
-    func testAgentMadeLink() throws {
+    // Make a pager -> an agent connects with its number -> ask -> answer -> wait -> acknowledge -> the closed record.
+    func testPagerJourney() throws {
         launch()
-        shot("01-agents-empty")
-        _ = try pairAgentLink("Claude Code · blueprint", shots: "02-pairing")
-        XCTAssertEqual(try agent.status()["status"] as? String, "active")
-        shot("03-agent-no-decisions")
+        shot("01-pagers-empty")
+        let number = makePager("Work", shots: "02")
+        shot("03-pager-empty")
 
-        _ = try agent.ask("What should we aim for first?", detail: "Maya’s team can start this week; reliability work can follow their first real session.",
-                          options: ["Ship to Maya’s team", "Reliability first"], recommended: 1)
+        try agent.connect(number: number, app: "Codex", project: "atomic-pages")
+        _ = try agent.ask("What should we aim for first?", detail: "Maya’s team can start this week.", options: ["Ship to Maya’s team", "Reliability first"], recommended: 1)
         let maya = try agent.ask("Send Maya the update?", detail: "Maya asked for an update once the phone flow was ready.",
                                  options: ["Send now", "Send at 9:00 tomorrow", "Don’t send it"], recommended: 1)
+        let other = AgentHarness(base: AgentHarness.server)
+        try other.connect(number: number, app: "Claude Code", project: "agentpager")
+        _ = try other.ask("Option detail: bottom sheet or full screen?", options: ["Bottom sheet", "Full screen"])
         wait(app.buttons["open-Send Maya the update?"], 8)
-        shot("04-agent-open")
+        wait(app.buttons["open-Option detail: bottom sheet or full screen?"], 8)
+        XCTAssertTrue(app.staticTexts["ATOMIC-PAGES"].exists || app.staticTexts["atomic-pages"].exists, "grouped by project")
+        shot("04-pager-open")
+        back()
+        waitUntil(5, "the badge counts both agents' open decisions") { app.buttons["pager-Work"].label.contains("3 open") }
+        shot("05-pagers-badge")
+        app.buttons["pager-Work"].tap()
 
-        app.buttons["open-Send Maya the update?"].tap()
-        wait(app.buttons["tile-A"])
+        open("Send Maya the update?")
+        XCTAssertEqual(app.staticTexts["who-asked"].label, "Codex")
         XCTAssertFalse(app.buttons["send-option"].exists, "nothing to send until an option is picked")
-        shot("05-decision")
+        shot("06-decision")
         app.buttons["tile-B"].tap()
-        shot("06-decision-selected")
+        shot("07-decision-picked")
         let sentAt = Date()
         app.buttons["send-option"].tap()
         wait(app.buttons["undo-button"], 3)
-        shot("07-undo-window")
+        shot("08-undo-window")
 
         guard let answer = try agent.waitForAnswer(maya, seconds: 20) else { return XCTFail("no answer") }
         XCTAssertGreaterThan(Date().timeIntervalSince(sentAt), 4.5, "the answer waited out the Undo window")
         let choice = answer["choice"] as! [String: Any]
         XCTAssertEqual(choice["kind"] as? String, "option")
         XCTAssertEqual(choice["number"] as? Int, 2)
-        let row = app.buttons["answered-Send Maya the update?"]
-        waitUntil(6, "waiting row") { row.exists && row.label.contains("Waiting for your agent") }
-        shot("08-waiting-for-agent")
-
+        let row = answeredRow("atomic-pages", "Send Maya the update?")
+        waitUntil(6, "waiting row") { row.label.contains("Waiting for Codex") }
         try agent.acknowledge(maya, answerId: answer["answerId"] as! String, nextSteps: "Sending it at 9:00 tomorrow.")
-        waitUntil(8, "green tick") { row.exists && row.label.contains("Agent confirmed") }
-        shot("09-agent-confirmed")
+        waitUntil(8, "green tick") { row.label.contains("Agent confirmed") }
+        shot("09-answered-list")
 
         row.tap()
-        wait(app.staticTexts["Sending it at 9:00 tomorrow."])
-        shot("10-thread")
-        app.buttons["Close"].firstMatch.tap()
+        let record = app.descendants(matching: .any)["agent-confirmation"]
+        wait(record)
+        XCTAssertTrue(record.label.contains("Sending it at 9:00 tomorrow."), record.label)
+        XCTAssertTrue(app.descendants(matching: .any)["closed-choice"].label.contains("You chose B"))
+        XCTAssertFalse(app.buttons["tile-A"].exists, "a closed decision can't be answered again")
+        shot("10-answered-decision")
 
-        // Finishing ends the pager with "agent finished".
+        // Finishing shows on the decision; the agent asks nothing more.
         try agent.finish()
-        wait(app.staticTexts["This pager has ended"], 8)
-        XCTAssertEqual(app.staticTexts["end-reason"].label, "Your agent finished and ended it.")
-        // The server deleted the decisions; the phone keeps its copy, read only, for 24 hours.
-        wait(app.buttons["answered-Send Maya the update?"], 5)
-        wait(app.descendants(matching: .any).matching(identifier: "unanswered-What should we aim for first?").firstMatch, 5)
-        XCTAssertFalse(app.buttons["open-What should we aim for first?"].exists, "an ended pager's cards can't be answered")
-        shot("11-ended-agent-finished")
-        XCTAssertThrowsError(try agent.ask("Again?", options: ["One", "Two"])) { e in
-            XCTAssertEqual((e as? ToolError)?.tag, "PagerEnded")
-        }
+        waitUntil(8, "finished") { app.staticTexts["who-asked"].label == "Codex · finished" }
+        XCTAssertThrowsError(try agent.ask("Again?", options: ["One", "Two"])) { e in XCTAssertEqual((e as? ToolError)?.tag, "AgentFinished") }
     }
 
-    // Phone-made link: Connect sheet -> join_session -> pairing opens -> paired. A second join is refused.
-    func testPhoneMadeLink() throws {
+    // Off: the agent is refused and nothing is queued; the phone keeps the decision and offers Turn on.
+    func testOffAndOn() throws {
         launch()
-        app.buttons["connect-button"].tap()
-        let link = app.staticTexts["connect-link"]
-        waitUntil(10, "link") { link.exists && link.label.contains("/start/") }
-        shot("20-connect")
-        app.buttons["connect-lifetime"].firstMatch.tap()
-        wait(app.buttons["7 Days"])
-        RunLoop.current.run(until: Date().addingTimeInterval(0.8))
-        shot("21-connect-lifetime-menu")
-        tapMenuItem(app.buttons["7 Days"])
-        wait(app.staticTexts["The pager ends 7 days after your agent connects, unless you or your agent end it sooner."], 5)
-
-        let code = String(link.label.split(separator: "/").last!)
-        let joined = try agent.join(code: code, name: "Codex · agentpager")
-        XCTAssertTrue(joined.text.contains("in this order"), joined.text)
-        XCTAssertThrowsError(try AgentHarness(base: AgentHarness.server).join(code: code, name: "Second agent")) { e in
-            XCTAssertEqual((e as? ToolError)?.tag, "AlreadyJoined")
-        }
-        // The Connect sheet gives way to the pairing sheet once the agent has joined.
-        wait(app.buttons["pair-button"], 10)
-        wait(app.buttons["palette-\(joined.names[0])"])
-        shot("22-pairing-phone-link")
-        enter(joined.names)
-        app.buttons["pair-button"].tap()
-        wait(app.staticTexts["Paired"], 8)
-        wait(app.buttons["agent-menu"], 6)
-        allowAlerts()
-        let status = try agent.status()
-        XCTAssertEqual(status["status"] as? String, "active")
-        XCTAssertEqual(status["lifetime"] as? String, "7d")
-        let ends = AgentHarness.date(status["endsAt"] as! String)
-        XCTAssertEqual(ends.timeIntervalSinceNow, 7 * 86400, accuracy: 120)
-        shot("23-agent-7d")
-    }
-
-    // Pager number: Settings makes one; an agent opens a pager with it, which is listed already paired and gets
-    // cards. Changing the number refuses the old one and leaves the open pager working.
-    func testPagerNumber() throws {
-        launch()
-        app.buttons["settings-button"].tap()
-        let number = app.staticTexts["pager-number"]
-        waitUntil(10, "number") { number.exists && number.label.count == 32 }
-        shot("60-settings")
-        let first = number.label
-        try agent.page(number: first, name: "Claude Code · numbered")
-        app.buttons["Close"].firstMatch.tap()
-        let row = app.buttons["agent-Claude Code · numbered"]
-        wait(row, 10)
-        allowAlerts()
-        XCTAssertFalse(app.staticTexts["status-line"].exists, "no status pill while the server is reachable")
-        shot("61-agents-numbered")
-
-        let ship = try agent.ask("Ship it?", options: ["Ship", "Hold"])
-        row.tap()
-        wait(app.buttons["open-Ship it?"], 8)
-        app.buttons["open-Ship it?"].tap()
+        let number = makePager("Acme project")
+        try agent.connect(number: number)
+        let first = try agent.ask("Before off?", options: ["One", "Two"])
+        wait(app.buttons["open-Before off?"], 8)
+        app.buttons["pager-settings"].tap()
+        let toggle = app.switches["pager-on"]
+        wait(toggle)
+        toggle.switches.firstMatch.tap()
+        waitUntil(6, "pager off") { (try? self.agent.pagerOn()) == false }
+        shot("20-detail-off")
+        XCTAssertThrowsError(try agent.ask("While off?", options: ["One", "Two"])) { e in XCTAssertEqual((e as? ToolError)?.tag, "PagerOff") }
+        back()
+        back()
+        waitUntil(5, "off on the Pagers screen") { app.buttons["pager-Acme project"].label.contains("Off since") }
+        shot("21-pagers-off")
+        app.buttons["pager-Acme project"].tap()
+        open("Before off?")
+        let bar = app.descendants(matching: .any)["pager-off-bar"]
+        wait(bar)
+        XCTAssertFalse(app.buttons["tile-A"].isEnabled, "nothing can be sent while off")
+        shot("22-decision-off")
+        app.buttons["turn-on"].tap()
+        waitUntil(6, "pager on") { (try? self.agent.pagerOn()) == true }
+        wait(app.buttons["ask-for-changes"], 5)
         app.buttons["tile-A"].tap()
         app.buttons["send-option"].tap()
-        let answer = try XCTUnwrap(try agent.waitForAnswer(ship, seconds: 20))
+        let answer = try XCTUnwrap(try agent.waitForAnswer(first, seconds: 15))
         XCTAssertEqual((answer["choice"] as! [String: Any])["number"] as? Int, 1)
-        shot("62-numbered-answered")
-
-        app.navigationBars.buttons.element(boundBy: 0).tap()
-        wait(app.navigationBars["Agents"])
-        app.buttons["settings-button"].tap()
-        waitUntil(10, "same number") { number.exists && number.label == first }
-        app.buttons["change-number"].tap()
-        let confirm = app.buttons["Change Number"]
-        wait(confirm, 5)
-        shot("63-change-confirm")
-        confirm.tap()
-        waitUntil(10, "new number") { number.exists && number.label.count == 32 && number.label != first }
-        shot("64-new-number")
-        XCTAssertThrowsError(try AgentHarness(base: AgentHarness.server).page(number: first, name: "Pi · old number")) { e in
-            XCTAssertEqual((e as? ToolError)?.tag, "NumberInvalid")
-        }
-        try AgentHarness(base: AgentHarness.server).page(number: number.label, name: "Codex · after change")
-        app.buttons["Close"].firstMatch.tap()
-        wait(app.buttons["agent-Codex · after change"], 10)
-        XCTAssertNoThrow(try agent.ask("Still on?", options: ["Yes", "No"]))
-        shot("65-agents-after-change")
+        XCTAssertNoThrow(try agent.ask("After on?", options: ["One", "Two"]))
     }
 
-    // Three wrong codes end the pager with "pairing failed"; the agent's next call says so.
-    func testWrongCodeThreeTimes() throws {
-        launch()
-        let s = try agent.start(name: "Pi · release notes")
-        app.open(URL(string: "agentpager://start/\(s.code)")!)
-        wait(app.buttons["palette-\(s.names[0])"])
-        let wrong = wrongNames(s)
-        enter(wrong)
-        app.buttons["pair-button"].tap()
-        let status = app.staticTexts["pairing-status"]
-        waitUntil(6, "two tries left") { status.label == "Those don’t match. 2 tries left." }
-        shot("30-pairing-wrong")
-        enter(wrong)
-        app.buttons["pair-button"].tap()
-        waitUntil(6, "last try") { status.label == "Last try. If it’s wrong, this pager ends." }
-        shot("31-pairing-last-try")
-        enter(wrong)
-        app.buttons["pair-button"].tap()
-        wait(app.staticTexts["Pairing Failed"], 6)
-        shot("32-pairing-failed")
-        XCTAssertThrowsError(try agent.ask("Still there?", options: ["One", "Two"])) { e in
-            let body = (e as? ToolError)?.body ?? [:]
-            XCTAssertEqual(body["error"] as? String, "PagerEnded")
-            XCTAssertEqual(body["endReason"] as? String, "pairingFailed")
-        }
-        app.buttons["Connect an Agent"].tap()
-        wait(app.staticTexts["connect-link"], 6)
-    }
-
-    // Ends menu (counted from now), the Undo window, leaving the app during Undo, Ask for Changes,
-    // the "Answer Not Confirmed" alert, and End Pager.
-    func testEndsUndoAndEndPager() throws {
+    // The Undo window, leaving the app during Undo, Ask for changes, and the "Answer Not Confirmed" alert.
+    func testUndoChangesAndNotConfirmed() throws {
         launch(extra: ["-failSends", "4"])
-        _ = try pairAgentLink("Claude · trip planner")
-
-        // Ends: 30 Days, counted from now.
-        app.buttons["agent-menu"].tap()
-        let ends = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Ends'")).firstMatch
-        wait(ends)
-        RunLoop.current.run(until: Date().addingTimeInterval(0.8))
-        shot("40-agent-menu")
-        tapMenuItem(ends)
-        wait(app.buttons["30 Days"])
-        RunLoop.current.run(until: Date().addingTimeInterval(0.8))
-        shot("41-ends-submenu")
-        tapMenuItem(app.buttons["30 Days"])
-        waitUntil(6, "30d") { (try? self.agent.status()["lifetime"] as? String) == "30d" }
-        let endsAt = AgentHarness.date(try agent.status()["endsAt"] as! String)
-        XCTAssertEqual(endsAt.timeIntervalSinceNow, 30 * 86400, accuracy: 120)
-        XCTAssertTrue(app.staticTexts["Pager active · Ends in 30d"].waitForExistence(timeout: 5))
+        let number = makePager("Trips")
+        try agent.connect(number: number, app: "Claude", project: "trip planner")
 
         // The first send fails all its retries (debug flag) -> "Answer Not Confirmed" -> Retry sends the same answer.
         let flaky = try agent.ask("Book the 7:40 train?", options: ["Book it", "Wait for the 9:10"])
-        wait(app.buttons["open-Book the 7:40 train?"], 8)
-        app.buttons["open-Book the 7:40 train?"].tap()
+        open("Book the 7:40 train?")
         app.buttons["tile-A"].tap()
         app.buttons["send-option"].tap()
         let alert = app.alerts["Answer Not Confirmed"]
         wait(alert, 25)
-        shot("42-answer-not-confirmed")
+        shot("30-answer-not-confirmed")
         XCTAssertNil(try agent.waitForAnswer(flaky, seconds: 1))
         alert.buttons["Retry"].tap()
         let flakyAnswer = try XCTUnwrap(try agent.waitForAnswer(flaky, seconds: 10))
         XCTAssertEqual((flakyAnswer["choice"] as! [String: Any])["number"] as? Int, 1)
 
-        // Undo inside the window keeps the decision open and the choice selected.
+        // Undo inside the window reopens the decision with the choice still picked.
         let hotel = try agent.ask("Which hotel?", options: ["Central", "Seafront"], recommended: 1)
-        wait(app.buttons["open-Which hotel?"], 8)
-        app.buttons["open-Which hotel?"].tap()
+        open("Which hotel?")
         app.buttons["tile-B"].tap()
         app.buttons["send-option"].tap()
         wait(app.buttons["undo-button"], 3)
         app.buttons["undo-button"].tap()
         wait(app.buttons["send-option"], 5)
         XCTAssertTrue(app.buttons["tile-B"].isSelected)
-        shot("43-undo-reopened")
-        app.buttons["close-decision"].tap()
+        shot("31-undo-reopened")
+        back()
         XCTAssertNil(try agent.waitForAnswer(hotel, seconds: 7), "an undone answer is never sent")
 
-        // Leaving the app during the Undo window sends at once. Reopened, B is still picked (tapping it again
-        // would unpick it).
-        app.buttons["open-Which hotel?"].tap()
-        wait(app.buttons["tile-B"], 5)
+        // Leaving the app during the Undo window sends at once.
+        open("Which hotel?")
         XCTAssertTrue(app.buttons["tile-B"].isSelected)
         app.buttons["send-option"].tap()
         wait(app.buttons["undo-button"], 3)
@@ -302,63 +206,46 @@ final class FlowTests: XCTestCase {
         XCTAssertEqual((hotelAnswer["choice"] as! [String: Any])["number"] as? Int, 2)
         app.activate()
 
-        // Ask for Changes sends feedback instead of an option.
+        // Ask for changes sends a note instead of an option; the closed record shows the note.
         let dinner = try agent.ask("Dinner on Friday?", options: ["Sushi", "Pasta"])
-        wait(app.buttons["open-Dinner on Friday?"], 8)
-        app.buttons["open-Dinner on Friday?"].tap()
+        open("Dinner on Friday?")
         app.buttons["ask-for-changes"].tap()
         let field = app.textViews["feedback-text"]
         wait(field)
         field.typeText("Please find somewhere vegetarian.")
-        shot("44-ask-for-changes")
+        shot("32-ask-for-changes")
         app.buttons["send-feedback"].tap()
         let feedback = try XCTUnwrap(try agent.waitForAnswer(dinner, seconds: 15))
         XCTAssertEqual((feedback["choice"] as! [String: Any])["text"] as? String, "Please find somewhere vegetarian.")
         try agent.acknowledge(dinner, answerId: feedback["answerId"] as! String, nextSteps: "Looking for vegetarian places.")
-        let dinnerRow = app.buttons["answered-Dinner on Friday?"]
-        waitUntil(8, "feedback confirmed") { dinnerRow.exists && dinnerRow.label.contains("Agent confirmed") }
-        shot("45-feedback-confirmed")
-
-        // End Pager, with its confirmation.
-        app.buttons["agent-menu"].tap()
-        tapMenuItem(app.buttons["End Pager"])
-        wait(app.staticTexts["End Claude’s pager?"], 5)
-        shot("46-end-confirm")
-        app.buttons.matching(identifier: "End Pager").allElementsBoundByIndex.last!.tap()
-        wait(app.staticTexts["Ended in the last 24 hours"], 8)
-        shot("47-agents-ended")
-        XCTAssertThrowsError(try agent.ask("Still there?", options: ["One", "Two"])) { e in
-            XCTAssertEqual((e as? ToolError)?.body["endReason"] as? String, "ownerEnded")
-        }
-        app.buttons["agent-Claude · trip planner"].tap()
-        wait(app.staticTexts["This pager has ended"])
-        XCTAssertEqual(app.staticTexts["end-reason"].label, "You ended it.")
-        wait(app.buttons["answered-Dinner on Friday?"], 5) // the phone keeps its copy when the owner ends it, too
-        shot("48-ended-by-you")
+        let row = answeredRow("trip planner", "Dinner on Friday?")
+        waitUntil(8, "note confirmed") { row.label.contains("Agent confirmed") }
+        row.tap()
+        wait(app.descendants(matching: .any)["closed-choice"])
+        XCTAssertTrue(app.descendants(matching: .any)["closed-choice"].label.contains("Please find somewhere vegetarian."))
+        shot("33-note-answered")
     }
 
-    // Needs a second server with short lifetimes, e.g. PORT=8788 AGENTPAGER_SESSION_MS=20000 AGENTPAGER_UNPAIRED_MS=60000.
-    func testTimedOut() throws {
-        guard let short = ProcessInfo.processInfo.environment["AGENTPAGER_SHORT_SERVER_URL"], let url = URL(string: short) else {
-            throw XCTSkip("set TEST_RUNNER_AGENTPAGER_SHORT_SERVER_URL to a short-lifetime server")
-        }
-        agent = AgentHarness(base: url)
-        app.launchArguments = ["-resetKeys", "-AgentPagerServerURL", short]
+    // Delete: the pager leaves the phone and the service; its agents can't reach the phone again.
+    func testDeletePager() throws {
         launch()
-        let s = try agent.start(name: "Research agent")
-        app.open(URL(string: "agentpager://start/\(s.code)")!)
-        wait(app.buttons["palette-\(s.names[0])"])
-        enter(s.names)
-        app.buttons["pair-button"].tap()
-        wait(app.buttons["agent-menu"], 8)
-        allowAlerts()
-        let ends = AgentHarness.date(try agent.status()["endsAt"] as! String)
-        XCTAssertLessThan(ends.timeIntervalSinceNow, 60)
-        wait(app.staticTexts["This pager has ended"], ends.timeIntervalSinceNow + 10)
-        XCTAssertEqual(app.staticTexts["end-reason"].label, "It reached its end time.")
-        shot("50-ended-timed-out")
+        let number = makePager("VM scratch")
+        try agent.connect(number: number)
+        _ = try agent.ask("Keep the VM's build cache?", options: ["Keep", "Clear"])
+        wait(app.buttons["open-Keep the VM's build cache?"], 8)
+        app.buttons["pager-settings"].tap()
+        app.buttons["delete-pager"].tap()
+        let confirm = app.buttons.matching(NSPredicate(format: "label == 'Delete pager' AND identifier != 'delete-pager'")).firstMatch
+        wait(confirm, 5)
+        shot("40-delete-confirm")
+        confirm.tap()
+        wait(app.navigationBars["Pagers"], 8)
+        XCTAssertFalse(app.buttons["pager-VM scratch"].exists)
         XCTAssertThrowsError(try agent.ask("Still there?", options: ["One", "Two"])) { e in
-            XCTAssertEqual((e as? ToolError)?.body["endReason"] as? String, "timedOut")
+            XCTAssertEqual((e as? ToolError)?.tag, "UnknownAgent")
+        }
+        XCTAssertThrowsError(try AgentHarness(base: AgentHarness.server).connect(number: number)) { e in
+            XCTAssertEqual((e as? ToolError)?.tag, "NumberInvalid")
         }
     }
 }

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -13,14 +13,21 @@ test('setup adds the MCP entry to Claude Desktop and Cursor configs, idempotentl
   const desktop = path.join(home, 'Library', 'Application Support', 'Claude', 'claude_desktop_config.json');
   mkdirSync(path.dirname(desktop), { recursive: true }); mkdirSync(path.join(home, '.cursor'));
   writeFileSync(desktop, JSON.stringify({ mcpServers: { other: { command: 'other' } }, theme: 'dark' }));
+  chmodSync(desktop, 0o600);
   const run = (...args: string[]) => execFileSync(process.execPath, ['--experimental-strip-types', main, 'setup', ...args], { env: { HOME: home, PATH: '/usr/bin:/bin' }, encoding: 'utf8' });
   assert.match(run('--print'), /Claude Desktop: .* would add[\s\S]*Cursor: .* would add/);
   assert.equal(JSON.parse(readFileSync(desktop, 'utf8')).mcpServers.agentpager, undefined, '--print changed nothing');
   assert.match(run(), /Claude Desktop: .* added the agentpager MCP server \(restart Claude Desktop\)/);
   const config = JSON.parse(readFileSync(desktop, 'utf8'));
   assert.deepEqual(config, { mcpServers: { other: { command: 'other' }, agentpager: { command: 'agentpager', args: ['mcp'] } }, theme: 'dark' }, 'other settings kept');
+  assert.equal(statSync(desktop).mode & 0o777, 0o600, 'its permissions kept');
   assert.deepEqual(JSON.parse(readFileSync(path.join(home, '.cursor', 'mcp.json'), 'utf8')).mcpServers.agentpager, { command: 'agentpager', args: ['mcp'] });
   assert.match(run(), /Claude Desktop: .* already set up[\s\S]*Cursor: .* already set up/);
+  // A folder it can't write: said so, nothing thrown.
+  const cursor = path.join(home, '.cursor', 'mcp.json');
+  writeFileSync(cursor, '{}'); chmodSync(path.join(home, '.cursor'), 0o500);
+  assert.match(run(), /Cursor: .* couldn't write it \(EACCES\)\. Add "agentpager"/);
+  chmodSync(path.join(home, '.cursor'), 0o700);
   // A config that isn't plain JSON is left alone, byte for byte.
   const commented = '// mine\n{ "mcpServers": { "other": { "command": "other" } }, }\n';
   writeFileSync(desktop, commented);

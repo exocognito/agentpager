@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import type { Result } from './commands.ts';
@@ -27,9 +27,16 @@ function jsonConfig(file: string, print: boolean): string | null {
   const servers = isObject(config.mcpServers) ? config.mcpServers : {};
   if (JSON.stringify(servers.agentpager) === JSON.stringify(ENTRY)) return `${file}: already set up`;
   if (!print) {
-    const temp = `${file}.agentpager-${process.pid}.tmp`;
-    writeFileSync(temp, JSON.stringify({ ...config, mcpServers: { ...servers, agentpager: ENTRY } }, null, 2) + '\n');
-    renameSync(temp, file);
+    // These files can hold other servers' keys: the new one keeps the old one's permissions (else owner only).
+    const temp = `${file}.agentpager-${process.pid}.tmp`, mode = existsSync(file) ? statSync(file).mode & 0o777 : 0o600;
+    try {
+      writeFileSync(temp, JSON.stringify({ ...config, mcpServers: { ...servers, agentpager: ENTRY } }, null, 2) + '\n', { mode });
+      chmodSync(temp, mode);
+      renameSync(temp, file);
+    } catch (e) {
+      rmSync(temp, { force: true });
+      return `${file}: couldn't write it (${e instanceof Error && 'code' in e ? String(e.code) : 'write failed'}). Add "agentpager": ${JSON.stringify(ENTRY)} to its mcpServers yourself`;
+    }
   }
   return `${file}: ${print ? 'would add' : 'added'} the agentpager MCP server`;
 }

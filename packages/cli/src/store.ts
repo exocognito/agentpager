@@ -1,4 +1,4 @@
-import { appendFileSync, chmodSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync, chmodSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { randomInt } from 'node:crypto';
 import { homedir } from 'node:os';
 import path from 'node:path';
@@ -45,14 +45,31 @@ export function saveAgent(a: AgentFile) {
   chmodSync(temp, 0o600);
   renameSync(temp, file);
 }
-// Several agents (a coordinator and its helpers) may share one id: each change re-reads the file and is applied to
-// what is there now, so one's write never drops another's decision.
+// Several agents (a coordinator and its helpers, each its own process) may share one id: each change takes the
+// agent's lock, re-reads the file and is applied to what is there now, so one's write never drops another's
+// decision. The lock is a directory (mkdir is atomic); one left by a crashed process is broken after 10 seconds.
+const LOCK_STALE_MS = 10_000, LOCK_WAIT_MS = 5_000;
+const pause = (ms: number) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+function locked<A>(id: string, run: () => A): A {
+  const lock = path.join(agentsDir(), `${id}.lock`), until = Date.now() + LOCK_WAIT_MS;
+  for (;;) {
+    try { mkdirSync(lock); break; } catch (e) {
+      if (!(e instanceof Error && 'code' in e && e.code === 'EEXIST')) throw e;
+      try { if (Date.now() - statSync(lock).mtimeMs > LOCK_STALE_MS) { rmSync(lock, { recursive: true, force: true }); continue; } } catch { continue; }
+      if (Date.now() > until) throw Object.assign(new Error(`agent ${id} is busy`), { code: 'EBUSY' });
+      pause(10);
+    }
+  }
+  try { return run(); } finally { rmSync(lock, { recursive: true, force: true }); }
+}
 export function updateAgent(id: string, change: (a: AgentFile) => void): AgentFile | null {
-  const a = loadAgent(id);
-  if (!a) return null;
-  change(a);
-  saveAgent(a);
-  return a;
+  return locked(id, () => {
+    const a = loadAgent(id);
+    if (!a) return null;
+    change(a);
+    saveAgent(a);
+    return a;
+  });
 }
 // Checked before anything is sent, so a machine that can't keep the agent's key never creates an agent it can't use.
 export function writable(): string | null {

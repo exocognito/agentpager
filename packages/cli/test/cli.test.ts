@@ -3,6 +3,7 @@ import { chmodSync, copyFileSync, mkdtempSync, readFileSync, statSync, writeFile
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { spawn } from 'node:child_process';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { fixture, assert, token } from '../../app/test/support.ts';
@@ -134,7 +135,7 @@ test('the binary: connect, refusals, ask, wait, ack, status, history, off, finis
   } finally { await client.close(); await f.stop(); }
 });
 
-test('round 1 of review: concurrent asks, an unwritable home, empty attachments, unsafe cells, fences, bad config', { timeout: 240_000 }, async () => {
+test('review rounds: concurrent asks, an unwritable home, attachments, unsafe cells, fences, bad input', { timeout: 240_000 }, async () => {
   const f = await fixture('cli-edges');
   const home = mkdtempSync(path.join(tmpdir(), 'agentpager-cli-')), work = mkdtempSync(path.join(tmpdir(), 'agentpager-card-'));
   process.env.AGENTPAGER_HOME = home; process.env.AGENTPAGER_SERVER = f.origin; delete process.env.AGENTPAGER_PAGER;
@@ -148,23 +149,41 @@ test('round 1 of review: concurrent asks, an unwritable home, empty attachments,
     const [one, two] = await Promise.all([op.ask(id, { yaml: small('One?'), dir: work }), op.ask(id, { yaml: small('Two?'), dir: work })]);
     for (const r of [one, two]) assert.equal((await op.wait(id, String((r.json as { decision: string }).decision), { seconds: 1 })).text.startsWith('Pending.'), true);
 
+    // The same from separate processes (helpers sharing the id): every decision is kept.
+    for (let n = 0; n < 4; n++) writeFileSync(path.join(work, `p${n}.yaml`), small(`Process ${n}?`));
+    const procs = await Promise.all([0, 1, 2, 3].map(n => new Promise<string>((resolve, reject) => {
+      const child = spawn(process.execPath, ['--experimental-strip-types', path.join(cli, 'src', 'main.ts'), 'ask', '--agent', id, path.join(work, `p${n}.yaml`), '--json'], { env: process.env });
+      let out = ''; child.stdout.on('data', d => { out += d; }); child.on('error', reject); child.on('close', () => resolve(out));
+    })));
+    const kept = JSON.parse(readFileSync(path.join(home, 'agents', `${id}.json`), 'utf8')).decisions;
+    for (const out of procs) assert.ok(JSON.parse(out).result.decision in kept, out);
+
     // A home it can't write: refused before anything is sent, so the phone shows no stray agent.
     const agentsBefore = (await f.pager(p.pagerId, p.phone)).agents.length;
     chmodSync(path.join(home, 'agents'), 0o500);
     const locked = await op.connect({ number: p.number, app: 'Codex', project: 'edges' });
     assert.equal(locked.code, 2); assert.match(locked.text, /^Can't write .* \(EACCES\)\. Nothing was sent\./);
     assert.match((await op.ask(id, { yaml: small('Locked?'), dir: work })).text, /^Can't write .*Nothing was sent\./);
+    assert.match(op.rules(id).text, /^A decision card asks your owner one question/, 'the contract still reads');
     chmodSync(path.join(home, 'agents'), 0o700);
     assert.equal((await f.pager(p.pagerId, p.phone)).agents.length, agentsBefore);
+    assert.equal((await op.wait(id, 'd_xxxx', { seconds: Number('abc') })).code, 2);
+    assert.equal((await op.wait(id, String((one.json as { decision: string }).decision), { seconds: Number('abc') })).text, '--seconds takes a number from 1 to 50.');
 
     // Cards: an inline attachment with no content, a line break or "|" in a table field, a fenced diff kept whole.
     const empty = await op.ask(id, { object: { title: 'Look?', detail: 'A mock.', context: { summary: '![Mock](a.png)' }, options: [{ label: 'A', title: 'A', prioritizes: 'a' }, { label: 'B', title: 'B', prioritizes: 'b' }], recommendation: { option: 'A', why: 'A.' }, attachments: [{ name: 'a.png', type: 'image/png' }] } });
     assert.equal(empty.text, 'Attachment a.png has no content: give its base64 (or text for a .md page).');
+    const page = (a: Record<string, unknown>) => op.ask(id, { object: { title: 'Read?', detail: 'A page.', context: { summary: 'See [notes](notes.md).' }, options: [{ label: 'A', title: 'A', prioritizes: 'a' }, { label: 'B', title: 'B', prioritizes: 'b' }], recommendation: { option: 'A', why: 'A.' }, attachments: [{ name: 'notes.md', ...a }] } });
+    assert.equal((await page({ type: 'text/markdown', base64: 'not base64!' })).text, "Attachment notes.md isn't valid base64.");
+    assert.equal((await page({ type: 'image/png', base64: 'aGk=' })).text, 'Attachment notes.md is declared image/png but its name says text/markdown.');
+    assert.equal((await page({ type: 'text/markdown', base64: Buffer.from([0xff, 0xfe, 0x00]).toString('base64') })).text, "Attachment notes.md isn't UTF-8 text.");
+    const reviewed = op.review({ object: { title: 'Look?', attachments: [{ name: 'a.png', type: 'image/png', base64: readFileSync(png).toString('base64') }] } }).text;
+    assert.match(reviewed, /"base64": "\([\d,]+ characters, not shown\)"/);
     const unsafe = small('Table?').replace('title: Sushi,', 'title: "Sushi\\nbar",') + 'tradeoffs:\n  - {concern: Cost, A: "green: Cheap | quick", B: "red: [dear]"}\n';
     assert.deepEqual((await op.ask(id, { yaml: unsafe, dir: work })).text.split('\n'), ['options[0].title must be one line.', 'tradeoffs[0].A has a "|", which would break the Options table; use "/" or words.', 'tradeoffs[0].B has a square bracket, which would end its rating early; use parentheses.']);
     const { compile } = await import('../src/card.ts');
-    const fenced = compile({ yaml: small('Diff?').replace('  - {label: Sushi, title: Sushi, prioritizes: fish}', '  - label: Sushi\n    title: Sushi\n    prioritizes: fish\n    changes: |\n      - One line.\n\n      ```diff menu.ts\n      -old\n      +new\n\n      ```'), dir: work });
-    assert.ok(fenced.ok && fenced.brief.card.markdown.includes('### What A changes\n- One line.\n\n```diff menu.ts\n-old\n+new\n\n```'), fenced.ok ? fenced.brief.card.markdown : fenced.problems.join());
+    const fenced = compile({ yaml: small('Diff?').replace('  - {label: Sushi, title: Sushi, prioritizes: fish}', '  - label: Sushi\n    title: Sushi\n    prioritizes: fish\n    changes: |\n      - One line.\n\n      ```python\n      # a comment, not a heading\n      def f():\n          return 1\n\n      ```'), dir: work });
+    assert.ok(fenced.ok && fenced.brief.card.markdown.includes('### What A changes\n- One line.\n\n```python\n# a comment, not a heading\ndef f():\n    return 1\n\n```'), fenced.ok ? fenced.brief.card.markdown : fenced.problems.join());
 
     // history with a nonsense limit reads as the default; a server that isn't a URL is refused, not a crash.
     assert.match(op.history(id, Number('abc')).text, /Two\?|One\?/);

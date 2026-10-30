@@ -31,6 +31,8 @@ const isRecord = (v: unknown): v is Fields => typeof v === 'object' && v !== nul
 const letter = (i: number) => String.fromCharCode(65 + i);
 const count = (s: string) => [...new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(s)].length;
 const number = (n: number) => n.toLocaleString('en-US');
+// Strict base64: the alphabet, whole quads and at most two "=", or nothing.
+const base64 = (text: string) => /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(text) && text.length > 0 ? Buffer.from(text, 'base64') : null;
 const typeOf = (name: string) => name.endsWith('.md') ? 'text/markdown' : name.endsWith('.png') ? 'image/png' : /\.jpe?g$/.test(name) ? 'image/jpeg' : null;
 
 // Prose: paragraphs and "- " bullets, hard-wrapped lines joined, so the phone reflows them. A fenced block (a diff,
@@ -41,8 +43,8 @@ export function prose(text: string): string {
   const flush = () => { if (items.length) out.push(items.join('\n')); items = []; };
   for (const raw of text.replace(/\s+$/, '').split('\n')) {
     const line = raw.trim();
-    if (fence) { fence.push(raw.replace(/^\s{0,4}/, '')); if (/^(```|~~~)\s*$/.test(line)) { out.push(fence.join('\n')); fence = null; } continue; }
-    if (/^(```|~~~)/.test(line)) { flush(); fence = [line]; continue; }
+    if (fence) { fence.push(raw); if (/^(```|~~~)\s*$/.test(line)) { out.push(fence.join('\n')); fence = null; } continue; }
+    if (/^(```|~~~)/.test(line)) { flush(); fence = [raw]; continue; }
     if (!line) { flush(); continue; }
     if (/^[-*] /.test(line) || /^!\[[^\]]*\]\([^)]+\)$/.test(line) || items.length === 0) items.push(line);
     else items[items.length - 1] += ' ' + line;
@@ -51,6 +53,11 @@ export function prose(text: string): string {
   if (fence) out.push(fence.join('\n'));
   return out.join('\n\n');
 }
+// The text outside fenced blocks: a heading, table or HTML inside a fence is code, not structure.
+const unfenced = (text: string) => {
+  let inside = false;
+  return text.split('\n').filter(l => { if (/^\s*(```|~~~)/.test(l)) { inside = !inside; return false; } return !inside; }).join('\n');
+};
 const images = (text: string) => [...text.matchAll(/!\[[^\]]*\]\(([^)\s]+)\)/g)].map(m => m[1]);
 
 // Reads a card.yaml file (attachments are files next to it) or a card object from MCP (attachments inline).
@@ -87,11 +94,17 @@ export function load(source: Source): { card: unknown; files: Map<string, Attach
     for (const a of listed) {
       if (!isRecord(a) || typeof a.name !== 'string') continue;
       const type = typeOf(a.name);
+      if (!type) continue;
+      if (a.type !== undefined && a.type !== type) { problems.push(`Attachment ${a.name} is declared ${String(a.type)} but its name says ${type}.`); continue; }
+      const bytes = typeof a.base64 === 'string' ? base64(a.base64) : null;
+      if (typeof a.base64 === 'string' && !bytes) { problems.push(`Attachment ${a.name} isn't valid base64.`); continue; }
       if (type === 'text/markdown' && typeof a.text === 'string') files.set(a.name, { name: a.name, type, text: a.text });
-      else if (type === 'text/markdown' && typeof a.base64 === 'string') files.set(a.name, { name: a.name, type, text: Buffer.from(a.base64, 'base64').toString('utf8') });
-      else if ((type === 'image/png' || type === 'image/jpeg') && typeof a.base64 === 'string') files.set(a.name, { name: a.name, type, base64: a.base64 });
+      else if (type === 'text/markdown' && bytes) {
+        try { files.set(a.name, { name: a.name, type, text: new TextDecoder('utf-8', { fatal: true }).decode(bytes) }); }
+        catch { problems.push(`Attachment ${a.name} isn't UTF-8 text.`); }
+      } else if (type !== 'text/markdown' && bytes && typeof a.base64 === 'string') files.set(a.name, { name: a.name, type, base64: a.base64 });
       // Named but with nothing in it: refused as missing, never sent without it.
-      else if (type) files.set(a.name, null);
+      else files.set(a.name, null);
     }
   }
   return { card, files, problems };
@@ -121,8 +134,9 @@ export function compile(source: Source): Compiled {
     if (value !== undefined && count(value) > max) problems.push(`${where} is ${number(count(value))} characters; the limit is ${number(max)}.`);
   };
   // R1: no headings, tables or HTML inside a prose field.
-  const plain = (value: string | undefined, where: string) => {
-    if (value === undefined) return;
+  const plain = (whole: string | undefined, where: string) => {
+    if (whole === undefined) return;
+    const value = unfenced(whole);
     if (/^\s*#/m.test(value)) problems.push(`${where} has a heading; prose fields take paragraphs, bullets and images only.`);
     else if (/^\s*\|/m.test(value)) problems.push(`${where} has a table; put comparisons in tradeoffs.`);
     else if (/<[A-Za-z/!?]/.test(value)) problems.push(`${where} has HTML; write plain text.`);

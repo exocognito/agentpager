@@ -72,7 +72,8 @@ export async function connect(input: { number?: string; app?: string; project?: 
 export function rules(agent?: string): Result {
   const a = agent ? loadAgent(agent) : null;
   if (agent && !a) return unknownAgent(agent);
-  if (a) updateAgent(a.id, x => { x.rulesShownAt = new Date().toISOString(); x.cardsSinceRules = 0; });
+  // Reading the contract needs no write: the reminder clock is reset when it can be.
+  if (a) try { updateAgent(a.id, x => { x.rulesShownAt = new Date().toISOString(); x.cardsSinceRules = 0; }); } catch { /* clock not reset */ }
   return done(rulesText());
 }
 
@@ -82,7 +83,9 @@ export const example = (): Result => done(EXAMPLE);
 export function review(card: Source): Result {
   let text: string;
   if ('file' in card) { try { text = readFileSync(card.file, 'utf8'); } catch { return refused(`There is no card at ${card.file}.`); } }
-  else text = 'yaml' in card ? card.yaml : JSON.stringify(card.object, null, 2);
+  // An MCP card's attachment bytes are named, not printed: the reviewer grades the card, and the bytes would fill
+  // its context.
+  else text = 'yaml' in card ? card.yaml : JSON.stringify(card.object, (key, value) => (key === 'base64' || key === 'text') && typeof value === 'string' && value.length > 200 ? `(${value.length.toLocaleString('en-US')} characters, not shown)` : value, 2);
   return done(`${REVIEW}\n\n--- card.yaml ---\n${text.trimEnd()}\n`);
 }
 
@@ -121,7 +124,8 @@ export async function wait(agent: string, ref: string, opts: { seconds?: number;
   if (!a) return unknownAgent(agent);
   const d = decisionOf(a, ref);
   if (!d) return refused(`Agent ${a.id} has no decision ${ref}. Its decisions: ${Object.keys(a.decisions).join(', ') || 'none yet'}.`);
-  const seconds = Math.min(Math.max(1, Math.floor(opts.seconds ?? WAIT_SECONDS)), WAIT_SECONDS);
+  if (opts.seconds !== undefined && !(Number.isFinite(opts.seconds) && opts.seconds >= 1)) return refused('--seconds takes a number from 1 to 50.');
+  const seconds = Math.min(Math.floor(opts.seconds ?? WAIT_SECONDS), WAIT_SECONDS);
   for (;;) {
     const r = await call(a.server, 'GET', `/api/agents/${a.agentId}/cards/${d.id}/answer?wait=${seconds}`, { key: a.agentKey, timeoutMs: (seconds + 20) * 1000 });
     if (!r.ok) return refusal(r, a.server);

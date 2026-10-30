@@ -9,15 +9,20 @@ pnpm start:app
 # http://localhost:8787
 ```
 
-The front page runs the Blueprint's imported React marketing screen; the owner's side of the product is the iPhone app in `../ios`, and the old web app address `/app` redirects to the front page. `/start` serves its imported plain Markdown document. The HTTPS API and stateless MCP server share SQLite-backed per-session Durable Objects. A registry object routes pairing links and serializes phone-connect joins. No accounts, notification service, or action execution is implemented.
+The front page runs the Blueprint's imported React marketing screen; the owner's side of the product is the iPhone app in `../ios`, and the old web app address `/app` redirects to the front page. `/start` tells agents how to connect, ask, wait and acknowledge. The HTTPS API and the stateless MCP server share one SQLite-backed Durable Object per agent (`Agent`) and one `Registry` for pagers. No accounts, and no action execution.
 
-## Pager number (dogfood)
+## Pagers and agents (v2, `docs/v2/`)
 
-`POST /api/numbers` with a phone key makes that key's one pager number and retires any older one. An agent with the
-number opens a pager with `POST /api/numbers/<number>/pagers {name, lifetime?}` (MCP `page_owner`), already paired to
-that phone key, so there is no link or emoji code. `GET /api/numbers` lists, for the phone key, the pagers opened with
-any of its numbers. The Registry stores numbers and keys only as digests. This relaxes SI2 for numbered pagers on
-purpose: the number is the owner's trust in the agents that can read it.
+A **pager** is made on the phone: `POST /api/pagers {number, publicKey, autoOff}` with the phone key. The phone makes
+a Curve25519 key pair and the number `ap1_` + base64url(pager id ‖ the first 8 bytes of the public key's SHA-256); the
+server checks that the fingerprint matches and keys the pager by its id. The name lives only on the phone. A pager is
+on or off (`POST /api/pagers/<id>/settings {on?, autoOff?}`); auto-off (`never`, `24h`, `7d`, `30d`) lands in the same
+off state. `GET /api/pagers/<id>` returns the pager and every agent on it with its open and answered decisions.
+`POST /api/pagers/<id>/delete` deletes it and its agents.
+
+An **agent** is whatever connected with the number: `POST /api/agents {number, app, project}` (MCP `connect`) makes a
+new one every time, with its own key. It has no lifetime; housekeeping forgets it 30 days after its last activity.
+While its pager is off, every call but status is refused `PagerOff` and nothing is queued; the phone's answers too.
 
 ## Decision briefs (dogfood)
 
@@ -26,21 +31,16 @@ Markdown pages and PNG or JPEG images. The Blueprint schema (`design/ui/componen
 brief whole with the reason: HTML outside code, a recommendation or option block or Tradeoffs column for a letter
 that is no option, a link to a missing attachment, or a size over its limit. The decision keeps each attachment's
 name, type and size; the bytes live in their own table, immutable, and go when the pager ends. The phone reads one
-with `GET /api/sessions/<id>/cards/<decisionId>/files/<name>` and its phone key.
+with `GET /api/agents/<id>/cards/<decisionId>/files/<name>` and its phone key.
 
-Versions: a brief's options get their number's keycap as `emoji`, so an iPhone build from before briefs draws a
-brief as an emoji card instead of failing the whole pager. A deleted proposal deletes its attachments (a trigger), so
-a build from before briefs still clears them when a pager ends. But that build cannot read a stored brief at all:
-before rolling the server back past briefs, end the pagers that hold one, or they answer `InvalidInput` until they end.
+A brief's options also get their number's keycap as `emoji`.
 
 `fixtures/briefs/` holds the canvas's four examples (D1–D4) word for word. `scripts/briefs.ts <server> <pager number>`
-plays the agent over MCP: it opens a pager with the number, asks all four, then acknowledges each answer.
+plays the agent over MCP: it connects with the number, asks all four, then acknowledges each answer.
 
 ## Local configuration
 
-`PORT`, `AGENTPAGER_INSPECTOR_PORT`, and `AGENTPAGER_PERSIST` select the local listener, inspector and persistent storage (outside the worktree). `AGENTPAGER_UNPAIRED_MS` and `AGENTPAGER_SESSION_MS` are local-only compile-time settings; defaults are 60000 and 180000. The imported schema bounds these at 10000–60000 and 10000–180000. Local startup builds to a private temporary directory, so concurrent instances never race over a bundle or database. Production builds always compile the production 15-minute / 24-hour constants, regardless of these environment variables.
-
-A generated link intentionally names `https://agentpager.me`, including on local workerd. For local use open the **same path and token** on `http://localhost:8787`; never follow it to production during local tests.
+`PORT`, `AGENTPAGER_INSPECTOR_PORT`, and `AGENTPAGER_PERSIST` select the local listener, inspector and persistent storage (outside the worktree). `AGENTPAGER_AUTO_OFF_MS` (every auto-off choice) and `AGENTPAGER_IDLE_MS` (housekeeping) are local-only compile-time clocks, so tests cross them in real time; zero or unset is the production value. Local startup builds to a private temporary directory, so concurrent instances never race over a bundle or database. Production builds always compile the production clocks.
 
 ## Acceptance proof
 
@@ -49,9 +49,9 @@ BLUEPRINT_EVIDENCE_DIR=/tmp/agentpager-proof \
   node --test --experimental-strip-types --test-concurrency=4 packages/app/test/**/*.test.ts
 ```
 
-Every test file starts isolated workerd instances with its own ports and persistence. Their local lifetimes are declared in `fixture(...)` calls and in each `target.json`. Browser tests use real Chromium (390 and 1280 px); HTTPS and official MCP SDK callers use real endpoints. Transport-loss tests let the request reach the real service, then discard its reply. Nothing replaces the service or its storage.
+Every test file starts isolated workerd instances with its own ports and persistence. Their local clocks are declared in `fixture(...)` calls. Browser tests use real Chromium (390 and 1280 px); HTTPS and official MCP SDK callers use real endpoints. Transport-loss tests let the request reach the real service, then discard its reply. Nothing replaces the service or its storage.
 
-The proof writes screenshots, browser traces, JSON exchanges, latency samples, storage counts, Worker logs and process-group exit records to `BLUEPRINT_EVIDENCE_DIR`. Node's TAP/summary reports every test. Production-only lifetime checks skip locally; real-time expiry, storage inspection and restart journeys skip remotely.
+The proof writes screenshots, browser traces, JSON exchanges, latency samples, storage counts, Worker logs and process-group exit records to `BLUEPRINT_EVIDENCE_DIR`. Node's TAP/summary reports every test. 
 
 ```sh
 AGENTPAGER_URL=https://agentpager.me BLUEPRINT_EVIDENCE_DIR=/tmp/agentpager-deployed \
@@ -62,7 +62,7 @@ Cold agent arrivals are **reviewer dogfood**, not acceptance tests: D2 and `reci
 
 ## Deployment
 
-Commit and clean the checkout, then `pnpm deploy:app`. The script reads only the prescribed vault item using the service-account token in `~/Agents/.secrets/op-service-account.token`, and supplies its credential and account id only to the one Wrangler deployment process. It creates the `agentpager.me` custom-domain route, verifies the binding, queries DNS and Durable Object placement, and checks the public HTTPS build header. Logs never contain token values. The Worker stays named `ownerpager`, with `Session`/`Registry` SQLite migrations `v1`/`v2`. Build artifacts and vault material are never committed.
+Commit and clean the checkout, then `pnpm deploy:app`. The script reads only the prescribed vault item using the service-account token in `~/Agents/.secrets/op-service-account.token`, and supplies its credential and account id only to the one Wrangler deployment process. It creates the `agentpager.me` custom-domain route, verifies the binding, queries DNS and Durable Object placement, and checks the public HTTPS build header. Logs never contain token values. The Worker stays named `ownerpager`, with SQLite migrations `v1` (`Session`), `v2` (`Registry`) and `v3`, which renames `Session` to `Agent`. v1's sessions are not read by v2: each forgets itself at its next alarm, and the Registry drops v1's link and number tables. Deploy v2 with the v2 iPhone build: v1 pagers stop working at once. Build artifacts and vault material are never committed.
 
 ### Alerts
 
@@ -70,13 +70,11 @@ Alerts go through Apple's push service with the owner's APNs key (D7). Deploymen
 
 ## Enforcement
 
-- Strict imported schemas decode UTF-8 requests before writes. The MCP byte gate refuses invalid UTF-8 before the SDK can normalize it; a refusal-only credential check preserves authorization precedence. Credential syntax is validated before header construction. Inputs are not trimmed or truncated.
-- Before claiming, the browser stores a random phone key, then supplies it via `x-phone-key`. A per-link browser lock shares that key across tabs. The SQLite transaction owns first-phone reservation: an identical credential can recover a lost reply; every other claimant is refused. It also owns correct-target pairing, fixed deadlines, ask gating, independent cards and immutable retries. SQL primary/unique keys and update-denying triggers protect proposals, answers and acknowledgements; an ownership/deadline trigger guards session metadata.
-- Session alarms and every live operation purge all payload and usable session credential tables on expiry. A minimal terminal refusal/time remains alongside a name and SHA-256 phone-key verifier in that session object. Only the reserved phone's key can retrieve the name through a terminal refusal, so a phone returning after a lost first reply can retain the real name rather than a placeholder. This terminal metadata retention is an explicit C8 caveat deviation for owner review, not a claim of total metadata erasure. The Registry drops its phone key at join. Transactional refusals cannot roll back expiry deletion.
-- The phone imports `CardApi`/`HomeApi` layers, real screen components and their machines. Only metadata and owner keys live in localStorage; no cards, answers, acknowledgements or drafts are persisted there. End/expiry removes the keys and pairing-link mappings, retaining only name and end time under a fresh, unrelated label key. Terminal rows have no session identifier or service link. Old terminal records are migrated to this shape. Home recovers pre-persisted pending claim credentials as well as connect links. Discovery commits only against a still-owned pending record under the same cross-tab lock as retirement, so a delayed response cannot recreate a deleted capability or duplicate its label.
-- The imported screen's shared literal-prose CSS preserves repeated spaces, indentation and newlines in proposals, choices, answers, acknowledgements and session labels; storage/DOM fidelity alone is not treated as visible fidelity.
-- The app lint disallows `any`, type assertions and suppressions in derived TypeScript; the entire pinned design remains under the existing strict typecheck. No design type is widened or bypassed.
+- Strict imported schemas decode UTF-8 requests before writes. The MCP byte gate refuses invalid UTF-8 before the SDK can normalize it; a refusal-only credential check preserves authorization precedence (I4): a wrong key wins over invalid input. Inputs are not trimmed or truncated.
+- Agent and phone keys are stored only as SHA-256 digests and compared in constant time. SQL keys and update-denying triggers keep proposals, answers, acknowledgements and attachments immutable.
+- Every agent call that sends something asks the Registry for its pager's state first; a deleted pager's agent forgets itself on its next call.
+- The app lint disallows `any`, type assertions and suppressions in derived TypeScript; the entire pinned design remains under the existing strict typecheck.
 
 ## Limits
 
-The local expiry proof is not a 24-hour production wait; Chromium is not a real handset or camera; latency is a five-exchange smoke sample on the recorded network. Platform backups, agent action execution, absent Claude/ChatGPT clients, and cross-device recovery are not claimed. See the promise caveats and the run's deviation log before the owner walk.
+The local auto-off and housekeeping proofs run on seconds, not the production days. Nothing is encrypted end to end yet (Stage 3): the server reads cards, attachments and answers. Platform backups, agent action execution and cross-device recovery are not claimed.

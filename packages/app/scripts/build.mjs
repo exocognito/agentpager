@@ -10,12 +10,13 @@ const sha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).tri
 await mkdir(path.join(out, 'public/assets'), { recursive: true });
 await build({ entryPoints: [path.join(root, 'src/browser.tsx')], outfile: path.join(out, 'public/assets/app.js'), bundle: true, format: 'esm', platform: 'browser', minify: true, jsx: 'automatic', define: { 'process.env.NODE_ENV': '"production"' } });
 await writeFile(path.join(out, 'public/index.html'), '<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>AgentPager</title><link rel="stylesheet" href="/assets/app.css"><style>html,body{margin:0;padding:0}</style><div id="root"></div><script type="module" src="/assets/app.js"></script></html>');
-await build({ entryPoints: [path.join(root, 'src/worker.ts')], outfile: path.join(out, 'worker.js'), bundle: true, format: 'esm', platform: 'browser', target: 'es2022', jsx: 'automatic', loader: { '.css': 'empty' }, define: { __BUILD_SHA__: JSON.stringify(sha), __LOCAL_UNPAIRED_MS__: local ? process.env.AGENTPAGER_UNPAIRED_MS || '60000' : '0', __LOCAL_SESSION_MS__: local ? process.env.AGENTPAGER_SESSION_MS || '180000' : '0', __LOCAL_RETAIN_MS__: local ? process.env.AGENTPAGER_RETAIN_MS || '180000' : '0', 'process.env.NODE_ENV': '"production"' } });
+await build({ entryPoints: [path.join(root, 'src/worker.ts')], outfile: path.join(out, 'worker.js'), bundle: true, format: 'esm', platform: 'browser', target: 'es2022', jsx: 'automatic', loader: { '.css': 'empty' }, define: { __BUILD_SHA__: JSON.stringify(sha), __LOCAL_AUTO_OFF_MS__: local ? process.env.AGENTPAGER_AUTO_OFF_MS || '0' : '0', __LOCAL_IDLE_MS__: local ? process.env.AGENTPAGER_IDLE_MS || '0' : '0', 'process.env.NODE_ENV': '"production"' } });
 const config = {
   name: 'ownerpager', main: './worker.js', compatibility_date: '2026-09-24',
   assets: { directory: './public', binding: 'ASSETS', run_worker_first: true },
-  durable_objects: { bindings: [{ name: 'SESSION', class_name: 'Session' }, { name: 'REGISTRY', class_name: 'Registry' }] },
-  migrations: [{ tag: 'v1', new_sqlite_classes: ['Session'] }, { tag: 'v2', new_sqlite_classes: ['Registry'] }],
+  durable_objects: { bindings: [{ name: 'AGENT', class_name: 'Agent' }, { name: 'REGISTRY', class_name: 'Registry' }] },
+  // v3: v2's agents are v1's sessions renamed. Their old rows are not read; each forgets itself at its next alarm.
+  migrations: [{ tag: 'v1', new_sqlite_classes: ['Session'] }, { tag: 'v2', new_sqlite_classes: ['Registry'] }, { tag: 'v3', renamed_classes: [{ from: 'Session', to: 'Agent' }] }],
   // Local builds keep the caller's origin (a LAN dogfood server hands out LAN links); only deploy binds the domain.
   ...(local ? {} : { routes: [{ pattern: 'agentpager.me', custom_domain: true }] }),
   // Workers Logs keep each failure's message, which the platform's analytics do not.
@@ -28,4 +29,4 @@ const config = {
   workers_dev: false,
 };
 await writeFile(path.join(out, 'wrangler.json'), JSON.stringify(config, null, 2));
-console.log(`Built ${sha} (${local && process.env.AGENTPAGER_UNPAIRED_MS !== '0' ? 'local lifetimes' : 'production lifetimes'}) at ${out}`);
+console.log(`Built ${sha} (${local && (process.env.AGENTPAGER_AUTO_OFF_MS || process.env.AGENTPAGER_IDLE_MS) ? 'local clocks' : 'production clocks'}) at ${out}`);

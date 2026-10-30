@@ -1,109 +1,113 @@
 import { JSONSchema, Schema } from 'effect';
-import QRCode from 'qrcode';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import * as C from './contract.ts';
 import { BUILD, forward, type Env } from './env.ts';
-import { body, decode, emptyBody, iso, json, read, refusal, sha256, token } from './shared.ts';
-import { codeDocument, codePage, OLD_CONNECT, startDocument } from './start.ts';
+import { body, decode, emptyBody, json, read, refusal, sha256, token } from './shared.ts';
+import { startDocument } from './start.ts';
 import { PushTarget } from './push.ts';
 import { AttachmentName } from '../../blueprint/design/ui/components/cards/brief/schema.ts';
-export { Session } from './session.ts';
+export { Agent } from './agent.ts';
 export { Registry } from './registry.ts';
 
-const RegistryHit = Schema.Struct({ sessionId: Schema.NullOr(C.Token) });
-async function lookup(env: Env, code: string) {
-  const codeHash = await sha256(code);
-  const reply = await read('/get', p => registry(env, p, { codeHash }));
-  const hit = decode(RegistryHit, await reply.json());
-  if (!hit.sessionId) throw C.refuse.linkInvalid();
-  return hit.sessionId;
-}
-async function init(env: Env, request: Request, origin: string, by: 'agent' | 'phone', name: string | null, lifetime: C.Lifetime) {
-  const sessionId = token(), code = token();
-  const headers: Record<string, string> = { 'content-type': 'application/json' };
-  const phoneKey = request.headers.get(C.PHONE_AUTH_HEADER);
-  if (by === 'phone' && phoneKey) headers[C.PHONE_AUTH_HEADER] = phoneKey;
-  return forward(env.SESSION, sessionId, '/init', { method: 'POST', headers, body: JSON.stringify({ sessionId, code, origin, by, name, lifetime }) });
-}
+// A refusal from a Durable Object, passed on to the caller as it is.
+class Relay extends Error { constructor(readonly response: Response) { super('relayed refusal'); } }
+const relay = (response: Response) => { if (!response.ok) throw new Relay(response); return response; };
+const failure = async (error: unknown) => error instanceof Relay ? error.response : refusal(error);
+
 const registry = (env: Env, path: string, data: unknown) => forward(env.REGISTRY, 'registry', path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(data) });
 async function phoneHash(request: Request) {
   const key = request.headers.get(C.PHONE_AUTH_HEADER);
   if (!key || !Schema.is(C.Token)(key)) throw C.refuse.unauthorized();
   return sha256(key);
 }
-// The listing row outlives any pager it names; by then the phone holds the pager's key.
-// During a deploy the Worker and its Durable Objects can run different versions for minutes, so what passes between
-// them stays readable by the version before: `push` may be absent, and is sent only when there is one.
-const NumberHit = Schema.Struct({ phoneHash: Schema.NullOr(Schema.String), push: Schema.optional(Schema.NullOr(PushTarget)) });
-async function page(env: Env, number: string, name: string, lifetime: C.Lifetime) {
-  const sessionId = token();
-  const reply = await registry(env, '/number-page', { numberHash: await sha256(number), sessionId, expiresAt: iso(Date.now() + C.LIFETIMES['30d'] + C.RETENTION_MS) });
-  const hit = decode(NumberHit, await reply.json());
-  if (!hit.phoneHash) throw C.refuse.numberInvalid();
-  return forward(env.SESSION, sessionId, '/open', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sessionId, phoneHash: hit.phoneHash, name, lifetime, ...(hit.push ? { push: hit.push } : {}) }) });
+const hex = (bytes: Uint8Array) => Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+const base64url = (text: string) => Uint8Array.from(atob(text.replaceAll('-', '+').replaceAll('_', '/')), c => c.charCodeAt(0));
+// The pager number names the pager and the first 8 bytes of its public key's SHA-256 (docs/v2/04-encryption.md §2).
+function parseNumber(number: string) {
+  if (!Schema.is(C.PagerNumber)(number)) throw C.refuse.numberInvalid();
+  const bytes = hex(base64url(number.slice(4)));
+  return { pagerId: bytes.slice(0, 32), fingerprint: bytes.slice(32) };
 }
-async function optionalBody(request: Request): Promise<unknown> {
-  const text = await request.clone().text();
-  return text === '' ? {} : body(request);
+async function fingerprint(publicKey: string) {
+  return hex(new Uint8Array(await crypto.subtle.digest('SHA-256', base64url(publicKey))).slice(0, 8));
 }
 
-// Public HTTPS routes -> one pager object (or the registry for link codes).
-async function api(request: Request, env: Env, origin: string): Promise<Response> {
+const PagerHit = Schema.Struct({ pager: C.Pager, agentIds: Schema.Array(C.Token) });
+const Deleted = Schema.Struct({ agentIds: Schema.Array(C.Token) });
+const Linked = Schema.Struct({ phoneHash: Schema.String });
+// The phone's own pager, checked before its input is read: a wrong key wins over invalid input (I4).
+async function ownPager(env: Env, request: Request, pagerId: string) {
+  const hash = await phoneHash(request);
+  const reply = await read('/get', p => registry(env, p, { pagerId, phoneHash: hash }));
+  return { hash, hit: decode(PagerHit, await relay(reply).json()) };
+}
+
+// Public HTTPS routes -> the Registry (pagers) or one agent's object.
+async function api(request: Request, env: Env): Promise<Response> {
   const u = new URL(request.url), method = request.method, parts = u.pathname.split('/').filter(Boolean).slice(1);
-  const pass = async (sessionId: string, path: string) => method === 'GET'
-    ? read(path + u.search, p => forward(env.SESSION, sessionId, p, { method, headers: request.headers }))
-    : forward(env.SESSION, sessionId, path + u.search, { method, headers: request.headers, body: await request.arrayBuffer() });
-  if (parts.length === 1 && parts[0] === 'sessions' && method === 'POST') {
-    const input = decode(C.CreateInput, await body(request));
-    return init(env, request, origin, 'agent', input.name, input.lifetime ?? C.DEFAULT_LIFETIME);
-  }
+  const pass = async (agentId: string, path: string) => method === 'GET'
+    ? read(path + u.search, p => forward(env.AGENT, agentId, p, { method, headers: request.headers }))
+    : forward(env.AGENT, agentId, path + u.search, { method, headers: request.headers, body: await request.arrayBuffer() });
+
+  // The phone makes a pager with the number it made, and the public key the number's fingerprint names.
   if (parts.length === 1 && parts[0] === 'pagers' && method === 'POST') {
-    await phoneHash(request);
-    const input = decode(C.PhoneCreateInput, await optionalBody(request));
-    return init(env, request, origin, 'phone', null, input.lifetime ?? C.DEFAULT_LIFETIME);
+    const hash = await phoneHash(request), input = decode(C.CreatePagerInput, await body(request));
+    const { pagerId, fingerprint: named } = parseNumber(input.number);
+    if (named !== await fingerprint(input.publicKey)) throw C.refuse.invalid('number: its fingerprint does not match publicKey');
+    return registry(env, '/create', { pagerId, fingerprint: named, publicKey: input.publicKey, phoneHash: hash, autoOff: input.autoOff });
   }
-  // The owner's pager number: the phone makes one, which retires its old one (POST), and lists the pagers agents
-  // opened with it (GET). An agent with the number opens a pager that is already paired.
-  if (parts.length === 1 && parts[0] === 'numbers') {
-    const hash = await phoneHash(request);
-    if (method === 'POST') {
-      await emptyBody(request);
-      const number = token();
-      const saved = await registry(env, '/number-put', { numberHash: await sha256(number), phoneHash: hash });
-      if (!saved.ok) throw new Error('Registry refused the number');
-      return json(decode(C.NumberMade, { number }));
+  if (parts[0] === 'pagers' && parts.length >= 2) {
+    const pagerId = decode(C.PagerId, parts[1]), rest = parts.slice(2).join('/');
+    // Everything on the pager, read while it is on or off: its state and each agent's decisions.
+    if (rest === '' && method === 'GET') {
+      const { hit } = await ownPager(env, request, pagerId);
+      const headers = { [C.PHONE_AUTH_HEADER]: request.headers.get(C.PHONE_AUTH_HEADER) ?? '' };
+      const replies = await Promise.all(hit.agentIds.map(id => read('/inbox', p => forward(env.AGENT, id, p, { method: 'GET', headers }))));
+      const agents: C.AgentInbox[] = [];
+      // An agent housekeeping has just forgotten is skipped; its pager stops listing it.
+      for (const reply of replies) if (reply.status !== 404) agents.push(decode(C.AgentInbox, await relay(reply).json()));
+      return json(decode(C.PagerInbox, { pager: hit.pager, agents }));
     }
-    if (method === 'GET') return read('/number-list', p => registry(env, p, { phoneHash: hash }));
+    if (rest === 'settings' && method === 'POST') {
+      const { hash } = await ownPager(env, request, pagerId), input = decode(C.PagerSettingsInput, await body(request));
+      return registry(env, '/settings', { pagerId, phoneHash: hash, ...input });
+    }
+    if (rest === 'push' && method === 'POST') {
+      const { hash } = await ownPager(env, request, pagerId), push = decode(PushTarget, await body(request));
+      return registry(env, '/push', { pagerId, phoneHash: hash, push });
+    }
+    // Deleting a pager deletes its agents and their decisions from the service.
+    if (rest === 'delete' && method === 'POST') {
+      const { hash } = await ownPager(env, request, pagerId);
+      await emptyBody(request);
+      const { agentIds } = decode(Deleted, await relay(await registry(env, '/delete', { pagerId, phoneHash: hash })).json());
+      // An agent that misses this finds its pager gone on its next call, and forgets itself then.
+      await Promise.all(agentIds.map(id => forward(env.AGENT, id, '/forget', { method: 'POST', headers: {} }).catch(() => undefined)));
+      return json({ ok: true });
+    }
   }
-  // Where this phone gets alerts: each pager an agent opens with its number starts with it.
-  if (parts.length === 2 && parts[0] === 'numbers' && parts[1] === 'push' && method === 'POST') {
-    const hash = await phoneHash(request), push = decode(PushTarget, await body(request));
-    return registry(env, '/number-push', { phoneHash: hash, push });
+  // An agent connects with the owner's pager number: a new agent on that pager, every time.
+  if (parts.length === 1 && parts[0] === 'agents' && method === 'POST') {
+    const input = decode(C.ConnectInput, await body(request));
+    const { pagerId, fingerprint: named } = parseNumber(input.number), agentId = token();
+    const linked = decode(Linked, await relay(await registry(env, '/connect', { pagerId, fingerprint: named, agentId })).json());
+    return forward(env.AGENT, agentId, '/open', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ agentId, pagerId, phoneHash: linked.phoneHash, app: input.app, project: input.project }) });
   }
-  if (parts.length === 3 && parts[0] === 'numbers' && parts[2] === 'pagers' && method === 'POST') {
-    const number = decode(C.Token, parts[1]), input = decode(C.CreateInput, await body(request));
-    return page(env, number, input.name, input.lifetime ?? C.DEFAULT_LIFETIME);
-  }
-  if (parts[0] === 'start' && parts.length >= 2) {
-    const code = decode(C.Token, parts[1]), sub = parts[2];
-    if (parts.length === 2 && method === 'GET') return pass(await lookup(env, code), '/start');
-    if (parts.length === 3 && method === 'POST' && (sub === 'pair' || sub === 'join')) return pass(await lookup(env, code), `/${sub}`);
-  }
-  if (parts[0] === 'sessions' && parts.length >= 2) {
-    const sessionId = decode(C.Token, parts[1]), rest = parts.slice(2).join('/');
-    if (rest === '' && method === 'GET') return pass(sessionId, '/status');
-    if (rest === 'cards') return pass(sessionId, method === 'POST' ? '/ask' : '/inbox');
+  if (parts[0] === 'agents' && parts.length >= 2) {
+    const agentId = decode(C.Token, parts[1]), rest = parts.slice(2).join('/');
+    if (rest === '' && method === 'GET') return pass(agentId, '/status');
+    if (rest === 'cards' && method === 'POST') return pass(agentId, '/ask');
     if (parts.length === 5 && parts[2] === 'cards') {
       const decisionId = decode(C.Token, parts[3]);
-      if (parts[4] === 'answer') return pass(sessionId, `/${method === 'GET' ? 'read' : 'answer'}/${decisionId}`);
-      if (parts[4] === 'acknowledge' && method === 'POST') return pass(sessionId, `/ack/${decisionId}`);
+      if (parts[4] === 'answer') return pass(agentId, `/${method === 'GET' ? 'read' : 'answer'}/${decisionId}`);
+      if (parts[4] === 'acknowledge' && method === 'POST') return pass(agentId, `/ack/${decisionId}`);
     }
     if (parts.length === 6 && parts[2] === 'cards' && parts[4] === 'files' && method === 'GET') {
-      return pass(sessionId, `/file/${decode(C.Token, parts[3])}/${decode(AttachmentName, parts[5])}`);
+      return pass(agentId, `/file/${decode(C.Token, parts[3])}/${decode(AttachmentName, parts[5])}`);
     }
-    if (method === 'POST' && (rest === 'end' || rest === 'finish' || rest === 'lifetime' || rest === 'push')) return pass(sessionId, `/${rest}`);
+    if (rest === 'finish' && method === 'POST') return pass(agentId, '/finish');
   }
   throw C.refuse.notFound();
 }
@@ -111,22 +115,21 @@ async function api(request: Request, env: Env, origin: string): Promise<Response
 // Tool replies are the same JSON as the HTTP API's. Each description names this server, so an agent can tell
 // tools for another AgentPager server apart.
 const descriptions = (origin: string): Record<keyof typeof C.MCP_TOOLS, string> => ({
-  start_session: `Start a pager on your owner's phone, on the AgentPager server ${origin}. lifetime is 24h (default), 7d or 30d. Then, in one message of your own (not only in a command's output), show your owner link.qrText in a fenced code block, the full link.url as text, and pairingCode.text verbatim as plain text. Never show agentKey; keep sessionId and agentKey for later turns. Then call ask_card right away: your owner sees it as soon as the phone pairs. Full guide: ${origin}/start`,
-  join_session: `Join the pager your owner's phone made, using the code from their AgentPager link (${origin}/start/<code>); links from other servers will not work here. Only the first join works. Print pairingCode.text to your owner verbatim as plain text; never show agentKey, and keep sessionId and agentKey for later turns. Then call ask_card right away.`,
-  page_owner: `Open a new pager on your owner's phone with the pager number they gave you (for example in AGENTS.md), on the AgentPager server ${origin}. It is paired already: there is no link or code to show. Open one pager for your piece of work and keep it for every question. lifetime is 24h (default), 7d or 30d. Never show agentKey or the number; keep sessionId and agentKey for later turns. Then call ask_card. Full guide: ${origin}/start`,
-  ask_card: `Ask your owner one decision as a "brief" card: a Markdown decision brief with 2 to 4 lettered options (number 1 is A) and optional attachments. Read "Decision briefs" in ${origin}/start before your first one; emoji ("generic") cards are refused. Works before pairing (the phone shows it once paired). At most 10 open decisions per pager. Replies {decisionId}.`,
-  wait_for_card_answer: 'Hold a read for up to 50 seconds. Replies {status:"pending"} (read again) or {status:"answered", answer:{answerId, choice, ...}}. On InternalError, read again after a few seconds; if it keeps failing for several minutes, stop and tell your owner. Keep reading while you have nothing better to do; if your turn ends, the answer waits for your next turn.',
-  acknowledge_card: 'Acknowledge the exact answerId with your next steps; your owner sees them with a green tick. Only the first acknowledgement counts.',
-  finish_session: 'End the pager when your work is done. Your key stops working.',
+  connect: `Connect to your owner's pager with the pager number they gave you (usually in AGENTS.md; it starts ap1_), on the AgentPager server ${origin}. You become a new agent on their phone: keep agentId and agentKey for every later call in this piece of work, and never show agentKey or the number. Connecting again adds another agent. app is who you are (Codex, Claude Code…); project is what you are working on, usually the repository's name: your owner's phone groups decisions by it. Then call ask. Full guide: ${origin}/start`,
+  ask: `Ask your owner one decision as a "brief" card: a Markdown decision brief with 2 to 4 lettered options (number 1 is A) and optional attachments. Read "Decision briefs" in ${origin}/start before your first one. At most 10 unanswered decisions per agent. When your owner has turned the pager off, it is refused with PagerOff and nothing is queued. Replies {decisionId}.`,
+  wait: 'Hold a read for up to 50 seconds. Replies {status:"pending"} (read again) or {status:"answered", answer:{answerId, choice, ...}}. A choice of kind "feedback" is your owner\'s note instead of an option: follow it, and ask a new card only if you still need a decision. On InternalError, read again after a few seconds; if it keeps failing for several minutes, stop and tell your owner. Keep reading while you have nothing better to do; if your turn ends, the answer waits for your next turn.',
+  ack: 'Acknowledge the exact answerId with your next steps; your owner sees them with a green tick. Only the first acknowledgement counts.',
+  status: "This agent's state, and whether its pager is on.",
+  finish: 'Tell your owner you are done with this piece of work. Your decisions stay on their phone; this agent asks nothing more.',
 });
-// A keyed tool call is decoded only as far as routing needs: the pager's and the decision's ids. The key goes on only
+// A keyed tool call is decoded only as far as routing needs: the agent's and the decision's ids. The key goes on only
 // when well formed (a malformed key is no key, as over HTTP), and the question, acknowledgement and wait go on as
-// sent, so the pager checks the key before any of them (I4). tools/list still lists the full schemas.
-const Keyed = { sessionId: C.Token, agentKey: Schema.optional(Schema.Unknown) };
+// sent, so the agent checks the key before any of them (I4). tools/list still lists the full schemas.
+const Keyed = { agentId: C.Token, agentKey: Schema.optional(Schema.Unknown) };
 const AskCall = Schema.Struct({ ...Keyed, question: Schema.optional(Schema.Unknown) });
 const WaitCall = Schema.Struct({ ...Keyed, decisionId: C.Token, waitSeconds: Schema.optional(Schema.Unknown) });
 const AckCall = Schema.Struct({ ...Keyed, decisionId: C.Token, acknowledgement: Schema.optional(Schema.Unknown) });
-const FinishCall = Schema.Struct(Keyed);
+const AgentCall = Schema.Struct(Keyed);
 const keyOf = (value: unknown) => Schema.is(C.Token)(value) ? value : undefined;
 async function mcp(request: Request, env: Env, origin: string) {
   // Stateless JSON replies only: never let the SDK open a GET event stream.
@@ -140,20 +143,19 @@ async function mcp(request: Request, env: Env, origin: string) {
     try {
       let path: string, method = 'POST', data: unknown, agentKey: string | undefined, missing: string | undefined;
       switch (call.params.name) {
-        case 'start_session': { data = decode(C.MCP_TOOLS.start_session.input, raw); path = '/api/sessions'; break; }
-        case 'join_session': { const p = decode(C.MCP_TOOLS.join_session.input, raw); path = `/api/start/${p.code}/join`; data = { name: p.name }; break; }
-        case 'page_owner': { const p = decode(C.MCP_TOOLS.page_owner.input, raw); path = `/api/numbers/${p.number}/pagers`; data = { name: p.name, ...(p.lifetime ? { lifetime: p.lifetime } : {}) }; break; }
-        case 'ask_card': { const p = decode(AskCall, raw); path = `/api/sessions/${p.sessionId}/cards`; data = p.question; agentKey = keyOf(p.agentKey); if (p.question === undefined) [missing, path, method] = ['question', `/api/sessions/${p.sessionId}`, 'GET']; break; }
-        // waitSeconds goes on as JSON, so the pager refuses a string or a fraction just as the schema would.
-        case 'wait_for_card_answer': { const p = decode(WaitCall, raw); path = `/api/sessions/${p.sessionId}/cards/${p.decisionId}/answer?wait=${p.waitSeconds === undefined ? C.ANSWER_WAIT_MAX_SECONDS : encodeURIComponent(JSON.stringify(p.waitSeconds))}`; method = 'GET'; agentKey = keyOf(p.agentKey); break; }
-        case 'acknowledge_card': { const p = decode(AckCall, raw); path = `/api/sessions/${p.sessionId}/cards/${p.decisionId}/acknowledge`; data = p.acknowledgement; agentKey = keyOf(p.agentKey); if (p.acknowledgement === undefined) [missing, path, method] = ['acknowledgement', `/api/sessions/${p.sessionId}`, 'GET']; break; }
-        case 'finish_session': { const p = decode(FinishCall, raw); path = `/api/sessions/${p.sessionId}/finish`; agentKey = keyOf(p.agentKey); break; }
+        case 'connect': { data = decode(C.MCP_TOOLS.connect.input, raw); path = '/api/agents'; break; }
+        case 'ask': { const p = decode(AskCall, raw); path = `/api/agents/${p.agentId}/cards`; data = p.question; agentKey = keyOf(p.agentKey); if (p.question === undefined) [missing, path, method] = ['question', `/api/agents/${p.agentId}`, 'GET']; break; }
+        // waitSeconds goes on as JSON, so the agent refuses a string or a fraction just as the schema would.
+        case 'wait': { const p = decode(WaitCall, raw); path = `/api/agents/${p.agentId}/cards/${p.decisionId}/answer?wait=${p.waitSeconds === undefined ? C.ANSWER_WAIT_MAX_SECONDS : encodeURIComponent(JSON.stringify(p.waitSeconds))}`; method = 'GET'; agentKey = keyOf(p.agentKey); break; }
+        case 'ack': { const p = decode(AckCall, raw); path = `/api/agents/${p.agentId}/cards/${p.decisionId}/acknowledge`; data = p.acknowledgement; agentKey = keyOf(p.agentKey); if (p.acknowledgement === undefined) [missing, path, method] = ['acknowledgement', `/api/agents/${p.agentId}`, 'GET']; break; }
+        case 'status': { const p = decode(AgentCall, raw); path = `/api/agents/${p.agentId}`; method = 'GET'; agentKey = keyOf(p.agentKey); break; }
+        case 'finish': { const p = decode(AgentCall, raw); path = `/api/agents/${p.agentId}/finish`; agentKey = keyOf(p.agentKey); break; }
         default: throw C.refuse.invalid('Unknown tool. Read /start.');
       }
       let response: Response;
-      try { response = await api(new Request(origin + path, { method, headers: { ...(agentKey ? { authorization: `Bearer ${agentKey}` } : {}), 'content-type': 'application/json' }, body: data === undefined ? undefined : JSON.stringify(data) }), env, origin); }
-      catch (error) { response = refusal(error); }
-      // A missing question or acknowledgement is named only once the pager has taken the key, by reading its status.
+      try { response = await api(new Request(origin + path, { method, headers: { ...(agentKey ? { authorization: `Bearer ${agentKey}` } : {}), 'content-type': 'application/json' }, body: data === undefined ? undefined : JSON.stringify(data) }), env); }
+      catch (error) { response = await failure(error); }
+      // A missing question or acknowledgement is named only once the agent has taken the key, by reading its status.
       if (missing && response.ok) response = refusal(C.refuse.invalid(`${missing}: is missing`));
       const result: unknown = await response.json();
       return { ...(response.ok ? {} : { isError: true }), content: [{ type: 'text', text: JSON.stringify(result) }] };
@@ -171,19 +173,9 @@ const text = (value: string, type: string, status = 200) => new Response(value, 
 async function serve(request: Request, env: Env) {
   const u = new URL(request.url), origin = u.origin;
   if (u.pathname === '/mcp') return mcp(request, env, origin);
-  if (u.pathname.startsWith('/api/')) return api(request, env, origin);
+  if (u.pathname.startsWith('/api/')) return api(request, env);
   if (request.method !== 'GET' && request.method !== 'HEAD') return json({ error: 'MethodNotAllowed', message: 'Use GET.' }, 405);
-  if (u.pathname === '/start') {
-    if (u.searchParams.has('connect')) return text(OLD_CONNECT, 'text/plain', 410);
-    return text(startDocument(origin), 'text/markdown');
-  }
-  // Read-only: a browser, a link preview or an agent reading this never joins or uses the link.
-  const start = u.pathname.match(/^\/start\/([^/]+)(\/qr\.svg)?$/);
-  if (start) {
-    const code = decode(C.Token, start[1]);
-    if (start[2]) return text(await QRCode.toString(`${origin}/start/${code}`, { type: 'svg', errorCorrectionLevel: 'M' }), 'image/svg+xml');
-    return isBrowser(request) ? text(codePage(origin, code), 'text/html') : text(codeDocument(origin, code), 'text/markdown');
-  }
+  if (u.pathname === '/start') return text(startDocument(origin), 'text/markdown');
   if (u.pathname === '/favicon.ico') return new Response(null, { status: 204 });
   if (u.pathname === '/' && !isBrowser(request)) return text(`# AgentPager\n\nAgents start at ${origin}/start.\n`, 'text/markdown');
   // The owner's side is the iPhone app, so the web serves the front page alone; the old web app's address leads there.
@@ -195,7 +187,7 @@ async function serve(request: Request, env: Env) {
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     let response: Response;
-    try { response = await serve(request, env); } catch (error) { response = refusal(error); }
+    try { response = await serve(request, env); } catch (error) { response = await failure(error); }
     const headers = new Headers(response.headers);
     headers.set('X-AgentPager-Build', BUILD);
     headers.set('Cache-Control', 'no-store');

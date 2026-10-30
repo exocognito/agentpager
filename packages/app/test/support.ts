@@ -1,6 +1,7 @@
 import { spawn, execFileSync, type ChildProcess } from 'node:child_process';
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { createWriteStream } from 'node:fs';
+import { createHash, generateKeyPairSync, randomBytes } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -21,7 +22,7 @@ export async function until<A>(fn: () => Promise<A>, accepts: (a: A) => boolean,
 }
 async function port() { const s = createServer(); await new Promise<void>(r => s.listen(0, '127.0.0.1', r)); const address = s.address(); if (!address || typeof address === 'string') throw new Error('port'); const p = address.port; await new Promise<void>(r => s.close(() => r())); return p; }
 
-export const ErrorBody = Schema.Struct({ error: Schema.String, message: Schema.String, reason: Schema.optional(Schema.String), triesLeft: Schema.optional(Schema.Number), endReason: Schema.optional(C.EndReason), endedAt: Schema.optional(C.Timestamp), name: Schema.optional(Schema.NullOr(Schema.String)), limit: Schema.optional(Schema.Number) });
+export const ErrorBody = Schema.Struct({ error: Schema.String, message: Schema.String, reason: Schema.optional(Schema.String), limit: Schema.optional(Schema.Number) });
 export type ErrorBody = typeof ErrorBody.Type;
 // A brief's short form: every card an agent asks is a brief.
 export function question(title = 'Which plan?', detail?: string) {
@@ -30,8 +31,18 @@ export function question(title = 'Which plan?', detail?: string) {
 // An emoji card, as agents sent before briefs; the server refuses them now.
 export const emojiCard = { title: 'Which plan?', card: { type: 'generic', options: [{ number: 1, emoji: '🚀', title: 'One' }, { number: 2, emoji: '🛠️', title: 'Two' }] } };
 
-// Each test file starts its own workerd with the shortest local lifetimes its cases need.
-export async function fixture(name: string, lifetimes = { windowMs: 60_000, lifetimeMs: 120_000, retainMs: 60_000 }) {
+// What the phone makes for a new pager: a Curve25519 key pair, a 16-byte pager id, and the number naming both
+// (docs/v2/04-encryption.md §2).
+export function pagerKeys() {
+  const publicKey = String(generateKeyPairSync('x25519').publicKey.export({ format: 'jwk' }).x);
+  const id = randomBytes(16), fingerprint = createHash('sha256').update(Buffer.from(publicKey, 'base64url')).digest().subarray(0, 8);
+  return { pagerId: id.toString('hex'), publicKey, number: 'ap1_' + Buffer.concat([id, fingerprint]).toString('base64url') };
+}
+export type AgentCreds = { agent: { agentId: string }; agentKey: string };
+
+// Each test file starts its own workerd. Zero is the production clock; a test that crosses auto-off or housekeeping
+// in real time sets a short one.
+export async function fixture(name: string, clocks = { autoOffMs: 0, idleMs: 0 }) {
   const evidence = path.join(process.env.BLUEPRINT_EVIDENCE_DIR || path.join(tmpdir(), 'agentpager-evidence'), name);
   await mkdir(evidence, { recursive: true });
   const directory = await mkdtemp(path.join(tmpdir(), `agentpager-${name}-`));
@@ -41,7 +52,7 @@ export async function fixture(name: string, lifetimes = { windowMs: 60_000, life
   let child: ChildProcess | undefined;
   const log = createWriteStream(path.join(evidence, 'server.log'));
   async function launch() {
-    child = spawn(process.execPath, ['scripts/start.mjs'], { cwd: app, detached: true, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, PORT: String(serverPort), AGENTPAGER_INSPECTOR_PORT: String(inspector), AGENTPAGER_PERSIST: persist, AGENTPAGER_BUILD_DIR: path.join(directory, 'build'), AGENTPAGER_UNPAIRED_MS: String(lifetimes.windowMs), AGENTPAGER_SESSION_MS: String(lifetimes.lifetimeMs), AGENTPAGER_RETAIN_MS: String(lifetimes.retainMs) } });
+    child = spawn(process.execPath, ['scripts/start.mjs'], { cwd: app, detached: true, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, PORT: String(serverPort), AGENTPAGER_INSPECTOR_PORT: String(inspector), AGENTPAGER_PERSIST: persist, AGENTPAGER_BUILD_DIR: path.join(directory, 'build'), AGENTPAGER_AUTO_OFF_MS: String(clocks.autoOffMs), AGENTPAGER_IDLE_MS: String(clocks.idleMs) } });
     child.stdout?.pipe(log, { end: false }); child.stderr?.pipe(log, { end: false });
     try { await until(async () => (await fetch(origin + '/start')).status, s => s === 200, 90_000); } catch (e) { await stop(); throw e; }
   }
@@ -71,28 +82,24 @@ export async function fixture(name: string, lifetimes = { windowMs: 60_000, life
     const r = await request(route, opts); assert.equal(r.status, status, `${route}: ${JSON.stringify(r.value)}`);
     const e = decode(ErrorBody, r.value); assert.equal(e.error, tag); assert.ok(e.message.length > 10, 'a plain message'); return e;
   }
-  const create = (name = 'Agent · acceptance', lifetime?: C.Lifetime) => ok(C.Created, '/api/sessions', { data: { name, ...(lifetime ? { lifetime } : {}) } });
-  const phoneCreate = (phone: string, lifetime?: C.Lifetime) => ok(C.PhoneCreated, '/api/pagers', { phone, data: lifetime ? { lifetime } : {} });
-  const join = (code: string, name = 'Codex · acceptance') => ok(C.Joined, `/api/start/${code}/join`, { data: { name } });
-  const info = (code: string) => ok(C.StartInfo, `/api/start/${code}`);
-  const pair = (code: string, phone: string, emojis: ReadonlyArray<string>) => ok(C.SessionReply, `/api/start/${code}/pair`, { phone, data: { code: emojis } });
-  const inbox = (sessionId: string, phone: string) => ok(C.PhoneInbox, `/api/sessions/${sessionId}/cards`, { phone });
-  const ask = (s: { session: { sessionId: string }; agentKey: string }, title = 'Which plan?') => ok(C.Asked, `/api/sessions/${s.session.sessionId}/cards`, { agent: s.agentKey, data: question(title) });
-  const answer = (sessionId: string, phone: string, decisionId: string, choice: unknown = { kind: 'option', number: 2 }, requestId = token()) => ok(C.Receipt, `/api/sessions/${sessionId}/cards/${decisionId}/answer`, { phone, data: { requestId, choice } });
-  const read = (s: { session: { sessionId: string }; agentKey: string }, decisionId: string, wait?: number) => ok(C.AnswerStatus, `/api/sessions/${s.session.sessionId}/cards/${decisionId}/answer${wait ? `?wait=${wait}` : ''}`, { agent: s.agentKey });
-  const ack = (s: { session: { sessionId: string }; agentKey: string }, decisionId: string, answerId: string, nextSteps = 'Received. Carrying on.') => ok(C.Acknowledgement, `/api/sessions/${s.session.sessionId}/cards/${decisionId}/acknowledge`, { agent: s.agentKey, data: { answerId, nextSteps } });
-  // An agent-made pager, paired by a fresh phone key.
-  async function paired(name?: string, lifetime?: C.Lifetime) {
-    const s = await create(name, lifetime), phone = token();
-    const p = await pair(s.link.code, phone, s.pairingCode.emojis);
-    return { s, phone, session: p.session };
+  // The phone makes a pager; it holds the number and the phone key.
+  async function makePager(autoOff: C.AutoOff = 'never', phone = token()) {
+    const keys = pagerKeys();
+    const made = await ok(C.PagerReply, '/api/pagers', { phone, data: { number: keys.number, publicKey: keys.publicKey, autoOff } });
+    return { ...keys, phone, pager: made.pager };
   }
+  const connect = (number: string, app = 'Codex', project = 'acceptance') => ok(C.Connected, '/api/agents', { data: { number, app, project } });
+  // A pager on a fresh phone, and one agent connected to it.
+  async function connected(app?: string, project?: string) {
+    const p = await makePager();
+    return { p, a: await connect(p.number, app, project) };
+  }
+  const pager = (pagerId: string, phone: string) => ok(C.PagerInbox, `/api/pagers/${pagerId}`, { phone });
+  const settings = (pagerId: string, phone: string, data: { on?: boolean; autoOff?: C.AutoOff }) => ok(C.PagerReply, `/api/pagers/${pagerId}/settings`, { phone, data });
+  const ask = (a: AgentCreds, title = 'Which plan?') => ok(C.Asked, `/api/agents/${a.agent.agentId}/cards`, { agent: a.agentKey, data: question(title) });
+  const answer = (agentId: string, phone: string, decisionId: string, choice: unknown = { kind: 'option', number: 2 }, requestId = token()) => ok(C.Receipt, `/api/agents/${agentId}/cards/${decisionId}/answer`, { phone, data: { requestId, choice } });
+  const read = (a: AgentCreds, decisionId: string, wait?: number) => ok(C.AnswerStatus, `/api/agents/${a.agent.agentId}/cards/${decisionId}/answer${wait ? `?wait=${wait}` : ''}`, { agent: a.agentKey });
+  const ack = (a: AgentCreds, decisionId: string, answerId: string, nextSteps = 'Received. Carrying on.') => ok(C.Acknowledgement, `/api/agents/${a.agent.agentId}/cards/${decisionId}/acknowledge`, { agent: a.agentKey, data: { answerId, nextSteps } });
   async function artifact(file: string, value: unknown) { await writeFile(path.join(evidence, file), typeof value === 'string' ? value : JSON.stringify(value, null, 2)); }
-  return { origin, evidence, persist, stop, restart, request, ok, refused, create, phoneCreate, join, info, pair, inbox, ask, answer, read, ack, paired, artifact, lifetimes };
-}
-// Three emojis from the palette that are not the code at some position.
-export function wrongCode(palette: ReadonlyArray<{ emoji: string }>, right: ReadonlyArray<string>) {
-  const other = palette.find(p => p.emoji !== right[0]);
-  if (!other) throw new Error('palette has one emoji');
-  return [other.emoji, right[1], right[2]];
+  return { origin, evidence, persist, stop, restart, request, ok, refused, makePager, connect, connected, pager, settings, ask, answer, read, ack, artifact, clocks };
 }

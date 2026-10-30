@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import { createServer } from 'node:http';
 import { generateKeyPairSync, verify } from 'node:crypto';
 import { Schema } from 'effect';
-import { fixture, assert, token, until, decode } from './support.ts';
+import { fixture, assert, token, until, decode, question } from './support.ts';
 
 // A stand-in for Apple's push service: it records each alert, checks the provider token, and answers each device
 // token as `replies` says (200 unless set).
@@ -94,7 +94,7 @@ test('alerts: a pager whose phone gave its token alerts when an agent asks and a
 
     // Off: nothing is sent, so nothing alerts.
     await f.settings(p.pagerId, p.phone, { on: false });
-    await f.refused(409, 'PagerOff', `/api/agents/${b.agent.agentId}/cards`, { agent: b.agentKey, data: { title: 'While off?' } });
+    await f.refused(409, 'PagerOff', `/api/agents/${b.agent.agentId}/cards`, { agent: b.agentKey, data: question('While off?') });
     assert.equal(sent(fresh).length, 1);
   } finally {
     await f.stop();

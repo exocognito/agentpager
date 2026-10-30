@@ -35,7 +35,6 @@ async function fingerprint(publicKey: string) {
 }
 
 const PagerHit = Schema.Struct({ pager: C.Pager, agentIds: Schema.Array(C.Token) });
-const Deleted = Schema.Struct({ agentIds: Schema.Array(C.Token) });
 const Linked = Schema.Struct({ phoneHash: Schema.String });
 // The phone's own pager, checked before its input is read: a wrong key wins over invalid input (I4).
 async function ownPager(env: Env, request: Request, pagerId: string) {
@@ -78,22 +77,11 @@ async function api(request: Request, env: Env): Promise<Response> {
       const { hash } = await ownPager(env, request, pagerId), push = decode(PushTarget, await body(request));
       return registry(env, '/push', { pagerId, phoneHash: hash, push });
     }
-    // Deleting a pager deletes its agents and their decisions from the service.
+    // Deleting a pager deletes its agents and their decisions from the service (the Registry sees it through).
     if (rest === 'delete' && method === 'POST') {
       const { hash } = await ownPager(env, request, pagerId);
       await emptyBody(request);
-      const { agentIds } = decode(Deleted, await relay(await registry(env, '/delete', { pagerId, phoneHash: hash })).json());
-      // Each agent forgets everything now, tried three times. One that still misses it finds its pager gone on its
-      // next call or attachment read, and forgets itself then; housekeeping forgets it in any case.
-      await Promise.all(agentIds.map(async id => {
-        for (let tries = 1; tries <= 3; tries++) {
-          const done = await forward(env.AGENT, id, '/forget', { method: 'POST', headers: {} }).then(r => r.ok, () => false);
-          if (done) return;
-          if (tries === 3) console.error('An agent of a deleted pager did not forget itself yet');
-          else await new Promise(r => setTimeout(r, 500 * tries));
-        }
-      }));
-      return json({ ok: true });
+      return registry(env, '/delete', { pagerId, phoneHash: hash });
     }
   }
   // An agent connects with the owner's pager number: a new agent on that pager, every time.

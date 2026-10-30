@@ -3,7 +3,7 @@ import { Schema } from 'effect';
 import * as C from './contract.ts';
 import { body, decode, iso, json, refusal, sameDigest } from './shared.ts';
 import { PushTarget } from './push.ts';
-import { clocks, type Env } from './env.ts';
+import { clocks, forward, type Env } from './env.ts';
 
 const Digest = Schema.String.pipe(Schema.pattern(/^[a-f0-9]{64}$/));
 const Fingerprint = Schema.String.pipe(Schema.pattern(/^[a-f0-9]{16}$/));
@@ -23,13 +23,25 @@ type Row = { pager_id: string; fingerprint: string; public_key: string; phone_ha
 // deleted pager can take them with it. No names: those live only on the phone.
 export class Registry {
   constructor(private ctx: DurableObjectState, private env: Env) {
-    void this.env;
     // v1 links and numbers fail by design: v2 is a fresh install.
     ctx.storage.sql.exec(`DROP TABLE IF EXISTS links_v2; DROP TABLE IF EXISTS numbers_v1; DROP TABLE IF EXISTS number_pagers_v1; DROP TABLE IF EXISTS number_push_v1;
       CREATE TABLE IF NOT EXISTS pagers_v2 (pager_id TEXT PRIMARY KEY, fingerprint TEXT NOT NULL, public_key TEXT NOT NULL, phone_hash TEXT NOT NULL,
         enabled INTEGER NOT NULL, auto_off TEXT NOT NULL, off_at INTEGER, off_since INTEGER, push TEXT, created_at INTEGER NOT NULL);
-      CREATE TABLE IF NOT EXISTS pager_agents_v2 (pager_id TEXT NOT NULL, agent_id TEXT NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY (pager_id, agent_id));`);
+      CREATE TABLE IF NOT EXISTS pager_agents_v2 (pager_id TEXT NOT NULL, agent_id TEXT NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY (pager_id, agent_id));
+      CREATE TABLE IF NOT EXISTS erase_v2 (agent_id TEXT PRIMARY KEY);`);
   }
+  // A deleted pager's agents still to forget everything. Each is tried now; any left are tried again every minute
+  // until done. Until then the agent finds its pager gone on any call, and forgets itself.
+  private async erase() {
+    const ids = this.ctx.storage.sql.exec<{ agent_id: string }>('SELECT agent_id FROM erase_v2').toArray().map(r => r.agent_id);
+    await Promise.all(ids.map(async id => {
+      const done = await forward(this.env.AGENT, id, '/forget', { method: 'POST', headers: {} }).then(r => r.ok, () => false);
+      if (done) this.ctx.storage.sql.exec('DELETE FROM erase_v2 WHERE agent_id=?', id);
+    }));
+    if (this.ctx.storage.sql.exec('SELECT 1 FROM erase_v2 LIMIT 1').toArray().length) await this.ctx.storage.setAlarm(Date.now() + 60_000);
+    else await this.ctx.storage.deleteAlarm();
+  }
+  async alarm() { await this.erase(); }
   private row(pagerId: string) { return this.ctx.storage.sql.exec<Row>('SELECT * FROM pagers_v2 WHERE pager_id=?', pagerId).toArray()[0]; }
   // Only the pager's own phone key reads or changes it.
   private mine(p: { pagerId: string; phoneHash: string }) {
@@ -87,11 +99,17 @@ export class Registry {
         if (row?.push && decode(PushTarget, JSON.parse(row.push)).token === p.token) this.ctx.storage.sql.exec('UPDATE pagers_v2 SET push=NULL WHERE pager_id=?', p.pagerId);
         return json({ ok: true });
       }
+      // Deleting a pager deletes its agents and their decisions from the service: they are queued to forget
+      // everything in the same transaction that deletes the pager.
       if (action === 'delete') {
-        const row = this.mine(decode(Phone, data)), agentIds = this.agents(row.pager_id);
-        this.ctx.storage.sql.exec('DELETE FROM pager_agents_v2 WHERE pager_id=?', row.pager_id);
-        this.ctx.storage.sql.exec('DELETE FROM pagers_v2 WHERE pager_id=?', row.pager_id);
-        return json({ agentIds });
+        const row = this.mine(decode(Phone, data));
+        this.ctx.storage.transactionSync(() => {
+          for (const id of this.agents(row.pager_id)) this.ctx.storage.sql.exec('INSERT OR IGNORE INTO erase_v2 VALUES (?)', id);
+          this.ctx.storage.sql.exec('DELETE FROM pager_agents_v2 WHERE pager_id=?', row.pager_id);
+          this.ctx.storage.sql.exec('DELETE FROM pagers_v2 WHERE pager_id=?', row.pager_id);
+        });
+        await this.erase();
+        return json({ ok: true });
       }
       // An agent connects with the number: the fingerprint must match, and the pager must be on.
       if (action === 'connect') {

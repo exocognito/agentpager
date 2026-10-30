@@ -128,8 +128,8 @@ export class Agent {
     try { await this.afterwards(); } catch (error) { console.error('Agent housekeeping failed', error instanceof Error ? error.message : 'unknown'); }
     return response;
   }
-  // Each call that carries a key checks it, then the pager's state, before reading its input: a wrong key is
-  // refused as unauthorized even when the input is also invalid (I4).
+  // Each call that carries a key checks it before reading its input: a wrong key is refused as unauthorized even when
+  // the input is also invalid (I4). A call that sends something then checks its pager's state, last before writing.
   private async handle(request: Request): Promise<Response> {
     const url = new URL(request.url), [action, param] = url.pathname.split('/').filter(Boolean);
     // From the Worker, once the Registry has checked the number and recorded the agent on its pager.
@@ -151,11 +151,12 @@ export class Agent {
     if (action === 'ask') {
       const digest = await agentDigest(request);
       const m = this.tx(() => { const m = this.agent(digest); if (m.finishedAt) throw C.refuse.finished(); return m; });
-      const push = await this.on(m);
       const raw = await body(request);
       // Every new card is a brief (QuestionInput takes no other).
       if (emojiCard(raw)) throw C.refuse.invalid('Emoji cards are retired. Send a brief (card.type "brief"); read "Decision briefs" in /start.');
       const question = decode(C.QuestionInput, raw);
+      // Checked last before the write, so the switch is read as late as it can be.
+      const push = await this.on(m);
       const asked = this.tx(() => {
         const m = this.agent(digest);
         if (this.openCount() >= C.MAX_OPEN_DECISIONS) throw C.refuse.tooMany();
@@ -177,9 +178,10 @@ export class Agent {
     }
     if (action === 'read') {
       const digest = await agentDigest(request);
-      await this.on(this.tx(() => this.agent(digest)));
+      const m = this.tx(() => this.agent(digest));
       const id = decode(C.Token, param), wait = url.searchParams.get('wait');
       const seconds = wait === null ? 0 : decode(Schema.Number.pipe(Schema.int(), Schema.between(1, C.ANSWER_WAIT_MAX_SECONDS)), Number(wait));
+      await this.on(m);
       const until = Date.now() + seconds * 1000;
       for (;;) {
         const d = this.tx(() => { this.agent(digest); return this.decision(id); });
@@ -191,8 +193,9 @@ export class Agent {
     }
     if (action === 'ack') {
       const digest = await agentDigest(request);
-      const push = await this.on(this.tx(() => this.agent(digest)));
+      const m = this.tx(() => this.agent(digest));
       const id = decode(C.Token, param), input = decode(C.AcknowledgementInput, await body(request));
+      const push = await this.on(m);
       const done = this.tx(() => {
         const m = this.agent(digest), d = this.decision(id);
         if (!d.answer) throw C.refuse.notAnswered();
@@ -208,8 +211,9 @@ export class Agent {
     // Finishing tells the phone this agent is done; its decisions stay, and it asks nothing more.
     if (action === 'finish') {
       const digest = await agentDigest(request);
-      await this.on(this.tx(() => this.agent(digest)));
+      const m = this.tx(() => this.agent(digest));
       await emptyBody(request);
+      await this.on(m);
       return json(this.tx(() => {
         const m = this.agent(digest), finishedAt = m.finishedAt ?? iso();
         if (!m.finishedAt) this.save({ ...m, finishedAt, lastActivityAt: finishedAt });
@@ -243,8 +247,9 @@ export class Agent {
     }
     if (action === 'answer') {
       const digest = await phoneDigest(request);
-      await this.on(this.tx(() => this.phone(digest)), 'phone');
+      const m = this.tx(() => this.phone(digest));
       const id = decode(C.Token, param), input = decode(C.AnswerInput, await body(request));
+      await this.on(m, 'phone');
       const canonical = JSON.stringify({ requestId: input.requestId, choice: input.choice.kind === 'option' ? { kind: 'option', number: input.choice.number } : { kind: 'feedback', text: input.choice.text } });
       return json(this.tx(() => {
         const m = this.phone(digest), d = this.decision(id);

@@ -183,6 +183,12 @@ test('review rounds: concurrent asks, an unwritable home, attachments, unsafe ce
     // Structure can't be injected through a one-line field, and a page on disk must be UTF-8.
     const injected = small('Headings?').replace('label: Sushi,', 'label: "Sushi ]",').replace('  summary: Friday is booked.', '  summary: Friday is booked.\n  more: {title: "How ] it works", body: Why.}') + 'next_steps:\n  heading: "after\\n## Options"\n  A: Eat.\n';
     assert.deepEqual((await op.ask(id, { yaml: injected, dir: work })).text.split('\n'), ['context.more.title has a square bracket; use parentheses.', 'options[0].label has a square bracket; use parentheses.', 'next_steps.heading must be one line.']);
+    // A carriage return is a line break too; one-line prose stays one line; a card file must be UTF-8.
+    assert.equal((await op.ask(id, { yaml: small('CR?').replace('title: CR?', 'title: "CR?\\r## Options"'), dir: work })).text.split('\n')[0], 'title must be one line.');
+    assert.equal((await op.ask(id, { yaml: small('Why?').replace('why: Closer.', 'why: "Closer.\\n\\n```\\ncode\\n```"'), dir: work })).text, 'recommendation.why must be one line.');
+    writeFileSync(path.join(work, 'latin1.yaml'), Buffer.concat([Buffer.from(small('Caf')), Buffer.from([0xe9])]));
+    assert.match((await op.ask(id, { file: path.join(work, 'latin1.yaml') })).text, /latin1\.yaml isn't UTF-8 text\.$/);
+    assert.ok(!op.review({ object: { title: 'T', attachments: [{ type: 'image/png', base64: 'U0VDUkVUQllURVM=' }, 'raw'] } }).text.includes('U0VDUkVU'));
     writeFileSync(path.join(work, 'bad.md'), Buffer.from([0x23, 0x20, 0xff, 0xfe]));
     assert.equal((await op.ask(id, { yaml: small('Bad page?') + 'attachments: [bad.md]\n', dir: work })).text, "Attachment bad.md isn't UTF-8 text.");
     const unsafe = small('Table?').replace('title: Sushi,', 'title: "Sushi\\nbar",') + 'tradeoffs:\n  - {concern: Cost, A: "green: Cheap | quick", B: "red: [dear]"}\n';

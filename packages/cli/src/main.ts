@@ -38,10 +38,14 @@ function parse(argv: string[]) {
   }
   return { flags, rest };
 }
-const card = (ref: string | undefined): Source | null => {
+// A card file, or stdin with "-". stdin must be UTF-8, as a card file must: never sent with replacement characters.
+const card = (ref: string | undefined): Source | op.Result | null => {
   if (!ref) return null;
-  return ref === '-' ? { yaml: readFileSync(0, 'utf8'), dir: process.cwd() } : { file: ref };
+  if (ref !== '-') return { file: ref };
+  try { return { yaml: new TextDecoder('utf-8', { fatal: true }).decode(readFileSync(0)), dir: process.cwd() }; }
+  catch { return { code: 2, text: "The card on stdin isn't UTF-8 text." }; }
 };
+const isResult = (c: Source | op.Result): c is op.Result => 'code' in c;
 
 async function run(argv: string[]): Promise<op.Result> {
   const [command, ...args] = argv;
@@ -53,8 +57,8 @@ async function run(argv: string[]): Promise<op.Result> {
     case 'connect': return op.connect({ number: rest[0], app: f('app'), project: f('project') });
     case 'rules': return op.rules(f('agent'));
     case 'example': return op.example();
-    case 'review': { const c = card(rest[0]); return c ? op.review(c) : { code: 2, text: 'Say which card: agentpager review card.yaml' }; }
-    case 'ask': { const c = card(rest[0]); return needsAgent(() => c ? op.ask(agent, c) : { code: 2, text: 'Say which card: agentpager ask --agent <id> card.yaml' }); }
+    case 'review': { const c = card(rest[0]); return !c ? { code: 2, text: 'Say which card: agentpager review card.yaml' } : isResult(c) ? c : op.review(c); }
+    case 'ask': { const c = card(rest[0]); return needsAgent(() => !c ? { code: 2, text: 'Say which card: agentpager ask --agent <id> card.yaml' } : isResult(c) ? c : op.ask(agent, c)); }
     case 'wait': return needsAgent(() => op.wait(agent, rest[0] ?? '', { forever: flags.forever === true, seconds: f('seconds') ? Number(f('seconds')) : undefined }));
     case 'ack': return needsAgent(() => op.ack(agent, rest[0] ?? '', rest.slice(1).join(' ')));
     case 'status': return needsAgent(() => op.status(agent));

@@ -67,8 +67,9 @@ export function load(source: Source): { card: unknown; files: Map<string, Attach
   const files = new Map<string, Attachment | null>(), problems: string[] = [];
   let card: unknown;
   if ('file' in source) {
-    let text: string;
-    try { text = readFileSync(source.file, 'utf8'); } catch { return { card: null, files, problems: [`There is no card at ${source.file}.`] }; }
+    let bytes: Buffer, text: string;
+    try { bytes = readFileSync(source.file); } catch { return { card: null, files, problems: [`There is no card at ${source.file}.`] }; }
+    try { text = new TextDecoder('utf-8', { fatal: true }).decode(bytes); } catch { return { card: null, files, problems: [`${source.file} isn't UTF-8 text.`] }; }
     return load({ yaml: text, dir: path.dirname(source.file) });
   }
   if ('yaml' in source) {
@@ -130,7 +131,7 @@ export function compile(source: Source): Compiled {
   // Fields that become one line, a button or a table cell: no line breaks, and nothing that breaks the table.
   const line = (value: string | undefined, where: string, cell = false) => {
     if (value === undefined) return;
-    if (/\n/.test(value)) problems.push(`${where} must be one line.`);
+    if (/[\r\n\u2028\u2029]/.test(value)) problems.push(`${where} must be one line.`);
     else if (cell && /[|]/.test(value)) problems.push(`${where} has a "|", which would break the Options table; use "/" or words.`);
     else if (cell && /[[\]]/.test(value)) problems.push(`${where} has a square bracket; use parentheses.`);
   };
@@ -210,6 +211,7 @@ export function compile(source: Source): Compiled {
   else unknown(c.recommendation, KEYS.recommendation, 'recommendation.');
   const recOption = text(rec.option, 'recommendation.option', isRecord(c.recommendation)), why = text(rec.why, 'recommendation.why', isRecord(c.recommendation));
   const changesMind = text(rec.changes_my_mind, 'recommendation.changes_my_mind', false);
+  line(recOption, 'recommendation.option'); line(why, 'recommendation.why'); line(changesMind, 'recommendation.changes_my_mind');
   plain(why, 'recommendation.why'); plain(changesMind, 'recommendation.changes_my_mind');
   const recommended = recOption ? letters.indexOf(recOption) + 1 : 0;
   if (recOption && !recommended) problems.push(`recommendation.option is ${recOption} but there ${letters.length === 1 ? 'is one option' : `are ${['no', 'one', 'two', 'three', 'four'][letters.length] ?? letters.length} options`}.`);
@@ -221,9 +223,10 @@ export function compile(source: Source): Compiled {
     const nextHeading = text(next.heading, 'next_steps.heading', false);
     line(nextHeading, 'next_steps.heading'); limit(nextHeading, LIMITS.title, 'next_steps.heading');
     for (const key of Object.keys(next)) if (!['heading', 'if_no_answer', ...letters].includes(key)) problems.push(/^[A-Z]$/.test(key) ? `next_steps.${key} names no option.` : `next_steps.${key} is not a card key.`);
-    for (const l of letters) { const line = text(next[l], `next_steps.${l}`, false); if (line) nextLines.push(`**After ${l}:** ${prose(line).replace(/\n+/g, ' ')}`); }
+    for (const l of letters) { const step = text(next[l], `next_steps.${l}`, false); line(step, `next_steps.${l}`); if (step) nextLines.push(`**After ${l}:** ${step}`); }
     const none = text(next.if_no_answer, 'next_steps.if_no_answer', false);
-    if (none) nextLines.push(`**If no decision:** ${prose(none).replace(/\n+/g, ' ')}`);
+    line(none, 'next_steps.if_no_answer');
+    if (none) nextLines.push(`**If no decision:** ${none}`);
   }
 
   // R3: every image or page the card names is attached; every attachment listed is there.
@@ -271,8 +274,8 @@ export function compile(source: Source): Compiled {
     md.push('', '## Tradeoffs', `| | ${ok.map((o, i) => `${letter(i)} ${o.title}`).join(' | ')} |`, `|---|${ok.map(() => '---').join('|')}|`);
     for (const r of live) md.push(`| ${r.concern} | ${r.cells.join(' | ')} |`);
   }
-  md.push('', `## Recommendation: ${letter(recommended - 1)}`, `**Why:** ${prose(why ?? '').replace(/\n+/g, ' ')}`);
-  if (changesMind) md.push(`**Assumes:** ${prose(changesMind).replace(/\n+/g, ' ')}`);
+  md.push('', `## Recommendation: ${letter(recommended - 1)}`, `**Why:** ${why ?? ''}`);
+  if (changesMind) md.push(`**Assumes:** ${changesMind}`);
   if (nextLines.length) md.push('', `## Next steps${next && typeof next.heading === 'string' && next.heading.trim() ? ': ' + next.heading.trim() : ''}`, ...nextLines);
   const markdown = md.join('\n') + '\n';
   const all: Attachment[] = [...attached, ...(more ? [{ name: pageName, type: 'text/markdown' as const, text: `# ${moreTitle}\n\n${prose(moreBody ?? '')}\n` }] : [])];

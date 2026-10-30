@@ -86,7 +86,7 @@ export function review(card: Source): Result {
   // An MCP card's attachments are named, never printed, as card.yaml names its files: the reviewer grades the card.
   else if ('object' in card && card.object === undefined) return refused('Give the card to review.');
   else text = 'yaml' in card ? card.yaml : JSON.stringify(card.object, (key, value) => key === 'attachments' && Array.isArray(value)
-    ? value.map(a => typeof a === 'object' && a !== null && 'name' in a ? { name: a.name, ...('type' in a ? { type: a.type } : {}) } : a) : value, 2);
+    ? value.map(a => typeof a === 'object' && a !== null ? { name: 'name' in a ? a.name : '(unnamed)', ...('type' in a ? { type: a.type } : {}) } : '(an attachment that is not an object)') : value, 2);
   return done(`${REVIEW}\n\n--- card.yaml ---\n${text.trimEnd()}\n`);
 }
 

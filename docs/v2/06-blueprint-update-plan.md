@@ -45,7 +45,7 @@ J1/J2 (web sessions) delete. J3 happy pager and J4 longest pager rewrite around:
 
 ## Dependencies (`design/dependencies/`)
 
-D1 Cloudflare: unchanged. D2 agent clients: rewrite around the binary (which harnesses, how `setup` configures each, the cloud-session case as untested). D3 owner browser: delete. D6 iPhone app: add the App Group, the notification extension, the Settings bundle, TestFlight. D7 Apple Developer Program: unchanged. New D8: Bun.
+D1 Cloudflare: unchanged. D2 agent clients: rewrite around the binary (which harnesses, how `setup` configures each, the cloud-session case as untested). The root `recipe.json` (the cleanroom run's cold-arrival commands) still configures the retired `https://agentpager.me/mcp` and v1 tools; rewrite it with D2, or retire it if cleanroom runs end. D3 owner browser: delete. D6 iPhone app: add the App Group, the notification extension, the Settings bundle, TestFlight. D7 Apple Developer Program: unchanged. New D8: Bun.
 
 ## Schemas, machines, UI
 

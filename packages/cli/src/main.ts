@@ -21,7 +21,7 @@ const HELP = `agentpager: send your owner decisions on their phone, and get thei
   agentpager finish --agent <id>
   agentpager agents | share --agent <id> | setup [--print] | mcp | version | update
 
-Every command takes --json. Exit codes: 0 done, 2 refused, 4 pager off, 5 can't reach the server, 6 unknown agent id.
+Every command takes --json. Exit codes: 0 done, 2 refused, 4 pager off, 5 no usable reply from the server (unreachable, no reply, or a reply not understood), 6 unknown agent id.
 The number can come from AGENTPAGER_PAGER; AGENTPAGER_SERVER and AGENTPAGER_HOME move the server and ~/.agentpager.`;
 
 function parse(argv: string[]) {

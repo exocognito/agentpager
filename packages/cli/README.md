@@ -29,7 +29,8 @@ agentpager ack --agent ap-7f3k d_2x8w "Building the smaller fix today."
 ```
 
 `status`, `history`, `finish`, `agents`, `share`, `version`. Every command takes `--json`. Exit codes: 0 done,
-2 refused, 4 pager off, 5 can't reach the server, 6 unknown agent id.
+2 refused, 4 pager off, 5 no usable reply from the server (unreachable, no reply, or a reply not understood),
+6 unknown agent id.
 
 Files: `~/.agentpager/agents/<id>.json` (mode 600: the agent's server key and its reminder clock; the agent only ever
 passes the id) and `~/.agentpager/history/<pager>.jsonl` (capped at 1,000 lines). `AGENTPAGER_HOME` moves the folder;

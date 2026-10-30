@@ -35,7 +35,7 @@ The last two fields are the binary's own memory of when this agent last saw the 
 | `agentpager rules` | Prints the card contract, the `card.yaml` template and one full example. Sets `rulesShownAt`. | Text. |
 | `agentpager example > card.yaml` | Writes the example card to start from. | File. |
 | `agentpager review <card.yaml>` | Prints the card with what good looks like and the reviewer instructions, as one block for a subagent, which grades each point ok / good to fix / must fix. Judges nothing itself. | Text. |
-| `agentpager ask --agent <id> <card.yaml \| ->` | Mechanical checks only (YAML parses, required keys, 2–4 options, tradeoff rows cover every option, attachments present, sizes, open-decision cap, pager off); refuses with one line per problem. Otherwise compiles to the JSON brief, encrypts, sends; appends the short contract when a reminder is due. Appends to history. | §4. |
+| `agentpager ask --agent <id> <card.yaml \| ->` | Mechanical checks only (YAML parses, required keys, 2–4 options, tradeoff rows cover every option, attachments present, sizes, open-decision cap, pager off), then the compiled brief against the server's own `QuestionInput` (an option title over 280 characters, an attachment name or image bytes the server won't take), named by the card.yaml key it came from; refuses with one line per problem. Otherwise compiles to the JSON brief, encrypts, sends; appends the short contract when a reminder is due. Appends to history. | §4. |
 | `agentpager wait --agent <id> <decision> [--forever]` | Waits up to 50 s for the answer (the server's long-poll); `--forever` keeps waiting in 50 s rounds, and through an unreachable or restarting server, retrying every 10 s. Appends the answer to history. | §4, §6. |
 | `agentpager ack --agent <id> <decision> "<next steps>"` | Acknowledges the exact answer with what happens next. | §4. |
 | `agentpager status --agent <id>` | Pager state, open decisions, unacknowledged answers. | Table or `--json`. |
@@ -47,7 +47,7 @@ The last two fields are the binary's own memory of when this agent last saw the 
 | `agentpager setup [--print]` | Writes the MCP server entry for every harness found: Claude Code (`claude mcp add`), Claude Desktop (its config file), Codex (`codex mcp add`), Cursor. Idempotent. The installer runs it. | What it changed. |
 | `agentpager update`, `version` | Self-update from agentpager.me; print version. | — |
 
-Every command takes `--json` for machine output. Exit codes: 0 done, 2 refused, 4 pager off, 5 can't reach the server, 6 unknown agent id.
+Every command takes `--json` for machine output. Exit codes: 0 done, 2 refused, 4 pager off, 5 no usable reply from the server (unreachable, no reply, or a reply not understood), 6 unknown agent id. Every reply from the server is decoded with the schema the server's contract gives its route (`packages/app/src/contract.ts`); a reply that doesn't decode is not AgentPager's, and is never taken as success.
 
 ### Detecting app and project
 
@@ -148,9 +148,27 @@ Can't reach https://agentpager.me (connection refused). Nothing was sent.
 If this machine blocks outbound requests, add agentpager.me to its allow list and try again.
 ```
 
+**any command, no reply** (timed out, or the connection dropped once it was open: the request may have gone out; exit 5. `connect` ends instead with `Connect again; their phone may show an extra agent from this try.`)
+```
+No reply from https://agentpager.me (timed out).
+This may or may not have reached your owner. Check with `agentpager status --agent ap-7f3k` before trying again.
+```
+
+**any command, reply not understood** (a reply that doesn't decode, such as a Wi-Fi sign-in page answering 200; exit 5, ending connect as above)
+```
+The reply from https://agentpager.me wasn't understood (HTTP 200, text/html). A proxy or Wi-Fi sign-in page may have answered for it.
+This may or may not have reached your owner. Check with `agentpager status --agent ap-7f3k` before trying again.
+```
+`wait --forever` keeps trying through no reply, as through an unreachable server; a reply it doesn't understand ends it.
+
 **any command, unknown agent**
 ```
 No agent ap-7f3k on this machine. Run `agentpager agents` to list them, or connect again.
+```
+
+**any command, agent file can't be read** (not JSON, or a field missing or wrong; exit 2; the file is never quoted, since it holds the key)
+```
+Can't read agent ap-7f3k's file, ~/.agentpager/agents/ap-7f3k.json (not JSON). Connect again for a new agent.
 ```
 
 **arriving without the binary**: `https://agentpager.me/mcp` and `/start` both answer with one paragraph: install with the curl line, then `agentpager connect <number>`. No API documentation for hand-rolled calls.

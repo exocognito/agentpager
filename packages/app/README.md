@@ -77,4 +77,4 @@ Alerts go through Apple's push service with the owner's APNs key (D7). Deploymen
 
 ## Limits
 
-The local auto-off and housekeeping proofs run on seconds, not the production days. Nothing is encrypted end to end yet (Stage 3): the server reads cards, attachments and answers. Platform backups, agent action execution and cross-device recovery are not claimed.
+Off is not atomic with a write (accepted 30 Oct for dogfooding, to fix later): an agent call checks its pager in the Registry and then writes in its own object, so a request already past that check when the owner turns the pager off still lands, a window of one Registry round trip; everything sent after the switch is refused. Closing it needs one writer per pager. The local auto-off and housekeeping proofs run on seconds, not the production days. Nothing is encrypted end to end yet (Stage 3): the server reads cards, attachments and answers. Platform backups, agent action execution and cross-device recovery are not claimed.

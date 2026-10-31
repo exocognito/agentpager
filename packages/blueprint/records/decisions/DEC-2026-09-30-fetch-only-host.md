@@ -45,4 +45,4 @@ The first paired PR review found that the proposed resume command used --last wh
 
 The spike recipe also chose between /mcp and /cards/mcp. MCARDS has one product surface, so the recipe now names only https://agentpager.me/mcp. The host qualification exercised that endpoint.
 
-E13 now lives in [E5::start-page-suffices](../../design/v1/evidence/E5-start-page-suffices.md) as its `cold` case, since #104 consolidated the evidence.
+E13 now lives in [E5::start-page-suffices](https://github.com/exocognito/blueprint/blob/7ad135c0ca84c721578a83f8c6becb83e620358c/docs/archive/2026-10-02-source-derived-evidence/E5-start-page-suffices.md) as its `cold` case, since #104 consolidated the evidence.

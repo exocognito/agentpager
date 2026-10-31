@@ -42,8 +42,8 @@ const JOURNEYS = [
   { name: 'delete', test: 'FlowTests/testDeletePager', about: 'Delete a pager from its detail screen: confirm, and it is gone from the phone.' },
 ];
 
-// Tracked files as they are on disk, and new files not yet added if they are source; tests, ignored files and other
-// untracked files (notes, editor backups) don't count.
+// Tracked files as they are on disk, and new files not yet added if their extension is in SOURCE_FILE. TypeScript
+// unit tests (*.test.ts) and ignored files don't count; the iPhone UI tests do, since they draw the journeys.
 const SOURCE_FILE = /\.(swift|ts|tsx|css|mjs|md|json|plist|png|jpe?g)$/;
 function fingerprint() {
   const list = (...args) => execFileSync('git', ['ls-files', '-z', ...args, '--', ...SOURCES], { cwd: repo, encoding: 'utf8' }).split('\0').filter(Boolean);
@@ -294,7 +294,7 @@ The phone is the SwiftUI app (\`packages/ios\`) in the ${DEVICE} Simulator, ${si
 
 On a Mac with Xcode and the ${DEVICE} Simulator, run \`pnpm designs\` (the last run took about ${minutes} min) and commit this folder. It starts a local server on a free port and stops it after, runs the UI tests (\`DesignTests\` and the journeys below), renders the front page, and rewrites this folder only once everything has passed. It prints the scratch folder that holds its full log.
 
-The fingerprint is a hash of the ${files} files it is drawn from: ${SOURCES.map(source => `\`${source}\``).join(', ')}. Tests don't count, and an untracked file counts only if it is source. The rest of the server (routing, storage, alerts) is left out: it changes often and draws nothing itself, so after a change there that shows on screen, run \`pnpm designs\` by hand. \`pnpm check\` fails when the fingerprint no longer matches.
+The fingerprint is a hash of the ${files} files it is drawn from: ${SOURCES.map(source => `\`${source}\``).join(', ')}. TypeScript unit tests (\`*.test.ts\`) don't count; the iPhone UI tests do, since they draw the journeys. An untracked file counts only with one of these extensions: .swift, .ts, .tsx, .css, .mjs, .md, .json, .plist, .png, .jpg, .jpeg. The rest of the server (routing, storage, alerts) is left out: it changes often and draws nothing itself, so after a change there that shows on screen, run \`pnpm designs\` by hand. \`pnpm check\` fails when the fingerprint no longer matches.
 
 ## Phone: \`phone/\`
 

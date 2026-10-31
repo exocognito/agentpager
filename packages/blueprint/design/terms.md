@@ -10,7 +10,7 @@ The words that mean something specific in this product. They name things; the pr
 | Off | A pager the owner switched off, or that turned off by itself. Nothing from its agents gets through and nothing is queued; the phone keeps everything, and turning it on makes open decisions answerable again. |
 | Auto-off | When a pager turns off by itself: never, or 24 hours, 7 days or 30 days after it was last turned on. It lands in the same off state as the switch. |
 | agentpager | The command agents use, which is both a command line and a local MCP server. It connects to a pager, checks and sends cards, waits for answers and acknowledges them, and keeps each agent's key and history on its machine. |
-| Agent | Whatever connected to a pager with its number. Every connect makes a new one. It is shown by who asked and its decisions are grouped by its project. It lasts until its pager is deleted, and is forgotten after 30 days with no activity. |
+| Agent | Whatever connected to a pager with its number. Every connect makes a new one. It is shown by who asked, and its decisions are grouped by its project. Once it finishes it asks nothing more. It lasts until its pager is deleted, and is forgotten after 30 days with no activity. |
 | Agent id | The short id the command gives an agent when it connects, such as `ap-7f3k`. It is not a secret: helpers on the same machine pass it to ask as that agent. |
 | Who asked | The app an agent runs in, such as Claude Code or Codex. The command detects it unless the agent names it. |
 | Project | What an agent's decisions are grouped under on the phone: the git repository's name, else the working folder's, unless the agent names one. |

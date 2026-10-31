@@ -7,7 +7,7 @@ serves:
 statement: Open AgentPager to see your pagers, which are on and how many decisions wait on each; open one to see its decisions grouped by project, with who asked.
 caveats:
   - The list belongs to one phone. Nothing joins pagers across phones.
-  - Deleting the app, or losing the keys it stores, loses its pagers. There is no recovery.
+  - A pager's keys stay on this device only (C26). Losing them loses the pager, and there is no recovery.
   - The screens refresh only while the app is open. A closed app learns nothing until it is opened, except through C17::get-paged's alerts.
   - Pagers belong to the server they were made on. With another server set in iOS Settings, the phone shows only the pagers made there.
 ---

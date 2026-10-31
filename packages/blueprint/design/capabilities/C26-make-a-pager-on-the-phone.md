@@ -6,7 +6,7 @@ serves:
   - SP6
 statement: Make a pager on your phone with a name and when it turns off, and copy the text that gives its number to your agents.
 caveats:
-  - A pager's keys stay in this phone's Keychain, on this device only. Deleting the app, or losing them, loses the pager with no recovery; the owner makes a new one.
+  - A pager's keys stay in this phone's Keychain, on this device only: they are not in backups and do not move to a new phone. Losing them loses the pager, with no recovery; the owner makes a new one.
   - The copied text works for an agent only once the agentpager command is installed where it runs (C29).
 ---
 

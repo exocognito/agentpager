@@ -33,10 +33,12 @@ Sam approved this order (verified): 3, 4 and 5 together as the format conversion
 
 ## Step 3: three milestones in parallel
 
-- The shape is in the orchestration plan from PR #40. It predates METHOD; where they differ, METHOD wins. Its "orchestrator" is the root. `main` now deploys to dev, and prod only deploys a tag that was green on dev.
+- The shape is in the orchestration plan from PR #40. It predates METHOD; where they differ, METHOD wins. Its "orchestrator" is the root.
+- The dev stage and release tags don't exist yet: `pnpm deploy:app` deploys straight to agentpager.me (verified). Until MENCRYPT's lead builds the dev stage, the root deploys `main` to prod as today. After that, `main` deploys to dev, and prod only deploys a tag that was green on dev.
 - MENCRYPT: Sam expects it to need "minimal input from me" (verified). Its lead builds the dev stage first. If that needs a Cloudflare permission, a DNS record or a credential that isn't in the vault, ask Sam. Never mint one.
+- MINSTALL: as the orchestration plan says. Sam does the App Store Connect steps himself; agents never sign or hold Apple credentials.
 - MSITE: Sam wants to "workshop that one quite a bit" (verified). Nothing gets built before the first round with him.
-- MOPEN: send its "Sam decides first" questions during step 3, so step 5 isn't waiting on them.
+- MOPEN doesn't run yet, but send its "Sam decides first" questions during step 3, so step 5 isn't waiting on them.
 - The review page that METHOD's walk step needs doesn't exist yet. Sam has seen a one-off page of the old Blueprint at https://claude.ai/artifact/YCfaftX4hmCb6dZLoFX8Ya, a snapshot of `main` at 3489430. Its generator is in a scratch folder that may not last, at `/private/tmp/claude-501/-Users-smcllns-Projects-agentpager-worktrees-v2-design/37866243-ba74-41ba-972f-d66de7d5edb7/scratchpad/blueprint-page/` (`build.mjs`, `page.css`, `page.js`). It reads the old format. Build the real one in the repo before step 4.
 
 ## Step 4: pause
@@ -47,6 +49,11 @@ Stop and wait for Sam to say he's happy. He reviews by:
 - reading the rebuilt Blueprint page.
 
 Nothing from MOPEN goes public before then. Publishing the repository can't be undone.
+
+## Step 5: MOPEN, then MFRIENDS
+
+- As the roadmap says: MOPEN's cleanup waits for MENCRYPT, and MFRIENDS comes last.
+- Making the repository public needs Sam's go for that step itself, even if he has given the go for MOPEN's pull requests.
 
 ## Things you inherit
 

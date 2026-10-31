@@ -51,19 +51,14 @@ nonisolated struct PagerInbox: Codable, Hashable, Sendable {
     var agents: [AgentInbox]
 }
 
-// A generic card's option has an emoji and maybe detail; a brief's option has a letter (number 1 is A), a label
-// for its answer button and what it prioritizes.
+// A brief's option: a letter (number 1 is A), a label for its answer button and what it prioritizes.
 nonisolated struct Option: Codable, Hashable, Sendable {
     var number: Int
-    var emoji: String?
     var title: String
-    var detail: String?
     var label: String?
     var prioritizes: String?
 
     var letter: String { String(UnicodeScalar(UInt8(64 + min(max(number, 1), 26)))) }
-    // What tells options apart: the emoji, or the brief's letter.
-    var mark: String { emoji ?? letter }
 }
 
 nonisolated struct Card: Codable, Hashable, Sendable {
@@ -71,8 +66,6 @@ nonisolated struct Card: Codable, Hashable, Sendable {
     var options: [Option]
     var recommended: Int?
     var markdown: String?
-
-    var isBrief: Bool { type == "brief" }
 }
 
 // An attachment the agent sent with a brief: the decision names it; the bytes come from its own route.
@@ -135,10 +128,10 @@ nonisolated struct Decision: Codable, Hashable, Identifiable, Sendable {
     var id: String { decisionId }
 
     func option(_ number: Int) -> Option? { card.options.first { $0.number == number } }
-    // An answer in words: "📨 Send now", or a brief's "B. Table".
+    // An answer in words: "B. Table".
     func choiceText(_ choice: Choice) -> String {
         switch choice {
-        case .option(let n): option(n).map { card.isBrief ? "\($0.letter). \($0.title)" : "\($0.mark) \($0.title)" } ?? "Option \(n)"
+        case .option(let n): option(n).map { "\($0.letter). \($0.title)" } ?? "Option \(n)"
         case .feedback(let text): text
         }
     }

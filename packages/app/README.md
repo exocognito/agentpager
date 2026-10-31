@@ -33,8 +33,6 @@ that is no option, a link to a missing attachment, or a size over its limit. The
 name, type and size; the bytes live in their own table, immutable, and go when the pager ends. The phone reads one
 with `GET /api/agents/<id>/cards/<decisionId>/files/<name>` and its phone key.
 
-A brief's options also get their number's keycap as `emoji`.
-
 `fixtures/briefs/` holds the canvas's four examples (D1–D4) word for word. `scripts/briefs.ts <server> <pager number>`
 plays the agent over the HTTP API: it connects with the number, asks all four, then acknowledges each answer.
 

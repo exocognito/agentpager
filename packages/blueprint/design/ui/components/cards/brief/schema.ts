@@ -1,10 +1,8 @@
 import { Schema } from "effect";
-import { characters, Emoji, OptionNumber, Text, ValidProse } from "../../../../schemas/values.ts";
+import { characters, OptionNumber, OPTIONS_MAX, OPTIONS_MIN, Text, ValidProse } from "../../../../schemas/values.ts";
 
 // A decision brief: the agent writes the sections in Markdown (the Kit) and AgentPager draws the question, the
 // option rows, the answer bar and the ✶ on the recommended option. Options are lettered: number 1 is A.
-export const BRIEF_OPTIONS_MIN = 2;
-export const BRIEF_OPTIONS_MAX = 4;
 export const BRIEF_MAX_CHARACTERS = 20_000;
 // The answer tile's word or two, under the letter.
 export const BRIEF_LABEL_MAX_CHARACTERS = 20;
@@ -137,12 +135,11 @@ export function missingAttachment(markdown: string, attachments: ReadonlyMap<str
 
 const Label = ValidProse.pipe(Schema.filter(text => characters(text) <= BRIEF_LABEL_MAX_CHARACTERS || `a label may not exceed ${BRIEF_LABEL_MAX_CHARACTERS} characters`));
 // title is the option's row ("Today's page + a limits link"); label its answer tile ("Limits link"), the title
-// when absent; the row reads "Prioritizes <prioritizes>". emoji is for phones from before briefs, which need one
-// to draw any option: the server gives each option its number's keycap unless the agent chose an emoji.
-export const BriefOption = Schema.Struct({ number: OptionNumber, title: Text, label: Schema.optional(Label), prioritizes: Text, emoji: Schema.optional(Emoji) });
+// when absent; the row reads "Prioritizes <prioritizes>".
+export const BriefOption = Schema.Struct({ number: OptionNumber, title: Text, label: Schema.optional(Label), prioritizes: Text });
 export type BriefOption = typeof BriefOption.Type;
 export const BriefOptions = Schema.Array(BriefOption).pipe(
-  Schema.minItems(BRIEF_OPTIONS_MIN), Schema.maxItems(BRIEF_OPTIONS_MAX),
+  Schema.minItems(OPTIONS_MIN), Schema.maxItems(OPTIONS_MAX),
   Schema.filter(options => options.every((option, index) => option.number === index + 1) || "options are numbered 1..n in order"),
 );
 
@@ -156,8 +153,6 @@ export const Payload = Schema.Struct({
   Schema.filter(card => briefProblem(card.markdown, card.options.length, card.recommended) ?? true),
 );
 export type Payload = typeof Payload.Type;
-export const KEYCAPS = ["1️⃣", "2️⃣", "3️⃣", "4️⃣"] as const;
-export const withKeycaps = (card: Payload): Payload => ({ ...card, options: card.options.map(o => ({ ...o, emoji: o.emoji ?? KEYCAPS[o.number - 1] })) });
 
 // Attachments travel with the question and are stored apart from it; the decision keeps their names, types and
 // sizes. A Markdown page opens as its own page; an image shows where the brief or a page names it.

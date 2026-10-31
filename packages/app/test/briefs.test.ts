@@ -9,7 +9,7 @@ import { briefNames, briefsDir, loadBrief } from '../fixtures/briefs/load.ts';
 // and fetches each attachment by name. The Frame's refusals are whole, with the reason.
 
 // The agent objects' stored databases, read after the server stops.
-function attachmentRows(persist: string) {
+function agentDatabases(persist: string) {
   const files: string[] = [];
   const walk = (dir: string) => { for (const name of readdirSync(dir)) { const p = path.join(dir, name); if (statSync(p).isDirectory()) walk(p); else if (p.endsWith('.sqlite')) files.push(p); } };
   walk(path.join(persist, 'v3', 'do'));
@@ -35,10 +35,7 @@ test('briefs: the four canvas examples ask, read back as sent, answer, and go wi
     for (const d of inbox.open) {
       const sent = loadBrief([...asked].find(([, id]) => id === d.decisionId)?.[0] ?? '');
       assert.equal(d.card.type, 'brief');
-      // As sent, plus each option's keycap for phones from before briefs.
-      const { options, ...rest } = d.card;
-      assert.deepEqual(options.map(o => o.emoji), ['1️⃣', '2️⃣', '3️⃣', '4️⃣'].slice(0, options.length));
-      assert.deepEqual({ ...rest, options: options.map(({ emoji, ...plain }) => plain) }, sent.card, 'the card reads back as sent');
+      assert.deepEqual(d.card, sent.card, 'the card reads back as sent');
       // The inbox names each attachment; its bytes never ride along with the poll.
       assert.ok(!JSON.stringify(d).includes('base64'));
     }
@@ -72,7 +69,7 @@ test('briefs: the four canvas examples ask, read back as sent, answer, and go wi
     await f.request(`/api/pagers/${p.pagerId}/delete`, { method: 'POST', phone });
     assert.equal((await file(d2, 'design.md')).status, 404);
     await f.stop();
-    const stores = attachmentRows(f.persist);
+    const stores = agentDatabases(f.persist);
     assert.ok(stores.length > 0, 'the agent object has an attachments table');
     for (const db of stores) { assert.equal(count(db), 0, 'no attachment bytes after the delete'); db.close(); }
   } finally { await f.stop(); }
@@ -96,14 +93,15 @@ test('briefs: refused whole, with a reason that says what to fix', { timeout: 12
       ['a link to a missing attachment', card({ markdown: markdown + '\n[Read more background](background.md)\n' }), /neither an attachment nor an https link/],
       ['a remote image', card({ markdown: markdown + '\n![Mock](https://example.com/a.png)\n' }), /is not an attachment/],
       ['a container left open', card({ markdown: markdown + '\n:::smallprint\n- one\n' }), /never closed/],
-      ['five options', card({ options: [1, 2, 3, 4, 5].map(number => ({ number, title: `Option ${number}`, prioritizes: 'speed' })) }), /at most 4|maxItems|4 items/i],
+      ['five options', card({ options: [1, 2, 3, 4, 5].map(number => ({ number, title: `Option ${number}`, prioritizes: 'speed' })) }), /between 1 and 4|at most 4|maxItems|4 items/i],
       ['a label too long for its tile', card({ options: [{ number: 1, title: 'Delete them', label: 'Delete every one of them now', prioritizes: 'a clean list' }, { number: 2, title: 'Keep them', prioritizes: 'links' }] }), /label may not exceed 20/],
       ['an image that is not what it says', { ...base, card: { ...card({}).card, markdown: markdown + '\n![Mock](a.png)\n' }, attachments: [{ name: 'a.png', type: 'image/png', base64: Buffer.from('GIF89a not a png').toString('base64') }] }, /is not a whole PNG file/],
       ['a brief with no Options section', card({ markdown: markdown.replace('## Options\n', '') }), /needs an "## Options" section/],
       ['an image naming a page', { ...base, card: { ...card({}).card, markdown: markdown + '\n![Mock](notes.md)\n' }, attachments: [{ name: 'notes.md', type: 'text/markdown', text: '# Notes' }] }, /names a page, not an image/],
       ['an image named for another type', { ...base, card: { ...card({}).card, markdown: markdown + '\n![Mock](a.jpg)\n' }, attachments: [{ name: 'a.jpg', type: 'image/png', base64: png }] }, /must end in \.png/],
-      ['an emoji card', emojiCard, /Emoji cards are retired\. Send a brief/],
-      ['attachments on an emoji card', { ...emojiCard, attachments: [{ name: 'a.png', type: 'image/png', base64: png }] }, /Emoji cards are retired\. Send a brief/],
+      ['an emoji card', emojiCard, /card\.type: Expected "brief"/],
+      ['an option with an emoji', card({ options: [{ number: 1, title: 'One', prioritizes: 'speed', emoji: '🚀' }, { number: 2, title: 'Two', prioritizes: 'safety' }] }), /emoji.*is unexpected/],
+      ['a title over 100 characters', { ...base, title: 'x'.repeat(101) }, /title: a title may not exceed 100 characters/],
       ['an unknown field', { ...base, card: { ...card({}).card, extra: 'dropped?' } }, /extra|is unexpected/],
     ];
     for (const [label, data, reason] of cases) {
@@ -114,5 +112,43 @@ test('briefs: refused whole, with a reason that says what to fix', { timeout: 12
     const inbox = (await f.pager(p.pagerId, p.phone)).agents[0];
     assert.equal(inbox.open.length, 0, 'nothing refused was stored');
 
+  } finally { await f.stop(); }
+});
+
+// Decisions asked before 31 Oct 2026 were stored with "kind": "card" and each option's keycap as emoji. The first
+// time an agent's object starts on this code it rewrites them without either, and they stay immutable after.
+test('briefs: a decision stored with kind and keycaps reads back without them', { timeout: 120_000 }, async () => {
+  const f = await fixture('legacy-decisions');
+  try {
+    const { p, a } = await f.connected();
+    const open = await f.ask(a, 'Still open?'), answered = await f.ask(a, 'Answered?');
+    await f.answer(a.agent.agentId, p.phone, answered.decisionId);
+    const before = (await f.pager(p.pagerId, p.phone)).agents[0];
+    await f.stop();
+    const keycaps = ['1️⃣', '2️⃣', '3️⃣', '4️⃣'];
+    for (const db of agentDatabases(f.persist)) {
+      db.exec('DROP TRIGGER proposal_immutable');
+      for (const row of db.prepare('SELECT id, json FROM proposals').all()) {
+        const d = JSON.parse(String(row.json));
+        const legacy = { decisionId: d.decisionId, kind: 'card', ...d, card: { ...d.card, options: d.card.options.map((o: { number: number }) => ({ ...o, emoji: keycaps[o.number - 1] })) } };
+        db.prepare('UPDATE proposals SET json=? WHERE id=?').run(JSON.stringify(legacy), String(row.id));
+      }
+      db.exec("CREATE TRIGGER proposal_immutable BEFORE UPDATE ON proposals BEGIN SELECT RAISE(ABORT,'immutable proposal'); END;");
+      assert.ok(String(db.prepare('SELECT json FROM proposals LIMIT 1').get()?.json).includes('"kind":"card"'));
+      db.close();
+    }
+    await f.restart();
+    const after = (await f.pager(p.pagerId, p.phone)).agents[0];
+    assert.deepEqual([after.open, after.answered], [before.open, before.answered], 'the decisions read as they did before the old shape was put back');
+    assert.deepEqual([...after.open, ...after.answered].map(d => d.decisionId).sort(), [open.decisionId, answered.decisionId].sort());
+    await f.stop();
+    for (const db of agentDatabases(f.persist)) {
+      for (const row of db.prepare('SELECT json FROM proposals').all()) {
+        const json = String(row.json);
+        assert.ok(!json.includes('"kind"') && !json.includes('"emoji"'), json);
+      }
+      assert.throws(() => db.prepare("UPDATE proposals SET json='{}'").run(), /immutable proposal/);
+      db.close();
+    }
   } finally { await f.stop(); }
 });

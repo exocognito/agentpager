@@ -1,8 +1,7 @@
 import type { DurableObjectState } from '@cloudflare/workers-types';
 import { Schema } from 'effect';
 import * as C from './contract.ts';
-import { acceptsChoice } from '../../blueprint/design/ui/components/cards/schemas.ts';
-import { AttachmentName, attachmentInfo, base64Bytes, withKeycaps } from '../../blueprint/design/ui/components/cards/brief/schema.ts';
+import { AttachmentName, attachmentInfo, base64Bytes } from '../../blueprint/design/ui/components/cards/brief/schema.ts';
 import { body, decode, emptyBody, iso, json, refusal, sameDigest, sha256, token } from './shared.ts';
 import { clocks, forward, type Env } from './env.ts';
 import { alert, pickupBody, PushTarget, questionBody, type Alert } from './push.ts';
@@ -24,8 +23,6 @@ const ALERT_EXPIRY_MS = 24 * 3_600_000;
 // A warning that couldn't be sent (the Registry unreachable) is tried again this much later.
 const WARN_RETRY_MS = 60_000;
 
-// A card an agent sends as the retired emoji kind, told apart before the schema refuses it, so its reason says what to do.
-const emojiCard = (value: unknown) => typeof value === 'object' && value !== null && 'card' in value && typeof value.card === 'object' && value.card !== null && 'type' in value.card && value.card.type === 'generic';
 async function keyDigest(value: string | null | undefined) { return value && Schema.is(C.Token)(value) ? sha256(value) : null; }
 const agentDigest = (request: Request) => keyDigest(request.headers.get(C.AGENT_AUTH_HEADER)?.replace(/^Bearer /, ''));
 const phoneDigest = (request: Request) => keyDigest(request.headers.get(C.PHONE_AUTH_HEADER));
@@ -34,21 +31,30 @@ const registry = (env: Env, path: string, data: unknown) => forward(env.REGISTRY
 export class Agent {
   constructor(private ctx: DurableObjectState, private env: Env) { this.schema(); }
   private schema() {
-    this.ctx.storage.sql.exec(`CREATE TABLE IF NOT EXISTS agent (id INTEGER PRIMARY KEY CHECK(id=1), json TEXT NOT NULL);
-      CREATE TABLE IF NOT EXISTS proposals (id TEXT PRIMARY KEY, json TEXT NOT NULL);
-      CREATE TABLE IF NOT EXISTS answers (decision_id TEXT PRIMARY KEY REFERENCES proposals(id), request_id TEXT NOT NULL UNIQUE, input TEXT NOT NULL, json TEXT NOT NULL);
-      CREATE TABLE IF NOT EXISTS acknowledgements (decision_id TEXT PRIMARY KEY REFERENCES answers(decision_id), json TEXT NOT NULL);
-      CREATE TABLE IF NOT EXISTS attachments (decision_id TEXT NOT NULL, name TEXT NOT NULL, type TEXT NOT NULL, data BLOB NOT NULL, PRIMARY KEY (decision_id, name));
-      CREATE TABLE IF NOT EXISTS pickups (decision_id TEXT PRIMARY KEY REFERENCES answers(decision_id), due INTEGER NOT NULL);
-      CREATE TABLE IF NOT EXISTS collections (decision_id TEXT PRIMARY KEY REFERENCES answers(decision_id), at TEXT NOT NULL);
-      CREATE TABLE IF NOT EXISTS warnings (decision_id TEXT PRIMARY KEY REFERENCES answers(decision_id), at TEXT NOT NULL);
-      CREATE TRIGGER IF NOT EXISTS proposal_immutable BEFORE UPDATE ON proposals BEGIN SELECT RAISE(ABORT,'immutable proposal'); END;
-      CREATE TRIGGER IF NOT EXISTS answer_immutable BEFORE UPDATE ON answers BEGIN SELECT RAISE(ABORT,'immutable answer'); END;
-      CREATE TRIGGER IF NOT EXISTS acknowledgement_immutable BEFORE UPDATE ON acknowledgements BEGIN SELECT RAISE(ABORT,'immutable acknowledgement'); END;
-      CREATE TRIGGER IF NOT EXISTS attachment_immutable BEFORE UPDATE ON attachments BEGIN SELECT RAISE(ABORT,'immutable attachment'); END;
-      CREATE TRIGGER IF NOT EXISTS collection_immutable BEFORE UPDATE ON collections BEGIN SELECT RAISE(ABORT,'immutable collection'); END;
-      CREATE TRIGGER IF NOT EXISTS warning_immutable BEFORE UPDATE ON warnings BEGIN SELECT RAISE(ABORT,'immutable warning'); END;
-      CREATE TRIGGER IF NOT EXISTS attachments_go_with_proposal AFTER DELETE ON proposals BEGIN DELETE FROM attachments WHERE decision_id = OLD.id; END;`);
+    this.tx(() => {
+      this.ctx.storage.sql.exec(`CREATE TABLE IF NOT EXISTS agent (id INTEGER PRIMARY KEY CHECK(id=1), json TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS proposals (id TEXT PRIMARY KEY, json TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS answers (decision_id TEXT PRIMARY KEY REFERENCES proposals(id), request_id TEXT NOT NULL UNIQUE, input TEXT NOT NULL, json TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS acknowledgements (decision_id TEXT PRIMARY KEY REFERENCES answers(decision_id), json TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS attachments (decision_id TEXT NOT NULL, name TEXT NOT NULL, type TEXT NOT NULL, data BLOB NOT NULL, PRIMARY KEY (decision_id, name));
+        CREATE TABLE IF NOT EXISTS pickups (decision_id TEXT PRIMARY KEY REFERENCES answers(decision_id), due INTEGER NOT NULL);
+        CREATE TABLE IF NOT EXISTS collections (decision_id TEXT PRIMARY KEY REFERENCES answers(decision_id), at TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS warnings (decision_id TEXT PRIMARY KEY REFERENCES answers(decision_id), at TEXT NOT NULL);`);
+      // Decisions asked before 31 Oct 2026 were stored with "kind": "card" and an emoji on each option, for phones from
+      // before briefs. Neither is in the contract now, so each is rewritten once without them.
+      if (this.ctx.storage.sql.exec("SELECT 1 FROM proposals WHERE json_type(json, '$.kind') IS NOT NULL LIMIT 1").toArray().length) {
+        const emoji = Array.from({ length: C.OPTIONS_MAX }, (_, i) => `'$.card.options[${i}].emoji'`).join(', ');
+        this.ctx.storage.sql.exec(`DROP TRIGGER IF EXISTS proposal_immutable;
+          UPDATE proposals SET json = json_remove(json, '$.kind', ${emoji}) WHERE json_type(json, '$.kind') IS NOT NULL;`);
+      }
+      this.ctx.storage.sql.exec(`CREATE TRIGGER IF NOT EXISTS proposal_immutable BEFORE UPDATE ON proposals BEGIN SELECT RAISE(ABORT,'immutable proposal'); END;
+        CREATE TRIGGER IF NOT EXISTS answer_immutable BEFORE UPDATE ON answers BEGIN SELECT RAISE(ABORT,'immutable answer'); END;
+        CREATE TRIGGER IF NOT EXISTS acknowledgement_immutable BEFORE UPDATE ON acknowledgements BEGIN SELECT RAISE(ABORT,'immutable acknowledgement'); END;
+        CREATE TRIGGER IF NOT EXISTS attachment_immutable BEFORE UPDATE ON attachments BEGIN SELECT RAISE(ABORT,'immutable attachment'); END;
+        CREATE TRIGGER IF NOT EXISTS collection_immutable BEFORE UPDATE ON collections BEGIN SELECT RAISE(ABORT,'immutable collection'); END;
+        CREATE TRIGGER IF NOT EXISTS warning_immutable BEFORE UPDATE ON warnings BEGIN SELECT RAISE(ABORT,'immutable warning'); END;
+        CREATE TRIGGER IF NOT EXISTS attachments_go_with_proposal AFTER DELETE ON proposals BEGIN DELETE FROM attachments WHERE decision_id = OLD.id; END;`);
+    });
   }
   private meta(): Meta | null {
     const raw = this.ctx.storage.sql.exec<{ json: string }>('SELECT json FROM agent WHERE id=1').toArray()[0]?.json;
@@ -197,10 +203,7 @@ export class Agent {
     if (action === 'ask') {
       const digest = await agentDigest(request);
       const m = this.tx(() => { const m = this.agent(digest); if (m.finishedAt) throw C.refuse.finished(); return m; });
-      const raw = await body(request);
-      // Every new card is a brief (QuestionInput takes no other).
-      if (emojiCard(raw)) throw C.refuse.invalid('Emoji cards are retired. Send a brief (card.type "brief"); with the agentpager command, agentpager rules prints the card format.');
-      const question = decode(C.QuestionInput, raw);
+      const question = decode(C.QuestionInput, await body(request));
       // Checked last before the write, so the switch is read as late as it can be.
       const push = await this.on(m);
       const asked = this.tx(() => {
@@ -208,8 +211,7 @@ export class Agent {
         if (this.openCount() >= C.MAX_OPEN_DECISIONS) throw C.refuse.tooMany();
         // The decision keeps each attachment's name, type and size; the bytes live in their own table.
         const { attachments, ...asked } = question;
-        const card = withKeycaps(asked.card);
-        const d: C.Decision = { ...asked, card, ...(attachments ? { attachments: attachments.map(attachmentInfo) } : {}), decisionId: token(), kind: 'card', status: 'open', askedAt: iso() };
+        const d: C.Decision = { ...asked, ...(attachments ? { attachments: attachments.map(attachmentInfo) } : {}), decisionId: token(), status: 'open', askedAt: iso() };
         decode(C.Decision, d);
         this.ctx.storage.sql.exec('INSERT INTO proposals VALUES (?, ?)', d.decisionId, JSON.stringify(d));
         for (const a of attachments ?? []) {
@@ -314,7 +316,7 @@ export class Agent {
           throw C.refuse.alreadyAnswered(receipt);
         }
         if (this.ctx.storage.sql.exec('SELECT 1 FROM answers WHERE request_id=?', input.requestId).toArray().length) throw C.refuse.invalid('requestId already belongs to another decision.');
-        if (!acceptsChoice(d.card, input.choice)) throw C.refuse.invalid('Choose an option offered on this card.');
+        if (!C.acceptsChoice(d.card, input.choice)) throw C.refuse.invalid('Choose an option offered on this card.');
         const sentAt = iso();
         const answer = decode(C.Answer, { answerId: token(), decisionId: id, choice: input.choice, sentAt });
         decode(C.Decision, { ...d, status: input.choice.kind === 'feedback' ? 'feedback' : 'answered', answer });

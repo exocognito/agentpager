@@ -76,7 +76,7 @@ export const acceptsChoice = (card: BriefCard, choice: Choice) =>
 // Every card is a brief.
 export const QuestionInput = Schema.Struct({
   title: Title,
-  detail: Schema.optional(Body),
+  detail: Schema.optional(Text),
   card: BriefCard,
   attachments: Schema.optional(Attachments),
 }).annotations(strict).pipe(Schema.filter(briefLinks));
@@ -85,7 +85,7 @@ export const Decision = Schema.Struct({
   decisionId: Token,
   status: DecisionStatus,
   title: Title,
-  detail: Schema.optional(Body),
+  detail: Schema.optional(Text),
   card: BriefCard,
   attachments: Schema.optional(Schema.Array(AttachmentInfo)),
   askedAt: Timestamp,

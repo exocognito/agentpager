@@ -102,6 +102,7 @@ test('briefs: refused whole, with a reason that says what to fix', { timeout: 12
       ['an emoji card', emojiCard, /card\.type: Expected "brief"/],
       ['an option with an emoji', card({ options: [{ number: 1, title: 'One', prioritizes: 'speed', emoji: '🚀' }, { number: 2, title: 'Two', prioritizes: 'safety' }] }), /emoji.*is unexpected/],
       ['a title over 100 characters', { ...base, title: 'x'.repeat(101) }, /title: a title may not exceed 100 characters/],
+      ['a detail over 280 characters', { ...base, detail: 'x'.repeat(281) }, /detail: text may not exceed 280 characters/],
       ['an unknown field', { ...base, card: { ...card({}).card, extra: 'dropped?' } }, /extra|is unexpected/],
     ];
     for (const [label, data, reason] of cases) {

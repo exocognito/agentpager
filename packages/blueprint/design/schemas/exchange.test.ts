@@ -27,6 +27,11 @@ it('holds a title to 100 characters, as asked and as stored', () => {
   expect(Schema.is(QuestionInput)({title:'x'.repeat(101),card:brief})).toBe(false);
   expect(Schema.is(Decision)({...question,title:'x'.repeat(101)})).toBe(false);
 });
+it('holds the one-line detail to 280 characters, as asked and as stored', () => {
+  expect(Schema.is(QuestionInput)({title:'Review',detail:'x'.repeat(280),card:brief})).toBe(true);
+  expect(Schema.is(QuestionInput)({title:'Review',detail:'x'.repeat(281),card:brief})).toBe(false);
+  expect(Schema.is(Decision)({...question,detail:'x'.repeat(281)})).toBe(false);
+});
 
 it('refuses malformed Unicode in card prose', () => {
   const bad = String.fromCharCode(0xd800);

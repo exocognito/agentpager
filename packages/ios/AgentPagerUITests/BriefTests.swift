@@ -44,17 +44,15 @@ final class BriefTests: XCTestCase {
         wait(pager, 60)
         pager.tap()
         wait(app.buttons["open-Which pricing page layout should I build?"], 30)
-        shot("00-inbox")
+        shot("inbox", after: "Claude Code (shop) asks the four example briefs; open the Shop pager")
 
         // D1, a visual choice: see B on the Options sheet (what it changes and why first, then its images, which
         // open full screen and swipe), pick B (its column outlined), read the background, send B.
         open("Which pricing page layout should I build?")
-        shot("D1-1-top")
-        reveal(app.buttons["open-options"])
-        shot("D1-2-decision-options")
+        shot("D1-top", after: "Open \"Which pricing page layout should I build?\"")
         tap("open-options")
         showOption("B")
-        shot("D1-3-option-B")
+        shot("D1-option-B", after: "Tap the Options row, then B at the top of the sheet: what it changes and why, then its images")
         let page = app.scrollViews["option-page-B"]
         let changes = page.staticTexts["What B changes"], why = page.staticTexts["Why choose B"]
         wait(changes, 10)
@@ -64,83 +62,82 @@ final class BriefTests: XCTestCase {
         XCTAssertLessThan(why.frame.maxY, thumb.frame.minY, "what B changes and why come before its images")
         XCTAssertTrue(page.buttons["image-b-table-phone.png"].exists)
         RunLoop.current.run(until: Date().addingTimeInterval(0.8))
-        shot("D1-3b-option-B-images")
         thumb.tap()
         wait(app.navigationBars["1 of 2"], 10)
         RunLoop.current.run(until: Date().addingTimeInterval(1))
-        shot("D1-3c-image-1-of-2")
+        shot("D1-image-1-of-2", after: "Tap the first image")
         app.swipeLeft()
         wait(app.navigationBars["2 of 2"], 10)
         RunLoop.current.run(until: Date().addingTimeInterval(1))
-        shot("D1-3d-image-2-of-2")
+        shot("D1-image-2-of-2", after: "Swipe left")
         app.navigationBars["2 of 2"].buttons.firstMatch.tap()
         waitUntil(10, "the viewer closed") { !app.navigationBars["2 of 2"].exists && changes.exists }
         closeSheet()
         tap("fold-smallprint")
         tap("tile-B")
         reveal(app.buttons["open-options"])
-        shot("D1-4-B-picked")
+        shot("D1-B-picked", after: "Close the viewer and the sheet, open Small print, tap B")
         tap("link-background.md")
         wait(app.navigationBars["Why the pricing page matters"], 20)
         RunLoop.current.run(until: Date().addingTimeInterval(1.5))
-        shot("D1-5-background")
+        shot("D1-background", after: "Tap the link to the background page")
         closeSheet()
-        sendPicked("Which pricing page layout should I build?", "D1")
+        sendPicked("Which pricing page layout should I build?", "D1", "Close the page, tap Send option B")
 
         // D2, a technical choice: see B (the diagram and diff), swipe to C, open the design notes, pick C, send C.
         open("How should checkout handle a payment timeout?")
         tap("open-options")
         showOption("B")
-        shot("D2-1-option-B")
+        shot("D2-option-B", after: "Go back; open \"How should checkout handle a payment timeout?\", tap the Options row, then B")
         app.swipeLeft()
         waitUntil(10, "swiping to show C") { segment("C").isSelected && any("option-header-C").isHittable }
         RunLoop.current.run(until: Date().addingTimeInterval(0.8))
-        shot("D2-2-swiped-to-C")
+        shot("D2-swiped-to-C", after: "Swipe left to C")
         let notes = app.scrollViews["option-page-C"].buttons["link-design.md"]
         for _ in 0..<6 where !notes.isHittable { app.scrollViews["option-page-C"].swipeUp() }
         notes.tap()
         wait(app.navigationBars["Three ways to handle a timeout"], 20)
         RunLoop.current.run(until: Date().addingTimeInterval(1.5))
-        shot("D2-3-design-notes")
+        shot("D2-design-notes", after: "Scroll C to its design notes link and tap it")
         back()
         closeSheet()
         tap("fold-smallprint")
         tap("tile-C")
-        shot("D2-4-C-picked")
-        sendPicked("How should checkout handle a payment timeout?", "D2")
+        shot("D2-C-picked", after: "Go back, close the sheet, open Small print, tap C")
+        sendPicked("How should checkout handle a payment timeout?", "D2", "Tap Send option C")
 
         // D3, a content choice: see C (the chat sample and rules diff), pick B, send B.
         open("How should the support bot handle refunds?")
         tap("open-options")
         showOption("C")
-        shot("D3-1-option-C")
+        shot("D3-option-C", after: "Go back; open \"How should the support bot handle refunds?\", tap the Options row, then C")
         closeSheet()
         tap("tile-B")
-        shot("D3-2-B-picked")
-        sendPicked("How should the support bot handle refunds?", "D3")
+        shot("D3-B-picked", after: "Close the sheet, tap B")
+        sendPicked("How should the support bot handle refunds?", "D3", "Tap Send option B")
 
         // D4, a small decision: its options have no blocks; ask for changes instead of an option.
         open("Delete 14 merged preview branches?")
-        shot("D4-1-top")
+        shot("D4-top", after: "Go back; open \"Delete 14 merged preview branches?\"")
         tap("open-options")
-        shot("D4-2-options")
+        shot("D4-options", after: "Tap the Options row: a small decision's options have no blocks")
         closeSheet()
         app.buttons["ask-for-changes"].tap()
         let field = app.textViews["feedback-text"]
         wait(field, 10)
         app.typeText("Keep the two newest; delete the other 12.")
-        shot("D4-3-ask-for-changes")
+        shot("D4-ask-for-changes", after: "Close the sheet, tap Ask for changes, type a note")
         app.buttons["send-feedback"].tap()
-        confirmed("Delete 14 merged preview branches?", "D4")
+        confirmed("Delete 14 merged preview branches?", "D4", "Send the note; Undo closes, it goes and the agent confirms. Tap shop's answered row")
 
         // Answered, the brief stays readable, and its Options sheet opens on the option sent.
         app.buttons["answered-shop"].tap()
         app.buttons["answered-Which pricing page layout should I build?"].tap()
         RunLoop.current.run(until: Date().addingTimeInterval(1.5))
-        shot("D1-7-answered")
+        shot("D1-answered", after: "Go back; open shop's answered list, then the pricing decision: it stays readable")
+        // The sheet opens on B, the option sent; it draws as frame D1-option-B did, so it's no new frame.
         tap("open-options")
         waitUntil(10, "the Options sheet opening on B") { segment("B").isSelected }
-        shot("D1-8-answered-options")
     }
 
     // The Options sheet's segmented control shows another option; it never chooses one.
@@ -206,22 +203,22 @@ final class BriefTests: XCTestCase {
         RunLoop.current.run(until: Date().addingTimeInterval(0.5))
     }
 
-    private func sendPicked(_ title: String, _ name: String) {
+    private func sendPicked(_ title: String, _ name: String, _ action: String) {
         tap("send-option")
-        shot("\(name)-undo")
+        shot("\(name)-undo", after: action + ": back on the pager, the Undo window counts down")
         confirmed(title, name)
     }
 
     // Sent once Undo closes; confirmed when the agent's acknowledgement arrives. The decision is then in the
     // project's "N answered" list.
-    private func confirmed(_ title: String, _ name: String) {
+    private func confirmed(_ title: String, _ name: String, _ action: String = "Undo closes, the answer goes and the agent confirms. Tap shop's answered row") {
         let group = app.buttons["answered-shop"]
         wait(group, 30)
         group.tap()
         let row = app.buttons["answered-\(title)"]
         wait(row, 30)
         waitUntil(40, "\(name) confirmed by the agent") { row.label.contains("Agent confirmed") }
-        shot("\(name)-confirmed")
+        shot("\(name)-confirmed", after: action)
         back()
     }
 }

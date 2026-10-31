@@ -1,0 +1,10 @@
+-demo empty: Pagers before there are any: the empty state and the + button.
+
+app "AgentPager" [0,0 390x844]
+ window [0,0 390x844]
+  navbar #Pagers [0,47 390x106]
+   text "Pagers" [15,104 109x40]
+  image #antenna.radiowaves.left.and.right "Cellular Data" [170,408 50x44]
+  text "No pagers" [142,408 105x88]
+  text "Make a pager, then give its number to your agents." [64,500 261x38]
+  button #new-pager "New pager" [310,742 56x56]

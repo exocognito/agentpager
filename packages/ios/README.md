@@ -61,13 +61,25 @@ answering, the Undo window, Ask for changes, Answer Not Confirmed, off and on, f
 ```sh
 TEST_RUNNER_AGENTPAGER_SERVER_URL=http://<mac-ip>:8787 TEST_RUNNER_SCREENSHOT_DIR=/tmp/agentpager-shots \
   xcodebuild test -project AgentPager.xcodeproj -scheme AgentPager \
-  -destination 'platform=iOS Simulator,name=iPhone 17e'
+  -destination 'platform=iOS Simulator,name=iPhone 17e' -only-testing:AgentPagerUITests/FlowTests
 ```
 
+Each `shot(name, after: action)` is a frame of the test's journey, kept in the test result. With
+`TEST_RUNNER_SCREENSHOT_DIR` set, it is also saved as `<dir>/<test>/<name>.png`, and `frames.tsv` there lists the
+frames in order with the action that led to each.
+
 `-failSends N` (launch argument) makes the next N answer attempts fail, to show the "Answer Not Confirmed" alert.
-`-demo <state>` launches on the mocks' sample data with no network, for screenshots to compare with `docs/v2/mocks/`:
-`pagers` (default), `pager`, `detail`, `new`, `decision`, `selected`, `options`, `page`, `changes`, `off`, `answered`,
-`undo`, `notconfirmed`, `notpickedup`, `empty`.
+`-demo <state>` launches on the mocks' sample data with no network: `pagers` (default), `pager`, `detail`, `new`,
+`decision`, `selected`, `options`, `page`, `changes`, `off`, `answered`, `undo`, `notconfirmed`, `notpickedup`,
+`empty`. `DesignTests` has one test per state; add one when you add a state.
+
+## Design catalogue
+
+`pnpm designs`, from the repository root, remakes `packages/blueprint/design/screens/`, the app's screens as images
+and text for agents without a Simulator. On the iPhone 17e Simulator, `DesignTests` saves each `-demo` state with its
+accessibility tree (`TEST_RUNNER_DESIGN_DIR`), and the journeys in `FlowTests` and `BriefTests` save
+their frames against a local server the command starts and stops. `pnpm check` fails when anything in `AgentPager/` or
+`AgentPagerUITests/` changed since, so run `pnpm designs` after changing either and commit what it writes.
 
 ## Decision briefs
 

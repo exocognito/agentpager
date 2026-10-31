@@ -8,11 +8,11 @@ The words that mean something specific in this product. They name things; the pr
 | Pager | What the owner makes on their phone, as many as they like: for example one for AGENTS.md, one for a throwaway VM, one per shared project. It has a number, and a name that only the phone knows. It is either active or off. |
 | Pager number | A pager's address, `ap1_` and 32 more characters, made on the phone from the pager's id and a fingerprint of its public key. Whoever has it can connect agents to the pager while it is on, and can read nothing. |
 | Off | A pager the owner switched off, or that turned off by itself. Nothing from its agents gets through and nothing is queued; the phone keeps everything, and turning it on makes open decisions answerable again. |
-| Auto-off | When a pager turns off by itself: never, or 24 hours, 7 days or 30 days after it was last turned on. It lands in the same off state as the switch. |
+| Auto-off | When a pager turns off by itself: never, or 24 hours, 7 days or 30 days after it was last turned on, or after the owner changed it while on. It lands in the same off state as the switch. |
 | agentpager | The command agents use, which is both a command line and a local MCP server. It connects to a pager, checks and sends cards, waits for answers and acknowledges them, and keeps each agent's key and history on its machine. |
 | Agent | Whatever connected to a pager with its number. Every connect makes a new one. It is shown by who asked, and its decisions are grouped by its project. Once it finishes it asks nothing more. It lasts until its pager is deleted, and is forgotten after 30 days with no activity. |
 | Agent id | The short id the command gives an agent when it connects, such as `ap-7f3k`. It is not a secret: helpers on the same machine pass it to ask as that agent. |
-| Who asked | The app an agent runs in, such as Claude Code or Codex. The command detects it unless the agent names it. |
+| Who asked | The app an agent runs in, such as Claude Code or Codex. The command detects it; an app it doesn't recognise can name itself. |
 | Project | What an agent's decisions are grouped under on the phone: the git repository's name, else the working folder's, unless the agent names one. |
 | Decision | One question from an agent, with the owner's answer and the agent's acknowledgement. The app calls it a decision. |
 | Card | How a decision looks, and what the agent writes: `card.yaml`. Each of its keys lands in one place on the phone: title, detail, context, options with their stories, tradeoffs, recommendation, next steps and attachments. |

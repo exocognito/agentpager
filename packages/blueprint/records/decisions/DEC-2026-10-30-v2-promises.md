@@ -22,7 +22,7 @@ He chose to tag the stages. Every promise stays, including those not built yet, 
 - Retired, with no successor: SI9 (the research offer) and SG3 (the paid value). There is no paid tier: AgentPager is open source, for Sam and about ten friends (01-decisions, Goal).
 - Unchanged: the Vision, SI1, SI3, SI7, SI8, SG1, SG2 and SP7. SP3 and SP4 stay retired.
 - SP2 tags Android as not built yet.
-- SI6 sets the detail at 280 characters on one line, the limit agents already meet through the binary. The server still allows 1,000 and is to be brought into line, as it was for titles in PR #33.
+- SI6 sets the detail at 280 characters on one line, the limit agents already meet through the binary. The server holds it to 280 too since PR #34, as it does titles since PR #33.
 - The Strategic Design Decisions are pinned: numbers only; the agentpager command as the one home for the writing rules; `card.yaml` compiled by the command; encryption before the friends rollout; no Settings screen; notes are answers to one decision.
 
 ## The contract
@@ -32,8 +32,8 @@ The contract changed first, before the other architecture work. PR #33 made ever
 ## Design
 
 - Terms: "agent" replaces "session", and a pager is what the owner makes on the phone. Links, the pairing code, the palette, the pairing window, end times, end reasons, the Agents list and the Agent screen are gone.
-- Capabilities. Deleted: C1, C2, C3, C4, C8, C9, C20, C21 and C24, the link, QR and emoji pairing, the web app and the hosted ways in. Rewritten: C5, C7, C17 and C18; and with new slugs, C22 (turn a pager off and on), C23 (pagers and the pager screen) and C25 (connect with a pager number). New: C26 (make a pager on the phone), C27 (review a card before sending), C29 (install the command), C30 (end-to-end encryption) and C31 (history on the agent's machine). Kept: C6 and C19. There is no C28: the owner's notes are answers to one decision, never guidance handed to other agents (01-decisions).
-- Invariants. Deleted: I1, I2 and I16. Rewritten with a new slug: I17 (an off pager delivers nothing; a deleted pager is forgotten). New: I19 (the number names the phone's key), I20 (the service holds nothing readable), I21 (every connect is a new agent) and I22 (a broken card is never sent). Kept: I3 (retired, as history), I4, I5, I6 and I18.
+- Capabilities. Deleted: C1, C2, C3, C4, C8, C9, C20, C21 and C24, the link, QR and emoji pairing, the web app and the hosted ways in. Rewritten: C5, C6, C7, C17, C18 and C19; and with new slugs, C22 (turn a pager off and on), C23 (pagers and the pager screen) and C25 (connect with a pager number). New: C26 (make a pager on the phone), C27 (review a card before sending), C29 (install the command), C30 (end-to-end encryption) and C31 (history on the agent's machine). There is no C28: the owner's notes are answers to one decision, never guidance handed to other agents (01-decisions).
+- Invariants. Deleted: I1, I2 and I16. Rewritten with a new slug: I17 (an off pager delivers nothing; a deleted pager is forgotten). New: I19 (the number names the phone's key), I20 (the service holds nothing readable), I21 (every connect is a new agent) and I22 (a broken card is never sent). Reworded for v2: I4, I5 and I6. Kept: I3 (retired, as history) and I18.
 - Tagged not built yet: encryption (SI10, C30, I20, the encrypted alert in C17 and the agent's own key check in I19); the one-line install (C29), since today the command is built from the repository; Android (SP2); the demo agent (C19); and the front page's v2 words and its note of what the service stores (C18).
 - A deleted id is never reused.
 - Journeys J1 to J5, dependencies D2, D3 and D6, the roadmap and `design/ui/` are rewritten in a follow-up. Until then they still name some of the deleted promises.

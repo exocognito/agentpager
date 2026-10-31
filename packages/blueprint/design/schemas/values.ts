@@ -23,10 +23,6 @@ export type Text = typeof Text.Type;
 export const BODY_MAX_CHARACTERS = 1000;
 export const Body = ValidProse.pipe(Schema.filter(text => characters(text) <= BODY_MAX_CHARACTERS || `text may not exceed ${BODY_MAX_CHARACTERS} characters`));
 export type Body = typeof Body.Type;
-// Short enough to fit one row on the phone's home screen.
-export const SESSION_NAME_MAX_CHARACTERS = 60;
-export const SessionName = ValidProse.pipe(Schema.filter(text => characters(text) <= SESSION_NAME_MAX_CHARACTERS || `a session name may not exceed ${SESSION_NAME_MAX_CHARACTERS} characters`));
-export type SessionName = typeof SessionName.Type;
 
 export const EMOJI_MAX_CODE_POINTS = 8;
 const RGI_EMOJI = new RegExp("^(?:\\p{RGI_Emoji})$", "v");

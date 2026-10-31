@@ -6,7 +6,7 @@ import { createServer as createNet, type Server, type Socket } from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Asked } from '../../app/src/contract.ts';
+import { Asked } from '../../blueprint/design/schemas/exchange.ts';
 
 // What leaves this machine and what comes back is held to the server's own contract: a card the server would refuse
 // is refused here, and a reply that isn't AgentPager's, or none at all, never reads as done or as "Nothing was sent".

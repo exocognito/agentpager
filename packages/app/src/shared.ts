@@ -1,5 +1,5 @@
 import { Either, ParseResult, Schema } from 'effect';
-import { Refusal, refuse, STATUS, type Token } from './contract.ts';
+import { REFUSAL_STATUS, Refusal, refuse, type Token } from './contract.ts';
 
 export const strict = { onExcessProperty: 'error' } as const;
 // A refusal names each field and what is wrong with it ("nextSteps: text may not exceed 280 characters"),
@@ -16,7 +16,7 @@ export function token(): Token {
 export const iso = (ms = Date.now()) => new Date(ms).toISOString();
 export const json = (value: unknown, status = 200) => Response.json(value, { status });
 export function refusal(error: unknown): Response {
-  if (error instanceof Refusal) return json({ error: error.tag, message: error.message, ...error.fields }, STATUS[error.tag]);
+  if (error instanceof Refusal) return json({ error: error.tag, message: error.message, ...error.fields }, REFUSAL_STATUS[error.tag]);
   console.error('Internal failure', error instanceof Error ? error.message : 'unknown');
   return json({ error: 'InternalError', message: 'Something went wrong on the server. Try again.' }, 500);
 }

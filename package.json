@@ -15,8 +15,6 @@
     "test:all": "pnpm test && pnpm test:app && pnpm test:cli",
     "storybook": "pnpm --filter @agentpager/storybook storybook",
     "build:storybook": "pnpm --filter @agentpager/storybook build:storybook",
-    "diagram": "pnpm --filter @agentpager/blueprint diagram",
-    "diagram:check": "pnpm --filter @agentpager/blueprint diagram:check",
     "build:app": "pnpm --filter @agentpager/app build",
     "start:app": "pnpm --filter @agentpager/app start",
     "deploy:app": "pnpm --filter @agentpager/app run deploy",

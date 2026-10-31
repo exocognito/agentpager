@@ -7,7 +7,9 @@
     "start": "node scripts/start.mjs",
     "deploy": "node scripts/deploy.mjs",
     "lint": "node scripts/lint.mjs",
-    "dogfood": "node scripts/dogfood.mjs"
+    "dogfood": "node scripts/dogfood.mjs",
+    "designs": "node scripts/designs.mjs",
+    "designs:check": "node scripts/designs.mjs --check"
   },
   "dependencies": {
     "effect": "3.22.1",

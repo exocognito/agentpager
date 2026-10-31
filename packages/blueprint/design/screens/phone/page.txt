@@ -1,0 +1,16 @@
+-demo page: A background page in a sheet: Markdown titled by its first heading, with a Mermaid flowchart drawn on the phone.
+
+app "AgentPager" [0,0 390x844]
+ window [0,0 390x844]
+  button "Sheet Grabber" value="Expanded" [157,42 76x25]
+  navbar #How the mix-up happens [0,63 390x54]
+   text "How the mix-up happens" [95,74 198x20]
+  scroll [0,47 390x797]
+   text "Attached by Codex · 1 min read" [20,129 188x15]
+   text "Every few seconds the agent asks the service "is there work for me?". Usually the answer is "no", and that's normal." [20,160 334x61]
+   text "Sometimes the service says "yes, here is job A" but the reply never arrives: the connection dropped on the way back. The service has already marked A as running. The agent, having heard nothing, asks again, and this time gets job B." [20,232 350x124]
+   text "Now A sits marked as running forever, with nobody working on it. That's the stuck job you'd see on the page." [20,366 350x61]
+   other "Diagram: ask, reply lost, ask again, B taken, A stuck" [20,441 350x200]
+   text "We don't know how often this happens in production. Option A makes the stuck state visible so you can clear it by hand; option B makes the service remember the hand-off so a retry gets A back." [20,655 343x103]
+   other "Vertical scroll bar, 1 page" value="0%" [357,117 30x679]
+   other "Vertical scroll bar, 1 page" value="0%" [357,117 30x679]

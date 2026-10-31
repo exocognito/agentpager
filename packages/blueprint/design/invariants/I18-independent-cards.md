@@ -3,9 +3,9 @@ id: I18::independent-cards
 serves:
   - SI7
   - SI8
-statement: Cards have independent identities and can be queued, answered and acknowledged in any order once the pager is paired.
+statement: Decisions have independent identities and can be asked, answered and acknowledged in any order.
 caveats:
-  - The proof answers three cards in one out-of-order sequence (the third before the second). It does not try every order, and never sends two answers at the same moment.
+  - No proof tries every order. The phone's journey test answers one of an agent's two open decisions and leaves the other open, and nothing sends two answers at the same moment.
 ---
 
-Answering or acknowledging one card never changes another. Until the pager is paired, the agent can ask no card.
+Answering or acknowledging one decision never changes another, whether they come from one agent or from several on the same pager.

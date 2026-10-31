@@ -3,22 +3,29 @@ import { Schema } from "effect";
 import { Body, ConnectInput, Decision, LABEL_MAX_CHARACTERS, QuestionInput } from "./exchange.ts";
 const token = "a".repeat(32), answerId = "b".repeat(32);
 const when = "2026-09-29T12:00:00.000Z";
-const question = {decisionId:token,kind:"card",status:"open",title:"Send update?",askedAt:when,card:{type:"generic",options:[{number:1,emoji:"📨",title:"Send it"},{number:2,emoji:"🗑️",title:"Don’t send"}]}};
+const brief = {type:"brief",recommended:2,options:[{number:1,title:"First plan",prioritizes:"speed"},{number:2,title:"Second plan",prioritizes:"safety"}],markdown:"## Context: two plans\nBoth are ready to start.\n\n## Options\n\n## Recommendation: B\n**Why:** It is safer.\n"};
+const question = {decisionId:token,status:"open",title:"Send update?",askedAt:when,card:brief};
 it("refuses HTML rich bodies instead of cleaning or executing them",()=>{expect(Schema.is(Body)("<script>alert(1)</script>")).toBe(false)});
 it("counts body characters and refuses 1001 whole",()=>{expect(Schema.is(Body)("👨‍👩‍👧".repeat(1000))).toBe(true);expect(Schema.is(Body)("👨‍👩‍👧".repeat(1001))).toBe(false)});
 it("refuses malformed Unicode and blank rich bodies",()=>{expect(Schema.is(Body)("\uD800")).toBe(false);expect(Schema.is(Body)(" ")).toBe(false)});
-it("accepts a recommended option only when the card offers it",()=>{const card=(recommended:number)=>({...question,card:{...question.card,recommended}});expect(Schema.is(Decision)(card(2))).toBe(true);expect(Schema.is(Decision)(card(3))).toBe(false)});
+it("accepts a recommended option only when the card offers it",()=>{const card=(recommended:number)=>({...question,card:{...question.card,recommended,markdown:question.card.markdown.replace("Recommendation: B",`Recommendation: ${"ABCD"[recommended-1]}`)}});expect(Schema.is(Decision)(card(2))).toBe(true);expect(Schema.is(Decision)(card(3))).toBe(false)});
 it("refuses an answer naming an option the card does not offer",()=>{expect(Schema.is(Decision)({...question,status:"answered",answer:{answerId,decisionId:token,sentAt:when,choice:{kind:"option",number:3}}})).toBe(false)});
 it("refuses an acknowledgement of another decision",()=>{expect(Schema.is(Decision)({...question,status:"acknowledged",answer:{answerId,decisionId:token,sentAt:when,choice:{kind:"option",number:1}},acknowledgement:{decisionId:answerId,answerId,nextSteps:"Will send it.",acknowledgedAt:when}})).toBe(false)});
 it("records collection and the pickup warning only for an answer, and neither is an acknowledgement",()=>{const answer={answerId,decisionId:token,sentAt:when,choice:{kind:"option",number:1}};expect(Schema.is(Decision)({...question,status:"answered",answer,collectedAt:when,warnedAt:when})).toBe(true);expect(Schema.is(Decision)({...question,collectedAt:when})).toBe(false);expect(Schema.is(Decision)({...question,warnedAt:when})).toBe(false);expect(Schema.is(Decision)({...question,status:"acknowledged",answer,collectedAt:when})).toBe(false)});
 it("keeps feedback as a final immutable answer even after acknowledgement",()=>{expect(Schema.is(Decision)({...question,status:"feedback",answer:{answerId,decisionId:token,sentAt:when,choice:{kind:"feedback",text:"Please shorten it."}},acknowledgement:{decisionId:token,answerId,nextSteps:"Will revise.",acknowledgedAt:when}})).toBe(true)});
 
-// Every new card is a brief; a decision still admits the retired emoji card (QuestionInput says why).
-const brief = {type:"brief",recommended:2,options:[{number:1,title:"First plan",prioritizes:"speed"},{number:2,title:"Second plan",prioritizes:"safety"}],markdown:"## Context: two plans\nBoth are ready to start.\n\n## Options\n\n## Recommendation: B\n**Why:** It is safer.\n"};
-it('takes only briefs as new questions, while a decision still admits the retired emoji card', () => {
+// Every card is a brief: neither a new question nor a decision admits the retired emoji card.
+const emojiCard = {type:"generic",options:[{number:1,emoji:"📨",title:"Send it"},{number:2,emoji:"🗑️",title:"Don’t send"}]};
+it('takes only briefs, as new questions and as decisions', () => {
   expect(Schema.is(QuestionInput)({title:'Review',card:brief})).toBe(true);
-  expect(Schema.is(QuestionInput)({title:'Review',card:question.card})).toBe(false);
+  expect(Schema.is(QuestionInput)({title:'Review',card:emojiCard})).toBe(false);
   expect(Schema.is(Decision)(question)).toBe(true);
+  expect(Schema.is(Decision)({...question,card:emojiCard})).toBe(false);
+});
+it('holds a title to 100 characters, as asked and as stored', () => {
+  expect(Schema.is(QuestionInput)({title:'x'.repeat(100),card:brief})).toBe(true);
+  expect(Schema.is(QuestionInput)({title:'x'.repeat(101),card:brief})).toBe(false);
+  expect(Schema.is(Decision)({...question,title:'x'.repeat(101)})).toBe(false);
 });
 
 it('refuses malformed Unicode in card prose', () => {
@@ -40,9 +47,10 @@ it('rejects excess card fields and unknown card types rather than silently dropp
   }
 });
 
-it("has no pairing decision: every decision is a card", () => {
-  expect(Schema.is(Decision)(question)).toBe(true);
-  expect(Schema.is(Decision)({ ...question, kind: "pairing" })).toBe(false);
+it("has no kind: a stored decision that still names one is refused, not read", () => {
+  const strict = Schema.decodeUnknownEither(Decision, { onExcessProperty: "error" });
+  expect(strict(question)._tag).toBe("Right");
+  expect(strict({ ...question, kind: "card" })._tag).toBe("Left");
 });
 
 it("names who asked and the project in short prose, and refuses unknown connect fields", () => {

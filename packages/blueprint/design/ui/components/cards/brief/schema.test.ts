@@ -1,7 +1,7 @@
 import { expect, it } from "vitest";
 import { Schema } from "effect";
 import { QuestionInput } from "../../../../schemas/exchange.ts";
-import { briefProblem, missingAttachment, proseLines, withKeycaps, withoutCodeSpans, Payload } from "./schema.ts";
+import { briefProblem, missingAttachment, proseLines, withoutCodeSpans, Payload } from "./schema.ts";
 
 const options = [{ number: 1, title: "Delete them", label: "Delete", prioritizes: "a clean branch list" }, { number: 2, title: "Keep them", prioritizes: "old links" }];
 const brief = (markdown: string, extra: Record<string, unknown> = {}) => ({ title: "Delete 14 branches?", card: { type: "brief", options, recommended: 1, markdown }, ...extra });
@@ -91,9 +91,10 @@ it("reads every line of a chat as chat, fence markers included", () => {
   expect(proseLines("```\n[a](b)\n```\n" + chat)).toContain("From: [secret](notes.md)");
   expect(proseLines("```\n[a](b)\n```")).toEqual([]);
 });
-it("gives each option its number's keycap for phones from before briefs, unless the agent chose an emoji", () => {
-  const card = Schema.decodeUnknownSync(Payload)({ type: "brief", options: [...options.slice(0, 1), { ...options[1], emoji: "🗂️" }], recommended: 1, markdown: ok });
-  expect(withKeycaps(card).options.map(o => o.emoji)).toEqual(["1️⃣", "🗂️"]);
+it("marks options by letter alone: an option with an emoji is refused", () => {
+  const card = (second: object) => Schema.decodeUnknownEither(Payload, { onExcessProperty: "error" })({ type: "brief", options: [options[0], second], recommended: 1, markdown: ok });
+  expect(card(options[1])._tag).toBe("Right");
+  expect(card({ ...options[1], emoji: "🗂️" })._tag).toBe("Left");
 });
 it("keeps attachments to briefs and pages to their own rules", () => {
   const page = { name: "background.md", type: "text/markdown", text: "# Why\nSee ![A](a.png)" };

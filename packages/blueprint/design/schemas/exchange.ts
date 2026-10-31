@@ -1,11 +1,10 @@
 import { Schema } from "effect";
-import { Token, Text, Body, Timestamp, OptionNumber, ValidProse, characters } from "./values.ts";
-import { Card, acceptsChoice } from "../ui/components/cards/schemas.ts";
+import { Token, Text, Title, Body, Timestamp, OptionNumber, ValidProse, characters } from "./values.ts";
 import { Attachments, AttachmentInfo, attachmentTypes, missingAttachment, Payload as BriefCard } from "../ui/components/cards/brief/schema.ts";
 
 // The live wire contract (v2, docs/v2/01-decisions.md): every shape the server, the agentpager binary and the phone
 // exchange. The server (packages/app) and the binary (packages/cli) decode with these schemas; the iPhone app mirrors
-// them in Model/API.swift. The primitives live in values.ts and the cards in ui/components/cards; this module
+// them in Model/API.swift. The primitives live in values.ts and the brief in ui/components/cards/brief; this module
 // re-exports the primitives so one import carries the whole contract.
 // A pager is made on the owner's phone and is either on or off; an agent is whatever connected to a pager with its
 // number, and lasts until it finishes or is forgotten.
@@ -69,13 +68,14 @@ export type Acknowledgement = typeof Acknowledgement.Type;
 export const Receipt = Schema.Struct({ decisionId: Token, answerId: Token, sentAt: Timestamp });
 export type Receipt = typeof Receipt.Type;
 
-// Attachments come only with a brief, and every image or page the brief names must be one of them.
-const briefLinks = (q: { card: Card; attachments?: ReadonlyArray<{ name: string; type: AttachmentInfo["type"] }> }) =>
-  q.card.type === "brief" ? missingAttachment(q.card.markdown, attachmentTypes(q.attachments)) ?? true
-    : q.attachments === undefined || "attachments come only with a brief card";
-// Every new card is a brief. Decision.card also admits the retired emoji card ("generic"), which no v2 decision holds.
+// Every image or page the brief names must be one of its attachments.
+const briefLinks = (q: { card: BriefCard; attachments?: ReadonlyArray<{ name: string; type: AttachmentInfo["type"] }> }) =>
+  missingAttachment(q.card.markdown, attachmentTypes(q.attachments)) ?? true;
+export const acceptsChoice = (card: BriefCard, choice: Choice) =>
+  choice.kind === "feedback" || card.options.some((option) => option.number === choice.number);
+// Every card is a brief.
 export const QuestionInput = Schema.Struct({
-  title: Text,
+  title: Title,
   detail: Schema.optional(Body),
   card: BriefCard,
   attachments: Schema.optional(Attachments),
@@ -83,12 +83,10 @@ export const QuestionInput = Schema.Struct({
 export type QuestionInput = typeof QuestionInput.Type;
 export const Decision = Schema.Struct({
   decisionId: Token,
-  // Always "card". Stored decisions carry it and are decoded strictly; neither the phone nor the binary reads it.
-  kind: Schema.Literal("card"),
   status: DecisionStatus,
-  title: Text,
+  title: Title,
   detail: Schema.optional(Body),
-  card: Card,
+  card: BriefCard,
   attachments: Schema.optional(Schema.Array(AttachmentInfo)),
   askedAt: Timestamp,
   answer: Schema.optional(Answer),

@@ -8,8 +8,9 @@ try {
   if (execFileSync('git', ['status', '--porcelain'], { encoding: 'utf8' }).trim()) throw new Error('Commit the candidate and clean the tree before deploy.');
   const sha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
   const serviceToken = readFileSync(path.join(homedir(), 'Agents/.secrets/op-service-account.token'), 'utf8').trim();
+  // The Cloudflare token's item, by id so a rename in 1Password can't break the deploy ("Cloudflare agentpager.me").
   let item;
-  try { item = JSON.parse(execFileSync('op', ['item', 'get', 'Cloudflare ownerpager', '--vault', 'Yolo Sam', '--format', 'json'], { env: { ...process.env, OP_SERVICE_ACCOUNT_TOKEN: serviceToken }, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 30_000 })); }
+  try { item = JSON.parse(execFileSync('op', ['item', 'get', 'k2rptzp2jwfoxsqvrguxxizsgi', '--vault', 'Yolo Sam', '--format', 'json'], { env: { ...process.env, OP_SERVICE_ACCOUNT_TOKEN: serviceToken }, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 30_000 })); }
   catch { throw new Error('Vault credential lookup failed (output withheld).'); }
   const field = name => item.fields.find(f => f.label === name || f.id === name)?.value;
   const credential = field('credential'), account = field('account_id');

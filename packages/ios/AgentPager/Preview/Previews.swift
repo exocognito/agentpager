@@ -173,7 +173,7 @@ extension Sample {
         case "undo": m.path = [.pager(work)]; m.undo = PreparedAnswer(pagerId: work, agentId: codex, decisionId: m11, requestId: "r", choice: .option(1), deadline: .now.addingTimeInterval(3600))
         case "notconfirmed":
             let p = PreparedAnswer(pagerId: work, agentId: codex, decisionId: m11, requestId: "r", choice: .option(1), deadline: .now)
-            m.path = [.pager(work)]; m.inFlight[m11] = p; m.notConfirmed = p
+            m.path = [.pager(work)]; m.inFlight[m11] = p; m.notConfirmed = [p]
         default: break
         }
         return m

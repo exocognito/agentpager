@@ -160,6 +160,47 @@ final class FlowTests: XCTestCase {
         XCTAssertThrowsError(try agent.ask("Again?", options: ["One", "Two"])) { e in XCTAssertEqual((e as? ToolError)?.tag, "AgentFinished") }
     }
 
+    // I6: two answers that both fail are both reported, by name, and Retry sends both; neither is lost.
+    func testTwoAnswersNotConfirmed() throws {
+        launch(extra: ["-failSends", "8"])
+        let number = makePager("Ferries")
+        try agent.connect(number: number, app: "Claude", project: "ferries")
+        let early = try agent.ask("Take the early ferry?", options: ["Early", "Late"])
+        let cabin = try agent.ask("Book a cabin?", options: ["Cabin", "Seat"])
+        open("Take the early ferry?")
+        app.buttons["tile-A"].tap()
+        app.buttons["send-option"].tap()
+        open("Book a cabin?")
+        app.buttons["tile-B"].tap()
+        app.buttons["send-option"].tap()
+        let alert = app.alerts["Answer Not Confirmed"]
+        wait(alert, 30)
+        let names = { (title: String) in alert.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", title)).count > 0 }
+        waitUntil(30, "both answers named") { names("Take the early ferry?") && names("Book a cabin?") }
+        shot("40-two-not-confirmed")
+        alert.buttons["Retry"].tap()
+        XCTAssertEqual(((try XCTUnwrap(try agent.waitForAnswer(early, seconds: 15)))["choice"] as! [String: Any])["number"] as? Int, 1)
+        XCTAssertEqual(((try XCTUnwrap(try agent.waitForAnswer(cabin, seconds: 15)))["choice"] as! [String: Any])["number"] as? Int, 2)
+    }
+
+    // An app killed while its answer is still sending sends it on the next launch.
+    func testAnswerSurvivesRelaunch() throws {
+        launch(extra: ["-failSends", "100"])
+        let number = makePager("Relaunch")
+        try agent.connect(number: number, app: "Claude", project: "relaunch")
+        let late = try agent.ask("Order the parts?", options: ["Order", "Wait"])
+        open("Order the parts?")
+        app.buttons["tile-A"].tap()
+        app.buttons["send-option"].tap()
+        RunLoop.current.run(until: Date().addingTimeInterval(8)) // past Undo, into the failing retries
+        app.terminate()
+        XCTAssertNil(try agent.waitForAnswer(late, seconds: 1), "not sent while every attempt failed")
+        app.launchArguments = ["-AgentPagerServerURL", AgentHarness.server.absoluteString]
+        launch()
+        let answer = try XCTUnwrap(try agent.waitForAnswer(late, seconds: 20))
+        XCTAssertEqual((answer["choice"] as! [String: Any])["number"] as? Int, 1)
+    }
+
     // Off: the agent is refused and nothing is queued; the phone keeps the decision and offers Turn on.
     func testOffAndOn() throws {
         launch()

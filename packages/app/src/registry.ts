@@ -67,7 +67,14 @@ export class Registry {
       const action = new URL(request.url).pathname.slice(1), data = await body(request);
       if (action === 'create') {
         const p = decode(Create, data);
-        if (this.row(p.pagerId)) throw C.refuse.pagerExists();
+        // The same phone making the same pager again (its reply was lost) gets the pager back, with the turn-off choice
+        // it asks for now; anyone else is refused.
+        const existing = this.row(p.pagerId);
+        if (existing) {
+          if (!sameDigest(p.phoneHash, existing.phone_hash) || existing.public_key !== p.publicKey || existing.fingerprint !== p.fingerprint) throw C.refuse.pagerExists();
+          if (existing.auto_off !== p.autoOff) this.ctx.storage.sql.exec('UPDATE pagers_v2 SET auto_off=?, off_at=? WHERE pager_id=?', p.autoOff, existing.enabled === 1 ? this.offAt(p.autoOff, now) : null, p.pagerId);
+          return json({ pager: this.pager(this.row(p.pagerId)) });
+        }
         this.ctx.storage.sql.exec('INSERT INTO pagers_v2 VALUES (?, ?, ?, ?, 1, ?, ?, NULL, NULL, ?)', p.pagerId, p.fingerprint, p.publicKey, p.phoneHash, p.autoOff, this.offAt(p.autoOff, now), now);
         return json({ pager: this.pager(this.row(p.pagerId)) });
       }

@@ -73,7 +73,7 @@ final class DriverTests: XCTestCase {
         let timeout = (cmd["timeout"] as? Double) ?? 5
         switch op {
         case "tree":
-            return ["ok": true, "tree": tree(target(cmd)).joined(separator: "\n")]
+            return ["ok": true, "tree": target(cmd).tree().joined(separator: "\n")]
         case "tap", "type", "wait", "swipe", "get":
             guard let el = find(cmd) else { return ["ok": false, "error": "give id, label or contains"] }
             // Act on a snapshot's frame by coordinate: an element that goes away after the tap (a sheet closing)
@@ -149,45 +149,9 @@ final class DriverTests: XCTestCase {
         }
     }
 
-    // One line per element worth naming; the keyboard is summarised.
-    private func tree(_ root: XCUIApplication) -> [String] {
-        guard let snap = try? root.snapshot() else { return ["(no snapshot)"] }
-        var lines: [String] = []
-        func walk(_ s: XCUIElementSnapshot, _ depth: Int) {
-            if s.elementType == .keyboard { lines.append(String(repeating: " ", count: depth) + "keyboard"); return }
-            let value = (s.value as? String).map { $0.isEmpty ? "" : " value=\"\($0)\"" } ?? ""
-            let named = !s.identifier.isEmpty || !s.label.isEmpty || !value.isEmpty
-            var next = depth
-            if named || s.elementType != .other {
-                let f = s.frame
-                var line = String(repeating: " ", count: depth) + (Self.names[s.elementType] ?? "e\(s.elementType.rawValue)")
-                if !s.identifier.isEmpty { line += " #\(s.identifier)" }
-                if !s.label.isEmpty { line += " \"\(s.label)\"" }
-                line += value
-                line += " [\(Int(f.minX)),\(Int(f.minY)) \(Int(f.width))x\(Int(f.height))]"
-                if !s.isEnabled { line += " disabled" }
-                if s.isSelected { line += " selected" }
-                lines.append(line)
-                next = depth + 1
-            }
-            for child in s.children { walk(child, next) }
-        }
-        walk(snap, 0)
-        return lines
-    }
-
     private static let types: [String: XCUIElement.ElementType] = [
         "button": .button, "staticText": .staticText, "text": .staticText, "cell": .cell, "textField": .textField,
         "textView": .textView, "switch": .switch, "menuItem": .menuItem, "alert": .alert, "sheet": .sheet,
         "navigationBar": .navigationBar, "image": .image, "icon": .icon, "link": .link, "other": .other,
-    ]
-    private static let names: [XCUIElement.ElementType: String] = [
-        .application: "app", .window: "window", .alert: "alert", .sheet: "sheet", .button: "button",
-        .navigationBar: "navbar", .staticText: "text", .textField: "textField", .textView: "textView",
-        .cell: "cell", .switch: "switch", .toggle: "toggle", .image: "image", .icon: "icon", .link: "link",
-        .scrollView: "scroll", .collectionView: "collection", .table: "table", .menu: "menu", .menuItem: "menuItem",
-        .toolbar: "toolbar", .statusBar: "statusBar", .group: "group", .other: "other", .searchField: "search",
-        .segmentedControl: "segmented", .picker: "picker", .activityIndicator: "spinner",
-        .progressIndicator: "progress", .tabBar: "tabBar", .menuButton: "menuButton", .popover: "popover",
     ]
 }

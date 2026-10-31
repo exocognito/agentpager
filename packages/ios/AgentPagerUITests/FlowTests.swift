@@ -26,21 +26,21 @@ final class FlowTests: XCTestCase {
 
     // Makes a pager on the phone and lands on its screen. Returns its number, read from the detail screen.
     @discardableResult
-    private func makePager(_ name: String, shots: String? = nil) -> String {
+    private func makePager(_ name: String, shots: Bool = false) -> String {
         app.buttons["new-pager"].tap()
         let field = app.textFields["new-pager-name"]
         wait(field)
         field.typeText(name)
         let line = app.staticTexts["connect-line"]
         wait(line)
-        if let shots { shot("\(shots)-new-pager") }
+        if shots { shot("new-pager", after: "Tap +, type the name \"\(name)\"") }
         app.buttons["create-pager"].tap()
         wait(app.navigationBars[name], 10)
         app.tap() // lets the interruption monitor see the alerts prompt
         app.buttons["pager-settings"].tap()
         let detail = app.staticTexts["connect-line"]
         wait(detail)
-        if let shots { shot("\(shots)-detail") }
+        if shots { shot("pager-detail", after: "Tap Create, allow alerts, then tap the gear") }
         let number = String(detail.label.split(separator: " ").first { $0.hasPrefix("ap1_") } ?? "")
         XCTAssertTrue(number.hasPrefix("ap1_") && number.count == 36, number)
         back()
@@ -87,11 +87,11 @@ final class FlowTests: XCTestCase {
         wait(app.buttons["undo-button"], 3)
         let row = answeredRow("wake-lab", "Ship the fix tonight?")
         waitUntil(5 + pickup + 15, "the warning") { row.label.contains("Claude Desktop on air (wake-lab) hasn’t picked up your answer") }
-        shot("30-not-picked-up")
+        shot("not-picked-up", after: "Tap A, Send; no agent reads the answer within the pickup time")
         row.tap()
         let bar = app.descendants(matching: .any)["agent-confirmation"]
         wait(bar)
-        shot("31-not-picked-up-decision")
+        shot("not-picked-up-decision", after: "Tap the answered decision")
         back()
 
         guard let answer = try agent.waitForAnswer(late, seconds: 5) else { return XCTFail("no answer") }
@@ -104,9 +104,9 @@ final class FlowTests: XCTestCase {
     // Make a pager -> an agent connects with its number -> ask -> answer -> wait -> acknowledge -> the closed record.
     func testPagerJourney() throws {
         launch()
-        shot("01-pagers-empty")
-        let number = makePager("Work", shots: "02")
-        shot("03-pager-empty")
+        shot("pagers-empty", after: "Open the app with no pagers")
+        let number = makePager("Work", shots: true)
+        shot("pager-empty", after: "Go back to the new pager")
 
         try agent.connect(number: number, app: "Codex", project: "atomic-pages")
         _ = try agent.ask("What should we aim for first?", detail: "Maya’s team can start this week.", options: ["Ship to Maya’s team", "Reliability first"], recommended: 1)
@@ -118,22 +118,22 @@ final class FlowTests: XCTestCase {
         wait(app.buttons["open-Send Maya the update?"], 8)
         wait(app.buttons["open-Option detail: bottom sheet or full screen?"], 8)
         XCTAssertTrue(app.staticTexts["ATOMIC-PAGES"].exists || app.staticTexts["atomic-pages"].exists, "grouped by project")
-        shot("04-pager-open")
+        shot("pager-open", after: "Codex (atomic-pages) connects with the number and asks two decisions; Claude Code (agentpager) connects and asks one")
         back()
         waitUntil(5, "the badge counts both agents' open decisions") { app.buttons["pager-Work"].label.contains("3 open") }
-        shot("05-pagers-badge")
+        shot("pagers-badge", after: "Go back to Pagers")
         app.buttons["pager-Work"].tap()
 
         open("Send Maya the update?")
         XCTAssertEqual(app.staticTexts["who-asked"].label, "Codex")
         XCTAssertFalse(app.buttons["send-option"].exists, "nothing to send until an option is picked")
-        shot("06-decision")
+        shot("decision", after: "Open Work, then \"Send Maya the update?\"")
         app.buttons["tile-B"].tap()
-        shot("07-decision-picked")
+        shot("decision-picked", after: "Tap B")
         let sentAt = Date()
         app.buttons["send-option"].tap()
         wait(app.buttons["undo-button"], 3)
-        shot("08-undo-window")
+        shot("undo-window", after: "Tap Send option B: back on the pager, the Undo window counts down")
 
         guard let answer = try agent.waitForAnswer(maya, seconds: 20) else { return XCTFail("no answer") }
         XCTAssertGreaterThan(Date().timeIntervalSince(sentAt), 4.5, "the answer waited out the Undo window")
@@ -144,7 +144,7 @@ final class FlowTests: XCTestCase {
         waitUntil(6, "waiting row") { row.label.contains("Waiting for Codex") }
         try agent.acknowledge(maya, answerId: answer["answerId"] as! String, nextSteps: "Sending it at 9:00 tomorrow.")
         waitUntil(8, "green tick") { row.label.contains("Agent confirmed") }
-        shot("09-answered-list")
+        shot("answered-list", after: "The answer goes once Undo closes; Codex reads it and confirms. Tap atomic-pages' \"answered\" row")
 
         row.tap()
         let record = app.descendants(matching: .any)["agent-confirmation"]
@@ -152,7 +152,7 @@ final class FlowTests: XCTestCase {
         XCTAssertTrue(record.label.contains("Sending it at 9:00 tomorrow."), record.label)
         XCTAssertTrue(app.descendants(matching: .any)["closed-choice"].label.contains("You chose B"))
         XCTAssertFalse(app.buttons["tile-A"].exists, "a closed decision can't be answered again")
-        shot("10-answered-decision")
+        shot("answered-decision", after: "Tap the decision: the closed record")
 
         // Finishing shows on the decision; the agent asks nothing more.
         try agent.finish()
@@ -177,7 +177,7 @@ final class FlowTests: XCTestCase {
         wait(alert, 30)
         let names = { (title: String) in alert.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", title)).count > 0 }
         waitUntil(30, "both answers named") { names("Take the early ferry?") && names("Book a cabin?") }
-        shot("40-two-not-confirmed")
+        shot("two-not-confirmed", after: "Answer both while every send fails")
         alert.buttons["Retry"].tap()
         XCTAssertEqual(((try XCTUnwrap(try agent.waitForAnswer(early, seconds: 15)))["choice"] as! [String: Any])["number"] as? Int, 1)
         XCTAssertEqual(((try XCTUnwrap(try agent.waitForAnswer(cabin, seconds: 15)))["choice"] as! [String: Any])["number"] as? Int, 2)
@@ -213,21 +213,22 @@ final class FlowTests: XCTestCase {
         wait(toggle)
         toggle.switches.firstMatch.tap()
         waitUntil(6, "pager off") { (try? self.agent.pagerOn()) == false }
-        shot("20-detail-off")
+        shot("detail-off", after: "Codex asks \"Before off?\"; tap the gear, then switch the pager off")
         XCTAssertThrowsError(try agent.ask("While off?", options: ["One", "Two"])) { e in XCTAssertEqual((e as? ToolError)?.tag, "PagerOff") }
         back()
         back()
         waitUntil(5, "off on the Pagers screen") { app.buttons["pager-Acme project"].label.contains("Off since") }
-        shot("21-pagers-off")
+        shot("pagers-off", after: "Codex's next ask is refused PagerOff. Go back to Pagers")
         app.buttons["pager-Acme project"].tap()
         open("Before off?")
         let bar = app.descendants(matching: .any)["pager-off-bar"]
         wait(bar)
         XCTAssertFalse(app.buttons["tile-A"].isEnabled, "nothing can be sent while off")
-        shot("22-decision-off")
+        shot("decision-off", after: "Open Acme project, then \"Before off?\"")
         app.buttons["turn-on"].tap()
         waitUntil(6, "pager on") { (try? self.agent.pagerOn()) == true }
         wait(app.buttons["ask-for-changes"], 5)
+        shot("decision-on", after: "Tap Turn on: the answer bar is back")
         app.buttons["tile-A"].tap()
         app.buttons["send-option"].tap()
         let answer = try XCTUnwrap(try agent.waitForAnswer(first, seconds: 15))
@@ -248,7 +249,7 @@ final class FlowTests: XCTestCase {
         app.buttons["send-option"].tap()
         let alert = app.alerts["Answer Not Confirmed"]
         wait(alert, 25)
-        shot("30-answer-not-confirmed")
+        shot("answer-not-confirmed", after: "Claude asks \"Book the 7:40 train?\"; open it, tap A, Send; every retry fails")
         XCTAssertNil(try agent.waitForAnswer(flaky, seconds: 1))
         alert.buttons["Retry"].tap()
         let flakyAnswer = try XCTUnwrap(try agent.waitForAnswer(flaky, seconds: 10))
@@ -263,7 +264,7 @@ final class FlowTests: XCTestCase {
         app.buttons["undo-button"].tap()
         wait(app.buttons["send-option"], 5)
         XCTAssertTrue(app.buttons["tile-B"].isSelected)
-        shot("31-undo-reopened")
+        shot("undo-reopened", after: "Retry sends it. Claude asks \"Which hotel?\"; open it, tap B, Send, then Undo inside the window")
         back()
         XCTAssertNil(try agent.waitForAnswer(hotel, seconds: 7), "an undone answer is never sent")
 
@@ -286,7 +287,7 @@ final class FlowTests: XCTestCase {
         let field = app.textViews["feedback-text"]
         wait(field)
         field.typeText("Please find somewhere vegetarian.")
-        shot("32-ask-for-changes")
+        shot("ask-for-changes", after: "Send again and leave the app: it sends at once. Claude asks \"Dinner on Friday?\"; open it, tap Ask for changes, type a note")
         app.buttons["send-feedback"].tap()
         let feedback = try XCTUnwrap(try agent.waitForAnswer(dinner, seconds: 15))
         XCTAssertEqual((feedback["choice"] as! [String: Any])["text"] as? String, "Please find somewhere vegetarian.")
@@ -296,7 +297,7 @@ final class FlowTests: XCTestCase {
         row.tap()
         wait(app.descendants(matching: .any)["closed-choice"])
         XCTAssertTrue(app.descendants(matching: .any)["closed-choice"].label.contains("Please find somewhere vegetarian."))
-        shot("33-note-answered")
+        shot("note-answered", after: "Send the note; Claude confirms. Open trip planner's answered list, then the decision")
     }
 
     // Delete: the pager leaves the phone and the service; its agents can't reach the phone again.
@@ -307,13 +308,16 @@ final class FlowTests: XCTestCase {
         _ = try agent.ask("Keep the VM's build cache?", options: ["Keep", "Clear"])
         wait(app.buttons["open-Keep the VM's build cache?"], 8)
         app.buttons["pager-settings"].tap()
+        wait(app.buttons["delete-pager"])
+        shot("detail", after: "Codex asks \"Keep the VM's build cache?\"; tap the gear")
         app.buttons["delete-pager"].tap()
         let confirm = app.buttons.matching(NSPredicate(format: "label == 'Delete pager' AND identifier != 'delete-pager'")).firstMatch
         wait(confirm, 5)
-        shot("40-delete-confirm")
+        shot("delete-confirm", after: "Tap Delete pager")
         confirm.tap()
         wait(app.navigationBars["Pagers"], 8)
         XCTAssertFalse(app.buttons["pager-VM scratch"].exists)
+        shot("pagers-after", after: "Tap Delete pager again to confirm: back on Pagers, the pager gone")
         XCTAssertThrowsError(try agent.ask("Still there?", options: ["One", "Two"])) { e in
             XCTAssertEqual((e as? ToolError)?.tag, "UnknownAgent")
         }

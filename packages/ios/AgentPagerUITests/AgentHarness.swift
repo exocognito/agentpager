@@ -95,15 +95,28 @@ final class AgentHarness {
 }
 
 extension XCTestCase {
-    func shot(_ name: String) {
+    // A frame of this test's journey: the screenshot, and the action that led to it. Kept in the test result and,
+    // with SCREENSHOT_DIR set, saved as <dir>/<test>/<name>.png with a line "<name>\t<action>" in frames.tsv, so
+    // the journey reads frame, action, frame (packages/blueprint/design/screens/journeys).
+    func shot(_ name: String, after action: String) {
         let png = XCUIScreen.main.screenshot().pngRepresentation
         let attachment = XCTAttachment(data: png, uniformTypeIdentifier: "public.png")
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)
-        if let dir = ProcessInfo.processInfo.environment["SCREENSHOT_DIR"] {
-            try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
-            try? png.write(to: URL(fileURLWithPath: dir).appendingPathComponent("\(name).png"))
+        guard let dir = ProcessInfo.processInfo.environment["SCREENSHOT_DIR"] else { return }
+        // "-[FlowTests testPagerJourney]" -> "testPagerJourney"
+        let test = String(self.name.split(separator: " ").last?.dropLast() ?? "test")
+        let folder = URL(fileURLWithPath: dir).appendingPathComponent(test)
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try? png.write(to: folder.appendingPathComponent("\(name).png"))
+        let line = Data("\(name)\t\(action)\n".utf8), log = folder.appendingPathComponent("frames.tsv")
+        if let file = try? FileHandle(forWritingTo: log) {
+            file.seekToEndOfFile()
+            file.write(line)
+            file.closeFile()
+        } else {
+            try? line.write(to: log)
         }
     }
 
@@ -119,4 +132,44 @@ extension XCTestCase {
         }
         XCTFail("timed out: \(what)", file: file, line: line)
     }
+}
+
+extension XCUIApplication {
+    // What is on screen as text: one line per element worth naming, indented by depth, as type #identifier "label"
+    // value="…" [x,y wxh] in points, then disabled or selected. The keyboard is summarised.
+    func tree() -> [String] {
+        guard let snap = try? snapshot() else { return ["(no snapshot)"] }
+        var lines: [String] = []
+        func walk(_ s: XCUIElementSnapshot, _ depth: Int) {
+            if s.elementType == .keyboard { lines.append(String(repeating: " ", count: depth) + "keyboard"); return }
+            let value = (s.value as? String).map { $0.isEmpty ? "" : " value=\"\($0)\"" } ?? ""
+            let named = !s.identifier.isEmpty || !s.label.isEmpty || !value.isEmpty
+            var next = depth
+            if named || s.elementType != .other {
+                let f = s.frame
+                var line = String(repeating: " ", count: depth) + (Self.names[s.elementType] ?? "e\(s.elementType.rawValue)")
+                if !s.identifier.isEmpty { line += " #\(s.identifier)" }
+                if !s.label.isEmpty { line += " \"\(s.label)\"" }
+                line += value
+                line += " [\(Int(f.minX)),\(Int(f.minY)) \(Int(f.width))x\(Int(f.height))]"
+                if !s.isEnabled { line += " disabled" }
+                if s.isSelected { line += " selected" }
+                lines.append(line)
+                next = depth + 1
+            }
+            for child in s.children { walk(child, next) }
+        }
+        walk(snap, 0)
+        return lines
+    }
+
+    private static let names: [XCUIElement.ElementType: String] = [
+        .application: "app", .window: "window", .alert: "alert", .sheet: "sheet", .button: "button",
+        .navigationBar: "navbar", .staticText: "text", .textField: "textField", .textView: "textView",
+        .cell: "cell", .switch: "switch", .toggle: "toggle", .image: "image", .icon: "icon", .link: "link",
+        .scrollView: "scroll", .collectionView: "collection", .table: "table", .menu: "menu", .menuItem: "menuItem",
+        .toolbar: "toolbar", .statusBar: "statusBar", .group: "group", .other: "other", .searchField: "search",
+        .segmentedControl: "segmented", .picker: "picker", .activityIndicator: "spinner",
+        .progressIndicator: "progress", .tabBar: "tabBar", .menuButton: "menuButton", .popover: "popover",
+    ]
 }

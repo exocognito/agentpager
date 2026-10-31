@@ -2,7 +2,7 @@
 
 Bring an agent's decisions to the owner's phone. The [strategy](packages/blueprint/strategy/STRATEGY.md), [executable design](packages/blueprint/design/) with its [journeys](packages/blueprint/design/journeys/) and [wire contract](packages/blueprint/design/schemas/exchange.ts), and the [roadmap](packages/blueprint/roadmap/ROADMAP.md) are the product contract. The [workshop](packages/blueprint/records/workshop/) that preceded them is history: `strategy.md` there was promoted into the package with the edits `DEC-2026-09-25-mstart-scope` records, the tldraw board holds the round 3 proposal, and the visual workshop's variant E is the history behind the screens. The apps own appearance, and the [design catalogue](packages/blueprint/design/screens/README.md) records it.
 
-MCARDS, the first milestone, created `packages/app/` from this contract in a cleanroom run using [recipe.json](recipe.json). That recipe is retired with v2: it still targets the retired hosted MCP, so don't run it (`docs/v2/06-blueprint-update-plan.md`). `design/` is the one design folder. Alchemy is deferred by SP2.
+MCARDS, the first milestone, created `packages/app/` from this contract in a cleanroom run using [recipe.json](recipe.json). That recipe is retired with v2: it still targets the retired hosted MCP, so don't run it (`docs/v2/06-blueprint-update-plan.md`). `design/` is the one design folder.
 
 ## Layout
 

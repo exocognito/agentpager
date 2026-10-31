@@ -3,8 +3,8 @@ id: DEC-2026-10-31-next-roadmap
 date: 2026-10-31
 decidedBy: Sam
 basis:
-  - Sam in Claude Code, 2026-10-31, on the next roadmap: E2EE; easy installs of the command and TestFlight; a redesigned marketing page that is "simple, clear, up to date and looks good"; cleaned-up code and Blueprint published on GitHub with a clean history, "so people can inspect code, fork and self-host"; then initial external users and their feedback
-  - The same message: "No Android, Lock Screen, Live Activities, Pro version, etc. I don't need them yet, so there's no signal to prioritize them", and that the first three "can be done in parallel"
+  - 'Sam in Claude Code, 2026-10-31, on the next roadmap. Its goals: E2EE; easy installs of the command and TestFlight; a redesigned marketing page that is "simple, clear, up to date and looks good"; cleaned-up code and Blueprint published on GitHub with a clean history, "so people can inspect code, fork and self-host"; then initial external users and their feedback'
+  - 'The same message, on what to leave out: "No Android, Lock Screen, Live Activities, Pro version, etc. I don''t need them yet, so there''s no signal to prioritize them". And on order: the first three "can be done in parallel"'
 ---
 
 # The next roadmap gets AgentPager ready for its first owners

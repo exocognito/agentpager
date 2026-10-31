@@ -1,81 +1,21 @@
-import { Schema } from 'effect';
-import { Token, Timestamp, ValidProse, characters } from '../../blueprint/design/schemas/values.ts';
-import { Decision, QuestionInput, AnswerInput, AcknowledgementInput, Acknowledgement, Answer, Receipt } from '../../blueprint/design/schemas/exchange.ts';
-export { Token, Timestamp, Decision, QuestionInput, AnswerInput, AcknowledgementInput, Acknowledgement, Answer, Receipt };
+import { MAX_OPEN_DECISIONS, type Receipt, type RefusalTag } from '../../blueprint/design/schemas/exchange.ts';
 
-// The v2 model (docs/v2/01-decisions.md). A pager is made on the owner's phone and is either on or off; an agent is
-// whatever connected to a pager with its number, and lasts until it finishes or is forgotten.
-const strict = { parseOptions: { onExcessProperty: 'error' as const } };
+// The server's side of the contract. The wire contract itself, every shape a client sends or receives, is the
+// Blueprint's (packages/blueprint/design/schemas/exchange.ts); it is re-exported so the server reads one namespace.
+// What follows is the server's own: its clocks and the words of its refusals.
+export * from '../../blueprint/design/schemas/exchange.ts';
 
-export const MAX_OPEN_DECISIONS = 10;
-export const ANSWER_WAIT_MAX_SECONDS = 50;
 // Housekeeping: an agent is forgotten this long after its last activity.
 export const AGENT_IDLE_MS = 30 * 24 * 3_600_000;
 // An answer no agent has collected this long after Send gets one alert, and the phone says so (I6).
 export const PICKUP_MS = 3 * 60_000;
-
-// A pager turns off by itself after this long on, or never.
+// How long each auto-off choice keeps a pager on.
 export const AUTO_OFF = { '24h': 24 * 3_600_000, '7d': 7 * 24 * 3_600_000, '30d': 30 * 24 * 3_600_000 } as const;
-export const AutoOff = Schema.Literal('never', '24h', '7d', '30d');
-export type AutoOff = typeof AutoOff.Type;
 
-// The pager number, made on the phone: `ap1_` and base64url of the pager id (16 bytes) and the first 8 bytes of the
-// SHA-256 of the pager's public key (docs/v2/04-encryption.md §2). The server keys the pager by the id, as 32 hex.
-export const PagerNumber = Schema.String.pipe(Schema.pattern(/^ap1_[A-Za-z0-9_-]{32}$/));
-export const PagerId = Schema.String.pipe(Schema.pattern(/^[0-9a-f]{32}$/));
-// A Curve25519 public key: 32 bytes, base64url without padding.
-export const PublicKey = Schema.String.pipe(Schema.pattern(/^[A-Za-z0-9_-]{43}$/));
-// Who asked ("Codex") and the project its decisions are grouped under ("atomic-pages").
-export const LABEL_MAX_CHARACTERS = 60;
-export const Label = ValidProse.pipe(Schema.filter(text => characters(text) <= LABEL_MAX_CHARACTERS || `text may not exceed ${LABEL_MAX_CHARACTERS} characters`));
-
-const Count = Schema.Number.pipe(Schema.int(), Schema.nonNegative());
-// What the phone sees of a pager. The name lives only on the phone.
-export const Pager = Schema.Struct({
-  pagerId: PagerId, on: Schema.Boolean, autoOff: AutoOff,
-  // While on: when it turns off by itself, if ever. While off: since when.
-  offAt: Schema.NullOr(Timestamp), offSince: Schema.NullOr(Timestamp), createdAt: Timestamp,
-});
-export type Pager = typeof Pager.Type;
-// machine: the computer it runs on, by its short hostname, when the agent said.
-export const Agent = Schema.Struct({
-  agentId: Token, app: Label, project: Label, machine: Schema.optional(Label), createdAt: Timestamp, finishedAt: Schema.NullOr(Timestamp),
-  lastActivityAt: Timestamp, openCount: Count,
-});
-export type Agent = typeof Agent.Type;
-
-// Requests.
-export const CreatePagerInput = Schema.Struct({ number: PagerNumber, publicKey: PublicKey, autoOff: AutoOff }).annotations(strict);
-export const PagerSettingsInput = Schema.Struct({ on: Schema.optional(Schema.Boolean), autoOff: Schema.optional(AutoOff) }).annotations(strict);
-export const ConnectInput = Schema.Struct({ number: Schema.String, app: Label, project: Label, machine: Schema.optional(Label) }).annotations(strict);
-
-// Responses.
-export const PagerReply = Schema.Struct({ pager: Pager });
-export const AgentInbox = Schema.Struct({ agent: Agent, open: Schema.Array(Decision), answered: Schema.Array(Decision) });
-export type AgentInbox = typeof AgentInbox.Type;
-export const PagerInbox = Schema.Struct({ pager: Pager, agents: Schema.Array(AgentInbox) });
-export type PagerInbox = typeof PagerInbox.Type;
-export const Connected = Schema.Struct({ agent: Agent, agentKey: Token, message: Schema.String });
-export type Connected = typeof Connected.Type;
-export const AgentStatus = Schema.Struct({ agent: Agent, pager: Schema.Struct({ on: Schema.Boolean }) });
-export const Finished = Schema.Struct({ finishedAt: Timestamp });
-export const Asked = Schema.Struct({ decisionId: Token });
-export const AnswerStatus = Schema.Union(Schema.Struct({ status: Schema.Literal('pending') }), Schema.Struct({ status: Schema.Literal('answered'), answer: Answer }));
-
-export const AGENT_AUTH_HEADER = 'authorization';
-export const PHONE_AUTH_HEADER = 'x-phone-key';
-
-// Every refusal: { error: <tag>, message: <one plain sentence>, ...fields }.
-export const STATUS = {
-  InvalidInput: 400, Unauthorized: 401, UnknownAgent: 404, UnknownPager: 404, UnknownDecision: 404, UnknownFile: 404, NotFound: 404,
-  PagerOff: 409, PagerExists: 409, AgentFinished: 409, TooManyOpenDecisions: 409, NotAnswered: 409, AlreadyAcknowledged: 409,
-  AnswerMismatch: 409, AlreadyAnswered: 409, NumberInvalid: 410, PagerDeleted: 410,
-} as const;
-export type Tag = keyof typeof STATUS;
 export class Refusal extends Error {
-  readonly tag: Tag;
+  readonly tag: RefusalTag;
   readonly fields: Readonly<Record<string, unknown>>;
-  constructor(tag: Tag, message: string, fields: Readonly<Record<string, unknown>> = {}) { super(message); this.tag = tag; this.fields = fields; }
+  constructor(tag: RefusalTag, message: string, fields: Readonly<Record<string, unknown>> = {}) { super(message); this.tag = tag; this.fields = fields; }
 }
 export const refuse = {
   invalid: (reason: string) => new Refusal('InvalidInput', `The request was refused: ${reason}`, { reason }),

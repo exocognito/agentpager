@@ -3,7 +3,7 @@ import { randomInt } from 'node:crypto';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { Either, ParseResult, Schema } from 'effect';
-import { Token } from '../../app/src/contract.ts';
+import { Token } from '../../blueprint/design/schemas/exchange.ts';
 
 // Everything the binary keeps lives under ~/.agentpager (AGENTPAGER_HOME moves it), never in the project:
 //   config.json            { "server": "https://agentpager.me" }, optional

@@ -47,7 +47,7 @@ The last two fields are the binary's own memory of when this agent last saw the 
 | `agentpager setup [--print]` | Writes the MCP server entry for every harness found: Claude Code (`claude mcp add`), Claude Desktop (its config file), Codex (`codex mcp add`), Cursor. Idempotent. The installer runs it. | What it changed. |
 | `agentpager update`, `version` | Self-update from agentpager.me; print version. | — |
 
-Every command takes `--json` for machine output. Exit codes: 0 done, 2 refused, 4 pager off, 5 no usable reply from the server (unreachable, no reply, or a reply not understood), 6 unknown agent id. Every reply from the server is decoded with the schema the server's contract gives its route (`packages/app/src/contract.ts`); a reply that doesn't decode is not AgentPager's, and is never taken as success.
+Every command takes `--json` for machine output. Exit codes: 0 done, 2 refused, 4 pager off, 5 no usable reply from the server (unreachable, no reply, or a reply not understood), 6 unknown agent id. Every reply from the server is decoded with the schema the wire contract gives its route (`packages/blueprint/design/schemas/exchange.ts`); a reply that doesn't decode is not AgentPager's, and is never taken as success.
 
 ### Detecting app and project
 

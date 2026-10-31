@@ -7,10 +7,12 @@ Since MPAGERS. Make a pager on your phone with a name and when it turns off, and
 1. The + on Pagers opens New pager, a sheet with Cancel and Create and no grab handle. It asks for a name, which only this phone sees, and when the pager turns off: Never, After 24 hours, After 7 days or After 30 days. Never is the default.
 2. The phone makes the pager's id, key pair and number as the sheet opens, so the sheet already shows "Give agents this": the text to give agents, with a copy icon that copies it as one block.
 3. On a server other than agentpager.me, the text's command adds `--server` and the server's address.
-4. Create registers the pager's number, public key and auto-off with the service. The new pager opens, active and with no decisions [I19].
-5. If the service refuses the pager, the sheet says why; if it can't be reached, the sheet says so. Either way, nothing is made.
-6. The same text is in the pager's detail at any time [C22]. The number shows only there and in New pager, never on the Pagers rows.
-7. A phone holds as many pagers as the owner makes, each with its own number, keys and switch.
+4. Create registers the pager's number, public key and auto-off with the service. The new pager opens, active and with no decisions.
+5. The service refuses a number whose fingerprint does not name the key it is given [I19].
+6. If the service refuses the pager, the sheet says why; if it can't be reached, the sheet says so. Either way, nothing is made.
+7. The same text is in the pager's detail at any time [C22]. The number shows only there and in New pager, never on the Pagers rows.
+8. A phone holds as many pagers as the owner makes, each with its own number, keys and switch.
+9. The text works for an agent only once the agentpager command is installed where it runs [C29].
 
 ## C22 · Turn a pager off and on
 

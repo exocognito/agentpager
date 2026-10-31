@@ -39,7 +39,7 @@ The Blueprint is a folder; AGENTS.md says where.
 - **A specific in a line is a requirement.** Naming a control, a colour or a mechanism rules out better ones. State the outcome unless the owner means the specific.
 - **Design in code**:
   - State that outlives one request or one render is a machine's state or a stored row, so a view can show it.
-  - The wire contract is one schema module that every side imports, never a copy. What crosses a boundary is decoded before use.
+  - The wire contract is one schema module that every side in its language imports, never a copy. A side in another language mirrors it, and a test checks the mirror against it. What crosses a boundary is decoded before use.
   - A step with a side effect, a failure, a wait or a clock declares its errors, takes what it needs as something a test can swap, and reads time from a clock a test can move.
 - **New UI** is explored on a design canvas before code exists, starting from the screens as built; agreed artboards are copied into the milestone's `ui/`. Once built, the product's own screens, in `generated/`, are the record.
 
@@ -103,7 +103,8 @@ Never fix a miss the owner cares about with a test alone. A test follows from a 
 
 ## Tests
 
-- **Naming.** Every live clause, journey and metric has a test whose name starts with its id, such as `C26.3 Create registers the pager`. No test names a retired or unknown id. The id check enforces both.
+- **Naming.** Every live clause, journey and metric has a test whose name starts with its id, such as `C26.4 Create registers the pager`. Where a language allows no dot or space in a test's name, the id is written with underscores, such as Swift's `test_C26_4_createRegistersThePager`. No test names a retired or unknown id. The id check enforces both.
+- **The untested list.** A live line with no test yet is named in the id check's untested list, which the owner sees at each walk. The list only shrinks: each entry gets a test, or the owner retires the line.
 - **Proof is real.** Acceptance tests run on the real product: real storage, real endpoints, each stage. A unit test may fake the clock or inject a fault, never the thing it claims to prove. A test that proves a promise by waiting is a finding.
 - **Done.** A milestone is done when every test, earlier milestones' included, passes locally, on dev and, after release, on prod.
 - **Retries.** A run is green only when its command exits 0. On dev and prod, a failed test runs once more, and one that fails twice fails the run. Local runs never retry.

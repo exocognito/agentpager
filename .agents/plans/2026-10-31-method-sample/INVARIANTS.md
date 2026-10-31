@@ -12,5 +12,6 @@ Since MPAGERS.
 4. While a pager is off, an agent can still ask whether its pager is on, and its phone still reads the pager and every decision with its attachments.
 5. When a pager is deleted, the service deletes the pager, its agents, and their decisions, attachments, answers, acknowledgements and key digests. Its number connects nothing, and its agents' keys are refused as unknown.
 6. An agent with no activity for 30 days is forgotten the same way, and its pager stops listing it. Activity is asking, the owner's answer, acknowledging and finishing; waiting for an answer is not.
+7. A deleted pager's agents are told to forget at once. One that can't be reached then is tried again every minute, and forgets itself on its next call.
 
 Why: a pager number is an address I give out, so turning a pager off or deleting it has to close it for real.

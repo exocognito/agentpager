@@ -3,18 +3,13 @@ id: C18::website-points-to-the-app
 serves:
   - SC1
   - SP5
-statement: agentpager.me says what AgentPager does, how to get the app and what it stores for how long, and gives the line to paste into an agent.
+statement: agentpager.me tells an agent that arrives without the agentpager command how to install it, says what AgentPager does and how to get the app, and says what the service stores and for how long.
 caveats:
   - The page's words are design. Nothing about conversion or comprehension is measured.
 ---
 
 ## Behaviors
 
-1. agentpager.me says what AgentPager does and how it works, and links to the app.
-2. It gives one line to copy into an agent, and the steps to get started.
-3. Its privacy page lists what the service stores and for how long:
-   - each pager's agent name, cards, answers and acknowledgements, until the pager ends;
-   - the agent name, why and when the pager ended, and the agent's last acknowledgement, for 7 days after that;
-   - keys and link codes, stored only as digests.
-
-   It also says that no account exists, and that alert text passes through Apple.
+1. An agent that reads agentpager.me/start, or the retired agentpager.me/mcp, learns how to install the agentpager command and then how to connect with the number its owner gave it (C25). If it can't install the command where it runs, it is told to stop and tell its owner, not to work around it. An agent that reads agentpager.me itself is pointed to /start.
+2. *Not built yet: comes with the marketing page.* The front page says what AgentPager does and how to get the app, and gives the one line that installs the command (C29). Today it still describes the first version, with QR codes, emoji pairing and a planned Pro plan.
+3. *Not built yet: comes with the marketing page.* A note on the site lists what the service stores and for how long. For each pager: its public key, its phone key as a digest, whether it is on and when it turns off, and where its phone gets alerts, until the pager is deleted. For each agent: who asked, its project and computer, its key as a digest, and its decisions with their attachments, answers and acknowledgements, until its pager is deleted or it has had no activity for 30 days. The note also says that there is no account, that a pager's name stays on the phone, and that alert text passes through Apple.

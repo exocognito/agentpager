@@ -2,8 +2,8 @@ import { readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { parse } from 'yaml';
 import { Either, ParseResult, Schema } from 'effect';
-import { QuestionInput, TITLE_MAX_CHARACTERS } from '../../blueprint/design/schemas/exchange.ts';
-import { briefProblem, missingAttachment, attachmentTypes, IMAGE_MAX_BYTES, ATTACHMENTS_MAX, ATTACHMENTS_MAX_BYTES, BRIEF_MAX_CHARACTERS } from '../../blueprint/design/ui/components/cards/brief/schema.ts';
+import { QuestionInput, TEXT_MAX_CHARACTERS, TITLE_MAX_CHARACTERS } from '../../blueprint/design/schemas/exchange.ts';
+import { briefProblem, missingAttachment, attachmentTypes, IMAGE_MAX_BYTES, ATTACHMENTS_MAX, ATTACHMENTS_MAX_BYTES, BRIEF_LABEL_MAX_CHARACTERS, BRIEF_MAX_CHARACTERS } from '../../blueprint/design/ui/components/cards/brief/schema.ts';
 
 // card.yaml (docs/v2/02-writing-rules.md §2): the whole card as structure, each key landing in one place on the
 // phone. `ask` refuses only what is mechanically certain (R1–R4 here; R5 and R6 come from the server), one line per
@@ -11,7 +11,7 @@ import { briefProblem, missingAttachment, attachmentTypes, IMAGE_MAX_BYTES, ATTA
 // own QuestionInput, so nothing the server would refuse leaves this machine: once cards are end-to-end encrypted the
 // server can't read them to refuse them.
 
-export const LIMITS = { title: TITLE_MAX_CHARACTERS, detail: 280, prioritizes: 280, label: 20, markdown: BRIEF_MAX_CHARACTERS, page: 20_000, image: IMAGE_MAX_BYTES, attachments: ATTACHMENTS_MAX, attachmentBytes: ATTACHMENTS_MAX_BYTES };
+export const LIMITS = { title: TITLE_MAX_CHARACTERS, detail: TEXT_MAX_CHARACTERS, prioritizes: TEXT_MAX_CHARACTERS, label: BRIEF_LABEL_MAX_CHARACTERS, markdown: BRIEF_MAX_CHARACTERS, page: BRIEF_MAX_CHARACTERS, image: IMAGE_MAX_BYTES, attachments: ATTACHMENTS_MAX, attachmentBytes: ATTACHMENTS_MAX_BYTES };
 const RATINGS = ['green', 'yellow', 'orange', 'red'] as const;
 const STORY_KEYS = ['changes', 'why', 'why_not', 'assumes'] as const;
 const STORY: { readonly [k in typeof STORY_KEYS[number]]: string } = { changes: 'What {L} changes', why: 'Why choose {L}', why_not: 'Why pass on {L}', assumes: 'Assumptions {L} makes' };

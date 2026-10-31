@@ -2,7 +2,7 @@
 
 Bring an agent's decisions to the owner's phone. The [strategy](packages/blueprint/strategy/STRATEGY.md), [executable design](packages/blueprint/design/) with its [journeys](packages/blueprint/design/journeys/) and [wire contract](packages/blueprint/design/schemas/exchange.ts), and the [roadmap](packages/blueprint/roadmap/ROADMAP.md) are the product contract. The [workshop](packages/blueprint/records/workshop/) that preceded them is history: `strategy.md` there was promoted into the package with the edits `DEC-2026-09-25-mstart-scope` records, the tldraw board holds the round 3 proposal, and the visual workshop's variant E is the history behind the screens; `design/ui/` owns appearance.
 
-MCARDS, the first milestone, created `packages/app/` from this contract in a cleanroom run using [recipe.json](recipe.json). That recipe is retired with v2: it still targets the retired hosted MCP, so don't run it (`docs/v2/06-blueprint-update-plan.md`). `design/` is the one design folder; it also holds the draft promises and screens for the later milestones MACCOUNT and MPRORESEARCH. Alchemy is deferred by SP2.
+MCARDS, the first milestone, created `packages/app/` from this contract in a cleanroom run using [recipe.json](recipe.json). That recipe is retired with v2: it still targets the retired hosted MCP, so don't run it (`docs/v2/06-blueprint-update-plan.md`). `design/` is the one design folder. Alchemy is deferred by SP2.
 
 ## Layout
 
@@ -37,7 +37,7 @@ Browser tests require Chromium; if missing, `pnpm exec playwright install chromi
 
 ## Build the product
 
-Runs use the [simple loop](https://github.com/exocognito/blueprint/blob/main/src/process/simple-loop.md). The app and the binary import the Blueprint's schemas and components by relative path (`../../blueprint/design/...`). It supplies the Worker, the Durable Object behind the session store tag, the card API layer and routing. Since v2 (`docs/v2/`), the HTTP API's routes, auth headers and error statuses are in `packages/app/src/worker.ts` and `contract.ts`, ahead of the Blueprint update; [D1](packages/blueprint/design/dependencies/D1-cloudflare.md) names the build header. `/start` and the retired `/mcp` send an arriving agent to the `agentpager` command (`packages/cli`). Test fixtures stay outside package exports.
+Runs use the [simple loop](https://github.com/exocognito/blueprint/blob/main/src/process/simple-loop.md). The app and the binary import the Blueprint's schemas and components by relative path (`../../blueprint/design/...`). It supplies the Worker, the Durable Objects behind pagers and agents, the card API layer and routing. The HTTP API's routes, auth headers and error statuses are in `packages/app/src/worker.ts` and `contract.ts`; [D1](packages/blueprint/design/dependencies/D1-cloudflare.md) names the build header. `/start` and the retired `/mcp` send an arriving agent to the `agentpager` command (`packages/cli`). Test fixtures stay outside package exports.
 
 ## Reset deployed data (retired)
 

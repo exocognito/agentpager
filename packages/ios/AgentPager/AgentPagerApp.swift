@@ -47,9 +47,9 @@ struct RootView: View {
         .overlay(alignment: .bottom) {
             if let undo = model.undo { UndoPill(answer: undo) }
         }
-        // One alert covers every answer whose retries all failed, once no other send is still trying, so it names
-        // them all (an alert's text doesn't change while it shows); its buttons act on all of them.
-        .alert("Answer Not Confirmed", isPresented: Binding(get: { !model.notConfirmed.isEmpty && model.sendingNow.isEmpty }, set: { _ in })) {
+        // One alert covers every answer whose retries all failed, once no other answer is in its Undo window or still
+        // trying, so it names them all (an alert's text doesn't change while it shows); its buttons act on all of them.
+        .alert("Answer Not Confirmed", isPresented: Binding(get: { !model.notConfirmed.isEmpty && model.sendingNow.isEmpty && model.undo == nil }, set: { _ in })) {
             Button("Cancel", role: .cancel) { model.cancelNotConfirmed() }
             Button("Retry") { model.retryNotConfirmed() }.keyboardShortcut(.defaultAction)
         } message: {

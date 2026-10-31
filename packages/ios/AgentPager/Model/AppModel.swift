@@ -441,8 +441,15 @@ final class AppModel {
     }
 
     func commit(_ p: PreparedAnswer) {
+        // A pager no longer on this phone takes its answers with it.
+        guard pagers.contains(where: { $0.pagerId == p.pagerId }) else {
+            inFlight[p.decisionId] = nil
+            notConfirmed.removeAll { $0.requestId == p.requestId }
+            return
+        }
         inFlight[p.decisionId] = p
         drafts[p.decisionId] = nil
+        // An answer goes only to the server its pager was made on; it waits while the phone points elsewhere.
         guard live, let pager = pager(p.pagerId), !sendingNow.contains(p.requestId) else { return }
         sendingNow.insert(p.requestId)
         let client = self.client
@@ -454,24 +461,28 @@ final class AppModel {
                 do throws(APIError) {
                     if failSends > 0 { failSends -= 1; throw APIError.transport("simulated failure") }
                     _ = try await client.answer(pager, agentId: p.agentId, decisionId: p.decisionId, requestId: p.requestId, choice: p.choice)
+                    notConfirmed.removeAll { $0.requestId == p.requestId }
                     await refresh(p.pagerId)
                     return
                 } catch {
                     if !error.isTransport {
                         // AlreadyAnswered, a pager turned off and the like: the server's state wins.
                         inFlight[p.decisionId] = nil
+                        notConfirmed.removeAll { $0.requestId == p.requestId }
                         await refresh(p.pagerId)
                         return
                     }
                 }
             }
-            if !notConfirmed.contains(where: { $0.requestId == p.requestId }) { notConfirmed.append(p) }
+            // Unless its pager went while it was trying.
+            if pagers.contains(where: { $0.pagerId == p.pagerId }), !notConfirmed.contains(where: { $0.requestId == p.requestId }) { notConfirmed.append(p) }
         }
     }
 
-    // Answers kept from an earlier launch, or not yet sent from this server: sent again with the same requestId.
+    // Every answer not yet confirmed goes again with the same requestId: those kept from an earlier launch, and those
+    // already reported as not confirmed, which leave the alert once one gets through.
     func resumeSends() {
-        for p in inFlight.values where !notConfirmed.contains(where: { $0.requestId == p.requestId }) { commit(p) }
+        for p in inFlight.values { commit(p) }
     }
 
     func retryNotConfirmed() {

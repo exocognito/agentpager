@@ -1,20 +1,24 @@
 import { useRef, useState } from "react";
-import { createActor } from "xstate";
-import { Layer, Schema } from "effect";
 import "./marketing.css";
-import { CARD_AGENT_INSTRUCTION, PRODUCTION_ORIGIN } from "./StartScreen.tsx";
-import { CardScreen } from "./CardScreen.tsx";
-import { CardApi } from "../../effects/cards.ts";
-import { ROUTES } from "../../effects/session.ts";
-import { createCardMachine } from "../../machines/cards.ts";
-import { Inbox } from "../../schemas/exchange.ts";
+import "./cards.css";
 import { LogoMark } from "../components/LogoMark.tsx";
 import { QrPicture } from "../components/QrPicture.tsx";
 import { CopyIcon } from "../components/CopyIcon.tsx";
-import { installPlaywrightQuestion, session } from "../fixtures/decisions.ts";
 
-const host = new URL(PRODUCTION_ORIGIN).host,
+const PRODUCTION_ORIGIN = "https://agentpager.me",
+  host = new URL(PRODUCTION_ORIGIN).host,
   pro = "$2.99/mo";
+
+// The page's example decision: one easy yes or no.
+const EXAMPLE = {
+  title: "Install Playwright?",
+  detail: "I need it to screenshot the new signup page. It’s a free tool that lets me drive a browser.",
+  options: [
+    ["👍", "Yes, install it"],
+    ["⏭️", "Skip the screenshots"],
+    ["✋", "Wait until I’m back"],
+  ],
+} as const;
 
 // The App Store page, once AgentPager for iPhone is published. Empty until then: the download
 // buttons show, but do not link anywhere.
@@ -31,7 +35,7 @@ export const MARKETING = {
       "Screenshots need Playwright, but it isn’t installed here.",
       "Installing software needs Sam’s OK. I’ll ask him over AgentPager.",
     ],
-    asked: `Asked Sam: ${installPlaywrightQuestion.title}`,
+    asked: `Asked Sam: ${EXAMPLE.title}`,
     waiting: "waiting for Sam",
   },
   how: [
@@ -50,8 +54,8 @@ export const MARKETING = {
   ],
   scenes: [
     "An agent terminal shows a QR code. Once your iPhone scans it, the terminal says it is connected to Sam’s iPhone.",
-    `The agent finds it needs Sam’s OK to install software, asks him over AgentPager, and waits: ${installPlaywrightQuestion.title}`,
-    `Sam’s iPhone shows the agent’s card: ${installPlaywrightQuestion.title}, with Yes, install it chosen.`,
+    `The agent finds it needs Sam’s OK to install software, asks him over AgentPager, and waits: ${EXAMPLE.title}`,
+    `Sam’s iPhone shows the agent’s card: ${EXAMPLE.title}, with ${EXAMPLE.options[0][1]} chosen.`,
   ],
   getStarted: "Get started for free",
   steps: {
@@ -64,7 +68,7 @@ export const MARKETING = {
   },
   download: "Download",
   comingSoon: "Coming to the App Store",
-  instruction: CARD_AGENT_INSTRUCTION,
+  instruction: `Connect AgentPager at ${host}/start`,
   copy: "Copy",
   copiedShort: "Copied",
   copied: "Copied. Paste it to your agent.",
@@ -101,7 +105,7 @@ export const MARKETING = {
   faq: [
     [
       "Which agents does it work with?",
-      `Any agent client that can send HTTPS requests or add an MCP server. It starts at ${PRODUCTION_ORIGIN}${ROUTES.start.path}`,
+      `Any agent client that can send HTTPS requests or add an MCP server. It starts at ${PRODUCTION_ORIGIN}/start`,
     ],
     [
       "I already get notifications from my agent app. Why do I need this?",
@@ -123,19 +127,103 @@ export const MARKETING = {
   copyright: "© 2026 AgentPager",
 } as const;
 
-// The phone shows the real card screen with the Playwright card open and its first option chosen. It is a picture: nothing in it can take focus.
-const phone = (() => {
-  const layer = Layer.succeed(CardApi, {} as never),
-    machine = createCardMachine(layer, () => Date.parse(installPlaywrightQuestion.askedAt)),
-    inbox = Schema.decodeUnknownSync(Inbox)({ session, open: [installPlaywrightQuestion], history: [] });
-  return machine.resolveState({
-    value: { live: { screen: "view", clock: "counting" } },
-    context: { ...createActor(machine).getSnapshot().context, inbox, viewing: installPlaywrightQuestion.decisionId, choice: { kind: "option", number: 1 } },
-  });
-})();
+// The phone: the retired web app's card screen (cards.css) with the example open and its first option chosen. It is
+// a still picture, kept until the front page is redrawn for the iPhone app (docs/v2/06-blueprint-update-plan.md):
+// nothing in it can take focus.
+function CardPicture() {
+  const expires = new Date("2026-09-30T06:00:00.000Z").toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  return (
+    <div className="ap-app ap-rich" data-theme="system">
+      <div className="ap-base" inert>
+        <nav className="ap-nav" aria-label="Primary">
+          <div className="ap-nav-left">
+            <a className="ap-back" href="/app" aria-label="All sessions">
+              <svg width="13" height="21" viewBox="0 0 13 21" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M10.5 2.5 2.5 10.5l8 8" />
+              </svg>
+            </a>
+          </div>
+          <div className="ap-nav-center">
+            <h1 className="ap-session-name" tabIndex={0}>Claude Code · blueprint</h1>
+          </div>
+          <div className="ap-nav-right">
+            <button className="ap-session-status" disabled>
+              <span />
+              Active
+            </button>
+          </div>
+        </nav>
+        <main className="ap-scroll">
+          <div className="ap-column ap-session-column">
+            <section aria-labelledby="ap-open">
+              <div className="ap-section-heading">
+                <h2 id="ap-open" className="ap-section-label">Open decisions</h2>
+                <span>1 waiting</span>
+              </div>
+              <div className="ap-group">
+                <button className="ap-row ap-decision-row" aria-haspopup="dialog">
+                  <span className="ap-mark ap-mark-open" aria-hidden="true" />
+                  <span className="ap-row-text">
+                    <strong>{EXAMPLE.title}</strong>
+                    <small>{EXAMPLE.detail}</small>
+                  </span>
+                  <svg width="8" height="14" viewBox="0 0 8 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="m1.5 1.5 5.5 5.5-5.5 5.5" />
+                  </svg>
+                </button>
+              </div>
+            </section>
+            <footer className="ap-session-footer">
+              <button className="ap-text-button ap-destructive">End session</button>
+              <p>Session expires {expires}</p>
+            </footer>
+          </div>
+        </main>
+      </div>
+      <div className="ap-overlay">
+        <button className="ap-backdrop" tabIndex={-1} aria-label="Close overlay" />
+        <div className="ap-tray" role="dialog" aria-modal="true" aria-label={EXAMPLE.title} tabIndex={-1}>
+          <div className="ap-grabber" aria-hidden="true" />
+          <div className="ap-answer-scroll" tabIndex={0}>
+            <header className="ap-sheet-head">
+              <h2>{EXAMPLE.title}</h2>
+              <button className="ap-round ap-close" aria-label="Close decision">
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                  <path d="m2 2 8 8m0-8-8 8" />
+                </svg>
+              </button>
+            </header>
+            <div className="ap-about">
+              <p className="ap-clamp">{EXAMPLE.detail}</p>
+            </div>
+            <div className="ap-options" role="group" aria-label="Choices">
+              {EXAMPLE.options.map(([emoji, title], index) => (
+                <button key={title} className="ap-option" aria-label={`Choose ${index + 1}: ${title}`} aria-pressed={index === 0}>
+                  <span className="ap-option-emoji" aria-hidden="true">{emoji}</span>
+                  <span className="ap-option-copy">
+                    <strong>{title}</strong>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="ap-card-actions">
+            <button className="ap-primary">Send</button>
+            <button className="ap-text-button">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M20 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2Z" />
+              </svg>
+              Ask for changes
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const Brand = () => (
-  <a className="mk-brand" href={ROUTES.frontPage.path}>
+  <a className="mk-brand" href="/">
     <LogoMark size={22} />
     AgentPager
   </a>
@@ -223,7 +311,7 @@ export function MarketingScreen({
                   <div className="mk-phone-screen" inert>
                     <i className="mk-island" />
                     <div className="mk-phone-app">
-                      <CardScreen snapshot={phone} send={() => {}} />
+                      <CardPicture />
                     </div>
                   </div>
                 </div>

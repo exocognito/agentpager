@@ -9,6 +9,9 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { fixture, assert, token } from '../../app/test/support.ts';
 import { EXAMPLE } from '../src/rules.ts';
 
+// A field of a command's --json result, read without a cast.
+const field = (r: { json?: unknown }, key: string) => String(typeof r.json === 'object' && r.json !== null ? Reflect.get(r.json, key) : undefined);
+
 const cli = fileURLToPath(new URL('..', import.meta.url));
 const png = path.join(cli, '..', 'app', 'fixtures', 'briefs', 'D1-pricing', 'a-cards.png');
 
@@ -29,7 +32,7 @@ test('the binary: connect, refusals, ask, wait, ack, status, history, off, finis
     assert.deepEqual([bad.code, bad.text], [2, 'Not connected. This pager number is not in use. Ask your owner for their current one.']);
     const c = await op.connect({ number: p.number, app: 'Codex', project: 'atomic-pages' });
     assert.equal(c.code, 0, c.text);
-    const id = String((c.json as { agent: string }).agent);
+    const id = field(c, 'agent');
     assert.match(id, /^ap-[a-z0-9]{4}$/);
     assert.equal(c.text, `Connected as agent ${id} on your owner's pager (project atomic-pages, as Codex).\nYour owner's phone shows you as a new agent. Use --agent ${id} for every question in\nthis piece of work; running connect again adds another agent.\nBefore your first card: agentpager rules`);
     const file = path.join(home, 'agents', `${id}.json`);
@@ -37,7 +40,7 @@ test('the binary: connect, refusals, ask, wait, ack, status, history, off, finis
     assert.ok(!c.text.includes(JSON.parse(readFileSync(file, 'utf8')).agentKey), 'the key is never printed');
     process.env.AGENTPAGER_PAGER = p.number;
     const second = await op.connect({ app: 'Codex', project: 'atomic-pages' });
-    assert.notEqual(String((second.json as { agent: string }).agent), id, 'connecting again adds another agent');
+    assert.notEqual(field(second, 'agent'), id, 'connecting again adds another agent');
     delete process.env.AGENTPAGER_PAGER;
     assert.equal((await op.ask('ap-zzzz', { yaml: EXAMPLE, dir: work })).code, 6);
 
@@ -57,7 +60,7 @@ test('the binary: connect, refusals, ask, wait, ack, status, history, off, finis
     writeFileSync(path.join(work, 'card.yaml'), EXAMPLE);
     const asked = await op.ask(id, { file: path.join(work, 'card.yaml') });
     assert.equal(asked.code, 0, asked.text);
-    const d = String((asked.json as { decision: string }).decision);
+    const d = field(asked, 'decision');
     assert.equal(asked.text, `Sent. Your owner sees it as:\n  Which M11 guarantee should we build?\n  Two real alternatives: a smaller fix with occasional manual recovery, or precise automatic recovery.\nDecision ${d}. Wait for the answer with: agentpager wait --agent ${id} ${d}`);
     const asker = (await f.pager(p.pagerId, p.phone)).agents.find(a => a.open.length), seen = asker?.open[0];
     assert.equal(asker?.agent.machine, hostname().split('.')[0], 'the phone sees which computer asked');
@@ -82,7 +85,7 @@ test('the binary: connect, refusals, ask, wait, ack, status, history, off, finis
     assert.equal(acked.text, 'Acknowledged. Your owner sees "Build the smaller fix, the exact wording and the…" with a green tick on that decision.');
     assert.equal((await op.ack(id, d, 'Again.')).code, 2, 'only the first acknowledgement counts');
     const small = 'title: Dinner on Friday?\ndetail: Where to eat.\ncontext:\n  summary: Friday is booked.\noptions:\n  - {label: Sushi, title: Sushi, prioritizes: fish}\n  - {label: Pasta, title: Pasta, prioritizes: carbs}\nrecommendation: {option: B, why: Closer.}\n';
-    const dinner = String(((await op.ask(id, { yaml: small, dir: work })).json as { decision: string }).decision);
+    const dinner = field(await op.ask(id, { yaml: small, dir: work }), 'decision');
     const dinnerId = (await f.pager(p.pagerId, p.phone)).agents.flatMap(a => a.open).find(x => x.title === 'Dinner on Friday?')?.decisionId ?? '';
     await f.answer(agentId, p.phone, dinnerId, { kind: 'feedback', text: 'Somewhere vegetarian, please.' });
     assert.match((await op.wait(id, dinner)).text, /^Your owner wrote instead of choosing, at .*:\n  "Somewhere vegetarian, please\."\nFollow the note\. If you still need a decision, ask a new card\. Acknowledge this one with\nwhat you'll do: agentpager ack/);
@@ -146,11 +149,11 @@ test('review rounds: concurrent asks, an unwritable home, attachments, unsafe ce
   const small = (title: string) => `title: ${title}\ndetail: Where to eat.\ncontext:\n  summary: Friday is booked.\noptions:\n  - {label: Sushi, title: Sushi, prioritizes: fish}\n  - {label: Pasta, title: Pasta, prioritizes: carbs}\nrecommendation: {option: B, why: Closer.}\n`;
   try {
     const p = await f.makePager();
-    const id = String(((await op.connect({ number: p.number, app: 'Codex', project: 'edges' })).json as { agent: string }).agent);
+    const id = field(await op.connect({ number: p.number, app: 'Codex', project: 'edges' }), 'agent');
 
     // Two asks at once on one agent (helpers sharing its id): both decisions stay waitable.
     const [one, two] = await Promise.all([op.ask(id, { yaml: small('One?'), dir: work }), op.ask(id, { yaml: small('Two?'), dir: work })]);
-    for (const r of [one, two]) assert.equal((await op.wait(id, String((r.json as { decision: string }).decision), { seconds: 1 })).text.startsWith('Pending.'), true);
+    for (const r of [one, two]) assert.equal((await op.wait(id, field(r, 'decision'), { seconds: 1 })).text.startsWith('Pending.'), true);
 
     // The same from separate processes (helpers sharing the id): every decision is kept.
     for (let n = 0; n < 4; n++) writeFileSync(path.join(work, `p${n}.yaml`), small(`Process ${n}?`));
@@ -171,7 +174,7 @@ test('review rounds: concurrent asks, an unwritable home, attachments, unsafe ce
     chmodSync(path.join(home, 'agents'), 0o700);
     assert.equal((await f.pager(p.pagerId, p.phone)).agents.length, agentsBefore);
     assert.equal((await op.wait(id, 'd_xxxx', { seconds: Number('abc') })).code, 2);
-    assert.equal((await op.wait(id, String((one.json as { decision: string }).decision), { seconds: Number('abc') })).text, '--seconds takes a number from 1 to 50.');
+    assert.equal((await op.wait(id, field(one, 'decision'), { seconds: Number('abc') })).text, '--seconds takes a number from 1 to 50.');
 
     // Cards: an inline attachment with no content, a line break or "|" in a table field, a fenced diff kept whole.
     const empty = await op.ask(id, { object: { title: 'Look?', detail: 'A mock.', context: { summary: '![Mock](a.png)' }, options: [{ label: 'A', title: 'A', prioritizes: 'a' }, { label: 'B', title: 'B', prioritizes: 'b' }], recommendation: { option: 'A', why: 'A.' }, attachments: [{ name: 'a.png', type: 'image/png' }] } });
@@ -206,7 +209,7 @@ test('review rounds: concurrent asks, an unwritable home, attachments, unsafe ce
     process.env.AGENTPAGER_SERVER = 'http://127.0.0.1:9';
     const elsewhere = await op.connect({ number: p.number, app: 'Codex', project: 'edges', server: f.origin + '/' });
     assert.equal(elsewhere.code, 0, elsewhere.text);
-    assert.match((await op.status(String((elsewhere.json as { agent: string }).agent))).text, /Pager: on/);
+    assert.match((await op.status(field(elsewhere, 'agent'))).text, /Pager: on/);
     assert.equal((await op.connect({ number: p.number, server: 'agentpager.me' })).text, "--server takes the server's address, such as https://agentpager.me.");
     process.env.AGENTPAGER_SERVER = 'not a url';
     const bad = await op.connect({ number: p.number, app: 'Codex', project: 'edges' });

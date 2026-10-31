@@ -13,7 +13,8 @@ import { briefProblem, missingAttachment, attachmentTypes, IMAGE_MAX_BYTES, ATTA
 
 export const LIMITS = { title: 100, detail: 280, prioritizes: 280, label: 20, markdown: BRIEF_MAX_CHARACTERS, page: 20_000, image: IMAGE_MAX_BYTES, attachments: ATTACHMENTS_MAX, attachmentBytes: ATTACHMENTS_MAX_BYTES };
 const RATINGS = ['green', 'yellow', 'orange', 'red'] as const;
-const STORY = { changes: 'What {L} changes', why: 'Why choose {L}', why_not: 'Why pass on {L}', assumes: 'Assumptions {L} makes' } as const;
+const STORY_KEYS = ['changes', 'why', 'why_not', 'assumes'] as const;
+const STORY: { readonly [k in typeof STORY_KEYS[number]]: string } = { changes: 'What {L} changes', why: 'Why choose {L}', why_not: 'Why pass on {L}', assumes: 'Assumptions {L} makes' };
 const KEYS = {
   card: ['title', 'detail', 'context', 'options', 'tradeoffs', 'recommendation', 'next_steps', 'attachments'],
   context: ['heading', 'summary', 'more'], more: ['title', 'body'],
@@ -183,7 +184,7 @@ export function compile(source: Source): Compiled {
     limit(label, LIMITS.label, `${where}.label`); limit(p, LIMITS.prioritizes, `${where}.prioritizes`);
     line(label, `${where}.label`, true); line(t, `${where}.title`, true); line(p, `${where}.prioritizes`);
     const story: { -readonly [k in keyof typeof STORY]?: string } = {};
-    for (const key of Object.keys(STORY) as (keyof typeof STORY)[]) { story[key] = text(o[key], `${where}.${key}`, false); plain(story[key], `${where}.${key}`); }
+    for (const key of STORY_KEYS) { story[key] = text(o[key], `${where}.${key}`, false); plain(story[key], `${where}.${key}`); }
     const looks = text(o.looks_like, `${where}.looks_like`, false);
     return { label: label ?? '', title: t ?? '', prioritizes: p ?? '', story, looks };
   });
@@ -270,7 +271,7 @@ export function compile(source: Source): Compiled {
   ok.forEach((o, i) => {
     const L = letter(i), parts: string[] = [];
     if (o.looks) parts.push(`![${o.label}](${o.looks})`);
-    for (const key of Object.keys(STORY) as (keyof typeof STORY)[]) { const v = o.story[key]; if (v) parts.push(`### ${STORY[key].replace('{L}', L)}`, prose(v)); }
+    for (const key of STORY_KEYS) { const v = o.story[key]; if (v) parts.push(`### ${STORY[key].replace('{L}', L)}`, prose(v)); }
     if (parts.length) md.push(`:::option ${L}`, ...parts, ':::');
   });
   const live = rows.filter((r): r is NonNullable<typeof r> => !!r);

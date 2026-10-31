@@ -1,7 +1,8 @@
 import ts from 'typescript';
 import { globSync, readFileSync } from 'node:fs';
 let failures = 0;
-for (const path of globSync(['src/**/*.ts', 'src/**/*.tsx', 'test/**/*.ts'])) {
+// The server's code and tests, and the binary's (packages/cli), which agents run on their owners' machines.
+for (const path of globSync(['src/**/*.ts', 'src/**/*.tsx', 'test/**/*.ts', '../cli/src/**/*.ts', '../cli/test/**/*.ts'])) {
   const text = readFileSync(path, 'utf8');
   const file = ts.createSourceFile(path, text, ts.ScriptTarget.Latest, true);
   // No derived file currently needs a negative compiler directive. Reject these

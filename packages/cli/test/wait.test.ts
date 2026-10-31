@@ -6,6 +6,9 @@ import { fixture, assert, pause } from '../../app/test/support.ts';
 import { harness, self } from '../src/detect.ts';
 import type { Result } from '../src/commands.ts';
 
+// A field of a command's --json result, read without a cast.
+const field = (r: { json?: unknown }, key: string) => String(typeof r.json === 'object' && r.json !== null ? Reflect.get(r.json, key) : undefined);
+
 // How to wait follows the harness that waits (docs/v2/03-binary-surface.md §6). Only a positive identification
 // changes the words; every other agent keeps the ones cli.test.ts checks.
 test('harness: Claude Code and Claude Desktop only when positively identified', () => {
@@ -29,14 +32,14 @@ test('waiting words: Claude Code in the background, a Claude Desktop chat in its
   const op = await import('../src/commands.ts');
   const store = await import('../src/store.ts');
   const card = (title: string) => ({ object: { title, detail: 'A test.', context: { summary: 'Ready.' }, options: [{ label: 'Now', title: 'Now', prioritizes: 'speed' }, { label: 'Later', title: 'Later', prioritizes: 'rest' }], recommendation: { option: 'A', why: 'Ready.' } } });
-  const decision = (r: Result) => String((r.json as { decision: string }).decision);
+  const decision = (r: Result) => field(r, 'decision');
   try {
     const p = await f.makePager();
-    const id = String(((await op.connect({ number: p.number, app: 'Claude Code', project: 'wake' })).json as { agent: string }).agent);
+    const id = field(await op.connect({ number: p.number, app: 'Claude Code', project: 'wake' }), 'agent');
 
     // A harness the binary identifies names itself, whatever app the agent passes; any other keeps what it passed.
     const q = await f.makePager();
-    const named = async (app: string, mcpClient: string) => store.loadAgent(String(((await op.connect({ number: q.number, app, project: 'wake', mcpClient })).json as { agent: string }).agent))?.app;
+    const named = async (app: string, mcpClient: string) => store.loadAgent(field(await op.connect({ number: q.number, app, project: 'wake', mcpClient }), 'agent'))?.app;
     assert.equal(await named('Claude', 'local-agent-mode-agentpager'), 'Claude Desktop');
     assert.equal(await named('Claude', 'codex-mcp-client'), 'Claude');
 

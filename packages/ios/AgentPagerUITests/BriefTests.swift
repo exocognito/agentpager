@@ -50,11 +50,9 @@ final class BriefTests: XCTestCase {
         // open full screen and swipe), pick B (its column outlined), read the background, send B.
         open("Which pricing page layout should I build?")
         shot("D1-top", after: "Open \"Which pricing page layout should I build?\"")
-        reveal(app.buttons["open-options"])
-        shot("D1-options-row", after: "Scroll to the Options row")
         tap("open-options")
         showOption("B")
-        shot("D1-option-B", after: "Tap the Options row, then B at the top of the sheet")
+        shot("D1-option-B", after: "Tap the Options row, then B at the top of the sheet: what it changes and why, then its images")
         let page = app.scrollViews["option-page-B"]
         let changes = page.staticTexts["What B changes"], why = page.staticTexts["Why choose B"]
         wait(changes, 10)
@@ -64,7 +62,6 @@ final class BriefTests: XCTestCase {
         XCTAssertLessThan(why.frame.maxY, thumb.frame.minY, "what B changes and why come before its images")
         XCTAssertTrue(page.buttons["image-b-table-phone.png"].exists)
         RunLoop.current.run(until: Date().addingTimeInterval(0.8))
-        shot("D1-option-B-images", after: "Scroll B down to its images")
         thumb.tap()
         wait(app.navigationBars["1 of 2"], 10)
         RunLoop.current.run(until: Date().addingTimeInterval(1))
@@ -138,9 +135,9 @@ final class BriefTests: XCTestCase {
         app.buttons["answered-Which pricing page layout should I build?"].tap()
         RunLoop.current.run(until: Date().addingTimeInterval(1.5))
         shot("D1-answered", after: "Go back; open shop's answered list, then the pricing decision: it stays readable")
+        // The sheet opens on B, the option sent; it draws as frame D1-option-B did, so it's no new frame.
         tap("open-options")
         waitUntil(10, "the Options sheet opening on B") { segment("B").isSelected }
-        shot("D1-answered-options", after: "Tap the Options row: it opens on B, the option sent")
     }
 
     // The Options sheet's segmented control shows another option; it never chooses one.

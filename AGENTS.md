@@ -16,4 +16,4 @@ The Blueprint process lives in [exocognito/blueprint](https://github.com/exocogn
 - Work in an isolated worktree off `origin/main`, and preserve other agents' and the owner's edits.
 - Open changes as draft pull requests. The owner merges.
 - Install with pnpm. Use Node 22.19 or newer.
-- Before handing off a change, run `pnpm check` and `pnpm test:all`, which runs every suite: the design, the server and the binary. `pnpm check` fails when the iPhone app, its UI tests or the front page changed without `pnpm designs`, which remakes the catalogue on a Mac with Xcode.
+- Before handing off a change, run `pnpm check` and `pnpm test:all`, which runs every suite: the design, the server and the binary. `pnpm check` fails when the iPhone app, its UI tests, the brief fixtures, the wire contract or the front page changed without `pnpm designs`, which remakes the catalogue on a Mac with Xcode.

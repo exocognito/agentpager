@@ -16,14 +16,21 @@ const out = path.join(repo, 'packages/blueprint/design/screens');
 const ios = path.join(repo, 'packages/ios');
 const DEVICE = 'iPhone 17e';
 
-// What the catalogue is made from. A change to any of these makes it stale.
+// What the catalogue is drawn from: a change to any of these can change an image, so it makes the catalogue stale.
+// The rest of the server (routing, storage, alerts) is left out: it changes often and draws nothing itself. The wire
+// contract it serves, every shape the phone draws from, is in.
 const SOURCES = [
-  'packages/ios/AgentPager',
-  'packages/ios/AgentPagerUITests',
-  'packages/app/src/browser.tsx',
-  ':(glob)packages/blueprint/design/ui/screens/*',
-  ':(glob)packages/blueprint/design/ui/components/*.tsx',
-  'packages/app/scripts/designs.mjs',
+  'packages/ios/AgentPager', // the app
+  'packages/ios/AgentPagerUITests', // the screens and journeys, and what their agents ask
+  'packages/app/fixtures/briefs', // the briefs journey's four briefs
+  'packages/app/scripts/briefs.ts', // its agent, and the words it acknowledges with
+  'packages/blueprint/design/schemas', // the wire contract
+  'packages/app/src/contract.ts', // the server's side of it: its clocks and refusals
+  'packages/app/src/browser.tsx', // the front page
+  'packages/app/scripts/build.mjs', // its HTML shell and bundle
+  'packages/blueprint/design/ui/screens',
+  'packages/blueprint/design/ui/components', // the front page's parts, and the brief's wire format
+  'packages/app/scripts/designs.mjs', // this script, which writes the index
 ];
 
 // The journeys: UI tests against the local server, each playing the agent over the HTTP API.
@@ -35,10 +42,13 @@ const JOURNEYS = [
   { name: 'delete', test: 'FlowTests/testDeletePager', about: 'Delete a pager from its detail screen: confirm, and it is gone from the phone.' },
 ];
 
-// Tracked files and new ones not yet added, as they are on disk; ignored files don't count.
+// Tracked files as they are on disk, and new files not yet added if they are source; tests, ignored files and other
+// untracked files (notes, editor backups) don't count.
+const SOURCE_FILE = /\.(swift|ts|tsx|css|mjs|md|json|plist|png|jpe?g)$/;
 function fingerprint() {
-  const files = execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', ...SOURCES], { cwd: repo, encoding: 'utf8' }).split('\0')
-    .filter(file => file && !file.endsWith('.test.ts') && existsSync(path.join(repo, file))).sort();
+  const list = (...args) => execFileSync('git', ['ls-files', '-z', ...args, '--', ...SOURCES], { cwd: repo, encoding: 'utf8' }).split('\0').filter(Boolean);
+  const files = [...new Set([...list('--cached'), ...list('--others', '--exclude-standard').filter(file => SOURCE_FILE.test(file))])]
+    .filter(file => !file.endsWith('.test.ts') && existsSync(path.join(repo, file))).sort();
   const hash = createHash('sha256');
   for (const file of files) hash.update(`${file}\0${createHash('sha256').update(readFileSync(path.join(repo, file))).digest('hex')}\n`);
   return { hash: hash.digest('hex').slice(0, 16), files: files.length };
@@ -49,7 +59,7 @@ if (process.argv.includes('--check')) {
   const stored = existsSync(index) ? readFileSync(index, 'utf8').match(/^Fingerprint: `([0-9a-f]+)`/m)?.[1] : undefined;
   const { hash } = fingerprint();
   if (stored !== hash) {
-    console.error('Design screens are stale: the iPhone app, its UI tests or the front page changed since they were made. Run `pnpm designs` on a Mac and commit packages/blueprint/design/screens.');
+    console.error('Design screens are stale: what they are drawn from (the iPhone app, its UI tests, the brief fixtures, the wire contract or the front page) changed since. Run `pnpm designs` on a Mac and commit packages/blueprint/design/screens.');
     process.exit(1);
   }
   console.log(`Design screens are current (fingerprint ${hash}).`);
@@ -62,7 +72,7 @@ const derived = path.join(tmpdir(), 'agentpager-designs-build'); // kept between
 const log = path.join(scratch, 'log.txt');
 const logStream = createWriteStream(log);
 const children = new Set();
-let server, wasBooted = true, udid;
+let server, wasBooted = true, udid, appearance;
 
 async function freePort() {
   const s = createServer();
@@ -126,13 +136,24 @@ async function stopServer() {
   server = undefined;
 }
 
-function cleanUpNow() {
-  for (const child of children) child.kill('SIGTERM');
-  if (server?.pid) try { process.kill(-server.pid, 'SIGTERM'); } catch { /* already gone */ }
+// One way out, however the run ends: stop the tests and the server, and put the Simulator back as it was.
+let stopping;
+function shutdown() {
+  stopping ??= (async () => {
+    for (const child of children) child.kill('SIGTERM');
+    await stopServer();
+    if (!udid) return;
+    try { simctl('status_bar', udid, 'clear'); } catch { /* the Simulator may be gone */ }
+    if (appearance) try { simctl('ui', udid, 'appearance', appearance); } catch { /* likewise */ }
+    if (!wasBooted) try { simctl('shutdown', udid); } catch { /* already shut down */ }
+  })();
+  return stopping;
 }
-// However the run ends, the server and the tests stop with it.
-process.on('exit', cleanUpNow);
-for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => process.exit(130));
+for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, async () => {
+  console.error(`pnpm designs: stopped by ${signal}; cleaning up`);
+  await shutdown();
+  process.exit(130);
+});
 
 function simulator() {
   const { devices } = JSON.parse(simctl('list', 'devices', 'available', '-j'));
@@ -185,6 +206,8 @@ async function main() {
   step(`${DEVICE} (${sim.runtime}); scratch and log in ${scratch}`);
   wasBooted = sim.state === 'Booted';
   simctl('bootstatus', udid, '-b');
+  const was = simctl('ui', udid, 'appearance').trim();
+  appearance = was === 'light' || was === 'dark' ? was : undefined; // restored when the run ends
   simctl('status_bar', udid, 'override', '--time', '9:41', '--dataNetwork', 'wifi', '--wifiMode', 'active', '--wifiBars', '3', '--cellularMode', 'active', '--cellularBars', '4', '--batteryState', 'charged', '--batteryLevel', '100');
   simctl('ui', udid, 'appearance', 'light');
 
@@ -236,6 +259,13 @@ async function main() {
   const journeyRows = JOURNEYS.map(journey => {
     const from = path.join(shots, journey.test.split('/')[1]);
     const frames = readFileSync(path.join(from, 'frames.tsv'), 'utf8').trim().split('\n').map(line => line.split('\t'));
+    // Two frames alike mean a step that showed nothing new.
+    const seen = new Map();
+    for (const [name] of frames) {
+      const digest = createHash('sha256').update(readFileSync(path.join(from, `${name}.png`))).digest('hex');
+      if (seen.has(digest)) throw new Error(`journey ${journey.name}: frame ${name} is the same image as ${seen.get(digest)}; drop one, or make its step show something new`);
+      seen.set(digest, name);
+    }
     const dir = path.join(next, 'journeys', journey.name);
     mkdirSync(dir);
     const lines = frames.map(([name, action], i) => {
@@ -264,7 +294,7 @@ The phone is the SwiftUI app (\`packages/ios\`) in the ${DEVICE} Simulator, ${si
 
 On a Mac with Xcode and the ${DEVICE} Simulator, run \`pnpm designs\` (the last run took about ${minutes} min) and commit this folder. It starts a local server on a free port and stops it after, runs the UI tests (\`DesignTests\` and the journeys below), renders the front page, and rewrites this folder only once everything has passed. It prints the scratch folder that holds its full log.
 
-The fingerprint is a hash of the ${files} files it is made from: \`packages/ios/AgentPager/**\`, \`packages/ios/AgentPagerUITests/**\`, the front page (\`packages/app/src/browser.tsx\`, \`packages/blueprint/design/ui/screens/*\` and \`ui/components/*.tsx\`, but not their tests) and \`packages/app/scripts/designs.mjs\`. \`pnpm check\` fails when it no longer matches.
+The fingerprint is a hash of the ${files} files it is drawn from: ${SOURCES.map(source => `\`${source}\``).join(', ')}. Tests don't count, and an untracked file counts only if it is source. The rest of the server (routing, storage, alerts) is left out: it changes often and draws nothing itself, so after a change there that shows on screen, run \`pnpm designs\` by hand. \`pnpm check\` fails when the fingerprint no longer matches.
 
 ## Phone: \`phone/\`
 
@@ -298,11 +328,5 @@ try {
   console.error(`pnpm designs failed: ${error.message}`);
   process.exitCode = 1;
 } finally {
-  cleanUpNow();
-  await stopServer();
-  if (udid) {
-    try { simctl('status_bar', udid, 'clear'); } catch { /* the Simulator may be gone */ }
-    if (!wasBooted) try { simctl('shutdown', udid); } catch { /* already shut down */ }
-  }
-  logStream.end();
+  await shutdown();
 }

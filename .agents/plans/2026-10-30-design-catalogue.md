@@ -47,6 +47,19 @@ no Storybook. The images come from the real code, and a check fails when they go
 - Index at `packages/blueprint/design/screens/README.md`; `pnpm designs` in `packages/app/scripts/designs.mjs`;
   `pnpm check` runs `designs.mjs --check`, which hashes the sources with git and Node only.
 - Decision record: `DEC-2026-10-30-screens-from-the-app`.
-- verified: `pnpm designs` makes 74 images in 12 MB: 15 phone states (PNG and tree), 5 journeys with 49 frames
+- verified: `pnpm designs` makes 71 images in about 12 MB: 15 phone states (PNG and tree), 5 journeys with 46 frames
   (pager, briefs, undo-and-changes, off-and-on, delete) and 10 front-page screens. About 12 min with the app built,
-  18 min from a clean build. The fingerprint covers 35 files.
+  18 min from a clean build.
+
+## After review (PR #38)
+- verified: SIGINT and SIGTERM run the same awaited shutdown as a normal end: the server stops (SIGKILL after 5 s),
+  the status bar is cleared, the Simulator's appearance is put back, and a Simulator the run booted is shut down.
+  Tried by interrupting a run with the Simulator shut down, and with it booted in dark appearance.
+- verified: the fingerprint counts tracked files, and untracked files only with a source extension; an untracked
+  `notes.txt` leaves it current. 58 files.
+- chosen: the fingerprint adds the brief fixtures, `scripts/briefs.ts`, `scripts/build.mjs`, the wire contract
+  (`design/schemas`, `app/src/contract.ts`) and all of `ui/components`. The rest of the server (routing, storage,
+  alerts) stays out: it changes often and draws nothing itself. Editing a brief fixture now makes it stale.
+- verified: three brief frames repeated others byte for byte (D1-options-row, D1-option-B-images and
+  D1-answered-options); their steps changed nothing on screen, so they are dropped. `pnpm designs` now fails when two
+  frames of a journey are the same image.

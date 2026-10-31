@@ -21,3 +21,10 @@ My decisions, their attachments, my answers and my agents' acknowledgements are 
 
 - Hiding which pager and which agent, when, and how big each part is (C30).
 - Moving a pager's keys to a new phone, or recovering them.
+
+## Sam decides first
+
+The product stays the same, with encryption added, so two questions are Sam's:
+
+- What happens to decisions stored before the switch: deleted then, or kept readable until the service forgets them as usual (I17).
+- What an agent sees when its command is from before the switch: refused, with how to update (MINSTALL).

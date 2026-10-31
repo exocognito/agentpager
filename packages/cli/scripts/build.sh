@@ -1,6 +1,6 @@
 #!/bin/sh
 # Builds the agentpager binary for this machine with Bun (docs/v2: built locally and symlinked on PATH; no releases
-# or install script until Stage 4).
+# or install script until MINSTALL).
 set -e
 cd "$(dirname "$0")/.."
 version="$(git rev-parse --short HEAD)"

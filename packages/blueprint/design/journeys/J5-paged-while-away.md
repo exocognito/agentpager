@@ -10,7 +10,7 @@ for:
 statement: A new owner makes a pager, gives its text to an agent and leaves the app, and is paged, answers and hears back without opening AgentPager first.
 caveats:
   - Alerts need the deployed service and Apple's push service (D7). Delivery time is Apple's and is not measured.
-  - Today the app is built from Xcode, and its alerts go through Apple's sandbox push service. *Not built yet: the TestFlight build, with Apple's production push service, comes with the rollout to the owners Sam invites (D7).*
+  - Today the app is built from Xcode, and its alerts go through Apple's sandbox push service. *Not built yet: comes with the TestFlight build, which uses Apple's production push service (D7).*
 ---
 
 ## Steps

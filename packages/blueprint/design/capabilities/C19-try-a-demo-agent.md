@@ -8,7 +8,7 @@ caveats:
   - The demo shows the exchange, not an agent's judgement.
 ---
 
-*Not built yet: there is no demo agent; it comes with the TestFlight rollout to the owners Sam invites.*
+*Not built yet: there is no demo agent; it comes with the TestFlight build.*
 
 ## Behaviors
 

@@ -108,7 +108,7 @@ Use plain language I can understand without specialist knowledge. Options are di
 
 ### SP2 · Keep the first version focused and its foundations explicit
 
-My side is a native phone app, iPhone first; Android later, with the same behaviour, data and words, drawn its own way (*not built yet*). No accounts and no paid plans. It runs on a Cloudflare Worker at agentpager.me, with one Durable Object for the pagers and one per agent. Agents reach it only through the agentpager command, as a command line or a local MCP server. Defer Alchemy until a date the owner sets.
+My side is a native iPhone app. No accounts and no paid plans. It runs on a Cloudflare Worker at agentpager.me, with one Durable Object for the pagers and one per agent. Agents reach it only through the agentpager command, as a command line or a local MCP server. The code is open: anyone can read it, fork it and run their own (*not built yet*).
 
 ### SP3 · Agents choose the options; AgentPager keeps them easy to answer
 

@@ -64,8 +64,6 @@ A pager turns off when I turn it off, or by itself at the time I chose (never, o
 
 A question's title allows 100 visible characters, and its one-line detail 280. An option's title, what it prioritizes, and an acknowledgement allow 280 each. An option's answer label allows 20; my written feedback allows 1,000. Titles, labels and the detail are one line. Count spaces and Markdown punctuation. Text is valid UTF-8 with Markdown and no HTML. Anything else is refused whole, with an error that tells the agent what to fix; nothing is truncated or silently cleaned. A decision and each Markdown page attached to it hold up to 20,000 characters. A decision carries at most 8 attachments, PNG, JPEG or Markdown, of at most 1 MB per image and 3 MB in all. HTML is allowed only inside code, where it shows as text.
 
-**Changed limit:** the detail drops from 1,000 to 280, the limit agents already meet through the binary. The server will be brought into line, as it was for titles.
-
 ### SI7 · Cards are independent
 
 Several cards can be open at once and answered in any order. Answering one never changes another.

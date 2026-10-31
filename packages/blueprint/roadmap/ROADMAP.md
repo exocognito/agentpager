@@ -1,14 +1,14 @@
 # AgentPager roadmap
 
-1. MAPP
-2. MSHIP
+1. MENCRYPT
+2. MFRIENDS
 
 ## Horizons
 
-MACCOUNT and MPRORESEARCH are parked in [parked/](parked/) with their promises. MACCOUNT defines accounts and cross-device ownership, with authentication, recovery and privacy still draft. Its proposed deliverables and preview exist for review, but it is not in the ordered list. No email-only or library or provider choice is approved.
+MAPP, MPAGERS and MCOMMAND have shipped. Encryption comes before the rollout to the owners Sam invites (STRATEGY, Strategic Design Decisions).
 
-MPRORESEARCH defines the $2.99/month research offer and consented survey, not a subscription or unlimited-session entitlement. The preview says buying is not implemented. Survey delivery and retention still need design; it stays outside the ordered list.
+Review what works with users at each stage. The owner's side is the iPhone app (SP2). Android follows with the same behaviour, data and words, drawn its own way. The web app (MCARDS, parked before it closed) stays as history in [parked/](parked/).
 
-Review what works with users at each stage. The owner's side is the iPhone app (SP2). Android follows with the same behaviour, data and words; the web app (MCARDS, parked before it closed) stays as history. Community-contributed cards and Pro general availability remain draft direction. Contribution trust and compatibility, and real payment, support and reliability need their own designs. Research signals guide those choices; no stage promises revenue or organic growth.
+AgentPager has no accounts and no paid tier (SP2). If owners ever need their own writing rules, they come in layers: the command's defaults, then the owner's own, then each pager's. Testers need a way to send Sam their feedback, for example by choosing to share their history file. Neither is designed yet.
 
-Other deferred candidates: Alchemy when the owner sets its date, recovery for a lost phone key, a real deployed end-time wait, and SG1/SG2/SG3 outcome metrics once they have bars.
+Other deferred candidates: Alchemy when the owner sets its date, recovery for a pager's lost keys, a real deployed auto-off wait, and SG1/SG2 outcome metrics once they have bars.

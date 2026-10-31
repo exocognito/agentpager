@@ -103,8 +103,9 @@ Never fix a miss the owner cares about with a test alone. A test follows from a 
 
 ## Tests
 
-- **Naming.** Every live clause, journey and metric has a test whose name starts with its id, such as `C26.4 Create registers the pager`. Where a language allows no dot or space in a test's name, the id is written with underscores, such as Swift's `test_C26_4_createRegistersThePager`. No test names a retired or unknown id. The id check enforces both.
+- **Naming.** Every live clause, journey and metric has a test whose name starts with its id, such as `C26.4 Create registers the pager`, unless it is on the untested list below. Where a language allows no dot or space in a test's name, the id is written with underscores, such as Swift's `test_C26_4_createRegistersThePager`. No test names a retired or unknown id.
 - **The untested list.** A live line with no test yet is named in the id check's untested list, which the owner sees at each walk. The list only shrinks: each entry gets a test, or the owner retires the line.
+- **The id check** fails on a live line that has neither a test nor a place on the untested list, on a listed line that has a test or is retired, and on a test that names a retired or unknown id.
 - **Proof is real.** Acceptance tests run on the real product: real storage, real endpoints, each stage. A unit test may fake the clock or inject a fault, never the thing it claims to prove. A test that proves a promise by waiting is a finding.
 - **Done.** A milestone is done when every test, earlier milestones' included, passes locally, on dev and, after release, on prod.
 - **Retries.** A run is green only when its command exits 0. On dev and prod, a failed test runs once more, and one that fails twice fails the run. Local runs never retry.

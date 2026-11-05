@@ -27,6 +27,6 @@ My agents reach my pagers through the agentpager command, as a command line or a
 
 ## Out of scope
 
-- The one-line install and release builds (C29, D8): MFRIENDS. The command is built from the AgentPager repository.
+- The one-line install and release builds (C29, D8): MINSTALL. The command is built from the AgentPager repository.
 - Encryption: MENCRYPT. The command sends cards over HTTPS, readable by the service.
 - Cloud sessions: untested (D2).

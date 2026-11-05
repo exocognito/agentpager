@@ -11,4 +11,4 @@ Must supply: Apple's push service (APNs), TestFlight distribution to invited tes
 
 Must never do: let the APNs key reach the app bundle, the worktree, a log or a transcript.
 
-Proof runs on: the owner's iPhone. In MAPP, a build from Xcode with Apple's sandbox push service; from MFRIENDS, also a TestFlight build with the production service.
+Proof runs on: the owner's iPhone. In MAPP, a build from Xcode with Apple's sandbox push service; from MINSTALL, also a TestFlight build with the production service.

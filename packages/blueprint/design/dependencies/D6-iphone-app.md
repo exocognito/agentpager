@@ -6,7 +6,7 @@ provided: Xcode and the iOS Simulator on the owner's Mac, which build and run th
 caveats:
   - One simulated iPhone stands for every iPhone. The loop samples no real handset; the owner's iPhone is sampled at the walk.
   - "*Not built yet: comes with the encryption work.* An App Group, and a notification service extension that decrypts alerts on the phone (C30::decisions-are-encrypted-end-to-end). The app has neither today."
-  - "*Not built yet: comes with the rollout to the owners Sam invites.* A TestFlight build. Today the app is the development build `me.agentpager.app.dev`, and its alerts use Apple's sandbox push service."
+  - "*Not built yet: comes with the TestFlight build.* A TestFlight build. Today the app is the development build `me.agentpager.app.dev`, and its alerts use Apple's sandbox push service."
 ---
 
 Must supply: a macOS host with Xcode and an iOS 26 Simulator runtime, which tests drive through the app's interface and which a role uses when it plays the owner; and the owner's iPhone for the walk. The phone's Keychain keeps each pager's keys on this device only (C26::make-a-pager-on-the-phone). The Settings app shows the app's Settings bundle, whose Server field lets a self-hoster set the server address; the app itself has no Settings screen.

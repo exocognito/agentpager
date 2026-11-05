@@ -12,3 +12,4 @@ packages/blueprint/runs/
 .dev.vars
 .wrangler/
 packages/cli/dist/
+.pi/

@@ -14,7 +14,7 @@ agentpager setup --print                     # what it would add to Claude Code,
 agentpager setup
 ```
 
-No releases, install script or self-update until Stage 4.
+No releases, install script or self-update until MINSTALL.
 
 ## Use
 

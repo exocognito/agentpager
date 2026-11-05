@@ -1,14 +1,13 @@
 # AgentPager roadmap
 
-1. MENCRYPT
-2. MFRIENDS
+1. MENCRYPT | MINSTALL | MSITE
+2. MOPEN
+3. MFRIENDS
 
 ## Horizons
 
-MAPP, MPAGERS and MCOMMAND have shipped. Encryption comes before the rollout to the owners Sam invites (STRATEGY, Strategic Design Decisions).
+MAPP, MPAGERS and MCOMMAND have shipped. Next, AgentPager gets ready for the first owners beyond Sam ([DEC-2026-10-31-next-roadmap](../records/decisions/DEC-2026-10-31-next-roadmap.md)).
 
-Review what works with users at each stage. The owner's side is the iPhone app (SP2). Android follows with the same behaviour, data and words, drawn its own way. The web app (MCARDS, parked before it closed) stays as history in [parked/](parked/).
+MENCRYPT, MINSTALL and MSITE run side by side. MOPEN's cleanup waits for MENCRYPT, since both change the same code; deciding its licence, home and history can start sooner. MFRIENDS comes last: Sam invites owners once they can install AgentPager, read what it is, inspect its code, and know the service can't read their decisions. Encryption comes before that rollout (STRATEGY, Strategic Design Decisions).
 
-AgentPager has no accounts and no paid tier (SP2). If owners ever need their own writing rules, they come in layers: the command's defaults, then the owner's own, then each pager's. Testers need a way to send Sam their feedback, for example by choosing to share their history file. Neither is designed yet.
-
-Other deferred candidates: Alchemy when the owner sets its date, recovery for a pager's lost keys, a real deployed auto-off wait, and SG1/SG2 outcome metrics once they have bars.
+Nothing else is planned. No Android, no answering from the Lock Screen, no Live Activities and no paid tier: nobody has needed them yet. A feature joins the roadmap when owners using AgentPager, Sam included, show they need it. The web app (MCARDS, parked before it closed) stays as history in [parked/](parked/).

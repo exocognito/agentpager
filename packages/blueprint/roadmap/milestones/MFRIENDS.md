@@ -1,27 +1,24 @@
 ---
 id: MFRIENDS
 title: AgentPager for people I invite
+status: draft
 deliverables:
-  - C18::website-points-to-the-app
-  - C19::try-a-demo-agent
-  - C29::install-the-command-with-one-line
-  - K1::visible-within-five-seconds
-  - D6::iphone-app
-  - D7::apple-developer-program
-  - D8::bun
   - J5::paged-while-away
+  - K1::visible-within-five-seconds
 ---
-
-Stage 4 of the v2 plan (`docs/v2/05-readiness-review-and-stages.md`), with what is still relevant from MSHIP, which it replaces. Each deliverable's parts tagged not built yet for the marketing page, the release builds, the demo agent or the rollout to the owners Sam invites land here.
 
 # MFRIENDS · AgentPager for people I invite
 
 ## Objective
 
-Someone I invite installs AgentPager from TestFlight and tries the demo agent before connecting their own. They install the agentpager command with one line, run `agentpager setup`, and give their agents a pager's text, for example in AGENTS.md. When their agent asks, their phone alerts them even with the app closed, and opening the alert takes them to that decision. The website says what AgentPager stores and for how long. App Review can try the whole flow from the review notes. Every earlier promise still passes.
+I invite the first owners beyond me. They install the app and the command (MINSTALL), can read what AgentPager is and what it stores (MSITE), can inspect its code (MOPEN), and know the service can't read their decisions (MENCRYPT). Their agents page them while they are away, and they answer from their phone. They have an easy way to tell me what works and what doesn't, and I decide what changes next from what they say. Every earlier promise still passes on the deployed product.
 
 ## Out of scope
 
-- Answering from an alert or the Lock Screen, and Live Activities.
-- Android, and product cards.
-- A public App Store release before the owner decides on one.
+- Features nobody has asked for yet, such as Android, answering from the Lock Screen, Live Activities or a paid tier.
+- A public App Store release before I decide on one.
+
+## Sam decides first
+
+- Who to invite first, and how many.
+- How owners send feedback, for example from the app, or by choosing to share the command's history file (C31).

@@ -39,7 +39,7 @@ Sam approved this order (verified): 3, 4 and 5 together as the format conversion
 - MINSTALL: as the orchestration plan says. Sam does the App Store Connect steps himself; agents never sign or hold Apple credentials.
 - MSITE: Sam wants to "workshop that one quite a bit" (verified). Nothing gets built before the first round with him.
 - MOPEN doesn't run yet, but send its "Sam decides first" questions during step 3, so step 5 isn't waiting on them.
-- The review page that METHOD's walk step needs doesn't exist yet. Sam has seen a one-off page of the old Blueprint at https://claude.ai/artifact/YCfaftX4hmCb6dZLoFX8Ya, a snapshot of `main` at 3489430. Its generator is in a scratch folder that may not last, at `/private/tmp/claude-501/-Users-smcllns-Projects-agentpager-worktrees-v2-design/37866243-ba74-41ba-972f-d66de7d5edb7/scratchpad/blueprint-page/` (`build.mjs`, `page.css`, `page.js`). It reads the old format. Build the real one in the repo before step 4.
+- The review page that METHOD's walk step needs doesn't exist yet. Sam has seen a one-off page of the old Blueprint at https://claude.ai/artifact/YCfaftX4hmCb6dZLoFX8Ya, a snapshot of `main` at 3489430. Its generator was in a scratch folder and is gone (verified, 5 Nov). Build the real one in the repo before step 4.
 
 ## Step 4: pause
 
@@ -57,6 +57,5 @@ Nothing from MOPEN goes public before then. Publishing the repository can't be u
 
 ## Things you inherit
 
-- pro runs an older `agentpager` than air and mini, which run 1ee6c27. pro was asleep and unreachable over SSH on 31 Oct (verified). When it's awake, copy air's build over: from `/Users/smcllns/Projects/agentpager.worktrees/wake-claude-agents/packages/cli/dist/agentpager` to pro's `~/.agentpager/bin/agentpager.new`, then `mv` it into place. MINSTALL's install line replaces this chore.
-- Worktrees from step 1: `agentpager.worktrees/next-roadmap` and `agentpager.worktrees/method` can go once their pull requests merge, and `wake-claude-agents` once pro is updated. Deleting needs Sam's approval of the exact `trash` command.
+- You run on pro, Sam's main Mac since 5 Nov. air, mini and pro all run `agentpager` 1ee6c27 (verified, 5 Nov). Until MINSTALL's install line, updating a machine means building `packages/cli` and copying the binary to its `~/.agentpager/bin/`.
 - Reviewers in Herdr. Wait about 3 seconds after splitting a pane before starting pi in it. Exit pi with ctrl+d, not ctrl+c. Stage files by path: `git add -A` once committed a reviewer's `.pi/` session log. PR #40 adds `.pi/` to `.gitignore`.

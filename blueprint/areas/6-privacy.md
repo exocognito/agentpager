@@ -5,7 +5,7 @@
 > **Relies on:** Cloudflare, where the whole service runs: one Worker per stage, prod's at agentpager.me and dev's at dev.agentpager.me, each with its own data (AGENTS.md › Stages), behind Cloudflare's HTTPS, with its storage in Durable Objects, one for the pagers and one per agent · the iPhone's Keychain, which keeps each pager's private key and phone key on that phone · the cryptography built into iOS and into the Worker, which makes the key pair, the fingerprint and the digests
 > **Code:** `packages/app/src/worker.ts` (the number and its fingerprint), `https.ts` (HTTPS only), `registry.ts`, `agent.ts`, `shared.ts` (digests); `packages/app/scripts/build.mjs`, `deploy.mjs`; `packages/contract/exchange.ts`; `packages/ios/AgentPager/Model/Keychain.swift`
 > **Screens:** none
-> **Walked by:** J4
+> **Walked by:** no journey.
 
 ## Invariants
 

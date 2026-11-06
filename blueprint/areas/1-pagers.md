@@ -5,7 +5,7 @@
 > **Relies on:** an iPhone with iOS 26, where the app runs · the iPhone's Keychain, which keeps each pager's keys on that phone only and out of its backups · iOS Settings, which holds the app's server address · Cloudflare, where the service keeps each pager's state and its agents (6 Privacy)
 > **Code:** `packages/ios/AgentPager/`, the app: `Views/PagersView.swift`, `Views/PagerView.swift`, `Views/PagerDetailView.swift`, `Model/AppModel.swift`, `Model/Keychain.swift`, `Model/Wording.swift`, `Settings.bundle` · `packages/app/src/registry.ts` (pagers, off, auto-off, delete) · `packages/app/src/agent.ts` (the off check on every call, forgetting idle agents) · `packages/app/src/contract.ts` (the auto-off and idle times)
 > **Screens:** [pagers](../generated/screens/phone/pagers.png) · [empty](../generated/screens/phone/empty.png) · [pager](../generated/screens/phone/pager.png) · [detail](../generated/screens/phone/detail.png) · [new](../generated/screens/phone/new.png) · journeys: [pager](../generated/screens/journeys/pager/README.md), [off-and-on](../generated/screens/journeys/off-and-on/README.md), [delete](../generated/screens/journeys/delete/README.md)
-> **Walked by:** J3, J4, J5
+> **Walked by:** J4, J5
 
 ## Behaviors
 

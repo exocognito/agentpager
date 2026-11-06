@@ -5,7 +5,7 @@
 > **Relies on:** the owner's iPhone and iOS, which draw the screens, the sheets and the keyboard · the AgentPager service on Cloudflare, which stores each answer and acknowledgement (6 Privacy)
 > **Code:** `packages/ios/AgentPager/Views/DecisionView.swift`, `BriefView.swift`, `PagerView.swift`; `packages/ios/AgentPager/Model/AppModel.swift`, `InboxCache.swift`; `packages/app/src/agent.ts`; `packages/contract/`
 > **Screens:** [decision](../generated/screens/phone/decision.png) · [selected](../generated/screens/phone/selected.png) · [options](../generated/screens/phone/options.png) · [page](../generated/screens/phone/page.png) · [changes](../generated/screens/phone/changes.png) · [off](../generated/screens/phone/off.png) · [undo](../generated/screens/phone/undo.png) · [notconfirmed](../generated/screens/phone/notconfirmed.png) · [notpickedup](../generated/screens/phone/notpickedup.png) · [answered](../generated/screens/phone/answered.png) · journeys [briefs](../generated/screens/journeys/briefs/README.md) and [undo-and-changes](../generated/screens/journeys/undo-and-changes/README.md)
-> **Walked by:** J3, J4, J5
+> **Walked by:** J4, J5
 
 ## Behaviors
 

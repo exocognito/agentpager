@@ -84,10 +84,10 @@ test('warnings: duplicate ids, headings off the grammar, an unknown @M and a D i
   ]);
 });
 
-test('citations: ids in test names and comments only, not in a fixture; untested lists the rest and unknown ids', () => {
+test('citations: ids in test names and comments only, not in any other string, even after a // in it; untested lists the rest and unknown ids', () => {
   const cited = citations([
-    { file: 'packages/a.test.ts', text: "test('B5.1 Read the first clause', () => {\n  assert.equal(card.title, 'B5.2 is only a fixture');\n});\n/* I4.2 and\n   C25.3, an old id */\nconst png = 'D1-pricing/a.png';" },
-    { file: 'packages/ios/FlowTests.swift', text: 'func test_B5_3_theThird() {\n    // also B5.1\n    XCTAssertEqual(row.label, "B5_2 is only a label")\n}' },
+    { file: 'packages/a.test.ts', text: "test('B5.1 Read the first clause', () => {\n  assert.equal(card.title, 'B5.2 is only a fixture');\n  const url = 'https://fixtures.invalid/B5.2', page = `a page\nhttps://fixtures.invalid/B5.2`; // and it's I4.2\n});\n/* I4.2 and\n   C25.3, an old id */\nconst png = 'D1-pricing/a.png';" },
+    { file: 'packages/ios/FlowTests.swift', text: 'func test_B5_3_theThird() {\n    let url = "https://fixtures.invalid/B5_2" // also B5.1\n    XCTAssertEqual(row.label, "B5_2 is only a label")\n}' },
   ]);
   assert.deepEqual([...cited], [
     ['B5.1', ['packages/a.test.ts', 'packages/ios/FlowTests.swift']],

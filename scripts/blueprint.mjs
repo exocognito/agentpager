@@ -18,8 +18,10 @@ const CLAUSE = /^(\d+)\. (.*)$/;
 const ADDED = /^@M(\d+):\s*/;
 const D_ID = /(?<![\w-])D\d+(?![\w-])/;
 // Where a test file names ids: a comment, a TypeScript test's name (`test('…'`, `it(`, `describe(`, `test.skip(` and
-// the like), or a Swift test's name (`func test_B25_2_connects`). Anything else, such as a fixture's text, names nothing.
-const NAMED = /\/\/.*|\/\*[\s\S]*?\*\/|\b(?:test|it|describe)(?:\.\w+)?\(\s*(['"`])(?:\\.|(?!\1)[^\\])*\1|\bfunc\s+test\w*/g;
+// the like), or a Swift test's name (`func test_B25_2_connects`). Any other string literal is matched only to be
+// skipped, so a fixture's text names nothing, not even after a `//` inside it, as in a URL.
+const STRING = String.raw`'(?:\\.|[^\\'\n])*'|"(?:\\.|[^\\"\n])*"|\`(?:\\.|[^\\\`])*\``;
+const NAMED = new RegExp(String.raw`\b(?:test|it|describe)(?:\.\w+)?\(\s*(?:${STRING})|(${STRING})|\/\/.*|\/\*[\s\S]*?\*\/|\bfunc\s+test\w*`, 'g');
 // A clause id there: B25.2, or B25_2 in a Swift name. The letters of retired ids (C, D) are read too, so a test
 // naming one is reported.
 const CITED = /(?<![A-Za-z0-9])([BCDIJKL])(\d+)[._](\d+)(?!\d)/g;
@@ -72,7 +74,7 @@ export function check(files, milestones, warn) {
 // The clause ids the test files name in a test's name or a comment, each with the files that name it.
 export function citations(tests) {
   const cited = new Map();
-  for (const { file, text } of tests) for (const m of [...text.matchAll(NAMED)].flatMap(([named]) => [...named.matchAll(CITED)])) {
+  for (const { file, text } of tests) for (const m of [...text.matchAll(NAMED)].filter(m => m[1] === undefined).flatMap(([named]) => [...named.matchAll(CITED)])) {
     const id = `${m[1]}${m[2]}.${m[3]}`;
     cited.set(id, [...new Set([...(cited.get(id) ?? []), file])]);
   }

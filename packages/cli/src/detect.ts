@@ -3,7 +3,7 @@ import { realpathSync } from 'node:fs';
 import { homedir, hostname } from 'node:os';
 import path from 'node:path';
 
-// Who asked ("Codex") and the project its decisions are grouped under on the phone (B25.3, blueprint/areas/2-agents.md).
+// Who asked ("Codex") and the project its decisions are grouped under on the phone (B25, blueprint/areas/2-agents.md).
 // A harness is known by a marker in its environment, else by its process name. Verified: CLAUDECODE (Claude Code,
 // 29 Oct 2026). The others are each harness's documented or observed variable and are checked again when the binary
 // is built; an agent can always pass --app.

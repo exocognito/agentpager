@@ -6,7 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Schema } from 'effect';
 import pngjs from 'pngjs';
-import { AGENT_IDLE_MS, PagerInbox } from '../src/contract.ts';
+import { AGENT_IDLE_MS, CLIENT_HEADER, PagerInbox, clientVersion } from '../src/contract.ts';
 import { RELEASE_TAG, stageOf } from './stages.ts';
 
 // The upgrade baseline (METHOD.md › The milestone loop, step 7): what a release stored on a stage, kept so the next
@@ -94,10 +94,11 @@ function command(binary, home, args, extra = {}) {
 }
 const versionOf = (binary, home) => command(binary, home, ['version']).text.replace(/^agentpager /, '').trim();
 
+// It plays the phone, and names itself as every client of the API does (CLIENT_HEADER).
 async function phone(record, route, data) {
   const response = await fetch(record.server + route, {
     method: data === undefined ? 'GET' : 'POST',
-    headers: { 'x-phone-key': record.pager.phoneKey, ...(data === undefined || data === null ? {} : { 'content-type': 'application/json' }) },
+    headers: { 'x-phone-key': record.pager.phoneKey, [CLIENT_HEADER]: clientVersion('baseline', sha.slice(0, 7)), ...(data === undefined || data === null ? {} : { 'content-type': 'application/json' }) },
     body: data === undefined || data === null ? undefined : JSON.stringify(data),
   });
   return response;

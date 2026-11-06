@@ -36,8 +36,10 @@
 8. While the service can't be reached, the phone shows what it last read, and Pagers says it can't reach the server and when it last updated.
 9. A pager made on another phone never shows on this one.
 10. The server's address is set in iOS Settings; the app has no Settings screen of its own. The phone shows only the pagers made on the server it is set to.
+11. @M4: A pager made on dev.agentpager.me is marked dev on its row in Pagers and on its own screen. A pager made on agentpager.me isn't.
 
 - The server's address is for self-hosters. Left empty, the app uses agentpager.me.
+- The phone counts a server as dev when its address starts with `dev.`, as the front page does (B18.6), so a pager made on a local server isn't marked.
 
 ### B22 · @M2 · Turn a pager off and on, or delete it
 

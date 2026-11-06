@@ -30,7 +30,7 @@ Start here. [PRODUCT.md](PRODUCT.md) says what AgentPager is for, in Sam's words
 | 3 | [Cards](areas/3-cards.md) | What an agent writes and sends: `card.yaml`, the one review before sending, and the checks that refuse a broken card | B27 · I4 I22 · L16 |
 | 4 | [Getting paged](areas/4-getting-paged.md) | Alerts when the app is closed, opening one to its decision, the badge, and the warning when no agent picks up an answer | B17 · L17 |
 | 5 | [Answering](areas/5-answering.md) | Reading and answering a decision on the phone: options or changes, Send and Undo, and the closed record | B5 B6 B7 · I5 I6 I18 · L18 |
-| 6 | [Privacy](areas/6-privacy.md) | What the service is and what it can see: the keys and the number's fingerprint that tie a pager to its phone, and how keys and the service's own secrets are kept | I19 I23 · L19 L20 |
+| 6 | [Privacy](areas/6-privacy.md) | What the service is and what it can see: the keys and the number's fingerprint that tie a pager to its phone, and how keys and the service's own secrets are kept | I19 I23 · L19 |
 | 7 | [Getting started](areas/7-getting-started.md) | How someone new finds and sets up AgentPager: `/start` and setting up the command in agent apps | B18 B29 · L21 L22 L23 L24 |
 
 Limits (`L`) are what people meet today and the fix that waits; they start at L9. Lines not built yet wait in their milestone's doc in [milestones/next/](milestones/next/).

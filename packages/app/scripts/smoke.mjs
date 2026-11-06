@@ -52,6 +52,15 @@ await step('/ serves a browser the front page', async () => {
   check(response.status === 200, `status ${response.status}`); candidate(response);
   check(body.includes('<div id="root"></div>') && body.includes('/assets/app.js'), 'not the front page');
 });
+await step('Plain HTTP moves to HTTPS or is refused, and HTTPS replies tell browsers to keep to it (I23.4)', async () => {
+  const moved = await fetch(`http://${stage.host}/start?smoke=1`, { redirect: 'manual' });
+  check(moved.status === 308 && moved.headers.get('location') === `${origin}/start?smoke=1`, `GET over plain HTTP: ${moved.status} ${moved.headers.get('location')}`); candidate(moved);
+  const refused = await fetch(`http://${stage.host}/api/agents`, { method: 'POST', redirect: 'manual', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ number: bogus, app: 'smoke', project: 'smoke' }) });
+  const value = await refused.json();
+  check(refused.status === 403 && value.error === 'HttpsRequired', `POST over plain HTTP: ${refused.status} ${value.error}`); candidate(refused);
+  const secure = await fetch(origin + '/start');
+  check(secure.headers.get('strict-transport-security') === 'max-age=31536000', `HSTS: ${secure.headers.get('strict-transport-security')}`); await secure.arrayBuffer();
+});
 await step('The Registry refuses a pager number it has never seen', async () => {
   const response = await fetch(origin + '/api/agents', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ number: bogus, app: 'smoke', project: 'smoke' }) });
   const value = await response.json();

@@ -2,7 +2,7 @@ import { Schema } from "effect";
 import { Token, Text, Title, Body, Timestamp, OptionNumber, ValidProse, characters } from "./values.ts";
 import { Attachments, AttachmentInfo, attachmentTypes, missingAttachment, Payload as BriefCard } from "./brief.ts";
 
-// The live wire contract (v2, docs/v2/01-decisions.md): every shape the server, the agentpager binary and the phone
+// The live wire contract (v2, DEC-2026-10-29-v2-design in blueprint/DECISIONS.md): every shape the server, the agentpager binary and the phone
 // exchange. The server (packages/app) and the binary (packages/cli) decode with these schemas; the iPhone app mirrors
 // them in Model/API.swift. The primitives live in values.ts and the brief in brief.ts; this module
 // re-exports the primitives so one import carries the whole contract.
@@ -24,7 +24,7 @@ export const ANSWER_WAIT_MAX_SECONDS = 50;
 export const AutoOff = Schema.Literal("never", "24h", "7d", "30d");
 export type AutoOff = typeof AutoOff.Type;
 // The pager number, made on the phone: `ap1_` and base64url of the pager id (16 bytes) and the first 8 bytes of the
-// SHA-256 of the pager's public key (docs/v2/04-encryption.md §2). The server keys the pager by the id, as 32 hex.
+// SHA-256 of the pager's public key (I19, blueprint/areas/6-privacy.md). The server keys the pager by the id, as 32 hex.
 export const PagerNumber = Schema.String.pipe(Schema.pattern(/^ap1_[A-Za-z0-9_-]{32}$/));
 export const PagerId = Schema.String.pipe(Schema.pattern(/^[0-9a-f]{32}$/));
 // A Curve25519 public key: 32 bytes, base64url without padding.

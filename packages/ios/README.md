@@ -17,7 +17,8 @@ v2 is a fresh install: at launch the app deletes v1's pager keys, number and cac
 
 The default is the build setting `AGENTPAGER_SERVER_URL` in `project.yml` (`https://agentpager.me`). Self-hosters set
 their own in the Settings app: **AgentPager → Server** (empty means the build's default). There is no Settings screen
-in the app. Pagers are kept per server address; the app reads the setting each time it comes to the foreground.
+in the app. `pnpm phone:dev` builds with dev.agentpager.me as the default and installs it on the dev phone
+(`phone-dev.mjs`; AGENTS.md › Stages). Pagers are kept per server address; the app reads the setting each time it comes to the foreground.
 
 ## Pagers (v2)
 

@@ -1,6 +1,6 @@
 import SwiftUI
 
-// The mocks' sample data (docs/v2/mocks). Previews and `-demo` never touch the network or the Keychain.
+// The sample data the previews and `-demo` draw. They never touch the network or the Keychain.
 enum Sample {
     static let now = Date()
     static let work = "a0000000000000000000000000000001", vm = "a0000000000000000000000000000002", acme = "a0000000000000000000000000000003"
@@ -29,7 +29,7 @@ enum Sample {
         (1...count).map { n in answered(brief("\(prefix)\(n)", "Earlier decision \(n)", ago: Double(n) * 86400), .option(1), at: now.addingTimeInterval(-Double(n) * 86000), ack: "Done.") }
     }
 
-    // The M11 decision, docs/v2/card-example.yaml as the brief the binary compiles it to.
+    // The M11 decision: `EXAMPLE` in packages/cli/src/rules.ts, as the brief the binary compiles it to.
     static let m11Options = [
         option(1, "Smaller fix with manual recovery", "Small + manual", "less code and state, accepting an occasional Cancel or Run again after a connection failure"),
         option(2, "Precise automatic recovery", "Precise + automatic", "never leaving a job stuck, at the cost of durable request identities and more code"),
@@ -138,7 +138,7 @@ enum Sample {
 }
 
 extension Sample {
-    // `-demo <state>` launches the app on the mocks' sample data with no network, for screenshots.
+    // `-demo <state>` launches the app on the sample data with no network, for screenshots.
     static func demo(_ state: String?) -> AppModel? {
         guard let state else { return nil }
         let m = model(empty: state == "empty")

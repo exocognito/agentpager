@@ -18,12 +18,13 @@ Three stages, each with its own data, as [METHOD.md › Stages and releases](MET
 | Stage | Address | How it's deployed | Who uses it |
 | --- | --- | --- | --- |
 | local | `http://127.0.0.1:8787` from `pnpm start:app`, or the LAN dogfood server (`pnpm --filter @agentpager/app dogfood`) | runs from the checkout; each test file starts its own | the suites, the UI tests and `pnpm designs` |
-| dev | https://dev.agentpager.me, Worker `ownerpager-dev` | `pnpm deploy:dev` from a clean checkout of `main`, then `pnpm smoke:dev` | the root after each merge; Sam's walk on the dev phone, HomePhoneLite, with Settings → Server set to dev; binaries built from `main` |
+| dev | https://dev.agentpager.me, Worker `ownerpager-dev` | `pnpm deploy:dev` from a clean checkout of `main`, then `pnpm smoke:dev` | the root after each merge; Sam's walk on the dev phone, HomePhoneLite, which runs `main`'s app from `pnpm phone:dev`; binaries built from `main` |
 | prod | https://agentpager.me, Worker `ownerpager` | `pnpm deploy:prod`, which refuses anything but a clean tree at a release tag, then `pnpm smoke:prod` | Sam's real agents and phone |
 
 - **The root deploys dev after each merge** and runs `pnpm smoke:dev`. The smoke run pages no one and needs no phone; the one pager it makes, with no alert target, it deletes.
 - **Release tags** are `m<n>` for a milestone and `m<n>.<k>` for a fix after it, such as `m4` and `m4.1`. Prod, and the clients used with it, come only from a tag that was green on dev. Those clients are the phone build and the binary on air, mini and pro.
 - **Deploy order:** the service, then the binary, then the app.
+- **The dev phone** gets its builds from `pnpm phone:dev`: it builds the app with dev.agentpager.me as its default server, then installs and launches it on HomePhoneLite. The project's default stays agentpager.me, since Sam's own iPhone takes the same team's builds, and the Settings app's Server field still overrides either. Sam permits agents to control the dev phone (5 Nov 2026): installing, launching and reading its state with `devicectl`.
 - **A binary built from `main`** is tested under its own `AGENTPAGER_HOME`, with `--server https://dev.agentpager.me`. It never uses a machine's `~/.agentpager`, which Sam's real agents use.
 - **Hostnames.** Run without a terminal, wrangler silently replaces a DNS record or another Worker's domain on its hostname. So `deploy.mjs` refuses a hostname that is neither free nor already its stage's own. The Cloudflare token can't read certificate packs, so no check reads them.
 

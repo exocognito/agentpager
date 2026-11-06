@@ -24,7 +24,7 @@ test('briefs: the four canvas examples ask, read back as sent, answer, and go wi
     const cards = `/api/agents/${agentId}/cards`;
     const asked = new Map<string, string>();
     for (const name of briefNames()) {
-      const r = await f.ok(C.Asked, cards, { agent: s.agentKey, data: { decisionId: token(), ...loadBrief(name) } });
+      const r = await f.ok(C.Asked, cards, { agent: s.agentKey, data: { requestId: token(), ...loadBrief(name) } });
       asked.set(name, r.decisionId);
     }
     assert.deepEqual([...asked.keys()], ['D1-pricing', 'D2-checkout', 'D3-refunds', 'D4-branches']);
@@ -80,7 +80,7 @@ test('briefs: refused whole, with a reason that says what to fix', { timeout: 12
   try {
     const { p, a: s } = await f.connected('Claude Code', 'shop');
     const cards = `/api/agents/${s.agent.agentId}/cards`;
-    const base: Record<string, unknown> = { decisionId: token(), ...loadBrief('D4-branches') };
+    const base: Record<string, unknown> = { requestId: token(), ...loadBrief('D4-branches') };
     const card = (patch: Record<string, unknown>) => ({ ...base, card: { ...(typeof base.card === 'object' ? base.card : {}), ...patch } });
     const markdown = String((typeof base.card === 'object' && base.card !== null && 'markdown' in base.card) ? base.card.markdown : '');
     const png = Buffer.from(readFileSync(path.join(briefsDir, 'D1-pricing', 'a-cards.png'))).toString('base64');

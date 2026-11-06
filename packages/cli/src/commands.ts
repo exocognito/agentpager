@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { createHash, randomBytes } from 'node:crypto';
-import { Acknowledgement, AgentStatus, AnswerStatus, Asked, Connected, Finished } from '../../contract/exchange.ts';
+import { Acknowledgement, AgentStatus, AnswerStatus, Asked, Connected, Finished, decisionIdOf } from '../../contract/exchange.ts';
 import { call, type Failure } from './client.ts';
 import { compile, type Source } from './card.ts';
 import { HARNESS_APP, detectApp, detectMachine, detectProject, harness, self, type Harness } from './detect.ts';
@@ -21,8 +21,9 @@ const WAIT_SECONDS = 50;
 export const DESKTOP_WAIT_MS = 2 * 3_600_000;
 // How long `wait --forever` pauses before trying an unreachable server again.
 const RETRY_MS = 10_000;
-// How long an ask whose reply was lost pauses before it is sent once more.
-const ASK_AGAIN_MS = 1_000;
+// How long an ask whose reply was lost pauses before it is sent once more, and how long a run holds its card while
+// it sends: longer than its two tries can take, so a run that died lets the card go.
+const ASK_AGAIN_MS = 1_000, SENDING_MS = 2 * 60_000;
 
 const unknownAgent = (id: string): Result => ({ code: 6, text: `No agent ${id} on this machine. Run \`agentpager agents\` to list them, or connect again.` });
 // The agent's file, or the reply when there is none or it can't be read.
@@ -138,26 +139,43 @@ export async function ask(agent: string, card: Source, client?: string): Promise
   const brief = compiled.brief;
   const cannot = writable();
   if (cannot) return unwritable(cannot);
-  // The decision's id is chosen here and kept in the agent's file, under the card's content, until a reply settles
-  // it: the same card asked again after a lost reply, in this run or a later one, names the same decision.
+  // The ask's request id is chosen here and kept in the agent's file, under the card's content, until a reply settles
+  // it: the same card asked again after a lost reply, in this run or a later one, names the same decision. One run
+  // at a time sends a card, so a run that settles it can't drop the id another run has just been unsure of.
   const cardKey = createHash('sha256').update(JSON.stringify(brief)).digest('base64url');
-  let decisionId = '';
+  let requestId = '', busy = false;
   try {
-    if (!updateAgent(a.id, x => { x.asking ??= {}; decisionId = x.asking[cardKey] ??= randomBytes(24).toString('base64url'); })) return unknownAgent(a.id);
+    const now = Date.now();
+    if (!updateAgent(a.id, x => {
+      x.asking ??= {};
+      const kept = x.asking[cardKey];
+      if (kept?.sendingUntil && Date.parse(kept.sendingUntil) > now) { busy = true; return; }
+      requestId = kept?.requestId ?? randomBytes(24).toString('base64url');
+      x.asking[cardKey] = { requestId, sendingUntil: new Date(now + SENDING_MS).toISOString() };
+    })) return unknownAgent(a.id);
   } catch (e) {
     const code = e instanceof Error && 'code' in e ? String(e.code) : 'write failed';
     return code === 'EBUSY' ? refused(`Agent ${a.id} is busy with another call on this machine. Nothing was sent; try again.`) : unwritable(code);
   }
-  const send = () => call(Asked, a.server, 'POST', `/api/agents/${a.agentId}/cards`, { key: a.agentKey, data: { decisionId, ...brief } });
-  // It may have reached the owner (B32.10). The card keeps this id, even if another run of the same card settled it
-  // meanwhile, so asking again finds this decision; only when it does is the agent told asking again is safe.
-  const unsure = (f: Failure) => {
+  if (busy) return refused('Another run is sending this same card now. Nothing was sent: wait for its reply, then ask again only if it says to.');
+  // How this run leaves the card's id: gone once settled, otherwise kept for the next run, without this run's hold.
+  const leave = (settled: boolean) => {
     let kept = false;
-    try { updateAgent(a.id, x => { x.asking ??= {}; x.asking[cardKey] ??= decisionId; kept = x.asking[cardKey] === decisionId; }); } catch { /* not kept */ }
-    return kept ? uncertain(f, a, askAgain) : uncertain(f, a);
+    try {
+      updateAgent(a.id, x => {
+        x.asking ??= {};
+        const now = x.asking[cardKey];
+        if (now && now.requestId !== requestId) return;
+        if (settled) delete x.asking[cardKey]; else { x.asking[cardKey] = { requestId }; kept = true; }
+      });
+    } catch { /* left as it was: its hold runs out */ }
+    return kept;
   };
+  const send = () => call(Asked, a.server, 'POST', `/api/agents/${a.agentId}/cards`, { key: a.agentKey, data: { requestId, ...brief } });
+  // It may have reached the owner (B32.10): the id is kept, and the agent is told asking again is safe when it is.
+  const unsure = (f: Failure) => leave(false) ? uncertain(f, a, askAgain) : uncertain(f, a);
   let r = await send();
-  // A lost reply is sent once more: under the same id the owner gets one decision either way.
+  // A lost reply is sent once more: with the same request id the owner gets one decision either way.
   if (!r.ok && r.error === 'NoReply') {
     const lost = r;
     await new Promise(res => setTimeout(res, ASK_AGAIN_MS));
@@ -166,13 +184,17 @@ export async function ask(agent: string, card: Source, client?: string): Promise
   }
   if (!r.ok) {
     if (r.error === 'NoReply' || r.error === 'NotUnderstood') return unsure(r);
-    // Another card already has this id on the server: the next try takes a new one.
-    if (r.error === 'DecisionIdTaken') {
-      try { updateAgent(a.id, x => { if (x.asking?.[cardKey] === decisionId) delete x.asking[cardKey]; }); } catch { /* kept: refused again next time */ }
-      return refused('Not sent: the id kept for this card is already taken on the server. Ask again to send it under a new id.');
+    // Another card already has this request id on the server: the next try takes a new one.
+    if (r.error === 'RequestIdTaken') {
+      leave(true);
+      return refused('Not sent: the request id kept for this card is already taken on the server. Ask again to send it under a new one.');
     }
+    leave(false);
     return refusal(r, a);
   }
+  // The service names the decision by this agent and the request id; any other name isn't its reply.
+  if (r.value.decisionId !== await decisionIdOf(a.agentId, requestId)) return unsure({ ok: false, status: 200, error: 'NotUnderstood', message: 'it named another decision' });
+  leave(true);
   const id = r.value.decisionId;
   const now = new Date();
   // The short id is given out only once it is recorded; otherwise the reply names the server's id.
@@ -180,7 +202,6 @@ export async function ask(agent: string, card: Source, client?: string): Promise
   try {
     let chosen = '';
     updateAgent(a.id, x => {
-      if (x.asking?.[cardKey] === decisionId) delete x.asking[cardKey];
       chosen = shortId('d_', taken => taken in x.decisions);
       x.decisions[chosen] = { id, title: brief.title, options: brief.card.options.map(o => o.label), askedAt: now.toISOString() };
       const cards = x.cardsSinceRules + 1, since = x.rulesShownAt ? now.getTime() - Date.parse(x.rulesShownAt) : Infinity;

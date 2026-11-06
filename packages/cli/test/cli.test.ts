@@ -9,6 +9,8 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { fixture, assert, token } from '../../app/test/support.ts';
 import { EXAMPLE } from '../src/rules.ts';
+import type { Result } from '../src/commands.ts';
+import { decisionIdOf } from '../../contract/exchange.ts';
 
 // A field of a command's --json result, read without a cast.
 const field = (r: { json?: unknown }, key: string) => String(typeof r.json === 'object' && r.json !== null ? Reflect.get(r.json, key) : undefined);
@@ -254,8 +256,10 @@ test('B27.9 B32.10 A lost ask reply is never taken as success, and asking the sa
     const id = field(await op.connect({ number: p.number, app: 'Codex', project: 'lost' }), 'agent');
     const onPhone = async () => (await f.pager(p.pagerId, p.phone)).agents.flatMap(a => a.open).map(d => [d.title, d.decisionId]);
     const recorded = (short: string) => store.loadAgent(id)?.decisions[short]?.id;
+    // The decision a kept request id names: the service's agent id with it (decisionIdOf).
+    const named = async (requestId: string) => decisionIdOf(store.loadAgent(id)?.agentId ?? '', requestId);
 
-    // One reply lost: the command sends the ask once more under the same id, and the owner has it once.
+    // One reply lost: the command sends the ask once more with the same request id, and the owner has it once.
     net.lose(1);
     const once = await op.ask(id, { file: card('Lost once?') });
     assert.equal(once.code, 0, once.text);
@@ -264,13 +268,15 @@ test('B27.9 B32.10 A lost ask reply is never taken as success, and asking the sa
     assert.deepEqual(first, ['Lost once?', recorded(field(once, 'decision'))]);
     assert.deepEqual(store.loadAgent(id)?.asking, {}, 'settled');
 
-    // Both replies lost: it may have reached the owner, so it isn't success, and the card's id is kept.
+    // Both replies lost: it may have reached the owner, so it isn't success, and the card's request id is kept.
     net.lose(2);
     const lost = await op.ask(id, { file: card('Lost twice?') });
     assert.deepEqual([lost.code, lost.text], [5, `No reply from ${net.origin} (the connection closed).\nThis may or may not have reached your owner. Check with \`agentpager status --agent ${id}\` before trying again.\nAsking again with the same card is safe: your owner gets it once.`]);
     const kept = Object.values(store.loadAgent(id)?.asking ?? {});
     assert.equal(kept.length, 1);
-    assert.deepEqual(await onPhone(), [first, ['Lost twice?', kept[0]]], 'it did reach the owner, once');
+    assert.equal(kept[0].sendingUntil, undefined, 'no run holds it now');
+    const decision = await named(kept[0].requestId);
+    assert.deepEqual(await onPhone(), [first, ['Lost twice?', decision]], 'it did reach the owner, once');
     assert.equal(Object.keys(store.loadAgent(id)?.decisions ?? {}).length, 1, 'nothing recorded as asked');
 
     // Asked again by a new run of the command, the same card finds that decision: still one on the phone.
@@ -279,16 +285,19 @@ test('B27.9 B32.10 A lost ask reply is never taken as success, and asking the sa
       let out = ''; child.stdout.on('data', d => { out += d; }); child.on('error', reject); child.on('close', () => resolve(out));
     });
     const short = JSON.parse(again).result.decision;
-    assert.equal(recorded(short), kept[0]);
-    assert.deepEqual(await onPhone(), [first, ['Lost twice?', kept[0]]]);
+    assert.equal(recorded(short), decision);
+    assert.deepEqual(await onPhone(), [first, ['Lost twice?', decision]]);
     assert.deepEqual(store.loadAgent(id)?.asking, {}, 'settled');
-    await f.answer((await f.pager(p.pagerId, p.phone)).agents[0].agent.agentId, p.phone, kept[0]);
+    await f.answer((await f.pager(p.pagerId, p.phone)).agents[0].agent.agentId, p.phone, decision);
     assert.match((await op.wait(id, short)).text, /^Answered at .*: option B "Pasta"\./);
 
-    // Another run of the same card, at the same time, gets its reply and settles the card's id while this one loses
-    // both of its: this one keeps the id, so asking again still finds the one decision.
-    net.lose(2, async n => { if (n === 2) assert.equal((await op.ask(id, { file: card('At once?') })).code, 0); });
+    // One run at a time sends a card: another run of the same card while this one is sending is refused with nothing
+    // sent, so it can't settle the id this run is about to be unsure of. This run loses both replies and keeps the
+    // id, so asking again finds the one decision.
+    let meanwhile: Result | undefined, sent = 0;
+    net.lose(2, async n => { if (n === 1) { const before = net.asks(); meanwhile = await op.ask(id, { file: card('At once?') }); sent = net.asks() - before; } });
     const racing = await op.ask(id, { file: card('At once?') });
+    assert.deepEqual([meanwhile?.code, meanwhile?.text, sent], [2, 'Another run is sending this same card now. Nothing was sent: wait for its reply, then ask again only if it says to.', 0]);
     assert.equal(racing.code, 5, racing.text);
     assert.match(racing.text, /Asking again with the same card is safe/);
     const once2 = await op.ask(id, { file: card('At once?') });
@@ -298,7 +307,7 @@ test('B27.9 B32.10 A lost ask reply is never taken as success, and asking the sa
     // Once settled, the same card asked again is a new decision, as the agent meant it.
     const later = await op.ask(id, { file: card('Lost twice?') });
     assert.equal(later.code, 0, later.text);
-    assert.notEqual(recorded(field(later, 'decision')), kept[0]);
+    assert.notEqual(recorded(field(later, 'decision')), decision);
     assert.deepEqual((await onPhone()).map(([title]) => title), ['Lost once?', 'At once?', 'Lost twice?']);
   } finally { await net.close(); await f.stop(); }
 });

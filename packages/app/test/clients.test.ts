@@ -62,7 +62,7 @@ test('the phone: an app from before the header is served; an older one is told t
   const f = await fixture('clients-phone');
   try {
     const { p, a } = await f.connected('Codex', 'phone');
-    const brief: Record<string, unknown> = { decisionId: token(), ...loadBrief('D2-checkout') };
+    const brief: Record<string, unknown> = { requestId: token(), ...loadBrief('D2-checkout') };
     const asked = await f.ok(C.Asked, `/api/agents/${a.agent.agentId}/cards`, { agent: a.agentKey, data: brief });
     const did = asked.decisionId, decision = `/api/agents/${a.agent.agentId}/cards/${did}`;
     const routes = (pagerId: string, keys = pagerKeys()): Call[] => [

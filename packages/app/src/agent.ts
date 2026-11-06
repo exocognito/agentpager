@@ -16,8 +16,7 @@ const Meta = Schema.Struct({
 });
 type Meta = typeof Meta.Type;
 const Open = Schema.Struct({ agentId: C.Token, pagerId: C.PagerId, phoneHash: Digest, app: C.Label, project: C.Label, machine: Schema.optional(C.Label) });
-// taken: the decision id an ask claimed is already another agent's on this pager.
-const PagerState = Schema.Struct({ state: Schema.Literal('on', 'off', 'gone'), push: Schema.optional(Schema.NullOr(PushTarget)), taken: Schema.optional(Schema.Boolean) });
+const PagerState = Schema.Struct({ state: Schema.Literal('on', 'off', 'gone'), push: Schema.optional(Schema.NullOr(PushTarget)) });
 type PagerState = typeof PagerState.Type;
 // Alerts are never delivered later than this.
 const ALERT_EXPIRY_MS = 24 * 3_600_000;
@@ -31,8 +30,8 @@ const registry = (env: Env, path: string, data: unknown) => forward(env.REGISTRY
 
 export class Agent {
   constructor(private ctx: DurableObjectState, private env: Env) { this.schema(); }
-  // asks: each decision asked under the id its agent chose, with the SHA-256 of the question as asked, written with
-  // the decision, so asking the same again under that id finds it. Decisions from before asks named their id have none.
+  // asks: each decision asked with a request id (C.decisionIdOf), with the SHA-256 of the question as asked, written
+  // with the decision, so asking the same again with that request id finds it. Decisions from before have none.
   private schema() {
     this.tx(() => {
       this.ctx.storage.sql.exec(`CREATE TABLE IF NOT EXISTS agent (id INTEGER PRIMARY KEY CHECK(id=1), json TEXT NOT NULL);
@@ -142,19 +141,17 @@ export class Agent {
   }
   // The pager's state, asked of the Registry on every call that sends something. A deleted pager takes its agents
   // with it: one that missed being told forgets itself here.
-  // An ask also claims its decision id on the pager (claim), so no two agents on it share one.
-  private async pagerState(m: Meta, by: 'agent' | 'phone' | 'connect' = 'agent', claim?: string): Promise<PagerState> {
-    const reply = await registry(this.env, claim ? '/claim' : '/state', { pagerId: m.pagerId, ...(claim ? { agentId: m.agentId, decisionId: claim } : {}) });
+  private async pagerState(m: Meta, by: 'agent' | 'phone' | 'connect' = 'agent'): Promise<PagerState> {
+    const reply = await registry(this.env, '/state', { pagerId: m.pagerId });
     if (!reply.ok) throw new Error(`Registry refused the pager state: ${reply.status}`);
     const s = decode(PagerState, await reply.json());
     if (s.state === 'gone') { await this.forget(); throw by === 'agent' ? C.refuse.pagerDeleted() : by === 'phone' ? C.refuse.unknownPager() : C.refuse.numberInvalid(); }
     return s;
   }
   // Off means nothing gets through and nothing is queued.
-  private async on(m: Meta, by: 'agent' | 'phone' = 'agent', claim?: string) {
-    const s = await this.pagerState(m, by, claim);
+  private async on(m: Meta, by: 'agent' | 'phone' = 'agent') {
+    const s = await this.pagerState(m, by);
     if (s.state === 'off') throw C.refuse.pagerOff();
-    if (s.taken) throw C.refuse.decisionIdTaken();
     return s.push ?? null;
   }
   private decision(id: string): C.Decision {
@@ -211,19 +208,19 @@ export class Agent {
     if (action === 'ask') {
       const digest = await agentDigest(request);
       const m = this.tx(() => { const m = this.agent(digest); if (m.finishedAt) throw C.refuse.finished(); return m; });
-      const { decisionId, ...question } = decode(C.AskInput, await body(request));
-      // The question as decoded, in the schema's key order, so the same ask sent again has the same digest.
-      const asking = await sha256(JSON.stringify(question));
-      // Checked last before the write, so the switch is read as late as it can be. The id is claimed on the pager
-      // then, so another agent's decision on it can't have the same id: the phone tells decisions apart by id.
-      const push = await this.on(m, 'agent', decisionId);
+      const { requestId, ...question } = decode(C.AskInput, await body(request));
+      // The decision's id comes from this agent's id and the request id, so it is this agent's alone; the question as
+      // decoded, in the schema's key order, has the same digest when the same ask is sent again.
+      const decisionId = await C.decisionIdOf(m.agentId, requestId), asking = await sha256(JSON.stringify(question));
+      // Checked last before the write, so the switch is read as late as it can be.
+      const push = await this.on(m);
       const asked = this.tx(() => {
         const m = this.agent(digest);
         // The same ask again (its reply was lost) finds its decision, which stays as it was: nothing is stored and no
-        // alert goes, even when this agent's open decisions are now at their limit.
+        // alert goes, even when this agent's open decisions are now at their limit. Another question is refused.
         const known = this.ctx.storage.sql.exec<{ question: string }>('SELECT question FROM asks WHERE decision_id=?', decisionId).toArray()[0];
         if (known?.question === asking) return { m, again: true };
-        if (known || this.ctx.storage.sql.exec('SELECT 1 FROM proposals WHERE id=?', decisionId).toArray().length) throw C.refuse.decisionIdTaken();
+        if (known || this.ctx.storage.sql.exec('SELECT 1 FROM proposals WHERE id=?', decisionId).toArray().length) throw C.refuse.requestIdTaken();
         if (this.openCount() >= C.MAX_OPEN_DECISIONS) throw C.refuse.tooMany();
         // The decision keeps each attachment's name, type and size; the bytes live in their own table.
         const { attachments, ...rest } = question;

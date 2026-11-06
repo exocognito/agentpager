@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
 import { expect, it } from "vitest";
 import { Schema } from "effect";
-import { AskInput, CLIENT_HEADER, PROTOCOL, QuestionInput, clientVersion, readClientVersion } from "./exchange.ts";
+import { createHash } from "node:crypto";
+import { AskInput, CLIENT_HEADER, PROTOCOL, QuestionInput, Token, clientVersion, decisionIdOf, readClientVersion } from "./exchange.ts";
 
 // The iPhone app and its UI tests' agent mirror the client header in Swift (METHOD.md › Design in code): the same
 // header, the same protocol, and the app sends it on every request.
@@ -38,12 +39,24 @@ it("reads a client's header as its name, protocol and build, and nothing else", 
   }
 });
 
-it("asks under a decision id the agent chose; the question itself is unchanged", () => {
+it("asks with a request id the agent chose; the question itself is unchanged", () => {
   const card = { type: "brief", recommended: 1, options: [{ number: 1, title: "First", prioritizes: "speed" }, { number: 2, title: "Second", prioritizes: "safety" }], markdown: "## Options\n\n## Recommendation: A\n**Why:** It is quick.\n" };
   const question = { title: "Which?", card };
   expect(Schema.is(QuestionInput)(question)).toBe(true);
   expect(Schema.is(AskInput)(question)).toBe(false);
-  expect(Schema.is(AskInput)({ decisionId: "d".repeat(32), ...question })).toBe(true);
-  expect(Schema.is(AskInput)({ decisionId: "short", ...question })).toBe(false);
-  expect(() => Schema.decodeUnknownSync(QuestionInput, { onExcessProperty: "error" })({ decisionId: "d".repeat(32), ...question })).toThrow();
+  expect(Schema.is(AskInput)({ requestId: "r".repeat(32), ...question })).toBe(true);
+  expect(Schema.is(AskInput)({ requestId: "short", ...question })).toBe(false);
+  expect(Schema.is(AskInput)({ decisionId: "d".repeat(32), ...question })).toBe(false);
+  expect(() => Schema.decodeUnknownSync(QuestionInput, { onExcessProperty: "error" })({ requestId: "r".repeat(32), ...question })).toThrow();
+});
+
+it("names a decision by its agent and request id: the same pair the same id, another agent another id", async () => {
+  const agent = "A".repeat(32), other = "B".repeat(32), request = "r".repeat(32);
+  const id = await decisionIdOf(agent, request);
+  expect(Schema.is(Token)(id)).toBe(true);
+  expect(await decisionIdOf(agent, request)).toBe(id);
+  expect(await decisionIdOf(other, request)).not.toBe(id);
+  expect(await decisionIdOf(agent, "s".repeat(32))).not.toBe(id);
+  // Pinned, so every side that works it out agrees: SHA-256 of "agentpager decision\n<agent>\n<request>", 24 bytes.
+  expect(id).toBe(createHash("sha256").update(`agentpager decision\n${agent}\n${request}`).digest().subarray(0, 24).toString("base64url"));
 });

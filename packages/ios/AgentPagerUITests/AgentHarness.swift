@@ -72,8 +72,8 @@ final class AgentHarness {
             ["number": i + 1, "title": o, "prioritizes": o]
         }]
         if let recommended { card["recommended"] = recommended }
-        // The command chooses each decision's id.
-        var question: [String: Any] = ["decisionId": Self.token(), "title": title, "card": card]
+        // The command chooses each ask's request id.
+        var question: [String: Any] = ["requestId": Self.token(), "title": title, "card": card]
         if let detail { question["detail"] = detail }
         return try call("POST", "api/agents/\(agentId)/cards", question)["decisionId"] as! String
     }

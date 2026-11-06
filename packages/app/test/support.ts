@@ -41,12 +41,12 @@ export type ErrorBody = typeof ErrorBody.Type;
 // Every client of the API names itself (C.CLIENT_HEADER); the tests do too.
 export const CLIENT = C.clientVersion('tests', 'local');
 export const asClient = { [C.CLIENT_HEADER]: CLIENT };
-// A brief's short form: every card an agent asks is a brief, under a decision id of its own.
+// A brief's short form: every card an agent asks is a brief, with a request id of its own.
 export function question(title = 'Which plan?', detail?: string) {
-  return { decisionId: token(), title, ...(detail ? { detail } : {}), card: { type: 'brief', recommended: 2, options: [{ number: 1, title: 'First plan', label: 'First', prioritizes: 'speed' }, { number: 2, title: 'Second plan', label: 'Second', prioritizes: 'safety' }], markdown: '## Context: two plans\nBoth are ready to start.\n\n## Options\n\n## Tradeoffs\n|       | A First        | B Second       |\n|-------|----------------|----------------|\n| Speed | :green[Fast]   | :yellow[Slower] |\n\n## Recommendation: B\n**Why:** It is safer.\n' } };
+  return { requestId: token(), title, ...(detail ? { detail } : {}), card: { type: 'brief', recommended: 2, options: [{ number: 1, title: 'First plan', label: 'First', prioritizes: 'speed' }, { number: 2, title: 'Second plan', label: 'Second', prioritizes: 'safety' }], markdown: '## Context: two plans\nBoth are ready to start.\n\n## Options\n\n## Tradeoffs\n|       | A First        | B Second       |\n|-------|----------------|----------------|\n| Speed | :green[Fast]   | :yellow[Slower] |\n\n## Recommendation: B\n**Why:** It is safer.\n' } };
 }
 // An emoji card, as agents sent before briefs; the contract has no such card.
-export const emojiCard = { decisionId: token(), title: 'Which plan?', card: { type: 'generic', options: [{ number: 1, emoji: '🚀', title: 'One' }, { number: 2, emoji: '🛠️', title: 'Two' }] } };
+export const emojiCard = { requestId: token(), title: 'Which plan?', card: { type: 'generic', options: [{ number: 1, emoji: '🚀', title: 'One' }, { number: 2, emoji: '🛠️', title: 'Two' }] } };
 
 // What the phone makes for a new pager: a Curve25519 key pair, a 16-byte pager id, and the number naming both
 // (I19, blueprint/areas/6-privacy.md).

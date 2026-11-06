@@ -1,8 +1,5 @@
 import { test } from 'node:test';
 import { createServer } from 'node:http';
-import { readdirSync, statSync } from 'node:fs';
-import { DatabaseSync } from 'node:sqlite';
-import path from 'node:path';
 import { generateKeyPairSync, verify } from 'node:crypto';
 import { Schema } from 'effect';
 import { fixture, assert, token, until, decode, question, C } from './support.ts';
@@ -43,19 +40,6 @@ async function apple() {
   process.env.APNS_KEY_ID = 'KEY1234567'; process.env.APNS_TEAM_ID = 'TEAM123456'; process.env.APNS_TOPIC = 'me.agentpager.app.dev';
   process.env.APNS_ORIGIN = `http://127.0.0.1:${address.port}`;
   return { replies, sent: (to: string) => deliveries.filter(d => d.device === to), close: () => server.close() };
-}
-// The decision ids the Registry holds, read from its stored database once the server has stopped.
-function registryClaims(persist: string) {
-  const files: string[] = [];
-  const walk = (dir: string) => { for (const name of readdirSync(dir)) { const p = path.join(dir, name); if (statSync(p).isDirectory()) walk(p); else if (p.endsWith('.sqlite')) files.push(p); } };
-  walk(path.join(persist, 'v3', 'do'));
-  let tables = 0, rows = 0;
-  for (const file of files) {
-    const db = new DatabaseSync(file);
-    if (db.prepare("SELECT 1 FROM sqlite_master WHERE name='decisions_v2'").get()) { tables++; rows += Number(db.prepare('SELECT count(*) AS n FROM decisions_v2').get()?.n); }
-    db.close();
-  }
-  return { tables, rows };
 }
 const device = () => Array.from({ length: 64 }, () => '0123456789abcdef'[Math.floor(Math.random() * 16)]).join('');
 const registered = (f: Awaited<ReturnType<typeof fixture>>) => (pagerId: string, phone: string, deviceToken: string) => f.ok(Ok, `/api/pagers/${pagerId}/push`, { phone, data: { token: deviceToken, environment: 'sandbox' } });
@@ -174,10 +158,10 @@ test('not picked up: one alert and a warning when no agent collects an answer in
   }
 });
 
-// A lost ask reply: the command asks again under the decision id it chose. The owner gets one decision and one alert;
-// another question under that id is refused. Each alert goes out before its ask replies, so an ask that replies
-// without adding to the alerts below sent none.
-test('B27.9 The same ask again under its id is one decision and one alert; another question under it is refused', { timeout: 180_000 }, async () => {
+// A lost ask reply: the command asks again with the request id it chose. The owner gets one decision and one alert;
+// another question with that request id is refused. Each alert goes out before its ask replies, so an ask that
+// replies without adding to the alerts below sent none.
+test('B27.9 The same ask again with its request id is one decision and one alert; another question with it is refused', { timeout: 180_000 }, async () => {
   const { sent, close } = await apple();
   const f = await fixture('push-again'), register = registered(f);
   try {
@@ -186,17 +170,17 @@ test('B27.9 The same ask again under its id is one decision and one alert; anoth
     const a = await f.connect(p.number, 'Codex', 'again');
     const cards = `/api/agents/${a.agent.agentId}/cards`, alerted = () => sent(mine).map(d => d.payload.decisionId);
     const open = async () => (await f.pager(p.pagerId, p.phone)).agents[0].open.map(d => d.decisionId);
-    const ship = question('Ship it?'), id = ship.decisionId;
-    assert.equal((await f.ok(C.Asked, cards, { agent: a.agentKey, data: ship })).decisionId, id, 'stored under the id the agent chose');
+    const ship = question('Ship it?'), id = await C.decisionIdOf(a.agent.agentId, ship.requestId);
+    assert.equal((await f.ok(C.Asked, cards, { agent: a.agentKey, data: ship })).decisionId, id, 'named by the agent and its request id');
     assert.deepEqual(alerted(), [id]);
     // Again, and again with its fields in another order: the same decision, no alert.
     assert.equal((await f.ok(C.Asked, cards, { agent: a.agentKey, data: ship })).decisionId, id);
-    assert.equal((await f.ok(C.Asked, cards, { agent: a.agentKey, data: { card: ship.card, title: ship.title, decisionId: id } })).decisionId, id);
+    assert.equal((await f.ok(C.Asked, cards, { agent: a.agentKey, data: { card: ship.card, title: ship.title, requestId: ship.requestId } })).decisionId, id);
     assert.deepEqual(alerted(), [id], 'one alert');
     assert.deepEqual(await open(), [id], 'one decision');
-    // Another question, or the same one changed, under that id is refused, and stores and alerts nothing.
-    for (const data of [{ ...question('Something else?'), decisionId: id }, { ...ship, detail: 'Now with a detail.' }]) {
-      assert.match((await f.refused(409, 'DecisionIdTaken', cards, { agent: a.agentKey, data })).message, /taken/);
+    // Another question, or the same one changed, with that request id is refused, and stores and alerts nothing.
+    for (const data of [{ ...question('Something else?'), requestId: ship.requestId }, { ...ship, detail: 'Now with a detail.' }]) {
+      assert.match((await f.refused(409, 'RequestIdTaken', cards, { agent: a.agentKey, data })).message, /different question/);
     }
     assert.deepEqual(alerted(), [id]);
     assert.deepEqual((await f.pager(p.pagerId, p.phone)).agents[0].open.map(d => [d.title, d.detail]), [['Ship it?', undefined]], 'the decision as first asked');
@@ -219,23 +203,18 @@ test('B27.9 The same ask again under its id is one decision and one alert; anoth
     assert.equal((await f.ok(C.Asked, cards, { agent: a.agentKey, data: ship })).decisionId, id);
     assert.deepEqual(alerted(), [id, ...others]);
 
-    // No two agents on a pager share a decision id, since the phone tells decisions apart by id: another agent asking
-    // under it is refused, and stores and alerts nothing. Under a new id it asks as usual.
-    const b = await f.connect(p.number, 'Claude Code', 'again');
-    const theirs = `/api/agents/${b.agent.agentId}/cards`;
-    await f.refused(409, 'DecisionIdTaken', theirs, { agent: b.agentKey, data: ship });
-    await f.refused(409, 'DecisionIdTaken', theirs, { agent: b.agentKey, data: { ...question('Mine?'), decisionId: others[0] } });
-    assert.deepEqual(alerted(), [id, ...others], 'no alert');
-    const own = await f.ok(C.Asked, theirs, { agent: b.agentKey, data: { ...ship, decisionId: token() } });
+    // Another agent, here or on another pager, asking with the same request id gets a decision of its own, under an id
+    // of its own: no two agents' decisions share an id, which is how the phone tells them apart.
+    const b = await f.connect(p.number, 'Claude Code', 'again'), q = await f.makePager('never', p.phone), c = await f.connect(q.number, 'Codex', 'elsewhere');
+    const theirs = (await f.ok(C.Asked, `/api/agents/${b.agent.agentId}/cards`, { agent: b.agentKey, data: ship })).decisionId;
+    const elsewhere = (await f.ok(C.Asked, `/api/agents/${c.agent.agentId}/cards`, { agent: c.agentKey, data: ship })).decisionId;
+    assert.equal(new Set([id, theirs, elsewhere]).size, 3);
+    assert.equal((await f.read(b, theirs)).status, 'pending', 'its own decision, unanswered');
+    await f.refused(404, 'UnknownDecision', `/api/agents/${b.agent.agentId}/cards/${id}/answer`, { agent: b.agentKey });
     const seen = (await f.pager(p.pagerId, p.phone)).agents;
-    assert.deepEqual(seen.map(x => [x.agent.agentId, [...x.open, ...x.answered].filter(d => d.title === 'Ship it?').map(d => d.decisionId)]), [[a.agent.agentId, [id]], [b.agent.agentId, [own.decisionId]]]);
+    assert.deepEqual(seen.map(x => [x.agent.agentId, [...x.open, ...x.answered].filter(d => d.title === 'Ship it?').map(d => [d.decisionId, d.status])]), [[a.agent.agentId, [[id, 'answered']]], [b.agent.agentId, [[theirs, 'open']]]]);
     await until(async () => sent(mine), d => d.length === others.length + 2);
-    assert.deepEqual(alerted(), [id, ...others, own.decisionId]);
-    // The claims go with the pager.
-    await f.request(`/api/pagers/${p.pagerId}/delete`, { method: 'POST', phone: p.phone });
-    await f.stop();
-    assert.deepEqual(registryClaims(f.persist), { tables: 1, rows: 0 }, 'no decision ids kept for a deleted pager');
-    void token;
+    assert.deepEqual(alerted(), [id, ...others, theirs]);
   } finally {
     await f.stop();
     close();

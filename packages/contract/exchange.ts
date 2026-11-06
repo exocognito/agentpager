@@ -98,11 +98,18 @@ const question = {
 };
 export const QuestionInput = Schema.Struct(question).annotations(strict).pipe(Schema.filter(briefLinks));
 export type QuestionInput = typeof QuestionInput.Type;
-// What an agent sends to ask: the question, under a decision id its command chose. Asking the same question again
-// under the same id, as after a lost reply, finds the decision already made: the owner gets one decision and one
-// alert. The same id with another question, or one another agent on the pager has, is refused (DecisionIdTaken).
-export const AskInput = Schema.Struct({ decisionId: Token, ...question }).annotations(strict).pipe(Schema.filter(briefLinks));
+// What an agent sends to ask: the question, with a request id its command chose. The decision is stored under the id
+// decisionIdOf() makes from the agent and that request id, which the command can work out before it sends. Asking the
+// same question again with the same request id, as after a lost reply, finds the decision already made: the owner
+// gets one decision and one alert. The same request id with another question is refused (RequestIdTaken).
+export const AskInput = Schema.Struct({ requestId: Token, ...question }).annotations(strict).pipe(Schema.filter(briefLinks));
 export type AskInput = typeof AskInput.Type;
+// A decision's id: the first 24 bytes of the SHA-256 of its agent's id and its ask's request id, base64url. No two
+// agents' decisions can share one, so an agent can't name a decision of another agent's, on its pager or any other.
+export async function decisionIdOf(agentId: string, requestId: string): Promise<Token> {
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`agentpager decision\n${agentId}\n${requestId}`)));
+  return btoa(String.fromCharCode(...digest.slice(0, 24))).replaceAll("+", "-").replaceAll("/", "_");
+}
 export const Decision = Schema.Struct({
   decisionId: Token,
   status: DecisionStatus,
@@ -155,6 +162,6 @@ export const AnswerStatus = Schema.Union(Schema.Struct({ status: Schema.Literal(
 export const REFUSAL_STATUS = {
   InvalidInput: 400, UpdateRequired: 400, Unauthorized: 401, UnknownAgent: 404, UnknownPager: 404, UnknownDecision: 404, UnknownFile: 404, NotFound: 404,
   PagerOff: 409, PagerExists: 409, AgentFinished: 409, TooManyOpenDecisions: 409, NotAnswered: 409, AlreadyAcknowledged: 409,
-  AnswerMismatch: 409, AlreadyAnswered: 409, DecisionIdTaken: 409, NumberInvalid: 410, PagerDeleted: 410,
+  AnswerMismatch: 409, AlreadyAnswered: 409, RequestIdTaken: 409, NumberInvalid: 410, PagerDeleted: 410,
 } as const;
 export type RefusalTag = keyof typeof REFUSAL_STATUS;

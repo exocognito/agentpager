@@ -25,7 +25,7 @@ const agent = String(field(field(connected, 'agent'), 'agentId'));
 key = String(field(connected, 'agentKey'));
 const asked: { name: string; decisionId: string }[] = [];
 for (const name of names) {
-  const reply = await call('POST', `/api/agents/${agent}/cards`, { decisionId: randomBytes(24).toString('base64url'), ...loadBrief(name) });
+  const reply = await call('POST', `/api/agents/${agent}/cards`, { requestId: randomBytes(24).toString('base64url'), ...loadBrief(name) });
   asked.push({ name, decisionId: String(field(reply, 'decisionId')) });
   console.log(`asked ${name}: ${field(reply, 'decisionId')}`);
 }

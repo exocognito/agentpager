@@ -32,7 +32,7 @@ agentpager ack --agent ap-7f3k d_2x8w "Building the smaller fix today."
 2 refused, 4 pager off, 5 no usable reply from the server (unreachable, no reply, or a reply not understood),
 6 unknown agent id.
 
-Files: `~/.agentpager/agents/<id>.json` (mode 600: the agent's server key, its reminder clock, and the decision id of
+Files: `~/.agentpager/agents/<id>.json` (mode 600: the agent's server key, its reminder clock, and the request id of
 each ask no reply has settled yet, so asking the same card again after a lost reply reaches the owner once; the agent
 only ever passes the id) and `~/.agentpager/history/<pager>.jsonl` (capped at 1,000 lines). `AGENTPAGER_HOME` moves the folder;
 `AGENTPAGER_SERVER` or `config.json` `{"server": …}` picks the server (default `https://agentpager.me`).

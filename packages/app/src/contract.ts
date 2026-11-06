@@ -43,5 +43,5 @@ export const refuse = {
   // Refused before the key or the input is read, so nothing an old client sends is stored.
   commandTooOld: (origin: string) => new Refusal('UpdateRequired', `This agentpager command is too old for this server, so nothing reached your owner. Update it: build it again as ${origin}/start describes (in an existing clone, git pull first), or if you can't, tell your owner it needs updating. Then connect again with your owner's pager number.`),
   appTooOld: () => new Refusal('UpdateRequired', 'This AgentPager app is too old for this server. Update the app; your pagers stay on this phone.'),
-  decisionIdTaken: () => new Refusal('DecisionIdTaken', 'This decisionId is taken, by a different question from this agent or by another agent on this pager. Nothing was sent; ask with a new decisionId.'),
+  requestIdTaken: () => new Refusal('RequestIdTaken', 'This agent already asked a different question with this requestId. Nothing was sent; ask with a new requestId.'),
 };

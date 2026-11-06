@@ -131,7 +131,8 @@ export function review(card: Source): Result {
   return done(`${REVIEW}\n\n--- card.yaml ---\n${text.trimEnd()}\n`);
 }
 
-export async function ask(agent: string, card: Source, client?: string): Promise<Result> {
+// holdMs: how long this run holds the card while it sends (SENDING_MS); a test shortens it.
+export async function ask(agent: string, card: Source, client?: string, holdMs = SENDING_MS): Promise<Result> {
   const a = agentOf(agent);
   if ('code' in a) return a;
   const compiled = compile(card);
@@ -141,8 +142,9 @@ export async function ask(agent: string, card: Source, client?: string): Promise
   if (cannot) return unwritable(cannot);
   // The ask's request id is chosen here and kept in the agent's file, under the card's content, until a reply settles
   // it: the same card asked again after a lost reply, in this run or a later one, names the same decision. One run
-  // at a time sends a card, so a run that settles it can't drop the id another run has just been unsure of.
-  const cardKey = createHash('sha256').update(JSON.stringify(brief)).digest('base64url');
+  // at a time sends a card, and only the run that last took it may change it, so a run that settles it can't drop
+  // the id another run has since been unsure of, even one that outlived its hold.
+  const cardKey = createHash('sha256').update(JSON.stringify(brief)).digest('base64url'), run = randomBytes(24).toString('base64url');
   let requestId = '', busy = false;
   try {
     const now = Date.now();
@@ -151,7 +153,7 @@ export async function ask(agent: string, card: Source, client?: string): Promise
       const kept = x.asking[cardKey];
       if (kept?.sendingUntil && Date.parse(kept.sendingUntil) > now) { busy = true; return; }
       requestId = kept?.requestId ?? randomBytes(24).toString('base64url');
-      x.asking[cardKey] = { requestId, sendingUntil: new Date(now + SENDING_MS).toISOString() };
+      x.asking[cardKey] = { requestId, run, sendingUntil: new Date(now + holdMs).toISOString() };
     })) return unknownAgent(a.id);
   } catch (e) {
     const code = e instanceof Error && 'code' in e ? String(e.code) : 'write failed';
@@ -165,8 +167,8 @@ export async function ask(agent: string, card: Source, client?: string): Promise
       updateAgent(a.id, x => {
         x.asking ??= {};
         const now = x.asking[cardKey];
-        if (now && now.requestId !== requestId) return;
-        if (settled) delete x.asking[cardKey]; else { x.asking[cardKey] = { requestId }; kept = true; }
+        if (now && now.run !== run) return;
+        if (settled) delete x.asking[cardKey]; else { x.asking[cardKey] = { requestId, run }; kept = true; }
       });
     } catch { /* left as it was: its hold runs out */ }
     return kept;

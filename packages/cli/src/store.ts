@@ -23,9 +23,9 @@ const AgentFile = Schema.mutable(Schema.Struct({
     askedAt: Schema.optional(Schema.String), answered: Schema.optional(Schema.Boolean), acknowledged: Schema.optional(Schema.Boolean),
   })) })),
   // Asks no reply has settled yet, by their card's content: the request id chosen for each, so the same card asked
-  // again after a lost reply names the same decision, and, while a run is sending it, until when. It came later, so
-  // a file from before it still loads.
-  asking: Schema.optional(Schema.mutable(Schema.Record({ key: Schema.String, value: Schema.mutable(Schema.Struct({ requestId: Token, sendingUntil: Schema.optional(Schema.String) })) }))),
+  // again after a lost reply names the same decision; the run that last took it (run), which alone may change it; and,
+  // while that run is sending it, until when. It came later, so a file from before it still loads.
+  asking: Schema.optional(Schema.mutable(Schema.Record({ key: Schema.String, value: Schema.mutable(Schema.Struct({ requestId: Token, run: Token, sendingUntil: Schema.optional(Schema.String) })) }))),
 }));
 export type AgentFile = typeof AgentFile.Type;
 

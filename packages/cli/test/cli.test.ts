@@ -7,7 +7,7 @@ import { spawn } from 'node:child_process';
 import { createServer, type IncomingHttpHeaders } from 'node:http';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { fixture, assert, token } from '../../app/test/support.ts';
+import { fixture, assert, token, until } from '../../app/test/support.ts';
 import { EXAMPLE } from '../src/rules.ts';
 import type { Result } from '../src/commands.ts';
 import { decisionIdOf } from '../../contract/exchange.ts';
@@ -224,13 +224,18 @@ test('review rounds: concurrent asks, an unwritable home, attachments, unsafe ce
 // the server's reply from the command, closing the connection instead.
 async function lossy(target: string) {
   let lose = 0, asks = 0, lost = 0, before: (lost: number) => Promise<void> = async () => {};
+  let stalled: Promise<void> | null = null;
   const pass = (h: IncomingHttpHeaders) => Object.fromEntries(['content-type', 'authorization', 'x-agentpager-client'].filter(k => h[k]).map(k => [k, String(h[k])]));
   const server = createServer(async (req, res) => {
     const chunks: Buffer[] = [];
     for await (const chunk of req) chunks.push(chunk);
     const reply = await fetch(target + req.url, { method: req.method, headers: pass(req.headers), body: chunks.length ? Buffer.concat(chunks) : undefined });
     const body = Buffer.from(await reply.arrayBuffer());
-    if (req.method === 'POST' && /\/cards$/.test(req.url ?? '')) { asks++; if (lose > 0) { lose--; await before(++lost); req.socket.resetAndDestroy(); return; } }
+    if (req.method === 'POST' && /\/cards$/.test(req.url ?? '')) {
+      asks++;
+      if (stalled) { const until = stalled; stalled = null; await until; }
+      else if (lose > 0) { lose--; await before(++lost); req.socket.resetAndDestroy(); return; }
+    }
     res.writeHead(reply.status, { 'content-type': reply.headers.get('content-type') ?? 'application/json' });
     res.end(body);
   });
@@ -240,6 +245,8 @@ async function lossy(target: string) {
     origin: `http://127.0.0.1:${typeof address === 'object' && address ? address.port : 0}`,
     // `then` runs before each lost reply is dropped, with how many have been lost so far.
     lose: (n: number, then: (lost: number) => Promise<void> = async () => {}) => { lose = n; asks = 0; lost = 0; before = then; }, asks: () => asks,
+    // The next ask reaches the server, and its reply waits until the returned function is called.
+    stall: () => { let go = () => {}; stalled = new Promise<void>(r => { go = r; }); return go; },
     close: () => new Promise(r => { server.closeAllConnections(); server.close(r); }),
   };
 }
@@ -304,10 +311,26 @@ test('B27.9 B32.10 A lost ask reply is never taken as success, and asking the sa
     assert.equal(once2.code, 0, once2.text);
     assert.equal((await onPhone()).filter(([title]) => title === 'At once?').length, 1, 'one decision');
 
+    // A run that outlives its hold (here a hold of 0 ms, as if it paused for minutes) can't drop the request id a later
+    // run has since been unsure of: only the run that last took the card may change it.
+    const go = net.stall(), asked = net.asks();
+    const paused = op.ask(id, { file: card('Outlived?') }, undefined, 0);
+    await until(async () => net.asks(), n => n === asked + 1);
+    net.lose(2);
+    const later2 = await op.ask(id, { file: card('Outlived?') });
+    assert.equal(later2.code, 5, later2.text);
+    assert.match(later2.text, /Asking again with the same card is safe/);
+    go();
+    assert.equal((await paused).code, 0, 'the paused run gets its reply');
+    const outlived = Object.values(store.loadAgent(id)?.asking ?? {});
+    assert.equal(outlived.length, 1, 'the later run\'s request id is still kept');
+    assert.equal((await op.ask(id, { file: card('Outlived?') })).code, 0);
+    assert.equal((await onPhone()).filter(([title]) => title === 'Outlived?').length, 1, 'one decision');
+
     // Once settled, the same card asked again is a new decision, as the agent meant it.
     const later = await op.ask(id, { file: card('Lost twice?') });
     assert.equal(later.code, 0, later.text);
     assert.notEqual(recorded(field(later, 'decision')), decision);
-    assert.deepEqual((await onPhone()).map(([title]) => title), ['Lost once?', 'At once?', 'Lost twice?']);
+    assert.deepEqual((await onPhone()).map(([title]) => title), ['Lost once?', 'At once?', 'Outlived?', 'Lost twice?']);
   } finally { await net.close(); await f.stop(); }
 });

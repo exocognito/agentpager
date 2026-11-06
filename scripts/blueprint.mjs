@@ -17,8 +17,11 @@ const HEADING = /^### ([BIJKL])(\d+) · @M(\d+) · (\S.*)$/;
 const CLAUSE = /^(\d+)\. (.*)$/;
 const ADDED = /^@M(\d+):\s*/;
 const D_ID = /(?<![\w-])D\d+(?![\w-])/;
-// A clause id in a test file, in a test's name or a comment: B25.2 in TypeScript, B25_2 in a Swift name such as
-// test_B25_2_connects. The letters of retired ids (C, D) are read too, so a test naming one is reported.
+// Where a test file names ids: a comment, a TypeScript test's name (`test('…'`, `it(`, `describe(`, `test.skip(` and
+// the like), or a Swift test's name (`func test_B25_2_connects`). Anything else, such as a fixture's text, names nothing.
+const NAMED = /\/\/.*|\/\*[\s\S]*?\*\/|\b(?:test|it|describe)(?:\.\w+)?\(\s*(['"`])(?:\\.|(?!\1)[^\\])*\1|\bfunc\s+test\w*/g;
+// A clause id there: B25.2, or B25_2 in a Swift name. The letters of retired ids (C, D) are read too, so a test
+// naming one is reported.
 const CITED = /(?<![A-Za-z0-9])([BCDIJKL])(\d+)[._](\d+)(?!\d)/g;
 const TEST_FILE = /\.test\.[cm]?[jt]sx?$|Tests\.swift$/;
 
@@ -66,10 +69,10 @@ export function check(files, milestones, warn) {
   }
 }
 
-// The clause ids the test files name, each with the files that name it.
+// The clause ids the test files name in a test's name or a comment, each with the files that name it.
 export function citations(tests) {
   const cited = new Map();
-  for (const { file, text } of tests) for (const m of text.matchAll(CITED)) {
+  for (const { file, text } of tests) for (const m of [...text.matchAll(NAMED)].flatMap(([named]) => [...named.matchAll(CITED)])) {
     const id = `${m[1]}${m[2]}.${m[3]}`;
     cited.set(id, [...new Set([...(cited.get(id) ?? []), file])]);
   }

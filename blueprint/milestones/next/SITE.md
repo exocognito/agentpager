@@ -29,7 +29,7 @@ Sam works through the page in several rounds of visual drafts before anything is
 
 - **Adds:** B18's front page and its note on what the service stores, as the drafts settle them.
 - **Changes:** B18's title widens back to the whole site.
-- **Retires:** L21, the front page still describes the first version (7 Getting started), quoted here when it goes.
+- **Retires:** L21, the front page still describes the first version (7 Getting started), named here when it goes.
 
 ## From the old Blueprint (not built yet)
 

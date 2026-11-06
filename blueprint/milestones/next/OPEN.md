@@ -33,7 +33,7 @@ Sam decides these first:
 ## Adds · Changes · Retires
 
 - **Adds:** Sam's principle that the code is open, to [PRODUCT.md](../../PRODUCT.md), once it is published.
-- **Retires:** what the cleanup removes, quoted here when it goes.
+- **Retires:** what the cleanup removes, named here when it goes.
 
 ## Log
 

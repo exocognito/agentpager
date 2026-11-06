@@ -4,16 +4,6 @@ Decisions that bind beyond one milestone, with Sam's words as their basis. A mil
 
 This file is append only. A reversed or narrowed decision gets a new entry, and an old entry's only edit is `→ DEC-…` naming its replacement. The first entry starts the file, in M4. The entries after it are the older decisions that still bind, shortened from `packages/blueprint/records/decisions/` and in date order, plus DEC-2026-10-29-v2-design, recorded here for the first time from `docs/v2/`; git holds every record whole at tag `blueprint-old-format`. New entries go at the end.
 
-## DEC-2026-11-06-verbatim-quotes · Quote marks hold only what a person typed
-
-- **Decided by:** Sam, on 6 Nov 2026.
-- **Basis:** "agent words should never be quoted, quotations just for human verbatim inputs. Agent words are usually deducable from other info." (Sam in Claude Code, after a check of Sam's typed messages found that 29 of the 57 quotes the Blueprint gave as Sam's were agents' words.) Asked how Serves and Why lines should cite PRODUCT.md, which agents mostly wrote and Sam approved, Sam chose links to its headings.
-- **Decided, and still standing:**
-  - Quote marks hold only what a person typed, word for word, with where they typed it. An agent's words are never quoted or given as a person's, a pager option's label and a first-person draft included.
-  - PRODUCT.md is as Sam approved it, not in Sam's words. Serves and Why lines link its headings instead of quoting it.
-  - Older entries here stay as written, since this file is append only. Two of them quote agents' words: DEC-2026-10-08-native-ios names an agent's write-up as Sam's, and DEC-2026-10-29-v2-design quotes the v2 design record.
-- **Serves:** METHOD.md › Writing lines; PRODUCT.md; every area's Serves and Why lines.
-
 ## DEC-2026-11-05-blueprint-destination · The Blueprint by area, one milestone at a time
 
 - **Decided by:** Sam, on 5 Nov 2026, in the root session, on the [Destination v2 canvas](https://claude.ai/artifact/S8LzZkCuAQjurJ1Yb4zLSN).
@@ -134,3 +124,14 @@ This file is append only. A reversed or narrowed decision gets a new entry, and 
   - Everything else is off the roadmap until owners using AgentPager, Sam included, show they need it. Dropped with Android: the deferred Alchemy, owners' own writing rules, recovering lost keys, a deployed auto-off wait and outcome metrics.
 - **Serves:** README.md › Milestones; PRODUCT.md › Roadmap; `milestones/next/`.
 - → DEC-2026-11-05-blueprint-destination, in part: the first three "can be done in parallel" gave way to one milestone at a time, with CLIENTS after ENCRYPT.
+
+## DEC-2026-11-06-verbatim-quotes · Quote marks hold only what a person typed
+
+- **Decided by:** Sam, on 6 Nov 2026.
+- **Basis:** "agent words should never be quoted, quotations just for human verbatim inputs. Agent words are usually deducable from other info." (Sam in Claude Code, after a check of Sam's typed messages found that 29 of the 57 quotes the Blueprint gave as Sam's were agents' words.) Asked how Serves and Why lines should cite PRODUCT.md, which agents mostly wrote and Sam approved, Sam chose links to its headings.
+- **Decided, and still standing:**
+  - Quote marks hold only what a person typed, word for word, with where they typed it. An agent's words are never quoted or given as a person's, a pager option's label and a first-person draft included.
+  - PRODUCT.md is as Sam approved it, not in Sam's words. Serves and Why lines link its headings instead of quoting it.
+  - Older entries here stay as written, since this file is append only. Two of them quote agents' words: DEC-2026-10-08-native-ios names an agent's write-up as Sam's, and DEC-2026-10-29-v2-design quotes the v2 design record.
+- **Serves:** METHOD.md › Writing lines; PRODUCT.md; every area's Serves and Why lines.
+

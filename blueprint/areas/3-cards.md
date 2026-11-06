@@ -13,7 +13,7 @@
 
 1. The agentpager command is the one home of the card contract: how to write a decision the owner can answer on a phone in two minutes. `agentpager rules` prints it with the `card.yaml` template and a complete example. Connecting prompts the agent to read it before its first card (B25).
 2. An agent that uses the command's MCP server has the card contract in the ask tool's description.
-3. `agentpager review`, or the review tool, prints what a good card looks like and then the card, for a reviewer to grade each point ok, good to fix or must fix for this card, quoting the text to change. A point that only a small card's missing optional key fails is good to fix at most. The command grades nothing itself.
+3. `agentpager review`, or the review tool, prints what a good card looks like and then the card, for a reviewer to grade each point ok, good to fix or must fix for this card, quoting the text to change. When a point falls short only because a small card leaves out an optional key, it is good to fix at most. The command grades nothing itself.
 4. The card contract tells the writing agent to give that to a subagent, or to review the card itself if it can't start one, then to fix the must-fixes, use its judgement on the rest and send. There is one round.
 <!-- B27.5 dropped in Sam's review, 6 Nov 2026; ids are never reused -->
 6. A card that passes is compiled to the brief and sent. The reply says it was sent, shows the question and detail as the owner sees them first, and says how to wait for the answer (B32).

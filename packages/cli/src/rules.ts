@@ -27,8 +27,8 @@ Below is what a good card looks like. Grade each point for this card:
   ok            it holds
   good to fix   it falls short in a way the owner would notice
   must fix      the owner can't answer well without this fixed
-A small decision may leave out the optional keys (option stories, tradeoffs, next steps):
-grade a point that only a missing optional key fails good to fix at most.
+A small decision may leave out the optional keys (option stories, tradeoffs, next steps).
+When a point falls short only because one of them is missing, grade it good to fix at most.
 Output twelve lines, one per point in order: its number, its grade and, when it is not
 ok, what to change in one line, quoting the text. Do not rewrite the card. Nothing else.
 

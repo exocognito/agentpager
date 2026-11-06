@@ -3,6 +3,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fixture, assert, token, sha, pause } from './support.ts';
+import { DEFAULT_ORIGIN, frontDocument, startDocument } from '../src/start.ts';
 
 test('/start and /mcp tell an arriving agent to install the agentpager command; numbers only', { timeout: 180_000 }, async () => {
   const f = await fixture('start-pages');
@@ -30,6 +31,21 @@ test('/start and /mcp tell an arriving agent to install the agentpager command; 
       const r = await fetch(f.origin + p); assert.equal(r.headers.get('x-agentpager-build'), sha, p); assert.equal(r.headers.get('cache-control'), 'no-store'); await r.arrayBuffer();
     }
     await f.artifact('start.md', doc);
+  } finally { await f.stop(); }
+});
+
+test('A server other than agentpager.me says it is dev, at / and /start; agentpager.me does not', { timeout: 180_000 }, async () => {
+  const f = await fixture('dev-mark');
+  try {
+    const host = new URL(f.origin).host;
+    for (const p of ['/', '/start']) {
+      const r = await fetch(f.origin + p); assert.equal(r.status, 200, p);
+      const doc = await r.text();
+      assert.ok(doc.startsWith(`# AgentPager (dev)\n\nThis is ${host}, a dev server for testing AgentPager, not agentpager.me.`), p);
+    }
+    for (const doc of [startDocument(DEFAULT_ORIGIN), frontDocument(DEFAULT_ORIGIN)]) {
+      assert.ok(doc.startsWith('# AgentPager\n\n')); assert.equal(doc.includes('dev'), false);
+    }
   } finally { await f.stop(); }
 });
 

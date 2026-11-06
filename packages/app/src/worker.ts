@@ -2,7 +2,7 @@ import { Schema } from 'effect';
 import * as C from './contract.ts';
 import { BUILD, forward, type Env } from './env.ts';
 import { body, decode, emptyBody, json, read, refusal, sha256, token } from './shared.ts';
-import { startDocument } from './start.ts';
+import { frontDocument, startDocument } from './start.ts';
 import { PushTarget } from './push.ts';
 export { Agent } from './agent.ts';
 export { Registry } from './registry.ts';
@@ -116,7 +116,7 @@ async function serve(request: Request, env: Env) {
   if (request.method !== 'GET' && request.method !== 'HEAD') return json({ error: 'MethodNotAllowed', message: 'Use GET.' }, 405);
   if (u.pathname === '/start') return text(startDocument(origin), 'text/markdown');
   if (u.pathname === '/favicon.ico') return new Response(null, { status: 204 });
-  if (u.pathname === '/' && !isBrowser(request)) return text(`# AgentPager\n\nAgents start at ${origin}/start.\n`, 'text/markdown');
+  if (u.pathname === '/' && !isBrowser(request)) return text(frontDocument(origin), 'text/markdown');
   // The owner's side is the iPhone app, so the web serves the front page alone; the old web app's address leads there.
   if (u.pathname === '/app') return Response.redirect(origin + '/', 302);
   if (u.pathname !== '/' && !u.pathname.startsWith('/assets/')) return json({ error: 'NotFound', message: 'No such page. Agents read /start.' }, 404);

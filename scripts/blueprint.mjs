@@ -2,6 +2,11 @@
 // blueprint/generated/by-milestone.md and blueprint/generated/untested.md. It reports and never blocks.
 //   node scripts/blueprint.mjs          (pnpm blueprint) rewrites both files and prints the warnings
 //   node scripts/blueprint.mjs --check  (in pnpm check) fails only when either file is stale; warnings never fail it
+// Known limits, in forms no test here uses (checked on 5 Nov 2026, PR #46's last review):
+// - Swift: a raw string holding an escaped delimiter (`#"… \#"# …"#`) or a regex literal (`/func test_…/`) can hide a
+//   fake `func test_B26_4_…` that counts.
+// - TypeScript: an id written with `_` in a test's name (`test('B26_4 …')`) counts as B26.4; only Swift needs `_`.
+// - untested.md's intro names `*.test.ts`, but `.test.js`, `.mjs`, `.cjs`, `.jsx` and `.tsx` files are read too.
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
 import path from 'node:path';

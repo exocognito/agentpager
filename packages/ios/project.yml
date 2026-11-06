@@ -73,7 +73,7 @@ targets:
   # The alert extension (Notification Service Extension), embedded in the app. It reads pagers' keys from the app's
   # keychain group and never touches the network. A new bundle id, so the owner's first build in Xcode with automatic
   # signing registers its App ID and makes its development profile; the keychain group is in every such profile
-  # (TEAMID.*). Time-sensitive is here too, in case iOS checks it on the content an extension hands back.
+  # (TEAMID.*). No time-sensitive entitlement: Apple allows it only on apps, and the app's own covers its alerts.
   AgentPagerNotifications:
     type: app-extension
     platform: iOS
@@ -83,7 +83,6 @@ targets:
     entitlements:
       path: AgentPagerNotifications/AgentPagerNotifications.entitlements
       properties:
-        com.apple.developer.usernotifications.time-sensitive: true
         keychain-access-groups:
           - $(AppIdentifierPrefix)me.agentpager.app.dev
     settings:

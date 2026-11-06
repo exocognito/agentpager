@@ -15,12 +15,14 @@ const Connect = Schema.Struct({ pagerId: C.PagerId, fingerprint: Fingerprint, ag
 const Id = Schema.Struct({ pagerId: C.PagerId });
 const PushGone = Schema.Struct({ pagerId: C.PagerId, token: Schema.String });
 const Forget = Schema.Struct({ pagerId: C.PagerId, agentId: C.Token });
+const Claim = Schema.Struct({ pagerId: C.PagerId, agentId: C.Token, decisionId: C.Token });
 
 type Row = { pager_id: string; fingerprint: string; public_key: string; phone_hash: string; enabled: number; auto_off: string; off_at: number | null; off_since: number | null; push: string | null; created_at: number };
 
 // The pagers: each phone-made pager's public key, its phone key as a digest, whether it is on, when it turns off by
 // itself, and where its phone gets alerts. Also which agents connected to each, so the phone can read them and a
-// deleted pager can take them with it. No names: those live only on the phone.
+// deleted pager can take them with it, and which agent each decision id asked on it belongs to (decisions_v2), written
+// when an ask claims it, so no two agents on a pager share one. No names: those live only on the phone.
 export class Registry {
   constructor(private ctx: DurableObjectState, private env: Env) {
     // v1 links and numbers fail by design: v2 is a fresh install.
@@ -28,7 +30,8 @@ export class Registry {
       CREATE TABLE IF NOT EXISTS pagers_v2 (pager_id TEXT PRIMARY KEY, fingerprint TEXT NOT NULL, public_key TEXT NOT NULL, phone_hash TEXT NOT NULL,
         enabled INTEGER NOT NULL, auto_off TEXT NOT NULL, off_at INTEGER, off_since INTEGER, push TEXT, created_at INTEGER NOT NULL);
       CREATE TABLE IF NOT EXISTS pager_agents_v2 (pager_id TEXT NOT NULL, agent_id TEXT NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY (pager_id, agent_id));
-      CREATE TABLE IF NOT EXISTS erase_v2 (agent_id TEXT PRIMARY KEY);`);
+      CREATE TABLE IF NOT EXISTS erase_v2 (agent_id TEXT PRIMARY KEY);
+      CREATE TABLE IF NOT EXISTS decisions_v2 (pager_id TEXT NOT NULL, decision_id TEXT NOT NULL, agent_id TEXT NOT NULL, PRIMARY KEY (pager_id, decision_id));`);
   }
   // A deleted pager's agents still to forget everything. Each is tried now; any left are tried again every minute
   // until done. Until then the agent finds its pager gone on any call, and forgets itself.
@@ -113,6 +116,7 @@ export class Registry {
         this.ctx.storage.transactionSync(() => {
           for (const id of this.agents(row.pager_id)) this.ctx.storage.sql.exec('INSERT OR IGNORE INTO erase_v2 VALUES (?)', id);
           this.ctx.storage.sql.exec('DELETE FROM pager_agents_v2 WHERE pager_id=?', row.pager_id);
+          this.ctx.storage.sql.exec('DELETE FROM decisions_v2 WHERE pager_id=?', row.pager_id);
           this.ctx.storage.sql.exec('DELETE FROM pagers_v2 WHERE pager_id=?', row.pager_id);
         });
         await this.erase();
@@ -132,10 +136,22 @@ export class Registry {
         if (!row) return json({ state: 'gone' });
         return json({ state: row.enabled === 1 ? 'on' : 'off', push: row.push ? decode(PushTarget, JSON.parse(row.push)) : null });
       }
+      // An ask's state, which also claims its decision id for its agent, while the pager is on: an id another agent on
+      // the pager already has is taken, and nothing is claimed.
+      if (action === 'claim') {
+        const p = decode(Claim, data), row = this.row(p.pagerId);
+        if (!row) return json({ state: 'gone' });
+        const push = row.push ? decode(PushTarget, JSON.parse(row.push)) : null;
+        if (row.enabled !== 1) return json({ state: 'off', push });
+        const owner = this.ctx.storage.sql.exec<{ agent_id: string }>('SELECT agent_id FROM decisions_v2 WHERE pager_id=? AND decision_id=?', p.pagerId, p.decisionId).toArray()[0]?.agent_id;
+        if (owner === undefined) this.ctx.storage.sql.exec('INSERT INTO decisions_v2 VALUES (?, ?, ?)', p.pagerId, p.decisionId, p.agentId);
+        return json({ state: 'on', push, ...(owner !== undefined && owner !== p.agentId ? { taken: true } : {}) });
+      }
       // Housekeeping forgot an agent.
       if (action === 'forget') {
         const p = decode(Forget, data);
         this.ctx.storage.sql.exec('DELETE FROM pager_agents_v2 WHERE pager_id=? AND agent_id=?', p.pagerId, p.agentId);
+        this.ctx.storage.sql.exec('DELETE FROM decisions_v2 WHERE pager_id=? AND agent_id=?', p.pagerId, p.agentId);
         return json({ ok: true });
       }
       return json({ error: 'NotFound' }, 404);

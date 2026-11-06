@@ -100,7 +100,7 @@ export const QuestionInput = Schema.Struct(question).annotations(strict).pipe(Sc
 export type QuestionInput = typeof QuestionInput.Type;
 // What an agent sends to ask: the question, under a decision id its command chose. Asking the same question again
 // under the same id, as after a lost reply, finds the decision already made: the owner gets one decision and one
-// alert. The same id with another question is refused (DecisionIdTaken).
+// alert. The same id with another question, or one another agent on the pager has, is refused (DecisionIdTaken).
 export const AskInput = Schema.Struct({ decisionId: Token, ...question }).annotations(strict).pipe(Schema.filter(briefLinks));
 export type AskInput = typeof AskInput.Type;
 export const Decision = Schema.Struct({

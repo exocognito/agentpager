@@ -221,14 +221,14 @@ test('review rounds: concurrent asks, an unwritable home, attachments, unsafe ce
 // A stand-in for a network that loses replies: it passes each call to the server, and for the next `lose` asks keeps
 // the server's reply from the command, closing the connection instead.
 async function lossy(target: string) {
-  let lose = 0, asks = 0;
+  let lose = 0, asks = 0, lost = 0, before: (lost: number) => Promise<void> = async () => {};
   const pass = (h: IncomingHttpHeaders) => Object.fromEntries(['content-type', 'authorization', 'x-agentpager-client'].filter(k => h[k]).map(k => [k, String(h[k])]));
   const server = createServer(async (req, res) => {
     const chunks: Buffer[] = [];
     for await (const chunk of req) chunks.push(chunk);
     const reply = await fetch(target + req.url, { method: req.method, headers: pass(req.headers), body: chunks.length ? Buffer.concat(chunks) : undefined });
     const body = Buffer.from(await reply.arrayBuffer());
-    if (req.method === 'POST' && /\/cards$/.test(req.url ?? '')) { asks++; if (lose > 0) { lose--; req.socket.resetAndDestroy(); return; } }
+    if (req.method === 'POST' && /\/cards$/.test(req.url ?? '')) { asks++; if (lose > 0) { lose--; await before(++lost); req.socket.resetAndDestroy(); return; } }
     res.writeHead(reply.status, { 'content-type': reply.headers.get('content-type') ?? 'application/json' });
     res.end(body);
   });
@@ -236,7 +236,8 @@ async function lossy(target: string) {
   const address = server.address();
   return {
     origin: `http://127.0.0.1:${typeof address === 'object' && address ? address.port : 0}`,
-    lose: (n: number) => { lose = n; asks = 0; }, asks: () => asks,
+    // `then` runs before each lost reply is dropped, with how many have been lost so far.
+    lose: (n: number, then: (lost: number) => Promise<void> = async () => {}) => { lose = n; asks = 0; lost = 0; before = then; }, asks: () => asks,
     close: () => new Promise(r => { server.closeAllConnections(); server.close(r); }),
   };
 }
@@ -284,10 +285,20 @@ test('B27.9 B32.10 A lost ask reply is never taken as success, and asking the sa
     await f.answer((await f.pager(p.pagerId, p.phone)).agents[0].agent.agentId, p.phone, kept[0]);
     assert.match((await op.wait(id, short)).text, /^Answered at .*: option B "Pasta"\./);
 
+    // Another run of the same card, at the same time, gets its reply and settles the card's id while this one loses
+    // both of its: this one keeps the id, so asking again still finds the one decision.
+    net.lose(2, async n => { if (n === 2) assert.equal((await op.ask(id, { file: card('At once?') })).code, 0); });
+    const racing = await op.ask(id, { file: card('At once?') });
+    assert.equal(racing.code, 5, racing.text);
+    assert.match(racing.text, /Asking again with the same card is safe/);
+    const once2 = await op.ask(id, { file: card('At once?') });
+    assert.equal(once2.code, 0, once2.text);
+    assert.equal((await onPhone()).filter(([title]) => title === 'At once?').length, 1, 'one decision');
+
     // Once settled, the same card asked again is a new decision, as the agent meant it.
     const later = await op.ask(id, { file: card('Lost twice?') });
     assert.equal(later.code, 0, later.text);
     assert.notEqual(recorded(field(later, 'decision')), kept[0]);
-    assert.deepEqual((await onPhone()).map(([title]) => title), ['Lost once?', 'Lost twice?']);
+    assert.deepEqual((await onPhone()).map(([title]) => title), ['Lost once?', 'At once?', 'Lost twice?']);
   } finally { await net.close(); await f.stop(); }
 });

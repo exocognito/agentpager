@@ -149,21 +149,27 @@ export async function ask(agent: string, card: Source, client?: string): Promise
     return code === 'EBUSY' ? refused(`Agent ${a.id} is busy with another call on this machine. Nothing was sent; try again.`) : unwritable(code);
   }
   const send = () => call(Asked, a.server, 'POST', `/api/agents/${a.agentId}/cards`, { key: a.agentKey, data: { decisionId, ...brief } });
+  // It may have reached the owner (B32.10). The card keeps this id, even if another run of the same card settled it
+  // meanwhile, so asking again finds this decision; only when it does is the agent told asking again is safe.
+  const unsure = (f: Failure) => {
+    let kept = false;
+    try { updateAgent(a.id, x => { x.asking ??= {}; x.asking[cardKey] ??= decisionId; kept = x.asking[cardKey] === decisionId; }); } catch { /* not kept */ }
+    return kept ? uncertain(f, a, askAgain) : uncertain(f, a);
+  };
   let r = await send();
-  // A lost reply is sent once more. Either way the owner gets one decision; if that fails too, the first may still
-  // have reached them (B32.10).
+  // A lost reply is sent once more: under the same id the owner gets one decision either way.
   if (!r.ok && r.error === 'NoReply') {
     const lost = r;
     await new Promise(res => setTimeout(res, ASK_AGAIN_MS));
     r = await send();
-    if (!r.ok) return uncertain(lost, a, askAgain);
+    if (!r.ok) return unsure(lost);
   }
   if (!r.ok) {
-    if (r.error === 'NoReply' || r.error === 'NotUnderstood') return uncertain(r, a, askAgain);
+    if (r.error === 'NoReply' || r.error === 'NotUnderstood') return unsure(r);
     // Another card already has this id on the server: the next try takes a new one.
     if (r.error === 'DecisionIdTaken') {
       try { updateAgent(a.id, x => { if (x.asking?.[cardKey] === decisionId) delete x.asking[cardKey]; }); } catch { /* kept: refused again next time */ }
-      return refused('Not sent: the server already has a different card from this agent under the id kept for this one. Ask again to send it under a new id.');
+      return refused('Not sent: the id kept for this card is already taken on the server. Ask again to send it under a new id.');
     }
     return refusal(r, a);
   }

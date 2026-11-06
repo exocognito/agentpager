@@ -1,5 +1,8 @@
 import { test } from 'node:test';
 import { createServer } from 'node:http';
+import { readdirSync, statSync } from 'node:fs';
+import { DatabaseSync } from 'node:sqlite';
+import path from 'node:path';
 import { generateKeyPairSync, verify } from 'node:crypto';
 import { Schema } from 'effect';
 import { fixture, assert, token, until, decode, question, C } from './support.ts';
@@ -40,6 +43,19 @@ async function apple() {
   process.env.APNS_KEY_ID = 'KEY1234567'; process.env.APNS_TEAM_ID = 'TEAM123456'; process.env.APNS_TOPIC = 'me.agentpager.app.dev';
   process.env.APNS_ORIGIN = `http://127.0.0.1:${address.port}`;
   return { replies, sent: (to: string) => deliveries.filter(d => d.device === to), close: () => server.close() };
+}
+// The decision ids the Registry holds, read from its stored database once the server has stopped.
+function registryClaims(persist: string) {
+  const files: string[] = [];
+  const walk = (dir: string) => { for (const name of readdirSync(dir)) { const p = path.join(dir, name); if (statSync(p).isDirectory()) walk(p); else if (p.endsWith('.sqlite')) files.push(p); } };
+  walk(path.join(persist, 'v3', 'do'));
+  let tables = 0, rows = 0;
+  for (const file of files) {
+    const db = new DatabaseSync(file);
+    if (db.prepare("SELECT 1 FROM sqlite_master WHERE name='decisions_v2'").get()) { tables++; rows += Number(db.prepare('SELECT count(*) AS n FROM decisions_v2').get()?.n); }
+    db.close();
+  }
+  return { tables, rows };
 }
 const device = () => Array.from({ length: 64 }, () => '0123456789abcdef'[Math.floor(Math.random() * 16)]).join('');
 const registered = (f: Awaited<ReturnType<typeof fixture>>) => (pagerId: string, phone: string, deviceToken: string) => f.ok(Ok, `/api/pagers/${pagerId}/push`, { phone, data: { token: deviceToken, environment: 'sandbox' } });
@@ -180,7 +196,7 @@ test('B27.9 The same ask again under its id is one decision and one alert; anoth
     assert.deepEqual(await open(), [id], 'one decision');
     // Another question, or the same one changed, under that id is refused, and stores and alerts nothing.
     for (const data of [{ ...question('Something else?'), decisionId: id }, { ...ship, detail: 'Now with a detail.' }]) {
-      assert.match((await f.refused(409, 'DecisionIdTaken', cards, { agent: a.agentKey, data })).message, /different question/);
+      assert.match((await f.refused(409, 'DecisionIdTaken', cards, { agent: a.agentKey, data })).message, /taken/);
     }
     assert.deepEqual(alerted(), [id]);
     assert.deepEqual((await f.pager(p.pagerId, p.phone)).agents[0].open.map(d => [d.title, d.detail]), [['Ship it?', undefined]], 'the decision as first asked');
@@ -203,15 +219,22 @@ test('B27.9 The same ask again under its id is one decision and one alert; anoth
     assert.equal((await f.ok(C.Asked, cards, { agent: a.agentKey, data: ship })).decisionId, id);
     assert.deepEqual(alerted(), [id, ...others]);
 
-    // An id names a decision only within its agent: another agent asking under it gets a decision of its own, and
-    // never the first agent's decision or answer.
+    // No two agents on a pager share a decision id, since the phone tells decisions apart by id: another agent asking
+    // under it is refused, and stores and alerts nothing. Under a new id it asks as usual.
     const b = await f.connect(p.number, 'Claude Code', 'again');
-    assert.equal((await f.ok(C.Asked, `/api/agents/${b.agent.agentId}/cards`, { agent: b.agentKey, data: ship })).decisionId, id);
-    assert.equal((await f.read(b, id)).status, 'pending', 'its own decision, unanswered');
+    const theirs = `/api/agents/${b.agent.agentId}/cards`;
+    await f.refused(409, 'DecisionIdTaken', theirs, { agent: b.agentKey, data: ship });
+    await f.refused(409, 'DecisionIdTaken', theirs, { agent: b.agentKey, data: { ...question('Mine?'), decisionId: others[0] } });
+    assert.deepEqual(alerted(), [id, ...others], 'no alert');
+    const own = await f.ok(C.Asked, theirs, { agent: b.agentKey, data: { ...ship, decisionId: token() } });
     const seen = (await f.pager(p.pagerId, p.phone)).agents;
-    assert.deepEqual(seen.map(x => [x.agent.agentId, [...x.open, ...x.answered].filter(d => d.decisionId === id).map(d => d.status)]), [[a.agent.agentId, ['answered']], [b.agent.agentId, ['open']]]);
-    const last = await until(async () => sent(mine), d => d.length === others.length + 2);
-    assert.deepEqual([last.at(-1)?.payload.agentId, last.at(-1)?.payload.decisionId], [b.agent.agentId, id]);
+    assert.deepEqual(seen.map(x => [x.agent.agentId, [...x.open, ...x.answered].filter(d => d.title === 'Ship it?').map(d => d.decisionId)]), [[a.agent.agentId, [id]], [b.agent.agentId, [own.decisionId]]]);
+    await until(async () => sent(mine), d => d.length === others.length + 2);
+    assert.deepEqual(alerted(), [id, ...others, own.decisionId]);
+    // The claims go with the pager.
+    await f.request(`/api/pagers/${p.pagerId}/delete`, { method: 'POST', phone: p.phone });
+    await f.stop();
+    assert.deepEqual(registryClaims(f.persist), { tables: 1, rows: 0 }, 'no decision ids kept for a deleted pager');
     void token;
   } finally {
     await f.stop();

@@ -5,7 +5,7 @@ import path from 'node:path';
 const buildDir = process.env.AGENTPAGER_BUILD_DIR || mkdtempSync(path.join(tmpdir(), 'agentpager-build-'));
 const env = { ...process.env, AGENTPAGER_BUILD_DIR: buildDir };
 execFileSync(process.execPath, ['scripts/build.mjs', '--local'], { env, stdio: 'inherit', timeout: 120_000 });
-const args = ['exec', 'wrangler', 'dev', '--local', '--config', path.join(buildDir, 'wrangler.json'), '--port', process.env.PORT || '8787', ...(process.env.AGENTPAGER_IP ? ['--ip', process.env.AGENTPAGER_IP] : []), '--inspector-port', process.env.AGENTPAGER_INSPECTOR_PORT || '9230', '--persist-to', process.env.AGENTPAGER_PERSIST || mkdtempSync(path.join(tmpdir(), 'agentpager-data-'))];
+const args = ['exec', 'wrangler', 'dev', '--local', '--config', path.join(buildDir, 'wrangler.json'), '--port', process.env.PORT || '8787', ...(process.env.AGENTPAGER_IP ? ['--ip', process.env.AGENTPAGER_IP] : []), '--inspector-port', process.env.AGENTPAGER_INSPECTOR_PORT || '9230', '--persist-to', process.env.AGENTPAGER_PERSIST || mkdtempSync(path.join(tmpdir(), 'agentpager-data-')), ...(process.env.AGENTPAGER_LOCAL_PROTOCOL ? ['--local-protocol', process.env.AGENTPAGER_LOCAL_PROTOCOL] : [])];
 const child = spawn('pnpm', args, { env, stdio: 'inherit' });
 for (const signal of ['SIGTERM', 'SIGINT']) process.on(signal, () => child.kill(signal));
 child.on('exit', code => process.exit(code ?? 0));

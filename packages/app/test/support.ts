@@ -6,6 +6,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'node:net';
+import * as http from 'node:http';
+import * as https from 'node:https';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
 import * as C from '../src/contract.ts';
@@ -19,6 +21,18 @@ export async function until<A>(fn: () => Promise<A>, accepts: (a: A) => boolean,
   const stop = Date.now() + ms; let error: unknown;
   do { try { const result = await fn(); if (accepts(result)) return result; } catch (e) { error = e; } await pause(100); } while (Date.now() < stop);
   throw new Error(`Condition timed out: ${String(error ?? '')}`);
+}
+// One request with a Host header of the test's choosing: the local Worker builds its URL from that header, as a
+// deployed one does from the hostname it was reached by. HTTPS accepts the local server's self-signed certificate.
+// Each request has a connection of its own, since a refusal may leave the body it didn't read on the connection.
+export function raw(url: string, opts: { method?: string; host?: string; body?: string } = {}): Promise<{ status: number; headers: http.IncomingHttpHeaders; body: string }> {
+  const u = new URL(url), client = u.protocol === 'https:' ? https : http;
+  return new Promise((resolve, reject) => {
+    const req = client.request(u, { method: opts.method ?? 'GET', agent: false, headers: { ...(opts.host ? { host: opts.host } : {}), ...(opts.body ? { 'content-type': 'application/json', 'content-length': String(Buffer.byteLength(opts.body)) } : {}) }, rejectUnauthorized: false }, res => {
+      let body = ''; res.setEncoding('utf8'); res.on('data', chunk => { body += chunk; }); res.on('end', () => resolve({ status: res.statusCode ?? 0, headers: res.headers, body }));
+    });
+    req.on('error', reject); req.end(opts.body);
+  });
 }
 async function port() { const s = createServer(); await new Promise<void>(r => s.listen(0, '127.0.0.1', r)); const address = s.address(); if (!address || typeof address === 'string') throw new Error('port'); const p = address.port; await new Promise<void>(r => s.close(() => r())); return p; }
 
@@ -42,19 +56,20 @@ export type AgentCreds = { agent: { agentId: string }; agentKey: string };
 
 // Each test file starts its own workerd. Zero is the production clock; a test that crosses auto-off or housekeeping
 // in real time sets a short one.
-export async function fixture(name: string, clocks: { autoOffMs: number; idleMs: number; pickupMs?: number } = { autoOffMs: 0, idleMs: 0 }) {
+// `https` serves it over HTTPS, with a self-signed certificate.
+export async function fixture(name: string, clocks: { autoOffMs: number; idleMs: number; pickupMs?: number } = { autoOffMs: 0, idleMs: 0 }, serving: { https?: boolean } = {}) {
   const evidence = path.join(process.env.BLUEPRINT_EVIDENCE_DIR || path.join(tmpdir(), 'agentpager-evidence'), name);
   await mkdir(evidence, { recursive: true });
   const directory = await mkdtemp(path.join(tmpdir(), `agentpager-${name}-`));
   const serverPort = await port(), inspector = await port();
-  const origin = `http://127.0.0.1:${serverPort}`;
+  const origin = `${serving.https ? 'https' : 'http'}://127.0.0.1:${serverPort}`;
   const persist = path.join(directory, 'persist');
   let child: ChildProcess | undefined;
   const log = createWriteStream(path.join(evidence, 'server.log'));
   async function launch() {
-    child = spawn(process.execPath, ['scripts/start.mjs'], { cwd: app, detached: true, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, PORT: String(serverPort), AGENTPAGER_INSPECTOR_PORT: String(inspector), AGENTPAGER_PERSIST: persist, AGENTPAGER_BUILD_DIR: path.join(directory, 'build'), AGENTPAGER_AUTO_OFF_MS: String(clocks.autoOffMs), AGENTPAGER_IDLE_MS: String(clocks.idleMs), AGENTPAGER_PICKUP_MS: String(clocks.pickupMs ?? 0) } });
+    child = spawn(process.execPath, ['scripts/start.mjs'], { cwd: app, detached: true, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, PORT: String(serverPort), AGENTPAGER_INSPECTOR_PORT: String(inspector), AGENTPAGER_PERSIST: persist, AGENTPAGER_BUILD_DIR: path.join(directory, 'build'), AGENTPAGER_AUTO_OFF_MS: String(clocks.autoOffMs), AGENTPAGER_IDLE_MS: String(clocks.idleMs), AGENTPAGER_PICKUP_MS: String(clocks.pickupMs ?? 0), ...(serving.https ? { AGENTPAGER_LOCAL_PROTOCOL: 'https' } : {}) } });
     child.stdout?.pipe(log, { end: false }); child.stderr?.pipe(log, { end: false });
-    try { await until(async () => (await fetch(origin + '/start')).status, s => s === 200, 90_000); } catch (e) { await stop(); throw e; }
+    try { await until(async () => (await raw(origin + '/start')).status, s => s === 200, 90_000); } catch (e) { await stop(); throw e; }
   }
   async function stop() {
     const pid = child?.pid; if (!pid) return;

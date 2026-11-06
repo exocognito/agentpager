@@ -3,6 +3,7 @@ import * as C from './contract.ts';
 import { BUILD, forward, type Env } from './env.ts';
 import { body, decode, emptyBody, json, read, refusal, sha256, token } from './shared.ts';
 import { frontDocument, startDocument } from './start.ts';
+import { keepsToHttps, plainHttp, HSTS } from './https.ts';
 import { PushTarget } from './push.ts';
 export { Agent } from './agent.ts';
 export { Registry } from './registry.ts';
@@ -109,6 +110,8 @@ const text = (value: string, type: string, status = 200) => new Response(value, 
 
 async function serve(request: Request, env: Env) {
   const u = new URL(request.url), origin = u.origin;
+  const insecure = plainHttp(u, request.method);
+  if (insecure) return insecure;
   // The hosted MCP server is retired (B18.4, blueprint/areas/7-getting-started.md): an agent that arrives there, or at /start, is told to
   // install the agentpager command. The HTTP API stays as that command's transport.
   if (u.pathname === '/mcp') return text(startDocument(origin), 'text/markdown', 410);
@@ -133,6 +136,7 @@ export default {
     headers.set('Referrer-Policy', 'no-referrer');
     headers.set('X-Content-Type-Options', 'nosniff');
     headers.set('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'");
+    if (keepsToHttps(new URL(request.url))) headers.set('Strict-Transport-Security', HSTS);
     return new Response(response.body, { status: response.status, headers });
   },
 };

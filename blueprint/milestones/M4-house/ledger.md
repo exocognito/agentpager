@@ -4,8 +4,8 @@ Every line of the old Blueprint, and where it went when M4 converted it to the a
 
 ## Totals
 
-- **Rows:** 743, from 109 old files and sources, grouped by old file below. 53 rows are gaps the integrator filled (listed under Gaps filled). PR 4, the history cleanup, adds 24 more in its own section at the end, and PR 5b, the dev marks, 2 more after it.
-- **⚑ for Sam:** 94: 89 from the conversion, 3 from PR 4, the history cleanup ([PR 4](#pr-4-the-history-cleanup)), and 2 from PR 5b, the dev marks ([PR 5b](#pr-5b-the-dev-marks)).
+- **Rows:** 743, from 109 old files and sources, grouped by old file below. 53 rows are gaps the integrator filled (listed under Gaps filled). PR 4, the history cleanup, adds 24 more in its own section at the end, and PR 5b, the dev marks and HTTPS only, 4 more after it.
+- **⚑ for Sam:** 95: 89 from the conversion, 3 from PR 4, the history cleanup ([PR 4](#pr-4-the-history-cleanup)), and 3 from PR 5b, the dev marks and HTTPS only ([PR 5b](#pr-5b-the-dev-marks-and-https-only)).
 - **The new Blueprint:** 7 areas with 23 entries (14 behaviors and 9 invariants) and 162 clauses, 16 limits (L9 to L24), and 3 journeys with 20 steps.
 - **Ids:** each C became B with the same number; I, J and K kept theirs; B32, B33 and I23 are new; limits are L9 to L24; no D id remains, and C28 is never reused. Not built, and waiting in `milestones/next/`: B19 (INSTALL), B30 and I20 (ENCRYPT), K1 (FRIENDS).
 - **Words:** the old Blueprint docs this pull request deletes held 25,789 words (strategy, design, roadmap, decisions and lessons), plus 5,219 in the workshop's notes. The new `blueprint/` holds 25,343, without `generated/` and this ledger. Its always-true part (README, PRODUCT, TERMS, the areas and JOURNEYS) holds 14,186, against 12,403 in the old strategy and design.
@@ -110,6 +110,7 @@ Each row drops a line, changes its meaning, adds a line no old line held, or cut
 | 92 | docs/v2/03 §5, what history is for: "an agent that wants to know what was already decided …; a coordinator reviewing its helpers; and the owner's own analysis later" | dropped (PR 4) | B31 says what the history holds, not why; FRIENDS' question 2 names sharing it for feedback. |
 | 93 | (none; M4's plan, PR 5): a "dev" mark on the site | B18.6 · @M4: (PR 5b) | New clause B18.6: the front page on dev.agentpager.me says it is a dev server. Built and tested, with no old line. |
 | 94 | (none; M4's plan, PR 5, and M4's slice, Phone): a "dev" mark on the phone | B23.11 · @M4: (PR 5b) | New clause B23.11: a pager made on dev.agentpager.me is marked dev on Pagers and its screen. Built and tested, with no old line. |
+| 95 | D1 "every plain HTTP request redirected" (row 37), the text row 37 gave for when it is built | I23.4 · @M4: (PR 5b) | Built as Sam asked ("Yes fix plain http"), but narrower than row 37's text: only a request to read a page is sent to HTTPS, any other is refused unread, and a local server keeps plain HTTP. |
 
 ## Gaps filled
 
@@ -1445,11 +1446,13 @@ PR 4 deleted `docs/v2/`, the root `workshop/`, `recipe.json` and four superseded
 | memory `agent-wake-research` and the report Ph2BtiR64UBSde6fbXW5LT | docs/research/2026-10-30-agent-wake-lab.md | the lasting record of what wakes which app and how it was tested; B33's note and CLIENTS cite it |  |
 | DECISIONS.md's citations of `docs/v2/` | kept as written | DECISIONS.md is append only, and "which git keeps" stays true: the tag is `history-archive` |  |
 
-## PR 5b: the dev marks
+## PR 5b: the dev marks and HTTPS only
 
-PR 5b (#49) built the two "dev" marks M4's plan gave PR 5 that need the screens made again: the front page and the phone. Both count a server as dev when its address starts with `dev.`, so the catalogue, drawn from a local server, shows neither.
+PR 5b (#49) built the two "dev" marks M4's plan gave PR 5 that need the screens made again: the front page and the phone. Both count a server as dev when its address starts with `dev.`, so the catalogue, drawn from a local server, shows neither. Sam then answered M4's question 2, "Yes fix plain http", so it also builds HTTPS only and retires L20.
 
 | Old | New | Change | ⚑ |
 | --- | --- | --- | --- |
 | (none; M4's plan, PR 5): a "dev" mark on the site | B18.6 · @M4: (7 Getting started) | new line: the front page on dev.agentpager.me says it is a dev server, and agentpager.me's doesn't (`MarketingScreen.test.ts › B18.6`), so the Blueprint on main describes dev | ⚑ |
 | (none; M4's plan, PR 5, and M4's slice, Phone): a "dev" mark on the phone | B23.11 · @M4: (1 Pagers) | new line: a pager made on dev.agentpager.me is marked dev on its row in Pagers and on its own screen, and one made on agentpager.me isn't (`DesignTests.test_B23_11_aPagerMadeOnADevServerShowsTheDevMark`) | ⚑ |
+| L20 · @M1 · The service still answers plain HTTP (6 Privacy), from row 37 | retired; I23.4 holds what fixes it | deleted from 6 Privacy and quoted under M4's Retires. The id L20 is never reused. next/ENCRYPT no longer waits for it |  |
+| row 37's text when built: "The service answers only over HTTPS: a plain HTTP request is sent to HTTPS, and every response tells browsers to keep to HTTPS." | I23.4 · @M4: (6 Privacy) | new clause: GET and HEAD over plain HTTP move to the same address on HTTPS (308), any other method is refused unread (403), and every HTTPS reply carries Strict-Transport-Security for a year, without subdomains. A local server keeps plain HTTP (a note). Held by `https.test.ts › I23.4` and the smoke run's step on dev | ⚑ |

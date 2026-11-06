@@ -47,9 +47,9 @@ Sam decides these first:
 
 ## Adds · Changes · Retires
 
-- **Adds:** B30, whole; I20, whole; I19's check on the agent's machine; B17's encrypted alert, with the App Group and the notification service extension on the phone; J5's encrypted alert step; a limit on how fast a number can connect agents, which the design assumed; I23's HTTPS-only clause, unless M4 fixes it first; and new clauses for the ask request id and for telling an old command to update.
+- **Adds:** B30, whole; I20, whole; I19's check on the agent's machine; B17's encrypted alert, with the App Group and the notification service extension on the phone; J5's encrypted alert step; a limit on how fast a number can connect agents, which the design assumed; and new clauses for the ask request id and for telling an old command to update.
 - **Changes:** I4 and I22, since the service can no longer read a card, so the command's checks are the only ones; B5 and B17, for a not-picked-up warning the service can no longer word.
-- **Retires:** the limits encryption fixes, quoted here when they go: L19 "The service can read every decision" and, unless M4 fixes it first, L20 "The service still answers plain HTTP" (6 Privacy); L17 "Alerts pass through Apple as plain text" (4 Getting paged); and L10 "Turning a pager off can let one call through" (1 Pagers), if one writer per pager fixes it.
+- **Retires:** the limits encryption fixes, quoted here when they go: L19 "The service can read every decision" (6 Privacy); L17 "Alerts pass through Apple as plain text" (4 Getting paged); and L10 "Turning a pager off can let one call through" (1 Pagers), if one writer per pager fixes it.
 
 ## From the old Blueprint (not built yet)
 
@@ -74,8 +74,6 @@ The lines the old Blueprint held for this milestone, as the [M4 ledger](../M4-ho
 - Once the service can't read decisions, it can't write who asked, the project or the question into an alert, so B17.2's title and body, the agent's words in B17.5's acknowledgement alert, and the names in B17.8's alert come from the phone.
 
 **J5, a step added:** after J5.3, the alert travels encrypted, and an extension on the phone decrypts it to show the question.
-
-**I23, a clause added** (6 Privacy), unless M4 fixes L20 first: the service answers only over HTTPS. A plain HTTP request is sent to HTTPS, and every reply tells browsers to keep to HTTPS.
 
 **I22 and I4, changed** (3 Cards): once cards are encrypted, the service can't read a card to refuse it. The command's check (I22) becomes the only check of a card's text, and I4 then holds on the service only for what it can still read.
 

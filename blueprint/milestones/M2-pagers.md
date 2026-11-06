@@ -1,6 +1,6 @@
 # M2 · Pagers on my phone
 
-> **Status:** shipped · **Shipped:** 29 Oct 2026, as Stage 1 of the v2 plan (PR #22) · **Tag:** none; prod runs 1ee6c27 · **Word:** PAGERS
+> **Status:** shipped · **Shipped:** 29 Oct 2026, as Stage 1 of the v2 plan (PR #22) · **Tag:** none; released at 1ee6c27 · **Word:** PAGERS
 
 ## Objective
 

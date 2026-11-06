@@ -1,6 +1,6 @@
 # M4 · House in order
 
-> **Status:** built, awaiting Sam's review · **Started:** 5 Nov 2026 · **Tag:** none yet (m4 proposed) · **Order:** runs alone, before ENCRYPT
+> **Status:** released, awaiting Sam's review · **Started:** 5 Nov 2026 · **Released:** 6 Nov 2026 · **Tag:** `m4`, on 9849671 · **Order:** runs alone, before ENCRYPT
 
 ## Objective
 

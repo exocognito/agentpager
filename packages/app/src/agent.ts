@@ -30,6 +30,8 @@ const registry = (env: Env, path: string, data: unknown) => forward(env.REGISTRY
 
 export class Agent {
   constructor(private ctx: DurableObjectState, private env: Env) { this.schema(); }
+  // asks: each decision asked under the id its agent chose, with the SHA-256 of the question as asked, written with
+  // the decision, so asking the same again under that id finds it. Decisions from before asks named their id have none.
   private schema() {
     this.tx(() => {
       this.ctx.storage.sql.exec(`CREATE TABLE IF NOT EXISTS agent (id INTEGER PRIMARY KEY CHECK(id=1), json TEXT NOT NULL);
@@ -37,6 +39,7 @@ export class Agent {
         CREATE TABLE IF NOT EXISTS answers (decision_id TEXT PRIMARY KEY REFERENCES proposals(id), request_id TEXT NOT NULL UNIQUE, input TEXT NOT NULL, json TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS acknowledgements (decision_id TEXT PRIMARY KEY REFERENCES answers(decision_id), json TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS attachments (decision_id TEXT NOT NULL, name TEXT NOT NULL, type TEXT NOT NULL, data BLOB NOT NULL, PRIMARY KEY (decision_id, name));
+        CREATE TABLE IF NOT EXISTS asks (decision_id TEXT PRIMARY KEY, question TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS pickups (decision_id TEXT PRIMARY KEY REFERENCES answers(decision_id), due INTEGER NOT NULL);
         CREATE TABLE IF NOT EXISTS collections (decision_id TEXT PRIMARY KEY REFERENCES answers(decision_id), at TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS warnings (decision_id TEXT PRIMARY KEY REFERENCES answers(decision_id), at TEXT NOT NULL);`);
@@ -53,7 +56,9 @@ export class Agent {
         CREATE TRIGGER IF NOT EXISTS attachment_immutable BEFORE UPDATE ON attachments BEGIN SELECT RAISE(ABORT,'immutable attachment'); END;
         CREATE TRIGGER IF NOT EXISTS collection_immutable BEFORE UPDATE ON collections BEGIN SELECT RAISE(ABORT,'immutable collection'); END;
         CREATE TRIGGER IF NOT EXISTS warning_immutable BEFORE UPDATE ON warnings BEGIN SELECT RAISE(ABORT,'immutable warning'); END;
-        CREATE TRIGGER IF NOT EXISTS attachments_go_with_proposal AFTER DELETE ON proposals BEGIN DELETE FROM attachments WHERE decision_id = OLD.id; END;`);
+        CREATE TRIGGER IF NOT EXISTS ask_immutable BEFORE UPDATE ON asks BEGIN SELECT RAISE(ABORT,'immutable ask'); END;
+        CREATE TRIGGER IF NOT EXISTS attachments_go_with_proposal AFTER DELETE ON proposals BEGIN DELETE FROM attachments WHERE decision_id = OLD.id; END;
+        CREATE TRIGGER IF NOT EXISTS ask_goes_with_proposal AFTER DELETE ON proposals BEGIN DELETE FROM asks WHERE decision_id = OLD.id; END;`);
     });
   }
   private meta(): Meta | null {
@@ -203,26 +208,34 @@ export class Agent {
     if (action === 'ask') {
       const digest = await agentDigest(request);
       const m = this.tx(() => { const m = this.agent(digest); if (m.finishedAt) throw C.refuse.finished(); return m; });
-      const question = decode(C.QuestionInput, await body(request));
+      const { decisionId, ...question } = decode(C.AskInput, await body(request));
+      // The question as decoded, in the schema's key order, so the same ask sent again has the same digest.
+      const asking = await sha256(JSON.stringify(question));
       // Checked last before the write, so the switch is read as late as it can be.
       const push = await this.on(m);
       const asked = this.tx(() => {
         const m = this.agent(digest);
+        // The same ask again (its reply was lost) finds its decision, which stays as it was: nothing is stored and no
+        // alert goes, even when this agent's open decisions are now at their limit.
+        const known = this.ctx.storage.sql.exec<{ question: string }>('SELECT question FROM asks WHERE decision_id=?', decisionId).toArray()[0];
+        if (known?.question === asking) return { m, again: true };
+        if (known || this.ctx.storage.sql.exec('SELECT 1 FROM proposals WHERE id=?', decisionId).toArray().length) throw C.refuse.decisionIdTaken();
         if (this.openCount() >= C.MAX_OPEN_DECISIONS) throw C.refuse.tooMany();
         // The decision keeps each attachment's name, type and size; the bytes live in their own table.
-        const { attachments, ...asked } = question;
-        const d: C.Decision = { ...asked, ...(attachments ? { attachments: attachments.map(attachmentInfo) } : {}), decisionId: token(), status: 'open', askedAt: iso() };
+        const { attachments, ...rest } = question;
+        const d: C.Decision = { ...rest, ...(attachments ? { attachments: attachments.map(attachmentInfo) } : {}), decisionId, status: 'open', askedAt: iso() };
         decode(C.Decision, d);
-        this.ctx.storage.sql.exec('INSERT INTO proposals VALUES (?, ?)', d.decisionId, JSON.stringify(d));
+        this.ctx.storage.sql.exec('INSERT INTO proposals VALUES (?, ?)', decisionId, JSON.stringify(d));
+        this.ctx.storage.sql.exec('INSERT INTO asks VALUES (?, ?)', decisionId, asking);
         for (const a of attachments ?? []) {
           const bytes = 'text' in a ? new TextEncoder().encode(a.text) : base64Bytes(a.base64);
           if (!bytes) throw new Error('An attachment passed its schema but did not decode');
-          this.ctx.storage.sql.exec('INSERT INTO attachments VALUES (?, ?, ?, ?)', d.decisionId, a.name, a.type, bytes.buffer);
+          this.ctx.storage.sql.exec('INSERT INTO attachments VALUES (?, ?, ?, ?)', decisionId, a.name, a.type, bytes.buffer);
         }
-        this.touch(m); return { m, decisionId: d.decisionId };
+        this.touch(m); return { m, again: false };
       });
-      await this.alertPhone(asked.m, push, asked.decisionId, 'decision', questionBody(question));
-      return json({ decisionId: asked.decisionId });
+      if (!asked.again) await this.alertPhone(asked.m, push, decisionId, 'decision', questionBody(question));
+      return json(decode(C.Asked, { decisionId }));
     }
     if (action === 'read') {
       const digest = await agentDigest(request);

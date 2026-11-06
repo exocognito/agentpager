@@ -9,6 +9,11 @@ struct ToolError: Error, @unchecked Sendable, CustomStringConvertible {
 }
 
 final class AgentHarness {
+    // The agentpager command's client header, as this harness plays it. It mirrors CLIENT_HEADER and PROTOCOL in
+    // packages/contract/exchange.ts, which packages/contract/mirror.test.ts checks.
+    static let clientHeader = "x-agentpager-client"
+    static let clientVersion = "uitests/1 harness"
+
     let base: URL
     var agentId = ""
     var agentKey = ""
@@ -41,7 +46,7 @@ final class AgentHarness {
     // One API call; a refusal throws its {error, message, ...} body.
     @discardableResult
     func call(_ method: String, _ path: String, _ body: [String: Any]? = nil, timeout: TimeInterval = 70) throws -> [String: Any] {
-        var headers = ["content-type": "application/json"]
+        var headers = ["content-type": "application/json", Self.clientHeader: Self.clientVersion]
         if !agentKey.isEmpty { headers["authorization"] = "Bearer \(agentKey)" }
         let (status, data) = try http(method, path, headers: headers, body: try body.map { try JSONSerialization.data(withJSONObject: $0) }, timeout: timeout)
         let value = (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? ["error": "BadReply", "raw": String(decoding: data, as: UTF8.self)]
@@ -67,9 +72,16 @@ final class AgentHarness {
             ["number": i + 1, "title": o, "prioritizes": o]
         }]
         if let recommended { card["recommended"] = recommended }
-        var question: [String: Any] = ["title": title, "card": card]
+        // The command chooses each decision's id.
+        var question: [String: Any] = ["decisionId": Self.token(), "title": title, "card": card]
         if let detail { question["detail"] = detail }
         return try call("POST", "api/agents/\(agentId)/cards", question)["decisionId"] as! String
+    }
+
+    // 32 URL-safe characters, as the command's ids are.
+    static func token() -> String {
+        let alphabet = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_")
+        return String((0..<32).map { _ in alphabet.randomElement()! })
     }
 
     // Returns the answer object, or nil while pending.

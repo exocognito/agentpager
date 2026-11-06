@@ -4,6 +4,7 @@ import { hostname, tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
+import { createServer, type IncomingHttpHeaders } from 'node:http';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { fixture, assert, token } from '../../app/test/support.ts';
@@ -215,4 +216,78 @@ test('review rounds: concurrent asks, an unwritable home, attachments, unsafe ce
     const bad = await op.connect({ number: p.number, app: 'Codex', project: 'edges' });
     assert.equal(bad.code, 5); assert.match(bad.text, /^Can't reach not a url \(/);
   } finally { process.env.AGENTPAGER_SERVER = f.origin; await f.stop(); }
+});
+
+// A stand-in for a network that loses replies: it passes each call to the server, and for the next `lose` asks keeps
+// the server's reply from the command, closing the connection instead.
+async function lossy(target: string) {
+  let lose = 0, asks = 0;
+  const pass = (h: IncomingHttpHeaders) => Object.fromEntries(['content-type', 'authorization', 'x-agentpager-client'].filter(k => h[k]).map(k => [k, String(h[k])]));
+  const server = createServer(async (req, res) => {
+    const chunks: Buffer[] = [];
+    for await (const chunk of req) chunks.push(chunk);
+    const reply = await fetch(target + req.url, { method: req.method, headers: pass(req.headers), body: chunks.length ? Buffer.concat(chunks) : undefined });
+    const body = Buffer.from(await reply.arrayBuffer());
+    if (req.method === 'POST' && /\/cards$/.test(req.url ?? '')) { asks++; if (lose > 0) { lose--; req.socket.resetAndDestroy(); return; } }
+    res.writeHead(reply.status, { 'content-type': reply.headers.get('content-type') ?? 'application/json' });
+    res.end(body);
+  });
+  await new Promise<void>(r => server.listen(0, '127.0.0.1', r));
+  const address = server.address();
+  return {
+    origin: `http://127.0.0.1:${typeof address === 'object' && address ? address.port : 0}`,
+    lose: (n: number) => { lose = n; asks = 0; }, asks: () => asks,
+    close: () => new Promise(r => { server.closeAllConnections(); server.close(r); }),
+  };
+}
+
+test('B32.10 A lost ask reply is never taken as success, and asking the same card again reaches the owner once', { timeout: 240_000 }, async () => {
+  const f = await fixture('cli-lost'), net = await lossy(f.origin);
+  const home = mkdtempSync(path.join(tmpdir(), 'agentpager-cli-')), work = mkdtempSync(path.join(tmpdir(), 'agentpager-card-'));
+  process.env.AGENTPAGER_HOME = home; process.env.AGENTPAGER_SERVER = net.origin; delete process.env.AGENTPAGER_PAGER;
+  delete process.env.CLAUDECODE;
+  const op = await import('../src/commands.ts'), store = await import('../src/store.ts');
+  const card = (title: string) => { const file = path.join(work, `${title.replace(/\W/g, '')}.yaml`); writeFileSync(file, `title: ${title}\ndetail: Where to eat.\ncontext:\n  summary: Friday is booked.\noptions:\n  - {label: Sushi, title: Sushi, prioritizes: fish}\n  - {label: Pasta, title: Pasta, prioritizes: carbs}\nrecommendation: {option: B, why: Closer.}\n`); return file; };
+  try {
+    const p = await f.makePager();
+    const id = field(await op.connect({ number: p.number, app: 'Codex', project: 'lost' }), 'agent');
+    const onPhone = async () => (await f.pager(p.pagerId, p.phone)).agents.flatMap(a => a.open).map(d => [d.title, d.decisionId]);
+    const recorded = (short: string) => store.loadAgent(id)?.decisions[short]?.id;
+
+    // One reply lost: the command sends the ask once more under the same id, and the owner has it once.
+    net.lose(1);
+    const once = await op.ask(id, { file: card('Lost once?') });
+    assert.equal(once.code, 0, once.text);
+    assert.equal(net.asks(), 2, 'sent twice');
+    const [first] = await onPhone();
+    assert.deepEqual(first, ['Lost once?', recorded(field(once, 'decision'))]);
+    assert.deepEqual(store.loadAgent(id)?.asking, {}, 'settled');
+
+    // Both replies lost: it may have reached the owner, so it isn't success, and the card's id is kept.
+    net.lose(2);
+    const lost = await op.ask(id, { file: card('Lost twice?') });
+    assert.deepEqual([lost.code, lost.text], [5, `No reply from ${net.origin} (the connection closed).\nThis may or may not have reached your owner. Check with \`agentpager status --agent ${id}\` before trying again.\nAsking again with the same card is safe: your owner gets it once.`]);
+    const kept = Object.values(store.loadAgent(id)?.asking ?? {});
+    assert.equal(kept.length, 1);
+    assert.deepEqual(await onPhone(), [first, ['Lost twice?', kept[0]]], 'it did reach the owner, once');
+    assert.equal(Object.keys(store.loadAgent(id)?.decisions ?? {}).length, 1, 'nothing recorded as asked');
+
+    // Asked again by a new run of the command, the same card finds that decision: still one on the phone.
+    const again = await new Promise<string>((resolve, reject) => {
+      const child = spawn(process.execPath, ['--experimental-strip-types', path.join(cli, 'src', 'main.ts'), 'ask', '--agent', id, card('Lost twice?'), '--json'], { env: process.env });
+      let out = ''; child.stdout.on('data', d => { out += d; }); child.on('error', reject); child.on('close', () => resolve(out));
+    });
+    const short = JSON.parse(again).result.decision;
+    assert.equal(recorded(short), kept[0]);
+    assert.deepEqual(await onPhone(), [first, ['Lost twice?', kept[0]]]);
+    assert.deepEqual(store.loadAgent(id)?.asking, {}, 'settled');
+    await f.answer((await f.pager(p.pagerId, p.phone)).agents[0].agent.agentId, p.phone, kept[0]);
+    assert.match((await op.wait(id, short)).text, /^Answered at .*: option B "Pasta"\./);
+
+    // Once settled, the same card asked again is a new decision, as the agent meant it.
+    const later = await op.ask(id, { file: card('Lost twice?') });
+    assert.equal(later.code, 0, later.text);
+    assert.notEqual(recorded(field(later, 'decision')), kept[0]);
+    assert.deepEqual((await onPhone()).map(([title]) => title), ['Lost once?', 'Lost twice?']);
+  } finally { await net.close(); await f.stop(); }
 });

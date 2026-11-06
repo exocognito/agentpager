@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { stageOf } from './stages.ts';
+import { CLIENT_HEADER, clientVersion } from '../../contract/exchange.ts';
 
 // The smoke run (METHOD.md › Tests and checks): node scripts/smoke.mjs --stage dev|prod checks that the stage serves
 // this checkout's commit and that its Worker and Registry answer, from outside, paging no one and needing no phone. It
@@ -22,6 +23,8 @@ function throwawayPager() {
   const id = randomBytes(16), fingerprint = createHash('sha256').update(Buffer.from(publicKey, 'base64url')).digest().subarray(0, 8);
   return { pagerId: id.toString('hex'), publicKey, number: 'ap1_' + Buffer.concat([id, fingerprint]).toString('base64url'), phone: randomBytes(24).toString('base64url') };
 }
+// The smoke run's own calls name it as their client, as every client of the API does.
+const asClient = { 'content-type': 'application/json', [CLIENT_HEADER]: clientVersion('smoke', sha.slice(0, 7)) };
 const check = (ok, message) => { if (!ok) throw new Error(message); };
 const candidate = response => check(response.headers.get('x-agentpager-build') === sha, `serves build ${response.headers.get('x-agentpager-build')}, not ${sha}`);
 // start.ts heads every page for an agent with this on a dev server (B18.5), such as dev.agentpager.me.
@@ -55,16 +58,21 @@ await step('/ serves a browser the front page', async () => {
 await step('Plain HTTP moves to HTTPS or is refused, and HTTPS replies tell browsers to keep to it (I23.4)', async () => {
   const moved = await fetch(`http://${stage.host}/start?smoke=1`, { redirect: 'manual' });
   check(moved.status === 308 && moved.headers.get('location') === `${origin}/start?smoke=1`, `GET over plain HTTP: ${moved.status} ${moved.headers.get('location')}`); candidate(moved);
-  const refused = await fetch(`http://${stage.host}/api/agents`, { method: 'POST', redirect: 'manual', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ number: bogus, app: 'smoke', project: 'smoke' }) });
+  const refused = await fetch(`http://${stage.host}/api/agents`, { method: 'POST', redirect: 'manual', headers: asClient, body: JSON.stringify({ number: bogus, app: 'smoke', project: 'smoke' }) });
   const value = await refused.json();
   check(refused.status === 403 && value.error === 'HttpsRequired', `POST over plain HTTP: ${refused.status} ${value.error}`); candidate(refused);
   const secure = await fetch(origin + '/start');
   check(secure.headers.get('strict-transport-security') === 'max-age=31536000', `HSTS: ${secure.headers.get('strict-transport-security')}`); await secure.arrayBuffer();
 });
 await step('The Registry refuses a pager number it has never seen', async () => {
-  const response = await fetch(origin + '/api/agents', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ number: bogus, app: 'smoke', project: 'smoke' }) });
+  const response = await fetch(origin + '/api/agents', { method: 'POST', headers: asClient, body: JSON.stringify({ number: bogus, app: 'smoke', project: 'smoke' }) });
   const value = await response.json();
   check(response.status === 410 && value.error === 'NumberInvalid', `${response.status} ${value.error}`); candidate(response);
+});
+await step('An agent call that doesn\'t name its client, as an m4 command\'s, is told to update before anything is read', async () => {
+  const response = await fetch(origin + '/api/agents', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ number: bogus, app: 'smoke', project: 'smoke' }) });
+  const value = await response.json();
+  check(response.status === 400 && value.error === 'UpdateRequired' && value.message.includes(`${origin}/start`), `${response.status} ${value.error}`); candidate(response);
 });
 await step('The binary built from this commit connects to a pager only this stage has, and is refused one no pager has, under its own AGENTPAGER_HOME', async () => {
   execFileSync('sh', ['scripts/build.sh'], { cwd: cli, stdio: 'ignore', timeout: 120_000 });
@@ -74,7 +82,7 @@ await step('The binary built from this commit connects to a pager only this stag
   const version = run('version').stdout;
   check(version.includes(sha.slice(0, 7)), `the binary is ${version.trim()}`);
   const pager = throwawayPager();
-  const made = await fetch(origin + '/api/pagers', { method: 'POST', headers: { 'content-type': 'application/json', 'x-phone-key': pager.phone }, body: JSON.stringify({ number: pager.number, publicKey: pager.publicKey, autoOff: '24h' }) });
+  const made = await fetch(origin + '/api/pagers', { method: 'POST', headers: { ...asClient, 'x-phone-key': pager.phone }, body: JSON.stringify({ number: pager.number, publicKey: pager.publicKey, autoOff: '24h' }) });
   check(made.status === 200, `making a throwaway pager: ${made.status} ${await made.text()}`);
   let failure;
   try {
@@ -86,7 +94,7 @@ await step('The binary built from this commit connects to a pager only this stag
     check(readdirSync(path.join(home, 'agents')).filter(f => f.endsWith('.json')).length === 1, 'the refused connect saved an agent');
   } catch (error) { failure = error; }
   // Deleting the pager deletes its agent with it.
-  const deleted = await fetch(`${origin}/api/pagers/${pager.pagerId}/delete`, { method: 'POST', headers: { 'x-phone-key': pager.phone } });
+  const deleted = await fetch(`${origin}/api/pagers/${pager.pagerId}/delete`, { method: 'POST', headers: { [CLIENT_HEADER]: asClient[CLIENT_HEADER], 'x-phone-key': pager.phone } });
   if (failure) throw failure;
   check(deleted.status === 200, `deleting the throwaway pager: ${deleted.status} ${await deleted.text()}`);
 });

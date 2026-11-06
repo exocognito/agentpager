@@ -1,4 +1,6 @@
 import { Either, Schema } from 'effect';
+import { CLIENT_HEADER, clientVersion } from '../../contract/exchange.ts';
+import { VERSION } from './version.ts';
 
 // The HTTP API is the binary's transport (the server's /start documents it). A reply is decoded with its route's
 // schema from the wire contract (packages/contract/exchange.ts), so a page that isn't AgentPager's
@@ -17,12 +19,15 @@ export function transportFailure(e: unknown): Failure {
   return { ok: false, status: 0, error: 'Unreachable', message: /refused/i.test(why) ? 'connection refused' : why };
 }
 
+// Every call says it is this command, at this build, and the protocol it speaks; a server that no longer accepts it
+// refuses it with how to update.
+const CLIENT = clientVersion('cli', VERSION);
 export async function call<A, I>(schema: Schema.Schema<A, I>, server: string, method: string, route: string, opts: { key?: string; data?: unknown; timeoutMs?: number } = {}): Promise<Reply<A>> {
   let response: Response, text: string;
   try {
     response = await fetch(server + route, {
       method, signal: AbortSignal.timeout(opts.timeoutMs ?? 20_000),
-      headers: { 'content-type': 'application/json', ...(opts.key ? { authorization: `Bearer ${opts.key}` } : {}) },
+      headers: { 'content-type': 'application/json', [CLIENT_HEADER]: CLIENT, ...(opts.key ? { authorization: `Bearer ${opts.key}` } : {}) },
       body: opts.data === undefined ? undefined : JSON.stringify(opts.data),
     });
     text = await response.text();

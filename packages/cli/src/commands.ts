@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { createHash, randomBytes } from 'node:crypto';
 import { Acknowledgement, AgentStatus, AnswerStatus, Asked, Connected, Finished } from '../../contract/exchange.ts';
 import { call, type Failure } from './client.ts';
 import { compile, type Source } from './card.ts';
@@ -20,6 +21,8 @@ const WAIT_SECONDS = 50;
 export const DESKTOP_WAIT_MS = 2 * 3_600_000;
 // How long `wait --forever` pauses before trying an unreachable server again.
 const RETRY_MS = 10_000;
+// How long an ask whose reply was lost pauses before it is sent once more.
+const ASK_AGAIN_MS = 1_000;
 
 const unknownAgent = (id: string): Result => ({ code: 6, text: `No agent ${id} on this machine. Run \`agentpager agents\` to list them, or connect again.` });
 // The agent's file, or the reply when there is none or it can't be read.
@@ -30,10 +33,13 @@ function agentOf(id: string): AgentFile | Result {
 const host = (base: string) => { try { return new URL(base).host || base; } catch { return base; } };
 const unreachable = (base: string, why: string): Result => ({ code: 5, text: `Can't reach ${base} (${why}). Nothing was sent.\nIf this machine blocks outbound requests, add ${host(base)} to its allow list and try again.` });
 // The request may have gone out: never "Nothing was sent", and look before trying again.
-const uncertain = (r: Failure, a: { server: string; id?: string }): Result => ({ code: 5, text: [
+const uncertain = (r: Failure, a: { server: string; id?: string }, ...more: string[]): Result => ({ code: 5, text: [
   r.error === 'NoReply' ? `No reply from ${a.server} (${r.message}).` : `The reply from ${a.server} wasn't understood (${r.message}). A proxy or Wi-Fi sign-in page may have answered for it.`,
   `This may or may not have reached your owner. ${a.id ? `Check with \`agentpager status --agent ${a.id}\` before trying again.` : 'Connect again; their phone may show an extra agent from this try.'}`,
+  ...more,
 ].join('\n') });
+// An ask goes under the id kept for its card, so asking it again can't reach the owner twice.
+const askAgain = 'Asking again with the same card is safe: your owner gets it once.';
 const unwritable = (why: string): Result => refused(`Can't write ${home()} (${why}). Nothing was sent. Set AGENTPAGER_HOME to a folder this agent can write, and try again.`);
 const offNotSent = 'Not sent. This pager is turned off and your message was not delivered. Nothing is queued:\nask again once your owner turns it on, or ask them for another pager number.';
 // A refusal from the server, in the words of the command that met it.
@@ -132,8 +138,32 @@ export async function ask(agent: string, card: Source, client?: string): Promise
   const brief = compiled.brief;
   const cannot = writable();
   if (cannot) return unwritable(cannot);
-  const r = await call(Asked, a.server, 'POST', `/api/agents/${a.agentId}/cards`, { key: a.agentKey, data: brief });
-  if (!r.ok) return refusal(r, a);
+  // The decision's id is chosen here and kept in the agent's file, under the card's content, until a reply settles
+  // it: the same card asked again after a lost reply, in this run or a later one, names the same decision.
+  const cardKey = createHash('sha256').update(JSON.stringify(brief)).digest('base64url');
+  let decisionId = '';
+  try {
+    if (!updateAgent(a.id, x => { x.asking ??= {}; decisionId = x.asking[cardKey] ??= randomBytes(24).toString('base64url'); })) return unknownAgent(a.id);
+  } catch (e) { return unwritable(e instanceof Error && 'code' in e ? String(e.code) : 'write failed'); }
+  const send = () => call(Asked, a.server, 'POST', `/api/agents/${a.agentId}/cards`, { key: a.agentKey, data: { decisionId, ...brief } });
+  let r = await send();
+  // A lost reply is sent once more. Either way the owner gets one decision; if that fails too, the first may still
+  // have reached them (B32.10).
+  if (!r.ok && r.error === 'NoReply') {
+    const lost = r;
+    await new Promise(res => setTimeout(res, ASK_AGAIN_MS));
+    r = await send();
+    if (!r.ok) return uncertain(lost, a, askAgain);
+  }
+  if (!r.ok) {
+    if (r.error === 'NoReply' || r.error === 'NotUnderstood') return uncertain(r, a, askAgain);
+    // Another card already has this id on the server: the next try takes a new one.
+    if (r.error === 'DecisionIdTaken') {
+      try { updateAgent(a.id, x => { if (x.asking?.[cardKey] === decisionId) delete x.asking[cardKey]; }); } catch { /* kept: refused again next time */ }
+      return refused('Not sent: the server already has a different card from this agent under the id kept for this one. Ask again to send it under a new id.');
+    }
+    return refusal(r, a);
+  }
   const id = r.value.decisionId;
   const now = new Date();
   // The short id is given out only once it is recorded; otherwise the reply names the server's id.
@@ -141,6 +171,7 @@ export async function ask(agent: string, card: Source, client?: string): Promise
   try {
     let chosen = '';
     updateAgent(a.id, x => {
+      if (x.asking?.[cardKey] === decisionId) delete x.asking[cardKey];
       chosen = shortId('d_', taken => taken in x.decisions);
       x.decisions[chosen] = { id, title: brief.title, options: brief.card.options.map(o => o.label), askedAt: now.toISOString() };
       const cards = x.cardsSinceRules + 1, since = x.rulesShownAt ? now.getTime() - Date.parse(x.rulesShownAt) : Infinity;

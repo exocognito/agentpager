@@ -23,6 +23,15 @@ off state. `GET /api/pagers/<id>` returns the pager and every agent on it with i
 An **agent** is whatever connected with the number: `POST /api/agents {number, app, project}` (`agentpager connect`) makes a
 new one every time, with its own key. It has no lifetime; housekeeping forgets it 30 days after its last activity.
 While its pager is off, every call but status is refused `PagerOff` and nothing is queued; the phone's answers too.
+An agent asks under a decision id its command chose (`decisionId`, a token): the same ask again under that id, as after
+a lost reply, returns the same decision without storing or alerting again, and another question under it is refused
+`DecisionIdTaken`.
+
+Every request names its client in `X-AgentPager-Client`, as `<client>/<protocol> <build>` (`CLIENT_HEADER` and
+`PROTOCOL` in `packages/contract/exchange.ts`). An agent's call without it, or from a protocol older than the service
+accepts (`OLDEST_PROTOCOL` in `src/contract.ts`), is refused `UpdateRequired`, before its key or input is read, with how
+to update. The phone's calls don't need it yet; an app that sends an older protocol is refused the same way, never
+`UnknownPager`.
 
 ## Decision briefs (dogfood)
 

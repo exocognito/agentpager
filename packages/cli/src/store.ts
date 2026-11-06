@@ -22,6 +22,9 @@ const AgentFile = Schema.mutable(Schema.Struct({
     id: Schema.String, title: Schema.String, options: Schema.mutable(Schema.Array(Schema.String)),
     askedAt: Schema.optional(Schema.String), answered: Schema.optional(Schema.Boolean), acknowledged: Schema.optional(Schema.Boolean),
   })) })),
+  // Asks no reply has settled yet: the decision id chosen for each, by its card's content, so the same card asked
+  // again after a lost reply names the same decision. It came later, so a file from before it still loads.
+  asking: Schema.optional(Schema.mutable(Schema.Record({ key: Schema.String, value: Token }))),
 }));
 export type AgentFile = typeof AgentFile.Type;
 

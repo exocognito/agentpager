@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import path from 'node:path';
-import { fixture, assert, token, C, emojiCard } from './support.ts';
+import { fixture, assert, token, C, emojiCard, asClient } from './support.ts';
 import { briefNames, briefsDir, loadBrief } from '../fixtures/briefs/load.ts';
 
 // Decision briefs: an agent sends Markdown with lettered options and attachments; the phone reads the decision
@@ -24,7 +24,7 @@ test('briefs: the four canvas examples ask, read back as sent, answer, and go wi
     const cards = `/api/agents/${agentId}/cards`;
     const asked = new Map<string, string>();
     for (const name of briefNames()) {
-      const r = await f.ok(C.Asked, cards, { agent: s.agentKey, data: loadBrief(name) });
+      const r = await f.ok(C.Asked, cards, { agent: s.agentKey, data: { decisionId: token(), ...loadBrief(name) } });
       asked.set(name, r.decisionId);
     }
     assert.deepEqual([...asked.keys()], ['D1-pricing', 'D2-checkout', 'D3-refunds', 'D4-branches']);
@@ -43,7 +43,7 @@ test('briefs: the four canvas examples ask, read back as sent, answer, and go wi
     assert.deepEqual(d1?.attachments?.map(a => a.name), ['a-cards.png', 'b-table-phone.png', 'b-table.png', 'background.md', 'c-link.png']);
 
     // The phone reads each attachment byte for byte, with its type; nobody else can.
-    const file = (decisionId: string, name: string, headers: Record<string, string> = { 'x-phone-key': phone }) => fetch(`${f.origin}${cards}/${decisionId}/files/${name}`, { headers });
+    const file = (decisionId: string, name: string, headers: Record<string, string> = { 'x-phone-key': phone }) => fetch(`${f.origin}${cards}/${decisionId}/files/${name}`, { headers: { ...asClient, ...headers } });
     for (const [name, decisionId] of asked) for (const a of inbox.open.find(d => d.decisionId === decisionId)?.attachments ?? []) {
       const r = await file(decisionId, a.name);
       assert.equal(r.status, 200, `${name}/${a.name}`);
@@ -80,7 +80,7 @@ test('briefs: refused whole, with a reason that says what to fix', { timeout: 12
   try {
     const { p, a: s } = await f.connected('Claude Code', 'shop');
     const cards = `/api/agents/${s.agent.agentId}/cards`;
-    const base = loadBrief('D4-branches');
+    const base: Record<string, unknown> = { decisionId: token(), ...loadBrief('D4-branches') };
     const card = (patch: Record<string, unknown>) => ({ ...base, card: { ...(typeof base.card === 'object' ? base.card : {}), ...patch } });
     const markdown = String((typeof base.card === 'object' && base.card !== null && 'markdown' in base.card) ? base.card.markdown : '');
     const png = Buffer.from(readFileSync(path.join(briefsDir, 'D1-pricing', 'a-cards.png'))).toString('base64');

@@ -14,6 +14,22 @@ const strict = { parseOptions: { onExcessProperty: "error" as const } };
 
 export const AGENT_AUTH_HEADER = "authorization";
 export const PHONE_AUTH_HEADER = "x-phone-key";
+
+// Every request from an AgentPager client says which client it is and the protocol it speaks, with its build for logs:
+// `<client>/<protocol> <build>`, such as `cli/1 3f9c2ab` from the agentpager command or `ios/1 0.1+1` from the iPhone
+// app (mirrored in Model/API.swift; mirror.test.ts checks it). The service compares only the protocol. It goes up
+// with a change that clients from before it can't follow, and the service then refuses those clients as
+// UpdateRequired, telling them how to update (packages/app/src/contract.ts).
+export const CLIENT_HEADER = "x-agentpager-client";
+export const PROTOCOL = 1;
+const CLIENT_VERSION = /^([a-z][a-z0-9-]{0,19})\/(0|[1-9][0-9]{0,5}) ([A-Za-z0-9._+-]{1,40})$/;
+export type ClientVersion = { client: string; protocol: number; build: string };
+// What a client of this code sends. A build that doesn't fit the header is sent with its other characters as "-".
+export const clientVersion = (client: string, build: string) => `${client}/${PROTOCOL} ${build.replace(/[^A-Za-z0-9._+-]/g, "-").slice(0, 40) || "-"}`;
+export function readClientVersion(header: string | null): ClientVersion | null {
+  const parts = header === null ? null : CLIENT_VERSION.exec(header);
+  return parts ? { client: parts[1], protocol: Number(parts[2]), build: parts[3] } : null;
+}
 export const MAX_OPEN_DECISIONS = 10;
 // The longest an agent's answer read holds open before it returns pending.
 export const ANSWER_WAIT_MAX_SECONDS = 50;
@@ -74,13 +90,19 @@ const briefLinks = (q: { card: BriefCard; attachments?: ReadonlyArray<{ name: st
 export const acceptsChoice = (card: BriefCard, choice: Choice) =>
   choice.kind === "feedback" || card.options.some((option) => option.number === choice.number);
 // Every card is a brief.
-export const QuestionInput = Schema.Struct({
+const question = {
   title: Title,
   detail: Schema.optional(Text),
   card: BriefCard,
   attachments: Schema.optional(Attachments),
-}).annotations(strict).pipe(Schema.filter(briefLinks));
+};
+export const QuestionInput = Schema.Struct(question).annotations(strict).pipe(Schema.filter(briefLinks));
 export type QuestionInput = typeof QuestionInput.Type;
+// What an agent sends to ask: the question, under a decision id its command chose. Asking the same question again
+// under the same id, as after a lost reply, finds the decision already made: the owner gets one decision and one
+// alert. The same id with another question is refused (DecisionIdTaken).
+export const AskInput = Schema.Struct({ decisionId: Token, ...question }).annotations(strict).pipe(Schema.filter(briefLinks));
+export type AskInput = typeof AskInput.Type;
 export const Decision = Schema.Struct({
   decisionId: Token,
   status: DecisionStatus,
@@ -131,8 +153,8 @@ export const AnswerStatus = Schema.Union(Schema.Struct({ status: Schema.Literal(
 // Every refusal is { error: <tag>, message: <one plain sentence>, ...fields } with its tag's HTTP status. Clients
 // branch on the tag; the server words the message (packages/app/src/contract.ts).
 export const REFUSAL_STATUS = {
-  InvalidInput: 400, Unauthorized: 401, UnknownAgent: 404, UnknownPager: 404, UnknownDecision: 404, UnknownFile: 404, NotFound: 404,
+  InvalidInput: 400, UpdateRequired: 400, Unauthorized: 401, UnknownAgent: 404, UnknownPager: 404, UnknownDecision: 404, UnknownFile: 404, NotFound: 404,
   PagerOff: 409, PagerExists: 409, AgentFinished: 409, TooManyOpenDecisions: 409, NotAnswered: 409, AlreadyAcknowledged: 409,
-  AnswerMismatch: 409, AlreadyAnswered: 409, NumberInvalid: 410, PagerDeleted: 410,
+  AnswerMismatch: 409, AlreadyAnswered: 409, DecisionIdTaken: 409, NumberInvalid: 410, PagerDeleted: 410,
 } as const;
 export type RefusalTag = keyof typeof REFUSAL_STATUS;

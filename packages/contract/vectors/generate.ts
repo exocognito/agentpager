@@ -435,6 +435,65 @@ export async function vectors(): Promise<string> {
     (decodes("card", plaintext) ? partsValid : partsInvalid).push({ name: `brief: ${name}`, kind: "card", plaintext });
   }
 
+  // JSON as JavaScript reads it, and nothing more: what Foundation also takes (trailing commas, field names equal
+  // only by Unicode canonical equivalence) and the edges of the grammar. Filed by what decodePart says.
+  const id = '"project":"site"';
+  const kelvin = "answer\u212aey";
+  const syntax: [string, string, string][] = [
+    ["identity", "a trailing comma in an object", `{"app":"Codex",${id},}`],
+    ["card", "a trailing comma in a list", JSON.stringify(c).replace('"attachments":[', '"attachments":[{"name":"x.md","type":"text/markdown"},').replace('"text/markdown"}]', '"text/markdown"},]')],
+    ["card", "the answer key's name with a Kelvin sign", JSON.stringify(c).replace('"answerKey"', `"${kelvin}"`)],
+    ["card", "the answer key's name with a Kelvin sign, escaped", JSON.stringify(c).replace('"answerKey"', '"answer\\u212aey"')],
+    ["card", "the answer key named both ways", JSON.stringify(c).replace('"answerKey"', `"${kelvin}":"${answerKey}","answerKey"`)],
+    ["identity", "an empty field name", `{"app":"Codex",${id},"":"x"}`],
+    ["identity", "a field name escaped to ASCII", `{"\\u0061pp":"Codex",${id}}`],
+    ["identity", "single quotes", `{'app':'Codex',${id}}`],
+    ["identity", "a field name unquoted", `{app:"Codex",${id}}`],
+    ["identity", "a comment", `{"app":"Codex",/* c */${id}}`],
+    ["identity", "a no-break space between tokens", `{"app":"Codex",\u00a0${id}}`],
+    ["identity", "tabs, CRs and newlines between tokens", `\t{\r\n"app"\t:\n"Codex" , ${id}\r\n}\n`],
+    ["identity", "a raw tab in a string", `{"app":"Co\tdex",${id}}`],
+    ["identity", "an escaped NUL in a string", `{"app":"Co\\u0000dex",${id}}`],
+    ["identity", "an escaped slash", `{"app":"Co\\/dex",${id}}`],
+    ["identity", "an unknown escape", `{"app":"Co\\xdex",${id}}`],
+    ["identity", "a unicode escape with a letter that isn't hex", `{"app":"Co\\u12g4dex",${id}}`],
+    ["identity", "a unicode escape then a letter", `{"app":"Co\\u12dex",${id}}`],
+    ["identity", "an escaped surrogate pair", `{"app":"Codex \\ud83d\\ude80",${id}}`],
+    ["identity", "an escaped surrogate pair in upper case", `{"app":"Codex \\uD83D\\uDE80",${id}}`],
+    ["identity", "a low surrogate alone", `{"app":"Codex \\ude80",${id}}`],
+    ["identity", "a value nested too deep in an extra field", `{"app":"Codex",${id},"x":${"[".repeat(70)}${"]".repeat(70)}}`],
+    ["identity", "the literal true for a field", `{"app":true,${id}}`],
+    ["identity", "a value after the object", `{"app":"Codex",${id}} {}`],
+    ["answer", "option 1.0000000000000001, a whole number once read", '{"choice":{"kind":"option","number":1.0000000000000001}}'],
+    ["answer", "option 2e0", '{"choice":{"kind":"option","number":2e0}}'],
+    ["answer", "option 20E-1", '{"choice":{"kind":"option","number":20E-1}}'],
+    ["answer", "option 2.5", '{"choice":{"kind":"option","number":2.5}}'],
+    ["answer", "option -0", '{"choice":{"kind":"option","number":-0}}'],
+    ["answer", "option 01", '{"choice":{"kind":"option","number":01}}'],
+    ["answer", "option +1", '{"choice":{"kind":"option","number":+1}}'],
+    ["answer", "option .5e1", '{"choice":{"kind":"option","number":.5e1}}'],
+    ["answer", "option 1.", '{"choice":{"kind":"option","number":1.}}'],
+    ["answer", "option 1e", '{"choice":{"kind":"option","number":1e}}'],
+    ["answer", "option 0x1", '{"choice":{"kind":"option","number":0x1}}'],
+    ["answer", "option 1e400", '{"choice":{"kind":"option","number":1e400}}'],
+    ["answer", "option NaN", '{"choice":{"kind":"option","number":NaN}}'],
+    ["answer", "option as true", '{"choice":{"kind":"option","number":true}}'],
+    ["answer", "the kind with a Kelvin sign", '{"choice":{"kind":"option","number":1},"\u212a":1}'],
+    ["card", "a link to an attachment named with a Kelvin sign", JSON.stringify({ ...c, attachments: [{ name: "K.md", type: "text/markdown" }], card: { ...c.card, markdown: "## Options\n[More](\u212a.md)\n" } })],
+    ["card", "a link to the attachment it names", JSON.stringify({ ...c, attachments: [{ name: "K.md", type: "text/markdown" }], card: { ...c.card, markdown: "## Options\n[More](K.md)\n" } })],
+    ["card", "an https link whose slash takes a combining mark", JSON.stringify({ ...c, card: { ...c.card, markdown: "## Options\n[a](https://\u0301e.com)\n" } })],
+    ["card", "a brief whose CR-LF lines Swift would read as one character", JSON.stringify({ ...c, card: { ...c.card, markdown: "## Options\r\n<b>\r\n" } })],
+  ];
+  // Characters counted as Intl.Segmenter and Swift both count them: a title of 100 of each cluster, and of 101.
+  const clusters: [string, string][] = [["a flag", "🇯🇵"], ["a family", "👨‍👩‍👧"], ["a skin tone", "👍🏽"], ["a rainbow flag", "🏳️‍🌈"], ["an accent", "a\u0301"], ["two accents", "e\u0301\u0302"], ["a Hangul syllable in jamo", "\u1100\u1161\u11a8"], ["a Devanagari conjunct", "क्ष"], ["a conjunct of three", "\u0915\u094d\u0937\u094d\u092e"], ["a joined conjunct", "क्\u200dष"], ["a Bengali conjunct", "ক্ষ"]];
+  for (const [name, cluster] of clusters) for (const n of [100, 101]) {
+    syntax.push(["card", `a title of ${n} of ${name}`, JSON.stringify({ ...c, title: cluster.repeat(n) })]);
+  }
+  for (const [kind, name, text] of syntax) {
+    const plaintext = b64(utf8(text));
+    (decodes(kind, plaintext) ? partsValid : partsInvalid).push({ name: `JSON: ${name}`, kind, plaintext });
+  }
+
   // The generator refuses to write a file whose part vectors its own shapes disagree with.
   for (const p of partsValid) if (!decodes(p.kind, p.plaintext)) throw new Error(`valid part refused: ${p.name}`);
   for (const p of partsInvalid) if (decodes(p.kind, p.plaintext)) throw new Error(`invalid part accepted: ${p.name}`);

@@ -105,23 +105,23 @@ enum BriefRules {
     }
 
     // brief.ts targets: /(!?)\[[^\]]*\]\(([^)\s]*)(?:\s+"[^"]*")?\)/g over each prose line without its code spans.
-    static func targets(_ markdown: String) -> [(image: Bool, target: String)] {
+    static func targets(_ markdown: String) -> [(image: Bool, target: Line)] {
         proseLines(markdown).flatMap { links(withoutCodeSpans($0)) }
     }
-    static func links(_ line: Line) -> [(image: Bool, target: String)] {
-        var found: [(Bool, String)] = [], p = 0
+    static func links(_ line: Line) -> [(image: Bool, target: Line)] {
+        var found: [(Bool, Line)] = [], p = 0
         while p < line.count {
             if let (image, target, end) = link(line, at: p) { found.append((image, target)); p = end } else { p += 1 }
         }
         return found
     }
-    static func link(_ line: Line, at p: Int) -> (Bool, String, Int)? {
+    static func link(_ line: Line, at p: Int) -> (Bool, Line, Int)? {
         var i = p, image = false
         if line[i] == "!", i + 1 < line.count, line[i + 1] == "[" { image = true; i += 1 }
         guard line[i] == "[", let close = line[(i + 1)...].firstIndex(of: "]"), close + 1 < line.count, line[close + 1] == "(" else { return nil }
         var j = close + 2
         while j < line.count, line[j] != ")", !isSpace(line[j]) { j += 1 }
-        let target = string(line[(close + 2)..<j])
+        let target = Array(line[(close + 2)..<j])
         guard j < line.count else { return nil }
         if line[j] == ")" { return (image, target, j + 1) }
         var k = j
@@ -139,15 +139,16 @@ enum BriefRules {
     }
 
     // brief.ts missingAttachment: every image names an image attachment and every link a page attachment, except
-    // that a link may go to an https address.
-    static func missingAttachment(_ markdown: String, _ attachments: [String: String]) -> String? {
+    // that a link may go to an https address. Names and targets compare scalar for scalar, as JavaScript's Map and
+    // startsWith compare them, never by Swift's canonical equivalence.
+    static func missingAttachment(_ markdown: String, _ attachments: [AttachmentEntryPart]) -> String? {
         for (image, target) in targets(markdown) {
-            if let type = attachments[target] {
-                if image == (type == "text/markdown") { return image ? "the image \"\(target)\" names a page" : "the link \"\(target)\" names an image" }
+            if let a = attachments.first(where: { $0.name.unicodeScalars.elementsEqual(target) }) {
+                if image == a.type.unicodeScalars.elementsEqual("text/markdown".unicodeScalars) { return image ? "the image \"\(string(target))\" names a page" : "the link \"\(string(target))\" names an image" }
                 continue
             }
-            if !image && target.hasPrefix("https://") { continue }
-            return image ? "the image \"\(target)\" is not an attachment" : "the link \"\(target)\" is neither an attachment nor an https link"
+            if !image && target.starts(with: "https://".unicodeScalars) { continue }
+            return image ? "the image \"\(string(target))\" is not an attachment" : "the link \"\(string(target))\" is neither an attachment nor an https link"
         }
         return nil
     }

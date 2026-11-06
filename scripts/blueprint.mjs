@@ -18,9 +18,9 @@ const CLAUSE = /^(\d+)\. (.*)$/;
 const ADDED = /^@M(\d+):\s*/;
 const D_ID = /(?<![\w-])D\d+(?![\w-])/;
 // Where a test file names ids: a comment, a TypeScript test's name (`test('…'`, `it(`, `describe(`, `test.skip(` and
-// the like), or a Swift test's name (`func test_B25_2_connects`). Any other string literal is matched only to be
-// skipped, so a fixture's text names nothing, not even after a `//` inside it, as in a URL.
-const STRING = String.raw`'(?:\\.|[^\\'\n])*'|"(?:\\.|[^\\"\n])*"|\`(?:\\.|[^\\\`])*\``;
+// the like), or a Swift test's name (`func test_B25_2_connects`). Any other string literal, Swift's multi-line
+// `"""` ones included, is matched only to be skipped, so a fixture's text names nothing, even after a `//` in it.
+const STRING = String.raw`"""[\s\S]*?"""|'(?:\\.|[^\\'\n])*'|"(?:\\.|[^\\"\n])*"|\`(?:\\.|[^\\\`])*\``;
 const NAMED = new RegExp(String.raw`\b(?:test|it|describe)(?:\.\w+)?\(\s*(?:${STRING})|(${STRING})|\/\/.*|\/\*[\s\S]*?\*\/|\bfunc\s+test\w*`, 'g');
 // A clause id there: B25.2, or B25_2 in a Swift name. The letters of retired ids (C, D) are read too, so a test
 // naming one is reported.

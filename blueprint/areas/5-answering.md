@@ -60,7 +60,7 @@
 Why: "I can reread the question, my answer and the agent's acknowledgement, but not change them."
 
 1. A stored decision and its answer never change, a note included, whatever is retried.
-2. Sending the same answer again, as the phone does after a lost reply, gets back the stored receipt. Any other answer to a decision already answered is refused.
+2. The phone's resend of an answer after a lost reply, as the same request, gets back the stored receipt. Any other send to an answered decision, even of the same option, is refused.
 3. An acknowledgement can't be replaced.
 4. An answered decision offers no control that could change it.
 

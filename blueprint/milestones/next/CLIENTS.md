@@ -16,6 +16,7 @@ CLIENTS decides which agent apps AgentPager supports, judged on one test: can an
   - **A Claude Desktop chat** can't be woken once its turn ends. It keeps its turn going by calling wait again, which held 48 minutes through dropped links to the Mac. Each wait is a model step. A hosted wait that only says "answered", leaving the command to decrypt, would hold up better, but needs a hosted server again.
   - **A chat started on claude.ai** can't reach the command at all.
   - **Codex, Cursor, pi and the rest** weren't tested. Ideas from reading another tool's source on 30 Oct, untested here: Codex can queue a message into a thread, pi and OpenCode can start a turn, and a hook or mod in Claude Code could start one.
+- Codex 0.158.0, observed on 3 Oct, starts MCP servers in the background and doesn't wait for them before its first turn, so an agent may start without AgentPager's tools. With every server marked required, the tools were there in all 18 starts tried. Setup doesn't mark it today.
 - Under ENCRYPT, a hosted server can carry only ciphertext, which is one reason CLIENTS comes after it.
 
 ## Still open

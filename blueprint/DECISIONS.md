@@ -2,7 +2,7 @@
 
 Decisions that bind beyond one milestone, with Sam's words as their basis. A milestone's own answers are in its doc. Each decision names the lines, METHOD rules or code it is context for; the decision is never the rule itself.
 
-This file is append only. A reversed or narrowed decision gets a new entry, and an old entry's only edit is `→ DEC-…` naming its replacement. The first entry starts the file, in M4. The entries after it are the older decisions that still bind, shortened from `packages/blueprint/records/decisions/` and in date order; git holds every record whole at tag `blueprint-old-format`. New entries go at the end.
+This file is append only. A reversed or narrowed decision gets a new entry, and an old entry's only edit is `→ DEC-…` naming its replacement. The first entry starts the file, in M4. The entries after it are the older decisions that still bind, shortened from `packages/blueprint/records/decisions/` and in date order, plus DEC-2026-10-29-v2-design, recorded here for the first time from `docs/v2/`; git holds every record whole at tag `blueprint-old-format`. New entries go at the end.
 
 ## DEC-2026-11-05-blueprint-destination · The Blueprint by area, one milestone at a time
 
@@ -11,7 +11,7 @@ This file is append only. A reversed or narrowed decision gets a new entry, and 
 - **Decided:**
   - **Where things live.** The Blueprint is `blueprint/` at the root of the repository: README.md (the milestone table and the areas), PRODUCT.md, TERMS.md, one file per area under `areas/`, one JOURNEYS.md in the same shape, DECISIONS.md, `milestones/` and `generated/`. It replaces the docs under `packages/blueprint/`.
   - **One shape.** Every item is a heading `### <id> · @M<n> · <short promise>`, with numbered clauses for its promises and bullets for its notes. An area file opens with its Definition, Serves, Relies on, Code, Screens and Walked by.
-  - **Ids.** Each C became B with the same number; I, J and K keep theirs; limits start at L9, after the retired lessons; there are no D ids; no id is ever reused, C28 included. B32 (wait for the answer, then acknowledge it) and B33 (each agent app is told how it wakes) give their own ids to promises that already held.
+  - **Ids.** Each C became B with the same number; I, J and K keep theirs; limits start at L9, after the retired lessons; there are no D ids; no id is ever reused, C28 included. B32 (wait for the answer, then acknowledge it), B33 (each agent app is told how it wakes) and I23 (keys stay secret, Sam's ★ in the first conversion step) give their own ids to promises that already held.
   - **Milestones** are numbered when they start, written `@M5`, and a queued one lives under its word in `milestones/next/`. They run one at a time, always. After M4 the order is ENCRYPT, CLIENTS, INSTALL, SITE, OPEN, FRIENDS: CLIENTS comes right after ENCRYPT.
   - **The six simplifications:**
     1. Promises state outcomes, not wording. Exact strings, paths, timings and flags live in code and tests, unless Sam says the specific is meant.

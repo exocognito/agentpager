@@ -11,7 +11,7 @@
 
 ### B26 · @M2 · Make a pager on the phone
 
-1. From Pagers, the owner starts a new pager. New pager asks for a name and when the pager turns off: never, or after 24 hours, 7 days or 30 days. Never is the default. Cancelling makes nothing.
+1. From Pagers, the owner starts a new pager. New pager asks for a name and when the pager turns off: never, or after 24 hours, 7 days or 30 days. Never is the default.
 2. A pager's name is seen only on this phone. The service never gets it.
 3. The phone makes the pager's number itself (I19), so New pager shows the text to give agents, with the number, before Create. Copying it copies the text as one block.
 4. The text names the pager's server, agentpager.me unless the app is set to another (B23.10), and gives the command that connects an agent with this pager's number.
@@ -22,7 +22,7 @@
 9. A phone holds as many pagers as the owner makes, each with its own number, keys and switch.
 
 - The text, as chosen on 29 Oct 2026: "When I'm away and you need my decision, use agentpager.me MCP or CLI to send me decisions:", then "$ agentpager connect ap1_…" on its own line.
-- The owner gives the text to an agent, for example in AGENTS.md, and the agent connects with it (B25). It works for an agent only once the agentpager command is installed where it runs (B29); an agent without it can find how to install it at agentpager.me (B18).
+- The owner gives the text to an agent, for example in AGENTS.md, and the agent connects with it (B25). It works for an agent only once the agentpager command is installed where it runs (B29); an agent without it can find how to install it at the server's /start (B18).
 
 ### B23 · @M2 · Pagers and the Pager screen
 

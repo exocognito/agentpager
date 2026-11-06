@@ -39,7 +39,7 @@ My agents reach my pagers through the agentpager command, as a command line or a
 ## Adds · Changes · Retires
 
 - **Adds:** B18, B25, B27, B29, B31, B32 and B33; I21 and I22; J3, J4, and J5's built steps; and the limits marked `@M3`. B32 and B33 got their ids in M4, for promises M3 built.
-- **Changes:** B5 and B17, for the warning when no agent picks up an answer; B6, for the agent reading a note word for word; I4, for the command refusing a broken card before it leaves the machine. Their clauses that M3 added start with `@M3:`.
+- **Changes:** B5 and B17, for the warning when no agent picks up an answer; B5, for an answer resent after a relaunch; B6, for a note that answers only its own decision; B26, for a pager's text that names another server; I4, for the command refusing a broken card before it leaves the machine. Their clauses that M3 added start with `@M3:`.
 - **Retires:** the hosted MCP server and plain HTTPS as ways in with nothing to install (C2); C25 as "page by pager number", reborn as connecting with one; and J3 and J4 as link-and-emoji walks. Their text is in git at ac75bcb.
 
 ## Log

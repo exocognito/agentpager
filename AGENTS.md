@@ -5,26 +5,11 @@ AgentPager brings an agent's decisions to Sam's phone. [METHOD.md](METHOD.md) is
 ## Working rules
 
 - Work in your own worktree off `origin/main`, and preserve other agents' and Sam's edits.
-- Every change is a draft pull request, reviewed as METHOD.md says. Inside a milestone Sam has approved, the root merges each merge-ready pull request (review passed, `pnpm check` and `pnpm test:all` green, no open finding), and Sam reviews after the merge.
+- Every change is a draft pull request, reviewed as METHOD.md says. When Sam gives the root the go for a milestone, the root merges each of its merge-ready pull requests (review passed, `pnpm check` and `pnpm test:all` green, no open finding), and Sam reviews after the merge.
+- Don't build to what v2 retired: link, QR and emoji pairing, sessions with end times, emoji cards, the web app, the hosted MCP and `recipe.json`.
 - Use pnpm and Node 22.19 or newer.
 - Before handing off, run `pnpm check` and `pnpm test:all`. `pnpm check` fails when what the screens are drawn from changed without `pnpm designs`, which needs a Mac with Xcode.
 - When Sam is away, page Sam as `~/.agents/agentpager.md` says.
-
-## Deploying and secrets
-
-- Deploy as [packages/app/README.md › Deployment](packages/app/README.md#deployment) says: the service, then the command, then the app. Keep the Worker's name, its Durable Object classes and their migration tags.
-- A deployed build never runs local clocks, and every reply names its build.
-- Secrets never reach a worktree, log or transcript (I23); flag a leak at once. If a credential falls short, ask Sam for scoped access; never make one.
-- Sam's paid Apple team signs the app; Sam keeps its push key in 1Password. Never create or use a signing identity.
-
-## Gotchas
-
-- Alerts need the deployed service: a local server sends none.
-- UI tests drive the real app in Simulators, one run at a time. Nothing tests dark appearance or the largest text. Sam's walks and dogfood sample real phones and agent apps.
-- Each test file starts its own wrangler on its own ports and storage. Zero tests reported isn't green. Port 4317 is taken on Sam's Mac.
-- An MCP client may silently drop a server over a detail another tolerates, so test with two real apps.
-- An agent app run without a terminal ends its turn when it asks in chat, and nothing resumes it.
-- `pnpm --filter @agentpager/cli build` compiles the command with Bun for this machine; from source, as in its tests, it runs on Node.
 
 ## Stages
 
@@ -41,3 +26,19 @@ Three stages, each with its own data, as [METHOD.md › Stages and releases](MET
 - **Deploy order:** the service, then the binary, then the app.
 - **A binary built from `main`** is tested under its own `AGENTPAGER_HOME`, with `--server https://dev.agentpager.me`. It never uses a machine's `~/.agentpager`, which Sam's real agents use.
 - **Hostnames.** Run without a terminal, wrangler silently replaces a DNS record or another Worker's domain on its hostname. So `deploy.mjs` refuses a hostname that is neither free nor already its stage's own. The Cloudflare token can't read certificate packs, so no check reads them.
+
+## Deploying and secrets
+
+- [packages/app/README.md › Deployment](packages/app/README.md#deployment) has the service's steps. Each stage keeps its Worker's name, its Durable Object classes and their applied migration tags; a new class needs a later tag.
+- A deployed build never runs local clocks, and every reply names its build.
+- Secrets never reach a worktree, log or transcript (I23); flag a leak at once. If a credential falls short, ask Sam for scoped access; never make one.
+- Sam's paid Apple team signs the app; Sam keeps its push key in 1Password. Never create, request or use an Apple signing identity, certificate or account on Sam's behalf.
+
+## Gotchas
+
+- Alerts need the deployed service: a local server sends none.
+- UI tests drive the real app in Simulators, one run at a time. Nothing tests dark appearance or the largest text. Sam's walks and dogfood sample real phones and agent apps.
+- Each test file starts its own wrangler on its own ports and storage. Zero tests reported isn't green. Port 4317 is taken on Sam's Mac.
+- An MCP client may silently drop a server over a detail another tolerates, so test with two real apps.
+- Run an agent app without a terminal with stdin closed, a time limit and its output streamed. It ends its turn when it asks in chat, nothing resumes it, and its resume flags differ from its start flags.
+- `pnpm --filter @agentpager/cli build` compiles the command with Bun (no version pinned) for this machine; from source, as in its tests, it runs on Node.

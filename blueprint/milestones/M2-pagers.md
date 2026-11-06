@@ -32,7 +32,7 @@ Sam and Claude agreed the v2 design on 29–30 Oct, in a claude.ai Project; its 
 ## Adds · Changes · Retires
 
 - **Adds:** B22, B23 and B26; I17 and I19; and the limits marked `@M2`. I19 also holds what was built of B30: the phone makes each pager's key pair, and the number names its public key.
-- **Changes:** B5 and B7, for a decision that opens full screen and reopens as a closed record; B17, so nothing alerts while a pager is off; I6, for a pager turned off inside the Undo window. Their clauses that M2 added start with `@M2:`.
+- **Changes:** B5 and B7, for a decision that opens full screen and reopens as a closed record; B17, so nothing alerts while a pager is off and an alert Apple can't deliver within 24 hours is dropped; I6, for a pager turned off inside the Undo window. Their clauses that M2 added start with `@M2:`.
 - **Retires:** pairing by link, QR code and emoji (C20, C21, C24); pager lifetimes and end reasons (C22 as "change or end a pager"); the Agents list (C23 as "Agents list"); one agent per phone (I16); and ended pagers (I17 as "ended pagers refuse and forget", with the phone's 24-hour copy of an ended pager). The v2 rewrite deleted their lines; their text is in git at ac75bcb.
 
 ## Log

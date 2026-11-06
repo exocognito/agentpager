@@ -70,7 +70,9 @@ Use plain language I can understand without specialist knowledge. Options are di
 
 ### Reach the agents owners actually use
 
-Any agent that can run the agentpager command can use AgentPager. *Which apps that covers, "terminal agents, and desktop apps like Claude Desktop and Cursor", is what [CLIENTS](milestones/next/CLIENTS.md) decides. Today only Claude Code and a Claude Desktop chat are told how to wake by themselves when the owner's answer arrives (B33); other agents must call wait again.* Cloud sessions with a shell should work too, untested so far. Agents with no machine of their own, like claude.ai in a browser, are out. The command sets itself up in the agent apps it finds. A waiting agent has my answer within a second of the Undo window closing, with nothing for me to nudge.
+Any agent that can run the agentpager command can use AgentPager. Cloud sessions with a shell should work too, untested so far. Agents with no machine of their own, like claude.ai in a browser, are out. The command sets itself up in the agent apps it finds. A waiting agent has my answer within a second of the Undo window closing, with nothing for me to nudge.
+
+> **Note, not Sam's words (M4):** Sam's first sentence went on: "terminal agents, and desktop apps like Claude Desktop and Cursor". Which apps that covers is what [CLIENTS](milestones/next/CLIENTS.md) decides; today only Claude agents wake by themselves (L11).
 
 ### Feel native
 

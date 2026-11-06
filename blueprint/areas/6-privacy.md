@@ -28,7 +28,7 @@ Why: "Only agents I give a number reach my phone"
 
 1. The service's storage holds each phone key and each agent key only as a digest, never the key itself. Whoever reads that storage can't act as the phone or as an agent.
 2. How long the service takes to refuse a key tells nothing about the digest it stores.
-3. The service's own secrets, Apple's push key and the Cloudflare credential, never appear in the app, a build, the repository, a log or a transcript.
+3. The service's own secrets, Apple's push key and the Cloudflare credential, never appear in the app, a build, a worktree, a log or a transcript.
 
 - The phone makes its phone key with each pager (B26). The service makes each agent key at connect and sends it only in that reply, and the command keeps it in the agent's file (B25).
 - Keys travel in request headers. The phone and the command use HTTPS to agentpager.me, though the service also answers plain HTTP (L20).

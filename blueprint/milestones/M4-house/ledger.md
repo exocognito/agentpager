@@ -4,11 +4,11 @@ Every line of the old Blueprint, and where it went when M4 converted it to the a
 
 ## Totals
 
-- **Rows:** 738, from 109 old files and sources, grouped by old file below. 48 rows are gaps the integrator filled (listed under Gaps filled).
-- **⚑ for Sam:** 63.
+- **Rows:** 740, from 109 old files and sources, grouped by old file below. 50 rows are gaps the integrator filled (listed under Gaps filled).
+- **⚑ for Sam:** 88.
 - **The new Blueprint:** 7 areas with 23 entries (14 behaviors and 9 invariants) and 161 clauses, 16 limits (L9 to L24), and 3 journeys with 20 steps.
 - **Ids:** each C became B with the same number; I, J and K kept theirs; B32, B33 and I23 are new; limits are L9 to L24; no D id remains, and C28 is never reused. Not built, and waiting in `milestones/next/`: B19 (INSTALL), B30 and I20 (ENCRYPT), K1 (FRIENDS).
-- **Words:** the old Blueprint docs this pull request deletes held 25,769 words (strategy, design, roadmap, decisions and lessons), plus 5,219 in the workshop's notes. The new `blueprint/` holds 25,167, without `generated/` and this ledger. Its always-true part (README, PRODUCT, TERMS, the areas and JOURNEYS) holds 14,136, against 12,383 in the old strategy and design.
+- **Words:** the old Blueprint docs this pull request deletes held 25,769 words (strategy, design, roadmap, decisions and lessons), plus 5,219 in the workshop's notes. The new `blueprint/` holds 25,271, without `generated/` and this ledger. Its always-true part (README, PRODUCT, TERMS, the areas and JOURNEYS) holds 14,142, against 12,383 in the old strategy and design.
 
 ## ⚑ for Sam
 
@@ -23,62 +23,87 @@ Each row drops a line, changes its meaning, adds a line no old line held, or cut
 | 5 | C5.6, "Send returns to the pager and shows 'Sending in 5s' with Undo" | B5.11 | The "Sending in 5s" countdown words are cut, and no test holds them. |
 | 6 | C5.7, the row's states | B5.12 | "Sending…" is cut to an outcome, and only code holds it. |
 | 7 | C5.7, the row and the decision | B5.12, B5.13 | B5.12 and B5.13 are widened: the decision itself, not only its row, says sending, waiting and not picked up. |
-| 8 | C7 caveat 2: an image or page not opened since the app started can't be shown offline | L18 · A brief's images and pages need the service | L18's why, fix and revisit are the drafter's words. |
-| 9 | C17 caveat 1: Apple delivers; the proof shows the hand-off to Apple and the phone showing it, not delivery time | B17, first note | The old claim that a test shows the phone displaying an alert is dropped; none does. |
-| 10 | C17 caveat 3: until encryption, the question, detail, recommendation and the warning's names pass through Apple as text | L17 · Alerts pass through Apple as plain text (area 4) | L17 is widened to every alert's title and the acknowledgement's words, as the code sends them. |
-| 11 | C25.6 | B25.6 | B25.6 adds "the key is never printed", which no old line said. |
-| 12 | C26.2 code block (the text given to agents) | B26.4 (outcome) + B26 note (exact text) | The text given to agents is kept only as a note; Sam may mean its exact words as a promise. |
-| 13 | C27.1 `agentpager rules` prints the contract, template and example | B27.1 | B27.1 adds `agentpager example`, built but in no old line. |
-| 14 | C27 caveat 1, "nothing proves that the agent ran the review or followed it" | L16 · Nothing makes an agent review its card | New limit L16: nothing makes an agent run the review. The old ledger sent it to a test comment. |
-| 15 | C31 caveat 3 (deleting a pager leaves its history) | L15 · Deleting a pager leaves its agents' files | L15's fix, and revisiting it at FRIENDS, are the drafter's guesses. |
-| 16 | I5 body, "Repeating a send with the same request id returns the stored receipt. Changing its input, or answering again with a new request id, is refused." | I5.2 | I5.2's replay and second-answer refusals have no test. |
-| 17 | I19 serves SI2, SI10 | I19 Why: "The pager number binds my phone's key" | I19's new Why quotes the half of SI10 that holds today; "so the service can't swap it" waits for ENCRYPT. |
-| 18 | I22 ¶1 s1, what broken in structure means | I22.2, I22.3, I22.5 | I22's "broken" is widened to what the command refuses today: an unreadable card, a character that breaks the table, an unreadable attachment. |
-| 19 | (none) | J5.6 "The agent's wait returns the owner's answer (B32)." | J5 gains a step, the wait returning the answer, which no old step said. |
-| 20 | D1 must supply: HTTPS on the apex, every plain HTTP request redirected, every response with Strict-Transport-Security; must never: answer over plain HTTP; deployed check: plain HTTP redirects and HTTPS carries HSTS | L20 · The service still answers plain HTTP (6 Privacy); next/ENCRYPT (I23's clause, unless M4 fixes it first) | D1's "HTTPS only" isn't true (5 Nov): new limit L20, and the clause waits in ENCRYPT. Sam was asked whether to fix it in M4. |
-| 21 | D1 deployed check: every response surface, across repeated requests, carries the candidate's build | the dev stage's smoke run (M4's dev-stage pull request decides what it checks) | The deploy checks one path's build header, not every reply's; the dev-stage smoke run decides. |
-| 22 | D1 deployed check: a pager's turn-off time is exactly its auto-off after it was turned on | the dev stage's smoke run (M4's dev-stage pull request decides what it checks) | Nothing checks a deployed pager's auto-off time; the dev-stage smoke run decides. |
-| 23 | D1 caveat 1: a green deploy doesn't show the zone's DNS is the only path in, or anything about Cloudflare's availability | dropped | D1's caveat that a green deploy doesn't prove DNS is the only way in is dropped; no comment holds it yet. |
-| 24 | D2 setup list: Claude Code (`claude mcp add --scope user`, unless `claude mcp get` finds one), Codex (`codex mcp add`), Claude Desktop, Cursor, pi | code `setup.ts`; B29.1 names the apps (area 7) | How setup reaches Claude Code and Codex is code only, and no test runs those paths. |
-| 25 | D6 Proof runs on: "in light and dark appearance, with the Pager and decision screens also at the largest standard text size" | AGENTS.md › Gotchas, as a gap: light appearance only; dark and the largest text untested | The old claim that dark appearance and the largest text are tested was untrue; it is now a gap in AGENTS.md. |
-| 26 | D8 proof: "the compiled binary … connects with it, reads its status, serves MCP and runs setup with no Bun or Node on the PATH; it is skipped until the binary is built, and `pnpm test:cli` builds it first" | nothing (test comment) | B29.8 (no Bun, Node or repository needed) is proven only in part. |
-| 27 | SI6 · UTF-8 with Markdown … never truncated | PRODUCT › Principles › same heading, without its numbers, linking I4 | PRODUCT's text-limits principle loses its numbers; I4 and the schemas hold them. |
-| 28 | SP5 · Reach the agents owners actually use, first sentence "Any agent that can run the agentpager command can use AgentPager: terminal agents, and desktop apps like Claude Desktop and Cursor." | PRODUCT › Principles › Reach the agents owners actually use | SP5's first sentence is cut to its true part; the app list moves to a note pointing to CLIENTS. |
-| 29 | SP5, rest | PRODUCT › same principle | SP5's "within a second … nothing to nudge" stays as Sam's aim, though unmeasured and untrue for an agent that stops waiting. |
-| 30 | STRATEGY § Strategic Design Decisions, its italic note | PRODUCT › Pinned design decisions, lead line | The pinned decisions' lead note loses "Technically, SD:" and Sam's "Lets just see…" aside. |
-| 31 | SI6, a decision and each Markdown page 20,000 characters | I4.4 | SI6's 20,000 characters leave the Blueprint for the schemas, and no test holds them. |
-| 32 | SI6, at most 8 attachments | I4.4 | SI6's 8 attachments leave the Blueprint for the schemas, and no test holds them. |
-| 33 | SI6, at most 1 MB per image | I4.4 | SI6's 1 MB per image leaves the Blueprint for the schemas, and no test holds it. |
-| 34 | SI6, at most 3 MB of attachments in all | I4.4 | SI6's 3 MB in all leaves the Blueprint for the schemas, and no test holds it. |
-| 35 | (new) Serves: "The pager number binds my phone's key" | area 6 Serves | Area 6's Serves quotes only part of SI10's sentence. |
-| 36 | (term) "card contract" | TERMS | New TERMS entry "Card contract", a word the areas and the command already use. |
-| 37 | (term) the sheet that makes a pager | TERMS › Pagers, Pager, Pager detail, New pager | New TERMS name "New pager", for the sheet that makes a pager. |
-| 38 | MENCRYPT question 2 "What an agent sees when its command is from before the switch: refused, with how to update (MINSTALL)." | next/ENCRYPT.md Still open 2; What's known adds that INSTALL now comes after ENCRYPT | ENCRYPT's question 2 loses its tie to INSTALL, which now runs after it. |
-| 39 | MINSTALL question 3 "How an installed command learns it is out of date. MENCRYPT will refuse commands from before encryption, so their owners need an easy way to update." | next/INSTALL.md Still open 3 "How an installed command updates once the service says it is out of date." | INSTALL's question 3 is narrowed: how a command learns it is out of date moves to ENCRYPT. |
-| 40 | DEC-2026-10-27-pr1-sign-off, "Questions 5 and 6 (how MAPP gets built, and the old copy in the blueprint repo) change nothing here and stay open." | dropped | DEC-2026-10-27-pr1-sign-off's question 6, the old copy in exocognito/blueprint, has no home: is it still open? |
-| 41 | docs/v2/02 §6.2, small decisions: should reviewers grade missing optional keys good to fix at most? | dropped | docs/v2/02's open question on grading small cards is dropped unsettled. |
-| 42 | docs/v2/02 §6.3, "tune after the first week" | dropped | docs/v2/02's "tune after the first week" is dropped; the reminder's numbers stay as built. |
-| 43 | docs/v2/03 §2 `agentpager agents` | B25.12 | New clause B25.12 (list the agents), built and tested, with no old line. |
-| 44 | docs/v2/03 §2 `agentpager finish`; TERMS "Agent"; Sam's 29 Oct "Keep `finish`" | B25.13 | New clause B25.13 (finish), built and tested, with no old line. |
-| 45 | docs/v2/03 §2–§3, §6 (wait holds up to 50 s; `seconds` up to 50) | B32.2 | New clause B32.2 (one wait returns within apps' limits), from docs/v2/03. |
-| 46 | docs/v2/03 §4 wait, pending | B32.3 | New clause B32.3 (a pending reply), from docs/v2/03. |
-| 47 | docs/v2/03 §4 wait, option chosen | B32.4 | New clause B32.4 (a chosen option arrives), from docs/v2/03. |
-| 48 | docs/v2/03 §2, §4 `--forever` (50 s rounds, retry every 10 s through an unreachable service; a reply not understood ends it) | B32.7 | New clause B32.7 (a wait with no end), from docs/v2/03. |
-| 49 | docs/v2/03 §2–§4 ack (next steps, green tick, only the first counts, refused before the answer) | B32.8 | New clause B32.8 (acknowledge); "refused before the answer" has no test. |
-| 50 | docs/v2/03 §2 `agentpager status` | B32.9 | New clause B32.9 (status), from docs/v2/03. |
-| 51 | docs/v2/03 §4 unreachable, no reply, reply not understood | B32.10 | New clause B32.10 (a reply not got or not read is never success), from docs/v2/03. |
-| 52 | docs/v2/03 §6, the 2-hour stop | L12 · A Desktop chat stops waiting after two hours | New limit L12: a Desktop chat stops waiting after two hours. |
-| 53 | 04 §2 "the server rate-limits connects per pager" | next/ENCRYPT | docs/v2/04's connect rate limit isn't built; it waits in ENCRYPT. |
-| 54 | docs/v2/04 specifics: the number's byte layout (§2), the envelope's byte layout and info string (§4), the push payload, its 4 KB limit, the 1 KB preview and the extension's 30-second budget (§5), table columns and the key route's path (§6) | cut from the tree; `docs/v2/04-encryption.md` stays in git, and next/ENCRYPT.md names it | docs/v2/04's byte layouts and payload sizes leave the tree; git keeps them. |
-| 55 | (new) `packages/app/README.md` › Limits: "Off is not atomic with a write (accepted 30 Oct for dogfooding, to fix later)" | L10 "Turning a pager off can let one call through" + I17 note | New limit L10, from packages/app/README.md: turning a pager off can let one call through. |
-| 56 | memory `agent-wake-research` (30 Oct lab and the deployed run) | B33 notes, L11 · Only Claude agents wake by themselves | New limit L11 (only Claude agents wake), from the wake lab in agent memory. |
-| 57 | memory pager-must-deliver-unprompted (Sam, 29 Oct: "there is NO point in a pager…") and agent-wake-research (Sam's 30 Oct wake choices) | M3-command.md Sam's answers | M3 quotes Sam's words that exist only in agent memory. |
-| 58 | hardening item 3 "one writer per pager" and item 5 "a smaller poll" | next/ENCRYPT.md items 3 and 5 | Hardening items 3 and 5 are defined nowhere; ENCRYPT's Plan picks what they cover. |
-| 59 | code `commands.ts › connect` (`--server`, 8a64d0e) | B25.11 | New clause B25.11 (another server), built and tested, with no old line. |
-| 60 | (none; from the code) | I22.4 | New clause I22.4 (parts that don't match), built and tested, with no old line. |
-| 61 | (none): an answer still sending when the app is closed goes again on the next launch | B5.16 · @M3: | New clause B5.16: an unconfirmed answer is sent again when the app reopens. Built and tested, with no old line. |
-| 62 | (new) I23 · @M1 · Keys stay secret | I23 | New invariant id I23 (Sam's A4 ★), retitled "Keys stay secret" and widened to the service's own secrets. |
-| 63 | (new) I23 Why: "Only agents I give a number reach my phone" | I23 Why | I23's Why quotes SI2's heading, the drafter's choice. |
+| 8 | C6.1, ask and write | B6.1 | B6.1 narrows "any open decision" to one whose pager is on, as the phone does. |
+| 9 | C6.1, "up to 1,000 characters with no HTML" | B6.2 | Sam's 1,000 characters for a note leave the Blueprint for I4 and the schemas; a test holds them. |
+| 10 | C7 caveat 2: an image or page not opened since the app started can't be shown offline | L18 · A brief's images and pages need the service | L18's why, fix and revisit are the drafter's words. |
+| 11 | C17 caveat 1: Apple delivers; the proof shows the hand-off to Apple and the phone showing it, not delivery time | B17, first note | The old claim that a test shows the phone displaying an alert is dropped; none does. |
+| 12 | C17 caveat 3: until encryption, the question, detail, recommendation and the warning's names pass through Apple as text | L17 · Alerts pass through Apple as plain text (area 4) | L17 is widened to every alert's title and the acknowledgement's words, as the code sends them. |
+| 13 | C22.3 row "Off since 9:40 AM" / "Off since yesterday", grey dot | B22.2 + B22 note | The off row's grey dot is cut; only code holds it. |
+| 14 | C23.1 rows | B23.1 | The rows' green and grey dots and the blue open-count badge are cut; only code holds them. |
+| 15 | C23.2 | B23.3 | The gear that opens a pager's detail is cut; only code holds it. |
+| 16 | C23.4 | B23.5 | "N answered" and its example wording are cut; only code and the catalogue hold them. |
+| 17 | C23.5 | B23.6 | The "about every 3 seconds" refresh is cut; only code holds it. |
+| 18 | C23.6 unreachable: last read, "Can't Reach Server" with when | B23.8 | "Can't Reach Server" is cut to an outcome; only code holds it. |
+| 19 | C25.1 | B25.1 | B25.1 now says the text names the pager's own server, as the code does; the old line said agentpager.me. |
+| 20 | C25.6 | B25.6 | B25.6 adds "the key is never printed", which no old line said. |
+| 21 | C26.1 | B26.1, B26.2 | New pager's missing grab handle is cut; only code holds it. |
+| 22 | C26.2 first sentence | B26.3 | The "Give agents this" label and the copy icon are cut; only code and the catalogue hold them. |
+| 23 | C26.2 code block (the text given to agents) | B26.4 (outcome) + B26 note (exact text) | The text given to agents is kept only as a note; Sam may mean its exact words as a promise. |
+| 24 | C26.2 "--server" sentence | B26.5 (@M3) | The phone's `--server` in the text is cut to an outcome; only code holds it. |
+| 25 | C27.1 `agentpager rules` prints the contract, template and example | B27.1 | B27.1 adds `agentpager example`, built but in no old line. |
+| 26 | C27.2 the writer's one round | B27.4 | B27.4 now promises what the card contract tells the agent, not what the agent does (L16). |
+| 27 | C27 caveat 1, "nothing proves that the agent ran the review or followed it" | L16 · Nothing makes an agent review its card | New limit L16: nothing makes an agent run the review. The old ledger sent it to a test comment. |
+| 28 | C31.2 | B31.2 | History's 20 most recent decisions is cut; only code holds it. |
+| 29 | C31 caveat 3 (deleting a pager leaves its history) | L15 · Deleting a pager leaves its agents' files | L15's fix, and revisiting it at FRIENDS, are the drafter's guesses. |
+| 30 | I5 body, "Repeating a send with the same request id returns the stored receipt. Changing its input, or answering again with a new request id, is refused." | I5.2 | I5.2's same-request receipt and its refusals have no test; the clause keeps the old line's same-request rule. |
+| 31 | I19 serves SI2, SI10 | I19 Why: "The pager number binds my phone's key" | I19's new Why quotes the half of SI10 that holds today; "so the service can't swap it" waits for ENCRYPT. |
+| 32 | I21 caveat 1 (sharing works only on one machine) | L14 · An agent id works on one machine only | L14's revisit is the drafter's guess. |
+| 33 | I22 ¶1 s1, what broken in structure means | I22.2, I22.3, I22.5 | I22's "broken" is widened to what the command refuses today: an unreadable card, a character that breaks the table, an unreadable attachment. |
+| 34 | I22 ¶1 s2, the brief held to the service's own contract | I22.6 | I22.6 adds that each problem is named by the card's own key, which no old line said. |
+| 35 | J4 step 7 · Delete | J4.7 | J4.7's refusal is corrected to what the code does: the agent is unknown, not its pager gone. |
+| 36 | (none) | J5.6 "The agent's wait returns the owner's answer (B32)." | J5 gains a step, the wait returning the answer, which no old step said. |
+| 37 | D1 must supply: HTTPS on the apex, every plain HTTP request redirected, every response with Strict-Transport-Security; must never: answer over plain HTTP; deployed check: plain HTTP redirects and HTTPS carries HSTS | L20 · The service still answers plain HTTP (6 Privacy); next/ENCRYPT (I23's clause, unless M4 fixes it first) | D1's "HTTPS only" isn't true (5 Nov): new limit L20, and the clause waits in ENCRYPT. Sam was asked whether to fix it in M4. |
+| 38 | D1 deployed check: every response surface, across repeated requests, carries the candidate's build | the dev stage's smoke run (M4's dev-stage pull request decides what it checks) | The deploy checks one path's build header, not every reply's; the dev-stage smoke run decides. |
+| 39 | D1 deployed check: a pager's turn-off time is exactly its auto-off after it was turned on | the dev stage's smoke run (M4's dev-stage pull request decides what it checks) | Nothing checks a deployed pager's auto-off time; the dev-stage smoke run decides. |
+| 40 | D1 caveat 1: a green deploy doesn't show the zone's DNS is the only path in, or anything about Cloudflare's availability | dropped | D1's caveat that a green deploy doesn't prove DNS is the only way in is dropped; no comment holds it yet. |
+| 41 | D2 setup list: Claude Code (`claude mcp add --scope user`, unless `claude mcp get` finds one), Codex (`codex mcp add`), Claude Desktop, Cursor, pi | code `setup.ts`; B29.1 names the apps (area 7) | How setup reaches Claude Code and Codex is code only, and no test runs those paths. |
+| 42 | D2 caveat 1 (cloud sessions untested) | L13 · Cloud sessions are untested | L13 adds the wake lab's sightings, and its fix and revisit are the drafter's. |
+| 43 | D6 Proof runs on: "in light and dark appearance, with the Pager and decision screens also at the largest standard text size" | AGENTS.md › Gotchas, as a gap: light appearance only; dark and the largest text untested | The old claim that dark appearance and the largest text are tested was untrue; it is now a gap in AGENTS.md. |
+| 44 | D8 proof: "the compiled binary … connects with it, reads its status, serves MCP and runs setup with no Bun or Node on the PATH; it is skipped until the binary is built, and `pnpm test:cli` builds it first" | nothing (test comment) | B29.8 (no Bun, Node or repository needed) is proven only in part. |
+| 45 | SI6 · UTF-8 with Markdown … never truncated | PRODUCT › Principles › same heading, without its numbers, linking I4 | PRODUCT's text-limits principle loses its numbers; I4 and the schemas hold them. |
+| 46 | SP5 · Reach the agents owners actually use, first sentence "Any agent that can run the agentpager command can use AgentPager: terminal agents, and desktop apps like Claude Desktop and Cursor." | PRODUCT › Principles › Reach the agents owners actually use | SP5's first sentence is cut to its true part; the rest of it moves to a note, marked as not Sam's words, pointing to CLIENTS. |
+| 47 | SP5, rest | PRODUCT › same principle | SP5's "within a second … nothing to nudge" stays as Sam's aim, though unmeasured and untrue for an agent that stops waiting. |
+| 48 | STRATEGY § Strategic Design Decisions, its italic note | PRODUCT › Pinned design decisions, lead line | The pinned decisions' lead note loses "Technically, SD:" and Sam's "Lets just see…" aside. |
+| 49 | SI6, a decision and each Markdown page 20,000 characters | I4.4 | SI6's 20,000 characters leave the Blueprint for the schemas, and no test holds them. |
+| 50 | SI6, at most 8 attachments | I4.4 | SI6's 8 attachments leave the Blueprint for the schemas, and no test holds them. |
+| 51 | SI6, at most 1 MB per image | I4.4 | SI6's 1 MB per image leaves the Blueprint for the schemas, and no test holds it. |
+| 52 | SI6, at most 3 MB of attachments in all | I4.4 | SI6's 3 MB in all leaves the Blueprint for the schemas, and no test holds it. |
+| 53 | (new) Serves: "The pager number binds my phone's key" | area 6 Serves | Area 6's Serves quotes only part of SI10's sentence, which PRODUCT.md doesn't hold; ENCRYPT's Objective quotes it whole. |
+| 54 | (term) "card contract" | TERMS | New TERMS entry "Card contract", a word the areas and the command already use. |
+| 55 | (term) the sheet that makes a pager | TERMS › Pagers, Pager, Pager detail, New pager | New TERMS name "New pager", for the sheet that makes a pager. |
+| 56 | MENCRYPT question 2 "What an agent sees when its command is from before the switch: refused, with how to update (MINSTALL)." | next/ENCRYPT.md Still open 2; What's known adds that INSTALL now comes after ENCRYPT | ENCRYPT's question 2 loses its tie to INSTALL, which now runs after it. |
+| 57 | MINSTALL question 3 "How an installed command learns it is out of date. MENCRYPT will refuse commands from before encryption, so their owners need an easy way to update." | next/INSTALL.md Still open 3 "How an installed command updates once the service says it is out of date." | INSTALL's question 3 is narrowed: how a command learns it is out of date moves to ENCRYPT. |
+| 58 | MOPEN question 5 "What the cleanup removes, for example `docs/v2/`, the workshop notes, the parked web milestone and the retired hosted MCP's answer." | next/OPEN.md Still open 5 "What the cleanup still removes after M4, for example the retired hosted MCP server's answer." | OPEN's question 5 is narrowed to what is left after M4's cleanup. |
+| 59 | — (Sam's go) | next/OPEN.md status line: publishing needs Sam's own go | "Publishing needs Sam's own go" is a new line in OPEN, from the drafter's brief. |
+| 60 | DEC-2026-10-08-storybook-is-the-design | dropped | DEC-2026-10-08-storybook-is-the-design's dark-mode 4.5:1 contrast rule is held nowhere now. |
+| 61 | DEC-2026-10-27-pr1-sign-off, "Questions 5 and 6 (how MAPP gets built, and the old copy in the blueprint repo) change nothing here and stay open." | dropped | DEC-2026-10-27-pr1-sign-off's question 6, the old copy in exocognito/blueprint, has no home: is it still open? |
+| 62 | docs/v2/02 §6.2, small decisions: should reviewers grade missing optional keys good to fix at most? | dropped | docs/v2/02's open question on grading small cards is dropped unsettled. |
+| 63 | docs/v2/02 §6.3, "tune after the first week" | dropped | docs/v2/02's "tune after the first week" is dropped; the reminder's numbers stay as built. |
+| 64 | docs/v2/03 §2 `agentpager agents` | B25.12 | New clause B25.12 (list the agents), built and tested, with no old line. |
+| 65 | docs/v2/03 §2 `agentpager finish`; TERMS "Agent"; Sam's 29 Oct "Keep `finish`" | B25.13 | New clause B25.13 (finish), built and tested, with no old line. |
+| 66 | docs/v2/03 §2–§3, §6 (wait holds up to 50 s; `seconds` up to 50) | B32.2 | New clause B32.2 (one wait returns within apps' limits), from docs/v2/03. |
+| 67 | docs/v2/03 §4 wait, pending | B32.3 | New clause B32.3 (a pending reply), from docs/v2/03. |
+| 68 | docs/v2/03 §4 wait, option chosen | B32.4 | New clause B32.4 (a chosen option arrives), from docs/v2/03. |
+| 69 | docs/v2/03 §2, §4 `--forever` (50 s rounds, retry every 10 s through an unreachable service; a reply not understood ends it) | B32.7 | New clause B32.7 (a wait with no end), from docs/v2/03. |
+| 70 | docs/v2/03 §2–§4 ack (next steps, green tick, only the first counts, refused before the answer) | B32.8 | New clause B32.8 (acknowledge); "refused before the answer" has no test. |
+| 71 | docs/v2/03 §2 `agentpager status` | B32.9 | New clause B32.9 (status), from docs/v2/03. |
+| 72 | docs/v2/03 §4 unreachable, no reply, reply not understood | B32.10 | New clause B32.10 (a reply not got or not read is never success), from docs/v2/03. |
+| 73 | docs/v2/03 §6, positive identification (`claude-code`, `local-agent-mode-<server>`, `CLAUDECODE=1` with no other marker) | B33.1 | New clause B33.1 (wake words only for an app identified for certain), from docs/v2/03 §6 and the wake lab. |
+| 74 | docs/v2/03 §6, Claude Code's words | B33.2 | New clause B33.2 (Claude Code's background wait), from docs/v2/03 §6 and the wake lab. |
+| 75 | docs/v2/03 §6, Claude Desktop's words (seconds 1 between steps, 50 s holds, `sleep 10` up to 10 times, stop after 2 hours) | B33.3 | New clause B33.3 (a Desktop chat keeps its turn), from docs/v2/03 §6 and the wake lab. |
+| 76 | docs/v2/03 §6, the 2-hour stop | L12 · A Desktop chat stops waiting after two hours | New limit L12: a Desktop chat stops waiting after two hours. |
+| 77 | 04 §2 "the server rate-limits connects per pager" | next/ENCRYPT | docs/v2/04's connect rate limit isn't built; it waits in ENCRYPT. |
+| 78 | docs/v2/04 specifics: the number's byte layout (§2), the envelope's byte layout and info string (§4), the push payload, its 4 KB limit, the 1 KB preview and the extension's 30-second budget (§5), table columns and the key route's path (§6) | cut from the tree; `docs/v2/04-encryption.md` stays in git, and next/ENCRYPT.md names it | docs/v2/04's byte layouts and payload sizes leave the tree; git keeps them. |
+| 79 | (new) `packages/app/README.md` › Limits: "Off is not atomic with a write (accepted 30 Oct for dogfooding, to fix later)" | L10 "Turning a pager off can let one call through" + I17 note | New limit L10, from packages/app/README.md: turning a pager off can let one call through. |
+| 80 | memory `agent-wake-research` (30 Oct lab and the deployed run) | B33 notes, L11 · Only Claude agents wake by themselves | New limit L11 (only Claude agents wake), from the wake lab in agent memory. |
+| 81 | memory pager-must-deliver-unprompted (Sam, 29 Oct: "there is NO point in a pager…") and agent-wake-research (Sam's 30 Oct wake choices) | M3-command.md Sam's answers | M3 quotes Sam's words that exist only in agent memory. |
+| 82 | hardening item 3 "one writer per pager" and item 5 "a smaller poll" | next/ENCRYPT.md items 3 and 5 | Hardening items 3 and 5 are defined nowhere; ENCRYPT's Plan picks what they cover. |
+| 83 | code `commands.ts › connect` (`--server`, 8a64d0e) | B25.11 | New clause B25.11 (another server), built and tested, with no old line. |
+| 84 | (none; from the code) | I22.4 | New clause I22.4 (parts that don't match), built and tested, with no old line. |
+| 85 | (none): an answer still sending when the app is closed goes again on the next launch | B5.16 · @M3: | New clause B5.16: an unconfirmed answer is sent again when the app reopens. Built and tested, with no old line. |
+| 86 | (new) I23 · @M1 · Keys stay secret | I23 | New invariant id I23 (Sam's A4 ★), retitled "Keys stay secret" and widened to the service's own secrets. |
+| 87 | (new) I23 Why: "Only agents I give a number reach my phone" | I23 Why | I23's Why quotes SI2's heading, the drafter's choice. |
+| 88 | — (new milestone) | next/CLIENTS.md | Sam's 5 Nov words quoted in CLIENTS and SITE have no record in the repo or memory before this pull request. |
 
 ## Gaps filled
 
@@ -88,6 +113,7 @@ Old files and lines that no drafter's part covered, checked against the step-0 i
 - Two TERMS entries: "Card contract" and "New pager".
 - I17.2's last sentence, from C22.2: an agent of an off pager is told to ask again once it is on, or to ask for another number.
 - L20, the plain HTTP limit, in place of I23's note that HTTPS only isn't built (the root's call).
+- Rows bound for AGENTS.md give the drafters' proposed text. AGENTS.md words it more briefly, and the row's New column says where.
 - Fixed cross-references: area 4's "B5.7" is B5.13; every `L?` is its L number.
 
 ## Old → new, by old file
@@ -130,8 +156,8 @@ Old clause numbers are the old behaviour numbers: C26.3 is C26's third behaviour
 | C6 | B6 · @M1 · Ask for changes in your own words | C→B, same number; title as areas.md |  |
 | C6 statement | B6.1, B6.3; B32.5 (area 2) | "the agent receives the exact text" is B32.5 and I6.1; "the decision never changes" links I5 |  |
 | C6 serves: SC1, SI3, SI8, SP1 | area 5 Serves | dissolved; SP1's fallback sentence and SI3 quoted |  |
-| C6.1, ask and write | B6.1 | "On any open decision" narrowed to "whose pager is on", to agree with B5.15 and B22.4: while off, the phone offers only Turn on (`DecisionView.swift`, `bar`) |  |
-| C6.1, "up to 1,000 characters with no HTML" | B6.2 | "no HTML" kept; "1,000 characters" → "the length a note allows (I4)", as area 3's I4.4 does for every limit but the title's 100. Held by contract test `exchange.test.ts › counts body characters and refuses 1001 whole` and the phone's check in `DecisionView.swift`, `AskChangesView`. The number is Sam's (SI6: "my written feedback allows 1,000"); the root kept I4 as the limits' one home |  |
+| C6.1, ask and write | B6.1 | "On any open decision" narrowed to "whose pager is on", to agree with B5.15 and B22.4: while off, the phone offers only Turn on (`DecisionView.swift`, `bar`) | ⚑ |
+| C6.1, "up to 1,000 characters with no HTML" | B6.2 | "no HTML" kept; "1,000 characters" → "the length a note allows (I4)", as area 3's I4.4 does for every limit but the title's 100. Held by contract test `exchange.test.ts › counts body characters and refuses 1001 whole` and the phone's check in `DecisionView.swift`, `AskChangesView`. The number is Sam's (SI6: "my written feedback allows 1,000"); the root kept I4 as the limits' one home | ⚑ |
 | C6.1, same Undo window; final answer | B6.3 | links I6 and I5 |  |
 | C6.2 | B32.5 (area 2) | moved per the areas.md pick; B6's first note links it |  |
 | C6.3, "The answered decision never changes" | B6.3 | merged; links I5 |  |
@@ -166,7 +192,7 @@ Old clause numbers are the old behaviour numbers: C26.3 is C26's third behaviour
 | C17.2, "as time sensitive" | B17.3 | merged with C17 caveat 2 (Focus mode) into one clause. "Time sensitive" kept: it is the name iOS shows the owner. Test `push.test.ts › alerts: …` holds the level |  |
 | C17.3 | B17.4 | (C5) → (B5) |  |
 | C17.4, first sentence | B17.5 | wording only |  |
-| C17.4, the decision banner with the app open | B17.6 | split from the acknowledgement. @M1: 3809f1a (9 Oct) showed a banner only for a decision from an agent not on screen; fa7e441 reworded it for pagers |  |
+| C17.4, the decision banner with the app open | B17.6 | split from the acknowledgement. @M1: 3809f1a (9 Oct) showed a banner only for a decision from an agent not on screen; fa7e441 reworded it for pagers. B17.6 links B17.8 for the other banner, so neither clause claims a decision is the only alert with one (`Alerts.swift` shows both) |  |
 | C17.4, "or a warning" | B17.8, last sentence | moved into the not-picked-up clause, @M3 with it (7a57c01, PR #27) |  |
 | C17.5 | B17.7 | the badge, @M1 (3809f1a). Its "on pagers that are on" moved to B17.9, @M2 (fa7e441) |  |
 | C17.6 | B17.8 | @M3 (7a57c01, PR #27). "3 minutes" kept: Sam's number in SC2. The alert's exact words left to test `push.test.ts › not picked up: one alert and a warning when no agent collects an answer in time`. (C5) → (B5). The row on the decision stays in B5.13 (areas.md pick: row in B5, alert in B17, B32 notes it) |  |
@@ -216,7 +242,7 @@ Old clause numbers are the old behaviour numbers: C26.3 is C26's third behaviour
 | C22.1 | B22.1 | kept. "opens from the gear (C23)" → B23.3; "The name lives only on the phone" → B26.2 |  |
 | C22.2 off refusal, nothing queued | I17.2, I17.3 | merged into the invariant, its one home; B22.3 links I17. Exact refusal text cut, held by `pagers.test.ts › off: nothing gets through and nothing is queued…` (asserts "This pager is turned off. Your message was not delivered.") and `contract.ts` `refuse.pagerOff` |  |
 | C22.2 "The agentpager command tells the agent to ask again once the owner turns it on, or to ask for another number" | I17.2 (1 Pagers); B25.9 for a connect (2 Agents) | the agent's side of an off pager. Its one home is I17.2's last sentence, which the integrator added from this line; held by `cli/src/commands.ts` `offNotSent` |  |
-| C22.3 row "Off since 9:40 AM" / "Off since yesterday", grey dot | B22.2 + B22 note | outcome kept; strings kept as note examples; held by `Wording.status`, `PagersView.swift`; `FlowTests.testOffAndOn` asserts "Off since" |  |
+| C22.3 row "Off since 9:40 AM" / "Off since yesterday", grey dot | B22.2 + B22 note | outcome kept; strings kept as note examples; held by `Wording.status`, `PagersView.swift`; `FlowTests.testOffAndOn` asserts "Off since" | ⚑ |
 | C22.3 keeps everything, readable, can't answer until on | B22.4 | kept |  |
 | C22.3 bar "[name] pager is off" with Turn on (C5) | B5 (5 Answering, old C5.9) | one home in B5; B22.4 links it |  |
 | C22.4 | B22.5 | kept |  |
@@ -236,18 +262,18 @@ Old clause numbers are the old behaviour numbers: C26.3 is C26's third behaviour
 | --- | --- | --- | --- |
 | C23 statement | B23 heading | id C→B, title kept |  |
 | C23 serves (SC1, SI2, SP6) | area Serves line | as C26 |  |
-| C23.1 rows | B23.1 | outcome kept. Cut "green dot … grey", "blue badge": held by `PagersView.swift` `PagerRow`; open count asserted by `FlowTests.testPagerJourney` ("3 open"). "status worded as in C22" → B22.2 link |  |
+| C23.1 rows | B23.1 | outcome kept. Cut "green dot … grey", "blue badge": held by `PagersView.swift` `PagerRow`; open count asserted by `FlowTests.testPagerJourney` ("3 open"). "status worded as in C22" → B22.2 link | ⚑ |
 | C23.1 "Rows show no number" | B26.8 | merged |  |
 | C23.1 empty state | B23.2 | kept |  |
 | C23.1 "The + button makes a pager (C26)" | B26.1 | merged |  |
-| C23.2 | B23.3 | outcome kept; "gear" cut, held by `PagerView.swift` toolbar (`pager-settings`, driven by FlowTests) |  |
+| C23.2 | B23.3 | outcome kept; "gear" cut, held by `PagerView.swift` toolbar (`pager-settings`, driven by FlowTests) | ⚑ |
 | C23.3 | B23.4 | kept |  |
-| C23.4 | B23.5 | outcome kept; exact "N answered" and "5 answered · Codex, pi" cut, held by `PagerView.answeredLabel` and catalogue `phone/pager.txt` |  |
-| C23.5 | B23.6 | outcome kept; "about every 3 seconds" cut, held by `AppModel.pollSeconds`; FlowTests waits about 5 s for the badge. The measured bar is K1 (next/FRIENDS) |  |
+| C23.4 | B23.5 | outcome kept; exact "N answered" and "5 answered · Codex, pi" cut, held by `PagerView.answeredLabel` and catalogue `phone/pager.txt` | ⚑ |
+| C23.5 | B23.6 | outcome kept; "about every 3 seconds" cut, held by `AppModel.pollSeconds`; FlowTests waits about 5 s for the badge. The measured bar is K1 (next/FRIENDS) | ⚑ |
 | C23.6 "lists the pagers whose keys it holds, as the service reports" | B23.7 | kept |  |
 | C23.6 "the service knows no pager's name" | B26.2 | merged; held by `pagers.test.ts` ("the name stays on the phone") |  |
 | C23.6 "A pager the service says no longer exists is dropped" | B23.7 | kept |  |
-| C23.6 unreachable: last read, "Can't Reach Server" with when | B23.8 | outcome kept; exact title cut, held by `AppModel.statusLine` |  |
+| C23.6 unreachable: last read, "Can't Reach Server" with when | B23.8 | outcome kept; exact title cut, held by `AppModel.statusLine` | ⚑ |
 | C23 Never 1 | B23.9 | Never → clause |  |
 | C23 caveat 1 (the list belongs to one phone) | L9 "A pager lives only on the phone that made it" + B23.9 | caveat → limit, merged into L9 |  |
 | C23 caveat 2 (keys on this device only) | Limit, same | merged |  |
@@ -260,7 +286,7 @@ Old clause numbers are the old behaviour numbers: C26.3 is C26's third behaviour
 | --- | --- | --- | --- |
 | C25 statement | B25 heading, B25.4, I21.1 | dissolves into the heading and clauses |  |
 | C25 serves SC1, SI2, SP5 | header Serves | SC1 and SP5 quoted exactly; SI2's substance is B25.7 |  |
-| C25.1 | B25.1 | outcome kept; "for example in AGENTS.md" becomes a note |  |
+| C25.1 | B25.1 | the text names the pager's own server (B26.4), whose /start tells an agent how to install the command, as `AppModel.instructions` and `worker.ts` do; the old line said agentpager.me, untrue for any other server, dev included. "For example in AGENTS.md" becomes a note | ⚑ |
 | C25.2 | B25.2 | `agentpager connect <number>` and "the connect tool" become "connects from the command line or through the command's MCP server", held by `cli.test.ts › the binary: connect, refusals…` (both ways). `AGENTPAGER_PAGER` kept: Sam confirmed it on 29 Oct as the opt-out for keeping the number out of transcripts (docs/v2/HANDOFF.md); the same test connects with it |  |
 | C25.3 | B25.3 | `--app` and `--project` cut to "names itself" and "unless the agent names one", held by `cli.test.ts › the binary…` and `binary.test.ts › the compiled binary…`. "Claude Desktop" made precise as "a Claude Desktop chat", and "whatever the agent passes" spelled out from `commands.ts › connect`, held by `wait.test.ts › waiting words…` (a chat passing "Claude" is named Claude Desktop) |  |
 | C25.4 | B25.4, I21.2 | "even with the same app and project; nothing matches agents by name" moves to I21.2, its one home |  |
@@ -280,10 +306,10 @@ Old clause numbers are the old behaviour numbers: C26.3 is C26's third behaviour
 | --- | --- | --- | --- |
 | C26 statement | B26 heading | id C→B, title kept; statement dissolves into B26.1–.9 |  |
 | C26 serves (SC1, SI2, SP6) | area Serves line | quotes from SC1, SI2 and SP6 copied exactly from STRATEGY |  |
-| C26.1 | B26.1, B26.2 | outcome kept: start a pager from Pagers, name, turn-off choice, Never default, cancel makes nothing. Cut "+", "a sheet with Cancel and Create and no grab handle": held by `PagersView.swift` (new-pager button) and `PagerDetailView.swift` `NewPagerSheet` (`presentationDragIndicator(.hidden)`), drawn in catalogue `phone/new.png`, driven by `FlowTests.makePager`. "Name only this phone sees" → B26.2 |  |
-| C26.2 first sentence | B26.3 | outcome kept: number made on the phone, text shown before Create, copied as one block. "Key pair" → I19 (6 Privacy), linked. Cut label "Give agents this" and "copy icon": held by `PagerDetailView.swift` `InstructionsBlock`, catalogue `phone/new.txt` |  |
+| C26.1 | B26.1, B26.2 | outcome kept: start a pager from Pagers, name, turn-off choice, Never default. Cut "+", "a sheet with Cancel and Create and no grab handle": held by `PagersView.swift` (new-pager button) and `PagerDetailView.swift` `NewPagerSheet` (`presentationDragIndicator(.hidden)`), drawn in catalogue `phone/new.png`, driven by `FlowTests.makePager`. "Name only this phone sees" → B26.2 | ⚑ |
+| C26.2 first sentence | B26.3 | outcome kept: number made on the phone, text shown before Create, copied as one block. "Key pair" → I19 (6 Privacy), linked. Cut label "Give agents this" and "copy icon": held by `PagerDetailView.swift` `InstructionsBlock`, catalogue `phone/new.txt` | ⚑ |
 | C26.2 code block (the text given to agents) | B26.4 (outcome) + B26 note (exact text) | the clause now promises what the text names; the exact wording is kept as a note, not a promise. Held by `AppModel.instructions` and catalogue `phone/new.txt`, `phone/detail.txt`; no test asserts it. Sam chose it on 29 Oct (docs/v2/01, App structure) and pastes it into AGENTS.md files, so Sam may mean it as a promise | ⚑ |
-| C26.2 "--server" sentence | B26.5 (@M3) | outcome kept; flag name cut, held by `AppModel.instructions`. Tagged @M3: `--server` reached the text in 8a64d0e (PR #24, MCOMMAND); in M2 the text only named the server's host (03aec45), which is B26.4 |  |
+| C26.2 "--server" sentence | B26.5 (@M3) | outcome kept; flag name cut, held by `AppModel.instructions`. Tagged @M3: `--server` reached the text in 8a64d0e (PR #24, MCOMMAND); in M2 the text only named the server's host (03aec45), which is B26.4 | ⚑ |
 | C26.3 "registers … number, public key, when it turns off" | B26.6 | outcome kept; what is sent cut, held by `pagers.test.ts › pagers and agents: the phone makes a pager…` (create body) |  |
 | C26.3 "service refuses a number whose fingerprint does not name that key (I19)" | I19 (6 Privacy) | moved to its one home; B26.3 links I19 |  |
 | C26.3 "new pager opens, active and with no decisions yet" | B26.6 | kept |  |
@@ -291,7 +317,7 @@ Old clause numbers are the old behaviour numbers: C26.3 is C26's third behaviour
 | C26.5 | B26.8 | kept; merged with C23.1 "Rows show no number" |  |
 | C26.6 | B26.9 | kept |  |
 | C26 caveat 1 (keys in this phone's Keychain, device only, no backup, no recovery) | L9 "A pager lives only on the phone that made it" | caveat → limit; merged with C23 caveats 1–2. Why/fix from MPAGERS and MENCRYPT "Out of scope"; revisit from step 0's ★ sample. Device-only held by `Keychain.swift` (`kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`) |  |
-| C26 caveat 2 (text works only once the command is installed, C29) | B26 note | caveat → note, linking B29 and B18 |  |
+| C26 caveat 2 (text works only once the command is installed, C29) | B26 note | caveat → note, linking B29 and B18. It names the server's /start, not agentpager.me, as B25.1 does |  |
 
 ### `packages/blueprint/design/capabilities/C27-review-a-card-before-sending.md`
 
@@ -306,7 +332,7 @@ Old clause numbers are the old behaviour numbers: C26.3 is C26's third behaviour
 | C27.1 "every connect ends by prompting the agent to read it" | B27.1 → B25.5 (2 Agents) | one home: the connect reply's prompt is B25's; B27.1 links to it. Exact "Before your first card: agentpager rules" left to `cli.test.ts › the binary: …` |  |
 | C27.1 MCP ask tool description | B27.2 | kept |  |
 | C27.2 review prints the list then the card; grades; quoting | B27.3 | kept; "as twelve points" cut, held by `rules.ts` `REVIEW` and `cli.test.ts › the binary: …` (the review block starts "Review this decision card" and ends with the card). The grades ok, good to fix and must fix kept: they are TERMS' words (Review) |  |
-| C27.2 the writer's one round | B27.4 | reworded as what the card contract tells the agent, since the command can't make it happen (see the limit) |  |
+| C27.2 the writer's one round | B27.4 | reworded as what the card contract tells the agent, since the command can't make it happen (see the limit) | ⚑ |
 | C27.3 | B27.5; I22.2–I22.6 | one home: the list of what `ask` refuses lives in I22, and B27.5 links to it |  |
 | C27.4 "Sent.", the question and detail as the owner sees them | B27.6 | outcome kept; exact reply text left to `cli.test.ts › the binary: …` |  |
 | C27.4 the short id and how to wait in the agent's own app | B32.1 (2 Agents) | moved, per `areas.md` "Ids that don't fit"; B27.6 links (B32). The example id `d_2x8w` is left to B32 |  |
@@ -360,7 +386,7 @@ Old clause numbers are the old behaviour numbers: C26.3 is C26's third behaviour
 | C31 statement | B31 heading, B31.1–.3 | dissolves |  |
 | C31 serves SC1, SG2 | header Serves | SG2 isn't quoted; the area's quotes cover what B31 serves (notes are answers, never guidance) |  |
 | C31.1 | B31.1 | `~/.agentpager/history/<pager>.jsonl` and `AGENTPAGER_HOME` cut; held by `store.ts` (historyPath, home) and by every CLI test, which sets `AGENTPAGER_HOME` (`decode.test.ts › a 200 that isn't AgentPager's reply…` checks the history folder). "Only the machine's user can read" kept; `store.ts` holds it, no test does |  |
-| C31.2 | B31.2 | `agentpager history --agent <id>` and "the history tool" become "an agent can read"; "20 unless asked for more" becomes "the most recent decisions unless asked for more". The 20 is held by `commands.ts › history`, no test. The fields are held by `cli.test.ts › the binary…` |  |
+| C31.2 | B31.2 | `agentpager history --agent <id>` and "the history tool" become "an agent can read"; "20 unless asked for more" becomes "the most recent decisions unless asked for more". The 20 is held by `commands.ts › history`, no test. The fields are held by `cli.test.ts › the binary…` | ⚑ |
 | C31.3 | B31.3 | unchanged |  |
 | C31.4 | B31.4 | 1,000 kept: Sam confirmed the cap on 29 Oct (docs/v2/HANDOFF.md). Held by `store.ts` HISTORY_CAP, no test |  |
 | C31 caveat 1 (only what this machine asked) | B31 note |  |  |
@@ -381,10 +407,10 @@ Old clause numbers are the old behaviour numbers: C26.3 is C26's third behaviour
 | I4 serves: SI6, SI8 | I4 Why; area 3 Serves | SI6's "Anything else is refused whole…" sentence quoted as the Why (A7). SI8 is how the owner answers the exact version (5 Answering) |  |
 | I4 statement | I4.1 | kept |  |
 | I4 ¶1 s1, visible characters, a combined emoji counts as one | I4.3 | kept; SI6's "Count spaces and Markdown punctuation" joined to it. Held by `values.test.ts › Text accepts exactly 280 visible characters, counting a combined emoji as one` |  |
-| I4 ¶1 s2, what is refused, with a reason that says what to fix, writing nothing | I4.1, I4.2 | split in two. Held by `briefs.test.ts › briefs: refused whole, with a reason that says what to fix` ("nothing refused was stored") and `exchange.test.ts › rejects excess card fields and unknown card types rather than silently dropping them`, `› refuses malformed Unicode in card prose`, `› refuses an answer naming an option the card does not offer`. Raw bytes that aren't UTF-8 are refused by `shared.ts › body`, which no test sends |  |
+| I4 ¶1 s2, what is refused, with a reason that says what to fix, writing nothing | I4.1, I4.2 | split in two. Held by `briefs.test.ts › briefs: refused whole, with a reason that says what to fix` ("nothing refused was stored") and `exchange.test.ts › rejects excess card fields and unknown card types rather than silently dropping them`, `› refuses malformed Unicode in card prose`, `› refuses an answer naming an option the card does not offer`. Raw bytes that aren't UTF-8 are refused by `shared.ts › body`, which no test sends. I4.2 names the field only when there is one: a body that isn't JSON, or an option the card doesn't offer, has none (`shared.ts`, `agent.ts`) |  |
 | I4 ¶1 s3, a wrong key wins over invalid input | I4.6 | kept; `keys.test.ts › a wrong key wins over invalid input` |  |
 | I4 ¶2 s1, the command holds a card to the same schemas | I4.8 → I22.6 | merged: I4.8 links to I22, where the check lives; `@M3:` per `areas.md` |  |
-| I4 ¶2 s2, compiling `card.yaml` trims spaces and joins wrapped lines | I4.8 | kept, `@M3:`. Added "code blocks pass through line for line" from `card.ts › prose`; held by `cli.test.ts › the binary: …` ("hard-wrapped prose is joined") and `› review rounds: concurrent asks, an unwritable home, attachments, unsafe cells, fences, bad input` (a fenced diff kept whole) |  |
+| I4 ¶2 s2, compiling `card.yaml` trims spaces and joins wrapped lines | I4.8 | kept, `@M3:`. held by `cli.test.ts › the binary: …` ("hard-wrapped prose is joined") and `› review rounds: concurrent asks, an unwritable home, attachments, unsafe cells, fences, bad input` (a fenced diff kept whole) |  |
 | I4 ¶3 s1, stores exactly the text it accepts | I4.7 | kept; `briefs.test.ts › briefs: the four canvas examples ask, read back as sent, answer, and go with the pager when it is deleted` |  |
 | I4 ¶3 s2, the decision screen shows it whole | I4.7 | kept; no test checks that the phone shows the whole text (untested clause) |  |
 | I4 ¶3 s2, a list row or an alert may shorten a long question | I4 note 1 | note. The cuts are in `PagerView.swift` (line limits) and `push.ts › questionBody` |  |
@@ -399,7 +425,7 @@ Old clause numbers are the old behaviour numbers: C26.3 is C26's third behaviour
 | I5 | I5 · @M1 · Answers never change | kept |  |
 | I5 statement | I5.1, I5.4 | wording only |  |
 | I5 serves: SI3, SI8 | I5 Why | SI3 quoted exactly. SI8 not quoted |  |
-| I5 body, "Repeating a send with the same request id returns the stored receipt. Changing its input, or answering again with a new request id, is refused." | I5.2 | outcome kept; "request id" cut. No test sends a replay or a second answer; code only: `agent.ts` (`answer`, `AlreadyAnswered`) and `AppModel.swift` (`PreparedAnswer.requestId`) | ⚑ |
+| I5 body, "Repeating a send with the same request id returns the stored receipt. Changing its input, or answering again with a new request id, is refused." | I5.2 | outcome kept: the stored receipt comes back only for the same request, as the phone resends it after a lost reply (its first request id, the same answer), and any other send to an answered decision, even of the same option, is refused, as `agent.ts › answer` does. "Request id" is cut. No test sends a replay or a second answer; code only: `agent.ts` (`answer`, `AlreadyAnswered`) and `AppModel.swift` (`PreparedAnswer.requestId`) | ⚑ |
 | I5 body, "An acknowledgement cannot be replaced." | I5.3 | held by `cli.test.ts › the binary: …` ("only the first acknowledgement counts") and the `acknowledgement_immutable` trigger in `agent.ts` |  |
 | I5 body, the 31 Oct rewrite of decisions stored with `kind` and option emoji | I5, first note | kept as a note, since the code still makes it on an old agent's first start; `kind`, the emoji, PR #33 and DEC-2026-10-30-v2-promises cut (git and the DEC hold them). Held by `briefs.test.ts › briefs: a decision stored with kind and keycaps reads back without them` |  |
 | I5 caveat: nothing proved about tampering below the API | I5, second note | kept as a note |  |
@@ -499,7 +525,7 @@ Old clause numbers are the old behaviour numbers: C26.3 is C26's third behaviour
 | I21 breaking 1 | I21.1 | test `pagers.test.ts › pagers and agents…` (a second connect gets another id) |  |
 | I21 breaking 2 | I21.2 | same test |  |
 | I21 breaking 3 | I21.3 | same test (one agent's key is refused on another agent) |  |
-| I21 caveat 1 (sharing works only on one machine) | L14 · An agent id works on one machine only | caveat → Limit. "Why it waits" is Sam's 29 Oct default, "no cross-machine sharing of agent ids; each machine connects" (docs/v2/HANDOFF.md); the fix is docs/v2/03 §7's export idea |  |
+| I21 caveat 1 (sharing works only on one machine) | L14 · An agent id works on one machine only | caveat → Limit. "Why it waits" is Sam's 29 Oct default, "no cross-machine sharing of agent ids; each machine connects" (docs/v2/HANDOFF.md); the fix is docs/v2/03 §7's export idea | ⚑ |
 | I21 caveat 2 (a lost connect reply may leave an unusable agent) | B25.10 | caveat → clause; exact words left to `decode.test.ts › a 200 that isn't…` and `› sent, no reply…` |  |
 
 ### `packages/blueprint/design/invariants/I22-a-broken-card-is-never-sent.md`
@@ -510,7 +536,7 @@ Old clause numbers are the old behaviour numbers: C26.3 is C26's third behaviour
 | I22 serves: SI6, SI11 | I22 Why | SI11's second sentence quoted as the Why (A7) |  |
 | I22 statement | I22.1 | kept |  |
 | I22 ¶1 s1, what broken in structure means | I22.2, I22.3, I22.5 | split into three clauses. Widened to what `card.ts › compile` refuses today: a card that can't be read (not UTF-8, no such file), a character that would break the Options table, and an attachment that is missing or can't be read. Held by `cli.test.ts › the binary: …` and `› review rounds: …` | ⚑ |
-| I22 ¶1 s2, the brief held to the service's own contract | I22.6 | kept. Added: each problem is named by the card's own key, held by `decode.test.ts › a card the server would refuse is refused here, in card.yaml words, before anything is sent` |  |
+| I22 ¶1 s2, the brief held to the service's own contract | I22.6 | kept. Added: each problem is named by the card's own key, held by `decode.test.ts › a card the server would refuse is refused here, in card.yaml words, before anything is sent` | ⚑ |
 | I22 ¶1 s3, nothing about how a card is written is refused | I22.7 | merged with C27 Never 1 and breaking 2 and 3 |  |
 | I22 ¶2, the service doesn't check one-line fields | I22 note 1 | note |  |
 | I22 caveat 1, an agent calling the service directly skips the command | I22 note 2 | note, merged with C27 caveat 2 |  |
@@ -530,7 +556,7 @@ Old clause numbers are the old behaviour numbers: C26.3 is C26's third behaviour
 | J3 caveat 2 "The agent's reviewer judges the card …" | J3 note | kept as a note; C27 → B27 |  |
 | J3 setting line "On the local product with its real persistent storage, …" | J3 note "Where:" | wording |  |
 | J3 step 1 | J3.1 | outcome kept; the controls (+, Give agents this, Create) left to FlowTests › `testPagerJourney` (makePager taps new-pager and create-pager) and the screens catalogue `journeys/pager` |  |
-| J3 step 2 | J3.2 | `agentpager connect` → "connects with the number through the agentpager command"; `agentpager rules` → "the writing rules". The connect reply's prompt is held by cli.test.ts › "the binary: connect, refusals, ask, wait, ack, status, history, off, finish, and the same over MCP" (asserts "Before your first card: agentpager rules") |  |
+| J3 step 2 | J3.2 | `agentpager connect` → "connects with the number through the agentpager command"; `agentpager rules` → "the card contract" (TERMS). The connect reply's prompt is held by cli.test.ts › "the binary: connect, refusals, ask, wait, ack, status, history, off, finish, and the same over MCP" (asserts "Before your first card: agentpager rules") |  |
 | J3 step 3 | J3.3 | `agentpager review`, `agentpager ask` and the exact reply "Sent." left to cli.test.ts › same test (asserts the ask reply text and the review tool); `card.yaml` kept, a product name |  |
 | J3 step 4 | J3.4 | unchanged in meaning |  |
 | J3 step 5 | J3.5 | kept "the green tick": Sam chose it (DEC-2026-10-08-native-ios: "a green tick shows when the agent confirms"). FlowTests checks the "Agent confirmed" label, not the tick; the screens catalogue shows it. Unsure whether Sam means the specific |  |
@@ -551,7 +577,7 @@ Old clause numbers are the old behaviour numbers: C26.3 is C26's third behaviour
 | J4 step 4 · Survive a restart | J4.4 | "its exit recorded" dropped: test procedure, held by packages/app/test/support.ts `restart()` |  |
 | J4 step 5 · Auto-off | J4.5 | "After 24 hours" kept (Sam's number). "Off since" → "it has been off since the time it was due", held by FlowTests › `testOffAndOn` and Wording.swift. "It comes due on the local clock" → the J4 note on the short local clock |  |
 | J4 step 6 · Revisit | J4.6 | unchanged in meaning |  |
-| J4 step 7 · Delete | J4.7 | sub-bullets joined |  |
+| J4 step 7 · Delete | J4.7 | sub-bullets joined. The refusal is the one the code gives, an unknown agent (I17.5; `pagers.test.ts` asserts UnknownAgent), not "its pager is gone" | ⚑ |
 
 ### `packages/blueprint/design/journeys/J5-paged-while-away.md`
 
@@ -570,7 +596,7 @@ Old clause numbers are the old behaviour numbers: C26.3 is C26's third behaviour
 | J5 step 2, not built "*Not built yet: comes with the demo agent (C19).* The owner gives the pager's text to the demo agent." | next/INSTALL | not built: in J5.2, the owner gives the pager's text to the demo agent (B19), which connects, asks its sample decision, acknowledges and finishes |  |
 | J5 step 3 | J5.3, J5.4 | split: the alert (J5.3); expanding it shows the detail and the recommended option (J5.4) |  |
 | J5 step 4 "*Not built yet: comes with the encryption work.* The alert travels encrypted, and an extension on the phone decrypts it to show the question (C30)." | next/ENCRYPT | not built: after J5.3, the alert travels encrypted, and an extension on the phone decrypts it to show the question (B30, and B17's encrypted alert) |  |
-| J5 step 5 | J5.5 | adds "the Undo window passes", which J3.4 already walks |  |
+| J5 step 5 | J5.5 | unchanged in meaning |  |
 | (none) | J5.6 "The agent's wait returns the owner's answer (B32)." | added, from the agreed sample: old step 6's acknowledgement implies it, but no step said how the answer reaches the agent | ⚑ |
 | J5 step 6 | J5.7, J5.8 | split: the acknowledgement alert (J5.7); the badge clears (J5.8) |  |
 | J5 caveat 2: "Today the app is built from Xcode, and its alerts go through Apple's sandbox push service. *Not built yet: comes with the TestFlight build.*" | L24 · The app installs only from Xcode | shared with JOURNEYS; J5 should link the limit |  |
@@ -598,7 +624,7 @@ Old clause numbers are the old behaviour numbers: C26.3 is C26's third behaviour
 | --- | --- | --- | --- |
 | D1 id and heading "Cloudflare" | dissolved | No D ids (brief rule 4) |  |
 | D1 statement: one Worker on the agentpager.me zone, one SQLite Durable Object per agent and one registry for the pagers, and nowhere else | Relies on (area 6); PRODUCT.md › Stack | Serves quotes SP2's own sentence. "Nowhere else" is "where the whole service runs"; `build.mjs` holds it (one custom-domain route, `workers_dev: false`) |  |
-| D1 provided: Worker `ownerpager`; SQLite classes `Agent` (made as `Session` at tag v1, renamed at v3) and `Registry` (v2); keep the names and applied tags, and add a later tag for any new class | AGENTS.md › Deploying and secrets (keep the names and tags); `packages/app/README.md` › Deployment names them | Deploy fact. `build.mjs` holds the migrations |  |
+| D1 provided: Worker `ownerpager`; SQLite classes `Agent` (made as `Session` at tag v1, renamed at v3) and `Registry` (v2); keep the names and applied tags, and add a later tag for any new class | AGENTS.md › Deploying and secrets (keep the names and applied tags; a new class needs a later tag); `packages/app/README.md` › Deployment names them | Deploy fact. `build.mjs` holds the migrations |  |
 | D1 provided: vault item "Cloudflare agentpager.me" (id k2rptzp2jwfoxsqvrguxxizsgi), fields credential and account_id | AGENTS.md › Deploying and secrets points to `packages/app/README.md` › Deployment; `deploy.mjs` holds the id | Deploy fact. `deploy.mjs` holds the id |  |
 | D1 provided: the deploy creates and verifies the domain binding, DNS and HTTPS on the zone | `packages/app/README.md` › Deployment, which AGENTS.md points to | Deploy fact. `deploy.mjs` checks the binding, the proxied DNS record, SQLite placement, the bindings, the APNs secret, and the build header over HTTPS |  |
 | D1 provided: DEC-2026-09-29-m1-owner-feedback records the credential's dated checks | dropped | That DEC goes to the tag (A10); git keeps it |  |
@@ -635,7 +661,7 @@ Old clause numbers are the old behaviour numbers: C26.3 is C26's third behaviour
 | D2 must never: a key or pager number in an app's config | B29.6 (area 7) | linked, not repeated |  |
 | D2 proof runs on: command tests on a local server, MCP over stdio with the SDK client, setup in a throwaway home | nothing | test comments already say it (`setup.test.ts`, `binary.test.ts`, `cli.test.ts`) |  |
 | D2 proof: real apps are sampled by Sam's dogfood, not by a test | AGENTS.md › Gotchas (Sam's dogfood samples real agent apps) |  |  |
-| D2 caveat 1 (cloud sessions untested) | L13 · Cloud sessions are untested | caveat → Limit, with SP5's own words as "Why it waits". Adds the lab's sightings (a Desktop chat's cloud VM blocked from agentpager.me until allowed, and pausing a few minutes after its turn) |  |
+| D2 caveat 1 (cloud sessions untested) | L13 · Cloud sessions are untested | caveat → Limit, with SP5's own words as "Why it waits". Adds the lab's sightings (a Desktop chat's cloud VM blocked from agentpager.me until allowed, and pausing a few minutes after its turn) | ⚑ |
 | D2 caveat 2 (recorded runs cover Claude Code and Desktop; Codex, Cursor and pi follow each app's documented behaviour; `--app`) | B33 note, B25.3 | `detect.ts` comment also holds the who-asked half |  |
 | D2 caveat 3 (claude.ai in a browser is out) | PRODUCT.md (SP5) | dropped here; SP5 already says it |  |
 | D2 must-never: "put the agent's key or the pager number in a client's config. setup writes only the command's path" | B29.6 | shared with area 2 (D2); placed here because setup is B29's. Held by `setup.test.ts` and `binary.test.ts` (the entry is exactly the command's path and `mcp`) |  |
@@ -652,7 +678,7 @@ Old clause numbers are the old behaviour numbers: C26.3 is C26's third behaviour
 | D6 Must supply: Keychain keeps each pager's keys on this device only | Relies on line + L9 "A pager lives only on the phone that made it" | held by `Keychain.swift` |  |
 | D6 Must supply: Settings bundle Server field for self-hosters; no Settings screen | B23.10 + B23 note + Relies on | Settings field held by `Settings.bundle/Root.plist`; "no Settings screen" is also a pinned decision in PRODUCT.md |  |
 | D6 Must never: a preview or fixture stands in for the app's own screen | dropped | held by METHOD ("the product's own screens, in `generated/`, are the record") and `DesignTests.swift`, which captures the real app |  |
-| D6 Must never: create, request or use an Apple signing identity on Sam's behalf | AGENTS.md › Deploying and secrets | in the provided row's text above |  |
+| D6 Must never: create, request or use an Apple signing identity on Sam's behalf | AGENTS.md › Deploying and secrets | AGENTS.md: "Never create, request or use an Apple signing identity, certificate or account on Sam's behalf." |  |
 | D6 Proof runs on: Simulator, through Pagers, Pager, Pager detail and the decision screen; second phone = second Simulator; Sam's walk on the iPhone | AGENTS.md › Gotchas | in the Must supply row's text above |  |
 | D6 Proof runs on: "in light and dark appearance, with the Pager and decision screens also at the largest standard text size" | AGENTS.md › Gotchas, as a gap: light appearance only; dark and the largest text untested | no test runs dark or the largest text size: `DesignTests.swift`'s comment says light only (dark tried 30 Oct, screenshots stayed light), and nothing sets the text size. ★ A17 put both on the untested list | ⚑ |
 | D6 caveat 1 (one simulated iPhone stands for every iPhone; Sam's iPhone is sampled at the walk) | AGENTS.md › Gotchas (Sam's walk samples real devices) | text: "One simulated iPhone stands for every iPhone; Sam's iPhone is sampled at the walk." |  |
@@ -668,7 +694,7 @@ Old clause numbers are the old behaviour numbers: C26.3 is C26's third behaviour
 | D7 | dissolved | no D ids (rule 4) |  |
 | D7 statement: alerts stand on the owner's Apple membership | area 4 Relies on |  |  |
 | D7 statement: distribution to other people | next/INSTALL | see the "TestFlight, App Review" row |  |
-| D7 provided: the paid team, the APNs key with its key id and team id in the 1Password item the owner names; the owner creates each, no role mints one | AGENTS.md › Deploying and secrets | Text: "Sam's paid Apple developer team signs the app. Alerts use Sam's APNs key, with its key id and team id, in the 1Password item Sam names. Sam creates each of these, and the App Store Connect access; agents never make one." |  |
+| D7 provided: the paid team, the APNs key with its key id and team id in the 1Password item the owner names; the owner creates each, no role mints one | AGENTS.md › Deploying and secrets | Text: "Sam's paid Apple developer team signs the app. Alerts use Sam's APNs key, with its key id and team id, in the 1Password item Sam names. Sam creates each of these, and the App Store Connect access; agents never make one.". AGENTS.md words it: "Sam's paid Apple team signs the app; Sam keeps its push key in 1Password", with the signing rule of the D6 row. The key id and team id are in `scripts/build.mjs` |  |
 | D7 must supply: Apple's push service | area 4 Relies on |  |  |
 | D7 must supply: TestFlight and App Review; provided: App Store Connect access; caveat: their timing is Apple's | next/INSTALL | not built. Text: "Distribution to invited owners stands on Sam's Apple Developer Program membership: TestFlight for invited testers, and App Review, through App Store Connect access Sam provides. Their timing is Apple's, and nothing promises a review outcome." |  |
 | D7 must never: the APNs key reaches the app bundle, the worktree, a log or a transcript | I23.3 (6 Privacy); a one-line pointer in AGENTS.md | root's call: a security rule becomes an invariant (BRIEF rule 4), merged with D1's token rule into I23.3. Held by `build.mjs` (the key is the Worker's secret, never in a build) and `deploy.mjs` (sent to wrangler on stdin, output redacted) |  |
@@ -683,7 +709,7 @@ Old clause numbers are the old behaviour numbers: C26.3 is C26's third behaviour
 | --- | --- | --- | --- |
 | D8 id | dissolves | no D ids |  |
 | D8 statement: "built with Bun into one file that runs on the kind of machine that built it" | area header, Relies on (Bun) + L22 · The command installs only from source | split: the service is a Relies-on line; "only the building machine's kind" is part of the limit |  |
-| D8 provided: "Bun on the machine that builds the command, installed by the owner. `pnpm --filter @agentpager/cli build` runs `bun build --compile` on the command's source and writes `packages/cli/dist/agentpager`. No Bun version is pinned." | AGENTS.md › Gotchas | a build fact. Text for AGENTS.md: "The command: `pnpm --filter @agentpager/cli build` runs `bun build --compile` and writes `packages/cli/dist/agentpager`, for this machine only. Bun is installed by Sam on the building machine; no Bun version is pinned." |  |
+| D8 provided: "Bun on the machine that builds the command, installed by the owner. `pnpm --filter @agentpager/cli build` runs `bun build --compile` on the command's source and writes `packages/cli/dist/agentpager`. No Bun version is pinned." | AGENTS.md › Gotchas | a build fact. Text for AGENTS.md: "The command: `pnpm --filter @agentpager/cli build` runs `bun build --compile` and writes `packages/cli/dist/agentpager`, for this machine only. Bun is installed by Sam on the building machine; no Bun version is pinned.". AGENTS.md keeps the build command, this machine only, and no Bun version pinned; the output path is in `packages/cli/scripts/build.sh` |  |
 | D8 must supply: "a compiler that bundles the command's TypeScript, its dependencies and a runtime into one executable, with Node's built-in modules, fetch, and standard input and output for the MCP server" | area header, Relies on (Bun) | the list of what the compiler must bundle is cut; `binary.test.ts` exercises it (the compiled binary connects, reads status, serves MCP over stdio and runs setup) |  |
 | D8 must never: "need Bun, Node or the repository where the built command runs" | B29.8 | wording only |  |
 | D8 proof: "the compiled binary … connects with it, reads its status, serves MCP and runs setup with no Bun or Node on the PATH; it is skipped until the binary is built, and `pnpm test:cli` builds it first" | nothing (test comment) | `binary.test.ts`'s own comment and the root `test:cli` script hold it. But the test clears the PATH only for setup: connect, status and MCP run with the test's own PATH, which has Node, and the binary runs from inside the repository. So B29.8 is proven only in part | ⚑ |
@@ -718,7 +744,7 @@ Old clause numbers are the old behaviour numbers: C26.3 is C26's third behaviour
 | SP2 "The code is open: anyone can read it, fork it and run their own (*not built yet*)." | next/OPEN | not built: "The code is open: anyone can read it, fork it and run their own." OPEN's objective (A18 ★) |  |
 | SP3 · Agents choose the options; AgentPager keeps them easy to answer | dropped | deprecated → SP7 (DEC-2026-10-27-briefs-are-the-card): emoji cards are gone; history; git holds it at tag blueprint-old-format |  |
 | SP4 · Keep the decision short; make detail optional | dropped | deprecated → SP8; history; git holds it at tag blueprint-old-format |  |
-| SP5 · Reach the agents owners actually use, first sentence "Any agent that can run the agentpager command can use AgentPager: terminal agents, and desktop apps like Claude Desktop and Cursor." | PRODUCT › Principles › Reach the agents owners actually use | not true for waking today: only Claude Code and a Claude Desktop chat are told how to wake (B33); Codex, Cursor, pi and others must call wait again (area 2's limit). Kept the true part, "Any agent that can run the agentpager command can use AgentPager.", word for word. The rest of the sentence is quoted inside an italic note that says which apps it covers is what CLIENTS decides. Areas 2 and 7 quote only the kept part | ⚑ |
+| SP5 · Reach the agents owners actually use, first sentence "Any agent that can run the agentpager command can use AgentPager: terminal agents, and desktop apps like Claude Desktop and Cursor." | PRODUCT › Principles › Reach the agents owners actually use | not true for waking today: only Claude Code and a Claude Desktop chat are told how to wake (B33), and other agents must call wait again (L11). Kept the true part, "Any agent that can run the agentpager command can use AgentPager.", word for word. The rest of Sam's sentence is quoted in a note after the principle, marked as not Sam's words, which says CLIENTS decides which apps it covers. The drafter's sentence on which apps wake today was taken out of PRODUCT: B33, L11 and CLIENTS hold it. Areas 2 and 7 quote only the kept part | ⚑ |
 | SP5, rest | PRODUCT › same principle | verbatim. "A waiting agent has my answer within a second of the Undo window closing, with nothing for me to nudge" kept as Sam's aim. It is literally true of an agent that is waiting, but the second is unmeasured (K1's answer half, next/FRIENDS), and an agent that stops waiting needs a nudge (area 2's limit) | ⚑ |
 | SP6 · Feel native | PRODUCT › Principles › same heading | verbatim; id retires |  |
 | SP7 · Letters tell options apart; ✶ marks the recommendation | PRODUCT › Principles › same heading | verbatim; id retires |  |
@@ -862,8 +888,8 @@ Old clause numbers are the old behaviour numbers: C26.3 is C26's third behaviour
 | MOPEN Out of scope | next/OPEN.md Out of scope, word for word |  |  |
 | MOPEN questions 1–3 (licence, where it lives, the clean history) | next/OPEN.md Still open 1–3, word for word |  |  |
 | MOPEN question 4 "Alerts on a service someone else runs. Apple delivers alerts only from the team that signed the app, so someone else's service can't alert the TestFlight app. A self-hoster builds the app under their own Apple team, or goes without alerts." | next/OPEN.md What's known (the fact) and Still open 4 (the choice) | split, words kept |  |
-| MOPEN question 5 "What the cleanup removes, for example `docs/v2/`, the workshop notes, the parked web milestone and the retired hosted MCP's answer." | next/OPEN.md Still open 5 "What the cleanup still removes after M4, for example the retired hosted MCP server's answer." | narrowed: M4 removes docs/v2, the workshop, lessons, parked and old plans (Sam's simplification 3); What's known says so |  |
-| — (Sam's go) | next/OPEN.md status line: publishing needs Sam's own go | from the brief; new |  |
+| MOPEN question 5 "What the cleanup removes, for example `docs/v2/`, the workshop notes, the parked web milestone and the retired hosted MCP's answer." | next/OPEN.md Still open 5 "What the cleanup still removes after M4, for example the retired hosted MCP server's answer." | narrowed: M4 removes docs/v2, the workshop, lessons, parked and old plans (Sam's simplification 3); What's known says so | ⚑ |
+| — (Sam's go) | next/OPEN.md status line: publishing needs Sam's own go | from the brief; new | ⚑ |
 
 ### `packages/blueprint/roadmap/milestones/MFRIENDS.md`
 
@@ -921,7 +947,7 @@ Old clause numbers are the old behaviour numbers: C26.3 is C26's third behaviour
 
 | Old | New | Change | ⚑ |
 | --- | --- | --- | --- |
-| DEC-2026-09-30-fetch-only-host | dropped | history; git holds it at tag blueprint-old-format. The v1 cold-client recipe, retired with recipe.json |  |
+| DEC-2026-09-30-fetch-only-host | dropped; its Codex finding to next/CLIENTS › What's known | history; git holds it at tag blueprint-old-format. The v1 cold-client recipe, retired with recipe.json. Its finding that Codex starts MCP servers in the background, so tools can be missing on the first turn unless the server is marked required, still holds for agents in Codex |  |
 
 ### `packages/blueprint/records/decisions/DEC-2026-10-01-home-screen.md`
 
@@ -954,7 +980,7 @@ Old clause numbers are the old behaviour numbers: C26.3 is C26's third behaviour
 | DEC-2026-10-08-native-ios | DECISIONS.md DEC-2026-10-08-native-ios | shortened to what stands: native iPhone app in SwiftUI, pager never session, an alert only opens the app, no Live Activity and the badge counts what waits, HTTPS only and keys as digests; marked → v2-promises and → next-roadmap in part |  |
 | DEC-2026-10-08-native-ios, "It adds two milestones: MAPP: the app on Sam's iPhone, without alerts" and answer 11 "Dogfood first: install on Sam's iPhone over USB with free signing, and set up Apple credentials in parallel without blocking product work." | milestones/M1-app.md | M1's starting answers, quoted |  |
 | DEC-2026-10-08-native-ios, answer 4 "Plan a demo agent for App Review." | next/INSTALL | the demo agent's origin (B19), with DEC-2026-10-27-pr1-sign-off answer 3b |  |
-| DEC-2026-10-08-native-ios, the rest: links, pairing, lifetimes, end reasons, "Ends" counts, `?connect=` links, MSHIP, Android later, the 10-open-cards-per-pager default, the privacy-page default | dropped | history; git holds it at tag blueprint-old-format. Retired by v2 and the 31 Oct roadmap; the open-decision cap is now 10 per agent, in code (MAX_OPEN_DECISIONS); the privacy-page note waits in next/SITE (the milestones drafter's, from MSITE) |  |
+| DEC-2026-10-08-native-ios, the rest: links, pairing, lifetimes, end reasons, "Ends" counts, `?connect=` links, MSHIP, Android later, the 10-open-cards-per-pager default, the privacy-page default | dropped | history; git holds it at tag blueprint-old-format. Retired by v2 and the 31 Oct roadmap; the open-decision cap is now 10 per agent, in code (MAX_OPEN_DECISIONS); the privacy-page note waits in next/SITE (the milestones drafter's, from MSITE). Default 6's limit on starting pagers per network address has its successor in ENCRYPT's connect rate limit |  |
 | DEC-2026-10-08-native-ios, answers 1, 3, 5 and 11 | M1-app.md Sam's answers, quoted as recorded | MAPP's own answers. Cross-ref: the DECISIONS drafter keeps or drops the DEC itself |  |
 | DEC-2026-10-08-native-ios, answer 4 | M1-app.md (pointer) and next/INSTALL.md What's known | ledger-7 has the same row |  |
 
@@ -969,13 +995,13 @@ Old clause numbers are the old behaviour numbers: C26.3 is C26's third behaviour
 
 | Old | New | Change | ⚑ |
 | --- | --- | --- | --- |
-| DEC-2026-10-08-storybook-is-the-design | dropped | history; git holds it at tag blueprint-old-format. Superseded by DEC-2026-10-30-screens-from-the-app |  |
+| DEC-2026-10-08-storybook-is-the-design | dropped | history; git holds it at tag blueprint-old-format. Superseded by DEC-2026-10-30-screens-from-the-app. Its rule that blue text in dark mode keeps 4.5:1 contrast is held nowhere now | ⚑ |
 
 ### `packages/blueprint/records/decisions/DEC-2026-10-09-alerts-in-mapp.md`
 
 | Old | New | Change | ⚑ |
 | --- | --- | --- | --- |
-| DEC-2026-10-09-alerts-in-mapp | dropped | history; git holds it at tag blueprint-old-format. Its answer and facts move (rows below). The first conversion step kept it; its one binding sense is M1's |  |
+| DEC-2026-10-09-alerts-in-mapp | dropped | history; git holds it at tag blueprint-old-format. Its answer and facts move (rows below). The first conversion step kept it; its one binding sense is M1's. Universal Links, which it left with MSHIP, are off the roadmap since 31 Oct |  |
 | DEC-2026-10-09-alerts-in-mapp, "C17::get-paged moves from MSHIP to MAPP" and Sam's words "Whats the reason we don't include push notifications in the dogfooded version btw? I feel like that's a kinda important feature but it's pushed to the next milestone - what would be required to pull it into the current dogfooding version" | milestones/M1-app.md | M1's answer: alerts came into M1, with the reason "A pager that only works while its app is open does not test what AgentPager is for" |  |
 | DEC-2026-10-09-alerts-in-mapp, facts: the signing team X3M532E87A is on the paid Apple Developer Program; the APNs key is in the vault item `AgentPager APN.p8 key` and works on sandbox and production; a deployed Worker reaches Apple's push service over HTTP/2, local workerd does not, so only the deployed service sends alerts | AGENTS.md › Deploying and secrets (Sam signs; the push key in 1Password) and › Gotchas (alerts need the deployed service). The team id and the key's vault item are in `scripts/build.mjs` and `packages/app/README.md` › Alerts | Apple and deploy facts; area 4's Relies on names Apple's push service |  |
 | DEC-2026-10-09-alerts-in-mapp, Sam's quote and answers | M1-app.md Sam's answers and Log (PR #8) | a milestone answer, so it lives in M1, not DECISIONS; its push-key and paid-team facts are AGENTS.md's |  |
@@ -1036,7 +1062,7 @@ Old clause numbers are the old behaviour numbers: C26.3 is C26's third behaviour
 
 | Old | New | Change | ⚑ |
 | --- | --- | --- | --- |
-| L1, whole | dropped | lessons retire (DEC-2026-11-05-blueprint-destination), and their id is never reused: limits start at L9. Start agent apps with stdin closed and output streamed: a rule for the retired cleanroom runs and recipe. git keeps it at tag `blueprint-old-format` |  |
+| L1, whole | AGENTS.md › Gotchas | lessons retire (DEC-2026-11-05-blueprint-destination), and their id is never reused: limits start at L9. Kept: run an agent app without a terminal with stdin closed, a time limit and its output streamed |  |
 
 ### `packages/blueprint/records/lessons/L2-codex-drops-a-server-that-answers-a-notification-with-a-body.md`
 
@@ -1048,7 +1074,7 @@ Old clause numbers are the old behaviour numbers: C26.3 is C26's third behaviour
 
 | Old | New | Change | ⚑ |
 | --- | --- | --- | --- |
-| L3, whole | dropped | lessons retire (DEC-2026-11-05-blueprint-destination), and their id is never reused: limits start at L9. The resume flags of the retired cleanroom runs. git keeps it at tag `blueprint-old-format` |  |
+| L3, whole | AGENTS.md › Gotchas | lessons retire (DEC-2026-11-05-blueprint-destination), and their id is never reused: limits start at L9. Kept: an agent app's resume flags differ from its start flags; the exact flags were the retired cleanroom runs' |  |
 
 ### `packages/blueprint/records/lessons/L4-a-chat-question-ends-the-turn.md`
 
@@ -1118,9 +1144,9 @@ Old clause numbers are the old behaviour numbers: C26.3 is C26's third behaviour
 | docs/v2/03 §2 `agentpager status` | B32.9 | new clause: held by `cli.test.ts › the binary…` and `pagers.test.ts › off: nothing gets through…` | ⚑ |
 | docs/v2/03 §4 unreachable, no reply, reply not understood | B32.10 | new clause; exact words left to `decode.test.ts › a 200 that isn't…` and `› sent, no reply…` | ⚑ |
 | docs/v2/03 §4 "ask, pager off (also on wait and ack)" | B32 note | I17 holds it |  |
-| docs/v2/03 §6, positive identification (`claude-code`, `local-agent-mode-<server>`, `CLAUDECODE=1` with no other marker) | B33.1 | the names and marker cut; held by `detect.ts › harness` and `wait.test.ts › harness…` |  |
-| docs/v2/03 §6, Claude Code's words | B33.2 | exact words left to `wait.test.ts › waiting words…` |  |
-| docs/v2/03 §6, Claude Desktop's words (seconds 1 between steps, 50 s holds, `sleep 10` up to 10 times, stop after 2 hours) | B33.3 | "two hours" kept: Sam chose the 2-hour Desktop limit on 30 Oct (memory `agent-wake-research`). The rest is left to `wait.test.ts › waiting words…`, which asserts every line |  |
+| docs/v2/03 §6, positive identification (`claude-code`, `local-agent-mode-<server>`, `CLAUDECODE=1` with no other marker) | B33.1 | the names and marker cut; held by `detect.ts › harness` and `wait.test.ts › harness…` | ⚑ |
+| docs/v2/03 §6, Claude Code's words | B33.2 | exact words left to `wait.test.ts › waiting words…` | ⚑ |
+| docs/v2/03 §6, Claude Desktop's words (seconds 1 between steps, 50 s holds, `sleep 10` up to 10 times, stop after 2 hours) | B33.3 | "two hours" kept: Sam chose the 2-hour Desktop limit on 30 Oct (memory `agent-wake-research`). The rest is left to `wait.test.ts › waiting words…`, which asserts every line | ⚑ |
 | docs/v2/03 §6, the 2-hour stop | L12 · A Desktop chat stops waiting after two hours | new limit: people meet it and it waits for a fix | ⚑ |
 | docs/v2/03 §1 (files on the machine, `config.json`, `AGENTPAGER_SERVER`, nothing in the project) | code `store.ts` | its comment holds the layout and "never in the project"; it was never a Blueprint line |  |
 | docs/v2/03 §2 exit codes | code `commands.ts` Result, `main.ts` help | held by `cli.test.ts` (2, 4, 5, 6) and `decode.test.ts` (5); never a Blueprint line |  |
@@ -1315,7 +1341,7 @@ Old clause numbers are the old behaviour numbers: C26.3 is C26's third behaviour
 | AGENTS.md: "One part still shows v1: the front page's copy." | L21 · The front page still describes the first version | the rewritten AGENTS.md drops the line; L21 holds it |  |
 | "Its product contract is the Blueprint in `packages/blueprint/`" | AGENTS.md first paragraph | now `blueprint/`, with METHOD.md as how it is built |  |
 | the ladder (strategy, design promises, design code and catalogue) and the roadmap line | AGENTS.md ladder | now blueprint/README.md, PRODUCT, the areas, JOURNEYS and `generated/screens` |  |
-| "Current state (31 Oct 2026)" | dropped | history now lives in M1–M3's docs. "Not built yet" lines wait in `milestones/next/`; docs/v2's decisions are DEC-2026-10-29-v2-design; the front page's v1 copy is L21; "don't build to what v2 retired" is METHOD's Don't list and M2's and M3's Retires |  |
+| "Current state (31 Oct 2026)" | dropped | history now lives in M1–M3's docs. "Not built yet" lines wait in `milestones/next/`; docs/v2's decisions are DEC-2026-10-29-v2-design; the front page's v1 copy is L21; "don't build to what v2 retired" stays as one line in AGENTS.md › Working rules |  |
 | "M4 HOUSE (from 5 Nov 2026)", the interim note | dropped | METHOD.md is in force; M4-house.md is the milestone's doc |  |
 | the exocognito/blueprint process links (law, files) | dropped | METHOD.md replaced them (DEC-2026-10-31-method) |  |
 | the working rules | AGENTS.md › Working rules | kept. "The owner merges" became the rule Sam approved for M4: the root merges merge-ready pull requests inside an approved milestone, and Sam reviews after the merge |  |
@@ -1359,6 +1385,8 @@ Old clause numbers are the old behaviour numbers: C26.3 is C26's third behaviour
 | --- | --- | --- | --- |
 | code `commands.ts › connect` (`--server`, 8a64d0e) | B25.11 | new clause: built, and held by `cli.test.ts › review rounds…` ("--server names another server, and the agent keeps it"). No old line held it except C26.2 in passing | ⚑ |
 | (none; from the code) | I22.4 | new clause: a recommendation, tradeoffs cell or next step naming a letter that isn't an option, a row with no cell for an option, or a cell with no rating. Built in `card.ts › compile` and listed under R1 in docs/v2/02 §2; held by `cli.test.ts › the binary: …` ("tradeoffs[0] has no cell for B.", "recommendation.option is C but there are two options.") | ⚑ |
+| (none; from `start.ts`) an agent finds agentpager.me through its owner's text | B18, first note | new note, true in the code: the pager's text names its server (B25.1), and `start.ts` serves /start there |  |
+| (none; from `start.ts`) /start tells the agent to run setup | B18, second note | new note, true in the code: /start ends its install steps with setup (`start.ts`) |  |
 
 ### `new in M4`
 
@@ -1373,6 +1401,6 @@ Old clause numbers are the old behaviour numbers: C26.3 is C26's third behaviour
 | (new) I23 Why: "Only agents I give a number reach my phone" | I23 Why | A new Why line, quoted exactly from SI2's heading (A7: Sam approves Why lines). The other candidate is DEC-2026-10-08-native-ios, "HTTPS only, keys stored as digests", but that is a record's summary of Sam's write-up, and HTTPS only isn't true yet | ⚑ |
 | Limits INSTALL retires | next/INSTALL | Text for INSTALL's Retires: L22 "The command installs only from source", L23 "Moving the command breaks its setup", L24 "The app installs only from Xcode" |  |
 | Limits SITE retires | next/SITE | Text for SITE's Retires: L21 "The front page still describes the first version" |  |
-| — (new milestone) | next/CLIENTS.md | new: Sam's 5 Nov words, quoted exactly; the wake lab report linked; order after ENCRYPT, anchoring INSTALL and SITE |  |
+| — (new milestone) | next/CLIENTS.md | new: Sam's 5 Nov words, quoted exactly; the wake lab report linked; order after ENCRYPT, anchoring INSTALL and SITE | ⚑ |
 | (new id) B32 · @M3 · Wait for the answer, then acknowledge it | B32 (2 Agents) | a new id Sam agreed (DEC-2026-11-05-blueprint-destination) for promises M3 built and no old id held alone: C27.4's how to wait, C6.2's note word for word, D2's long wait, and docs/v2/03's wait, acknowledge and status. The rows above map each clause |  |
 | (new id) B33 · @M3 · Each agent app is told how it wakes | B33 (2 Agents) | a new id Sam agreed for D2's per-app wake rules and the 30 Oct wake lab's words (memory `agent-wake-research`, docs/v2/03 §6). The rows above map each clause |  |

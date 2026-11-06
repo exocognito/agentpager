@@ -5,7 +5,7 @@ End-to-end walks across the areas. Each numbered step is a promise, tested by it
 ### J3 · @M3 · Happy pager: one agent asks and hears back
 
 1. The owner makes a pager from Pagers, names it and copies the text to give agents. The pager opens, active and with no decisions (B26).
-2. The owner gives the text to an agent. The agent connects with the number through the agentpager command, gets its agent id, and reads the writing rules as the reply prompts (B25).
+2. The owner gives the text to an agent. The agent connects with the number through the agentpager command, gets its agent id, and reads the card contract as the reply prompts (B25).
 3. The agent writes its `card.yaml`, has it reviewed once by a subagent, fixes what must be fixed, and asks. The reply says the card was sent, with its decision id (B27).
 4. The decision shows on the pager under the agent's project, with who asked (B23). The owner opens it, picks an option and presses Send, and the Undo window passes (B5).
 5. The agent's wait returns that option, and the agent acknowledges with its next steps (B32). In the project's answered decisions, the row waits for the agent, then shows the green tick (I6).
@@ -23,7 +23,7 @@ End-to-end walks across the areas. Each numbered step is a promise, tested by it
 4. **Survive a restart.** The owner closes and reopens the app. The service is stopped and restarted on unchanged storage. The pager, its decisions and both agents are still there, and each agent's next call works with the same id.
 5. **Auto-off.** The owner sets the pager to turn off after 24 hours, counted from that change. When it comes due, its row says it has been off since the time it was due, and an agent's next call is refused as off (B22). The owner turns it on again, and its auto-off counts from then.
 6. **Revisit.** The owner opens the project's answered decisions and reopens the note's decision. It shows the closed record: the owner's note, then the agent's next steps (B7, I5).
-7. **Delete.** The owner deletes the pager from its detail and confirms, and it leaves Pagers. Each agent's next call is refused because its pager is gone, and a connect with the number is refused as not in use (I17, B25).
+7. **Delete.** The owner deletes the pager from its detail and confirms, and it leaves Pagers. Each agent's next call is refused as from an unknown agent (I17.5), and a connect with the number is refused as not in use (I17, B25).
 
 - Areas: 1 Pagers (steps 1, 3, 5, 7), 2 Agents (1, 2, 3, 4, 7), 3 Cards (3), 5 Answering (2, 3, 6), 6 Privacy (4).
 - Where: on the local product, in real time, with one install of the app and the agentpager command built from this checkout. All state is kept throughout.
@@ -36,7 +36,7 @@ End-to-end walks across the areas. Each numbered step is a promise, tested by it
 2. The owner gives the pager's text to an agent that has the agentpager command, and the agent connects (B25).
 3. The owner leaves the app. The agent asks a decision, and an alert arrives titled with who asked and the project, with the question as its body (B17).
 4. Expanding the alert shows the decision's detail and the recommended option.
-5. Opening the alert opens that decision. The owner answers and sends, and the Undo window passes (B5).
+5. Opening the alert opens that decision. The owner answers and sends (B5).
 6. The agent's wait returns the owner's answer (B32).
 7. The owner leaves the app again. The agent acknowledges, and the acknowledgement arrives as an alert with the agent's words (B17).
 8. The app icon's badge clears.

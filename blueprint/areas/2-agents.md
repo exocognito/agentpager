@@ -11,7 +11,7 @@
 
 ### B25 · @M3 · Connect with a pager number
 
-1. The owner gives an agent a pager's text from the app (B26). It names agentpager.me, so an agent without the command can learn how to install it (B18).
+1. The owner gives an agent a pager's text from the app (B26). It names the pager's server (B26.4), whose /start tells an agent without the command how to install it (B18).
 2. The agent connects with the number, from the command line or through the command's MCP server. The number can instead come from `AGENTPAGER_PAGER`, so it needn't be written where transcripts show it.
 3. The command sends who asked, the project and the machine's name with the number. Who asked is the agent's app: the command names Claude Code and a Claude Desktop chat itself when it identifies them for certain (B33), whatever the agent passes, and any other app is detected or names itself. The project is the git repository's name, else the working folder's, unless the agent names one.
 4. Each connect makes a new agent on the pager (I21). The phone shows its decisions under its project with who asked (B23), and the owner taps nothing to let it in.

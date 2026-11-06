@@ -63,7 +63,7 @@
   font-weight: 600;
   text-decoration: none;
 }
-/* On a dev server, a strip above the page says so (B18.6). */
+/* On a dev server (src/dev.ts), a strip above the page says so. */
 .mk-dev {
   display: flex;
   flex-wrap: wrap;

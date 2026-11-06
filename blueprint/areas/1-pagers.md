@@ -36,7 +36,7 @@
 11. @M4: A pager made on dev.agentpager.me is marked dev on its row in Pagers and on its own screen. A pager made on agentpager.me isn't.
 
 - The server's address is for self-hosters. Left empty, the app uses agentpager.me.
-- The phone counts a server as dev when its address starts with `dev.`, as the front page does (B18.6), so a pager made on a local server isn't marked.
+- The phone counts a server as dev when its address starts with `dev.`, as /start does (B18.5), so a pager made on a local server isn't marked.
 
 ### B22 · @M2 · Turn a pager off and on, or delete it
 

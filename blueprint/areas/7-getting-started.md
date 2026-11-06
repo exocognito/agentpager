@@ -15,14 +15,13 @@
 2. An agent that can't install or run the command where it runs is told to stop and tell its owner, and not to work around it.
 3. An agent that reads agentpager.me itself, rather than a person in a browser, is pointed to /start.
 4. An agent that arrives at the retired hosted MCP server's address gets the same instructions, and is told that server is retired.
-5. @M4: On any server other than agentpager.me, /start and the page an agent reads at its address say it is a dev server, whose pagers are its own.
-6. @M4: On dev.agentpager.me, the front page in a browser says plainly that it is a dev server. agentpager.me's front page doesn't.
+5. @M4: On a dev server, one whose address starts with `dev.`, such as dev.agentpager.me, /start and the page an agent reads at its address say it is a dev server, whose pagers are its own. agentpager.me and every other server don't.
 
 - An agent finds agentpager.me through the text its owner copies from a pager (B25).
 - Today the install that /start describes is a build from the repository (L22). It also tells the agent to run setup (B29).
 - /start never documents the service's own API for calls made by hand: agents use the command.
 - /start's words are design: nothing measures whether arriving agents understand and follow them.
-- The front page counts a server as dev when its address starts with `dev.`, as the phone does (B23.11). A local server, which the screens catalogue is drawn from, shows no mark there, though its /start says dev (B18.5).
+- The front page and the phone (B23.11) count a server as dev the same way, so a local server, which the screens catalogue is drawn from, or a self-hosted one shows no dev mark anywhere.
 
 ### B29 · @M3 · Set up the command in agent apps
 

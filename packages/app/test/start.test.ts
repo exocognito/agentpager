@@ -34,16 +34,21 @@ test('/start and /mcp tell an arriving agent to install the agentpager command; 
   } finally { await f.stop(); }
 });
 
-test('A server other than agentpager.me says it is dev, at / and /start; agentpager.me does not', { timeout: 180_000 }, async () => {
+test('B18.5 A dev server says it is dev, at / and /start; agentpager.me and a local server do not', { timeout: 180_000 }, async () => {
   const f = await fixture('dev-mark');
   try {
-    const host = new URL(f.origin).host;
     for (const p of ['/', '/start']) {
       const r = await fetch(f.origin + p); assert.equal(r.status, 200, p);
       const doc = await r.text();
-      assert.ok(doc.startsWith(`# AgentPager (dev)\n\nThis is ${host}, a dev server for testing AgentPager, not agentpager.me.`), p);
+      assert.ok(doc.startsWith('# AgentPager\n\n'), p); assert.equal(doc.includes('a dev server'), false, p);
     }
-    for (const doc of [startDocument(DEFAULT_ORIGIN), frontDocument(DEFAULT_ORIGIN)]) {
+    for (const origin of ['https://dev.agentpager.me', 'https://DEV.example.com']) {
+      const host = new URL(origin).host;
+      for (const doc of [startDocument(origin), frontDocument(origin)]) {
+        assert.ok(doc.startsWith(`# AgentPager (dev)\n\nThis is ${host}, a dev server for testing AgentPager, not agentpager.me.`), origin);
+      }
+    }
+    for (const doc of [startDocument(DEFAULT_ORIGIN), frontDocument(DEFAULT_ORIGIN), startDocument('https://pager.example.com')]) {
       assert.ok(doc.startsWith('# AgentPager\n\n')); assert.equal(doc.includes('dev'), false);
     }
   } finally { await f.stop(); }

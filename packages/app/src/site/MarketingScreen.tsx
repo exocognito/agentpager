@@ -4,6 +4,7 @@ import "./cards.css";
 import { LogoMark } from "./LogoMark.tsx";
 import { QrPicture } from "./QrPicture.tsx";
 import { CopyIcon } from "./CopyIcon.tsx";
+import { isDevHost } from "../dev.ts";
 
 const PRODUCTION_ORIGIN = "https://agentpager.me",
   host = new URL(PRODUCTION_ORIGIN).host,
@@ -20,9 +21,6 @@ const EXAMPLE = {
   ],
 } as const;
 
-// A dev server says so (B18.6, blueprint/areas/7-getting-started.md): one whose host starts with `dev.`, as
-// dev.agentpager.me does. Not every host other than agentpager.me: the catalogue draws this page from a local server.
-export const isDevHost = (host: string) => host.toLowerCase().startsWith("dev.");
 
 // The App Store page, once AgentPager for iPhone is published. Empty until then: the download
 // buttons show, but do not link anywhere.

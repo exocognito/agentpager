@@ -16,7 +16,10 @@
     "designs": "pnpm --filter @agentpager/app designs",
     "build:app": "pnpm --filter @agentpager/app build",
     "start:app": "pnpm --filter @agentpager/app start",
-    "deploy:app": "pnpm --filter @agentpager/app run deploy",
+    "deploy:dev": "pnpm --filter @agentpager/app run deploy:dev",
+    "deploy:prod": "pnpm --filter @agentpager/app run deploy:prod",
+    "smoke:dev": "pnpm --filter @agentpager/app run smoke:dev",
+    "smoke:prod": "pnpm --filter @agentpager/app run smoke:prod",
     "test:dogfood": "pnpm --filter @agentpager/app test:dogfood"
   },
   "devDependencies": {

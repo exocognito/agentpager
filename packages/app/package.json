@@ -5,7 +5,10 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "start": "node scripts/start.mjs",
-    "deploy": "node scripts/deploy.mjs",
+    "deploy:dev": "node --experimental-strip-types scripts/deploy.mjs --stage dev",
+    "deploy:prod": "node --experimental-strip-types scripts/deploy.mjs --stage prod",
+    "smoke:dev": "node --experimental-strip-types scripts/smoke.mjs --stage dev",
+    "smoke:prod": "node --experimental-strip-types scripts/smoke.mjs --stage prod",
     "lint": "node scripts/lint.mjs",
     "dogfood": "node scripts/dogfood.mjs",
     "designs": "node scripts/designs.mjs",

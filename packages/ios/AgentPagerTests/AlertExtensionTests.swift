@@ -81,7 +81,7 @@ final class AlertExtensionTests: XCTestCase {
 
     // Every pager item on this phone, whichever build made it, decodes and is found by its id, once, in the group the
     // extension reads. After installing this build over an older one, the older one's pagers pass too.
-    func test_B23_7_everyPagerThePhoneHoldsIsWhereTheExtensionReadsIt() throws {
+    func testEveryPagerThePhoneHoldsIsWhereTheExtensionReadsIt() throws {
         let extensionBinary = try XCTUnwrap(Bundle.main.builtInPlugInsURL?.appendingPathComponent("AgentPagerNotifications.appex/AgentPagerNotifications"))
         let extensionGroups = try keychainGroups(ofBinaryAt: extensionBinary)
         let query: [String: Any] = [

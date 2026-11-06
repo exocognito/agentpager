@@ -1,11 +1,13 @@
 // What an agent that arrives without the agentpager command reads, at /start and /mcp: how to install it, then the
 // one command. No API documentation for hand-rolled calls (B18, blueprint/areas/7-getting-started.md). A server other than
 // agentpager.me names itself in the command (--server), since the binary defaults to agentpager.me.
+import { isDevHost } from './dev.ts';
+
 export const DEFAULT_ORIGIN = 'https://agentpager.me';
-// Any other server, dev.agentpager.me or a local one, says it is dev (METHOD.md › Stages and releases), since each
-// has its own data.
+// A dev server, such as dev.agentpager.me, says it is dev (B18.5; METHOD.md › Stages and releases), since its pagers are
+// its own. A local or self-hosted server doesn't.
 function heading(origin: string) {
-  return origin === DEFAULT_ORIGIN ? '# AgentPager\n' : `# AgentPager (dev)
+  return !isDevHost(new URL(origin).host) ? '# AgentPager\n' : `# AgentPager (dev)
 
 This is ${new URL(origin).host}, a dev server for testing AgentPager, not agentpager.me. Its pagers are its own: a pager number from agentpager.me isn't in use here.
 `;

@@ -18,7 +18,7 @@ it("sends the owner to the iPhone app, never to a web app", () => {
   expect(html).not.toMatch(/class="mk-(?:button|action)[^"]*" href="\/app"/);
 });
 
-it("B18.6 On dev.agentpager.me the front page says it is a dev server; on agentpager.me and local servers it does not", () => {
+it("On dev.agentpager.me the front page says it is a dev server; on agentpager.me and local servers it does not", () => {
   const page = (host: string) => renderToStaticMarkup(createElement(MarketingScreen, { host }));
   for (const host of ["dev.agentpager.me", "DEV.agentpager.me", "dev.example.com"]) {
     expect(page(host)).toContain(`<p class="mk-dev" role="note"><strong>dev</strong>This is ${host}, a dev server for testing AgentPager, not agentpager.me.</p>`);

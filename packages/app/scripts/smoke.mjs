@@ -24,7 +24,7 @@ function throwawayPager() {
 }
 const check = (ok, message) => { if (!ok) throw new Error(message); };
 const candidate = response => check(response.headers.get('x-agentpager-build') === sha, `serves build ${response.headers.get('x-agentpager-build')}, not ${sha}`);
-// start.ts heads every page for an agent with this on any server but agentpager.me.
+// start.ts heads every page for an agent with this on a dev server (B18.5), such as dev.agentpager.me.
 const says = body => check(body.startsWith('# AgentPager (dev)\n') === dev, dev ? 'no dev mark' : 'prod says it is dev');
 
 const results = [];

@@ -20,6 +20,10 @@ const EXAMPLE = {
   ],
 } as const;
 
+// A dev server says so (B18.6, blueprint/areas/7-getting-started.md): one whose host starts with `dev.`, as
+// dev.agentpager.me does. Not every host other than agentpager.me: the catalogue draws this page from a local server.
+export const isDevHost = (host: string) => host.toLowerCase().startsWith("dev.");
+
 // The App Store page, once AgentPager for iPhone is published. Empty until then: the download
 // buttons show, but do not link anywhere.
 export const APP_STORE_URL: string = "";
@@ -128,7 +132,7 @@ export const MARKETING = {
 } as const;
 
 // The phone: the retired web app's card screen (cards.css) with the example open and its first option chosen. It is
-// a still picture, kept until the front page is redrawn for the iPhone app (docs/v2/06-blueprint-update-plan.md):
+// a still picture, kept until the front page is redrawn for the iPhone app (L21, blueprint/areas/7-getting-started.md):
 // nothing in it can take focus.
 function CardPicture() {
   const expires = new Date("2026-09-30T06:00:00.000Z").toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
@@ -249,10 +253,13 @@ const Caption = ({ n }: { n: number }) => (
   </div>
 );
 
-// The page at `/`. The product serves this screen; a check reads these strings back.
+// The page at `/`. The product serves this screen; a check reads these strings back. `host` is the one it is served
+// from, which says whether it is dev.
 export function MarketingScreen({
+  host: servedFrom = "",
   copyText = (text) => navigator.clipboard.writeText(text),
 }: {
+  host?: string;
   copyText?: (text: string) => Promise<void>;
 }) {
   const [status, setStatus] = useState("");
@@ -268,6 +275,12 @@ export function MarketingScreen({
   const t = MARKETING.terminal;
   return (
     <div className="mk">
+      {isDevHost(servedFrom) && (
+        <p className="mk-dev" role="note">
+          <strong>dev</strong>
+          This is {servedFrom}, a dev server for testing AgentPager, not {host}.
+        </p>
+      )}
       <header className="mk-nav">
         <Brand />
       </header>

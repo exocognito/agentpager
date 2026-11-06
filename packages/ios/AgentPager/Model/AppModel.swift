@@ -147,7 +147,7 @@ final class AppModel {
         lastSuccess.map { "Can’t Reach Server · Updated " + Wording.ago($0, now: now) } ?? "Can’t Reach Server"
     }
 
-    // What the owner gives agents, copied as one block (docs/v2/01-decisions.md, App structure).
+    // What the owner gives agents, copied as one block (B26.3, blueprint/areas/1-pagers.md).
     // A pager on another server names it in the command (--server, or the MCP connect tool's server), since the
     // agentpager command defaults to agentpager.me.
     func instructions(_ p: LocalPager) -> String {

@@ -52,7 +52,10 @@ struct PagerRow: View {
         let state = model.state(pager.pagerId), on = state?.on ?? true, open = model.openCount(pager.pagerId)
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 3) {
-                Text(pager.name).font(.body.weight(.semibold)).foregroundStyle(on ? .primary : .secondary).lineLimit(1)
+                HStack(spacing: 6) {
+                    Text(pager.name).font(.body.weight(.semibold)).foregroundStyle(on ? .primary : .secondary).lineLimit(1)
+                    if pager.onDevServer { DevMark() }
+                }
                 HStack(spacing: 7) {
                     Circle().fill(on ? Color.green : Color(.systemGray3)).frame(width: 9, height: 9)
                     Text(state.map { Wording.status($0, now: model.now) } ?? "Active").foregroundStyle(.secondary).lineLimit(1)
@@ -69,5 +72,16 @@ struct PagerRow: View {
         }
         .padding(.vertical, 4)
         .accessibilityElement(children: .combine)
+    }
+}
+
+// Beside the name of a pager made on a dev server (B23.11): a small capsule, so a dev pager is never taken for a real one.
+struct DevMark: View {
+    var body: some View {
+        Text("dev").font(.caption.weight(.semibold)).foregroundStyle(.orange)
+            .padding(.horizontal, 7).padding(.vertical, 1)
+            .background(Color.orange.opacity(0.15), in: .capsule)
+            .accessibilityLabel("Dev server")
+            .accessibilityIdentifier("dev-mark")
     }
 }

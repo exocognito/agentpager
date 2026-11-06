@@ -4,8 +4,8 @@ Every line of the old Blueprint, and where it went when M4 converted it to the a
 
 ## Totals
 
-- **Rows:** 743, from 109 old files and sources, grouped by old file below. 53 rows are gaps the integrator filled (listed under Gaps filled). PR 4, the history cleanup, adds 24 more in its own section at the end.
-- **⚑ for Sam:** 92: 89 from the conversion and 3 from PR 4, the history cleanup ([PR 4](#pr-4-the-history-cleanup)).
+- **Rows:** 743, from 109 old files and sources, grouped by old file below. 53 rows are gaps the integrator filled (listed under Gaps filled). PR 4, the history cleanup, adds 24 more in its own section at the end, and PR 5b, the dev marks, 2 more after it.
+- **⚑ for Sam:** 94: 89 from the conversion, 3 from PR 4, the history cleanup ([PR 4](#pr-4-the-history-cleanup)), and 2 from PR 5b, the dev marks ([PR 5b](#pr-5b-the-dev-marks)).
 - **The new Blueprint:** 7 areas with 23 entries (14 behaviors and 9 invariants) and 162 clauses, 16 limits (L9 to L24), and 3 journeys with 20 steps.
 - **Ids:** each C became B with the same number; I, J and K kept theirs; B32, B33 and I23 are new; limits are L9 to L24; no D id remains, and C28 is never reused. Not built, and waiting in `milestones/next/`: B19 (INSTALL), B30 and I20 (ENCRYPT), K1 (FRIENDS).
 - **Words:** the old Blueprint docs this pull request deletes held 25,789 words (strategy, design, roadmap, decisions and lessons), plus 5,219 in the workshop's notes. The new `blueprint/` holds 25,343, without `generated/` and this ledger. Its always-true part (README, PRODUCT, TERMS, the areas and JOURNEYS) holds 14,186, against 12,403 in the old strategy and design.
@@ -108,6 +108,8 @@ Each row drops a line, changes its meaning, adds a line no old line held, or cut
 | 90 | docs/v2/01, Rejected as ceremony: "a pre-sorted must/nice list" | dropped (PR 4) | DEC-2026-10-29-v2-design's rejected list leaves it out, and DECISIONS.md is append only; B27.3, where the reviewer grades each point for the card at hand, holds it in effect. |
 | 91 | docs/v2/01, App structure: "Minimal helper text. Keep only lines that clearly help." | dropped (PR 4) | Sam's guidance for the app's words has no line; the screens in `generated/screens/` record the words as built. |
 | 92 | docs/v2/03 §5, what history is for: "an agent that wants to know what was already decided …; a coordinator reviewing its helpers; and the owner's own analysis later" | dropped (PR 4) | B31 says what the history holds, not why; FRIENDS' question 2 names sharing it for feedback. |
+| 93 | (none; M4's plan, PR 5): a "dev" mark on the site | B18.6 · @M4: (PR 5b) | New clause B18.6: the front page on dev.agentpager.me says it is a dev server. Built and tested, with no old line. |
+| 94 | (none; M4's plan, PR 5, and M4's slice, Phone): a "dev" mark on the phone | B23.11 · @M4: (PR 5b) | New clause B23.11: a pager made on dev.agentpager.me is marked dev on Pagers and its screen. Built and tested, with no old line. |
 
 ## Gaps filled
 
@@ -1442,3 +1444,12 @@ PR 4 deleted `docs/v2/`, the root `workshop/`, `recipe.json` and four superseded
 | `.agents/plans/2026-10-31-root-handoff.md` | kept | the row above said PR 4 deletes it. The root rewrites it at M4's end, which drops its links to the deleted plans |  |
 | memory `agent-wake-research` and the report Ph2BtiR64UBSde6fbXW5LT | docs/research/2026-10-30-agent-wake-lab.md | the lasting record of what wakes which app and how it was tested; B33's note and CLIENTS cite it |  |
 | DECISIONS.md's citations of `docs/v2/` | kept as written | DECISIONS.md is append only, and "which git keeps" stays true: the tag is `history-archive` |  |
+
+## PR 5b: the dev marks
+
+PR 5b built the two "dev" marks M4's plan gave PR 5 that need the screens made again: the front page and the phone. Both count a server as dev when its address starts with `dev.`, so the catalogue, drawn from a local server, shows neither.
+
+| Old | New | Change | ⚑ |
+| --- | --- | --- | --- |
+| (none; M4's plan, PR 5): a "dev" mark on the site | B18.6 · @M4: (7 Getting started) | new line: the front page on dev.agentpager.me says it is a dev server, and agentpager.me's doesn't (`MarketingScreen.test.ts › B18.6`), so the Blueprint on main describes dev | ⚑ |
+| (none; M4's plan, PR 5, and M4's slice, Phone): a "dev" mark on the phone | B23.11 · @M4: (1 Pagers) | new line: a pager made on dev.agentpager.me is marked dev on its row in Pagers and on its own screen, and one made on agentpager.me isn't (`DesignTests.test_B23_11_aPagerMadeOnADevServerShowsTheDevMark`) | ⚑ |

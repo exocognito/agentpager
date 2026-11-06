@@ -63,6 +63,29 @@
   font-weight: 600;
   text-decoration: none;
 }
+/* On a dev server, a strip above the page says so (B18.6). */
+.mk-dev {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px 10px;
+  margin: 0;
+  padding: 10px 16px;
+  border-bottom: 1px solid #f3d3a3;
+  background: #fff3e0;
+  color: #7a4100;
+  font-size: 13px;
+  text-align: center;
+}
+.mk-dev strong {
+  padding: 1px 9px;
+  border-radius: 999px;
+  background: #ff9500;
+  color: #ffffff;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
 .mk-footer {
   padding-top: 120px;
   padding-bottom: 40px;

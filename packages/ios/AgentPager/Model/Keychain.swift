@@ -14,13 +14,16 @@ nonisolated struct LocalPager: Codable, Hashable, Sendable, Identifiable {
     var server: String
     var createdAt: Date
     var id: String { pagerId }
+    // A pager made on a dev server, such as dev.agentpager.me, carries a dev mark (B23.11, blueprint/areas/1-pagers.md).
+    // Only a host that starts with `dev.` counts: a local server, as the UI tests and the catalogue use, isn't marked.
+    var onDevServer: Bool { URL(string: server)?.host()?.lowercased().hasPrefix("dev.") ?? false }
 
     var publicKey: String {
         (try? Curve25519.KeyAgreement.PrivateKey(rawRepresentation: privateKey)).map { base64url($0.publicKey.rawRepresentation) } ?? ""
     }
 
     // The number is `ap1_` and base64url of the pager id (16 bytes) and the first 8 bytes of the SHA-256 of its public
-    // key (docs/v2/04-encryption.md §2), so a server can't swap the key.
+    // key (I19, blueprint/areas/6-privacy.md), so a server can't swap the key.
     static func make(name: String, server: String) -> LocalPager {
         let key = Curve25519.KeyAgreement.PrivateKey()
         var id = [UInt8](repeating: 0, count: 16)

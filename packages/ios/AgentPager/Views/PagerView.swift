@@ -34,6 +34,17 @@ struct PagerView: View {
         .navigationTitle(model.pager(pagerId)?.name ?? "Pager")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            // A pager made on a dev server says so beside its name (B23.11).
+            if let p = model.pager(pagerId), p.onDevServer {
+                ToolbarItem(placement: .principal) {
+                    HStack(spacing: 6) {
+                        Text(p.name).font(.headline).lineLimit(1)
+                        DevMark()
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("pager-title")
+                }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 NavigationLink(value: Route.pagerDetail(pagerId)) { Image(systemName: "gearshape") }
                     .accessibilityLabel("Pager settings")

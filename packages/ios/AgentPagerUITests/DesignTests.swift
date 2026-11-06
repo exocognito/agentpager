@@ -1,9 +1,9 @@
 import XCTest
 
 // The design catalogue's phone screens (blueprint/generated/screens/phone): one test per `-demo` state in
-// Sample.demo (Preview/Previews.swift), on the mocks' sample data with no network. Each keeps its screenshots in the
-// test result and, with DESIGN_DIR set, saves <state>.png and <state>.txt there: a line on what the screen shows, then
-// its accessibility tree. Light only: on the iOS 26.5 Simulator, setting dark appearance (XCUIDevice or simctl) left
+// Sample.demo (Preview/Previews.swift), on the sample data with no network, and one for the dev mark that draws none.
+// Each keeps its screenshots in the test result and, with DESIGN_DIR set, saves <state>.png and <state>.txt there: a
+// line on what the screen shows, then its accessibility tree. Light only: on the iOS 26.5 Simulator, setting dark appearance (XCUIDevice or simctl) left
 // the screenshots light (tried 30 Oct 2026). `pnpm designs` runs it; by hand:
 //   TEST_RUNNER_DESIGN_DIR=<dir> xcodebuild test ... -only-testing:AgentPagerUITests/DesignTests
 final class DesignTests: XCTestCase {
@@ -24,6 +24,34 @@ final class DesignTests: XCTestCase {
     func testUndo() { capture("undo", "The Undo window after Send: \"Sending in …s\" with Undo, over the Work pager.", until: "undo-button") }
     func testNotConfirmed() { capture("notconfirmed", "The \"Answer Not Confirmed\" alert once every retry of an answer failed: Cancel or Retry.", until: "Answer Not Confirmed") }
     func testNotPickedUp() { capture("notpickedup", "An answer no agent read 3 minutes after Send: the warning naming the agent, its computer and its project (I6).", until: "agent-confirmation") }
+
+    // Draws no catalogue screen. With the sample pagers made on dev.agentpager.me, each shows the dev mark on Pagers and
+    // beside its name on its screen; made on agentpager.me or a local server, as in the catalogue, none does.
+    func test_B23_11_aPagerMadeOnADevServerShowsTheDevMark() {
+        for (server, marked) in [("https://dev.agentpager.me", true), ("https://agentpager.me", false), ("http://127.0.0.1:8787", false)] {
+            let app = XCUIApplication()
+            app.launchArguments += ["-demo", "pagers", "-AgentPagerServerURL", server]
+            app.launch()
+            let row = app.buttons["pager-Work"]
+            wait(row, 15)
+            XCTAssertEqual(row.label.contains("Dev server"), marked, "\(server): \(row.label)")
+            if marked { keep("dev-pagers") }
+            row.tap()
+            wait(app.buttons["pager-settings"], 15)
+            let title = app.navigationBars.descendants(matching: .any)["pager-title"]
+            XCTAssertEqual(title.exists, marked, server)
+            if marked { XCTAssertTrue(title.label.contains("Work") && title.label.contains("Dev server"), title.label); keep("dev-pager") }
+            app.terminate()
+        }
+    }
+
+    // A screenshot kept in the test result only.
+    private func keep(_ name: String) {
+        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
 
     private func capture(_ state: String, _ about: String, until marker: String) {
         let app = XCUIApplication()

@@ -36,7 +36,7 @@ Sam decides these first:
 
 ## From the old Blueprint (not built yet)
 
-The lines the old Blueprint held for this milestone, as the [M4 ledger](../M4-house/ledger.md) moved them. Each reaches its area file with the code that makes it true.
+The lines the old Blueprint held for this milestone, as the [M4 ledger](https://github.com/exocognito/agentpager/blob/m4-house-ledger/blueprint/milestones/M4-house/ledger.md) moved them. Each reaches its area file with the code that makes it true.
 
 **B19 · Try a demo agent** (7 Getting started). Try AgentPager without an agent of your own: a demo agent connects to a pager on your phone, asks a sample decision and acknowledges your answer.
 1. The demo is for App Review's notes and for owners Sam invites; agentpager.me doesn't offer it publicly.

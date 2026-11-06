@@ -52,6 +52,8 @@ The Blueprint is a folder; AGENTS.md says where.
 
 ## Writing lines
 
+- **What earns a line.** A line holds what the owner wants specified where several good answers exist that an agent might reasonably choose, and the owner wants one of them or wants some ruled out. When the owner doesn't mind which answer an agent chooses, and the choice reads plainly in the code, it gets no line. Guarantees the owner relies on, such as data surviving or one owner per fact, count as minded; guards against harm count as ruling answers out.
+- **Look lives in the screens.** How a screen looks is held by the product's own screens in `generated/`, not by lines, unless the owner needs a treatment that an agent refactoring the screen wouldn't find obvious.
 - **One shape for every item**: a heading, `### <id> · @M<n> · <short promise>`, then a `Why:` only when the code can't tell you, then numbered clauses and bulleted notes. Notes aren't tested.
 - **A clause** is one checkable statement in plain words: what a person sees, or what must hold. No implementation. A "never" is a clause too.
 - **An area file** opens with a header: Definition, Serves (links to the PRODUCT.md headings it serves), Relies on, Code, Screens and Walked by. Then `## Behaviors`, `## Invariants`, `## Metrics` and `## Limits`, when not empty.
@@ -125,6 +127,7 @@ Never fix a miss the owner cares about with a test alone. A test follows from a 
 - Prod, and the client builds used with it, run only a commit tagged as green on dev: a milestone tag, or a fix tag between milestones.
 - A release deploys the service before the clients that depend on it, in the order AGENTS.md gives.
 - A release never loses data. What the previous release stored on dev still opens after the new one deploys there. A client from the previous release either keeps working or is told plainly to update.
+- The owner may except one release from these two rules. Its milestone doc then names what is lost or stops working, why, and what its upgrade check proves instead.
 
 ## Pull requests and review
 

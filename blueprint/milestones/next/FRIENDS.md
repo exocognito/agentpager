@@ -35,7 +35,7 @@ Sam decides these first:
 
 ## From the old Blueprint (not built yet)
 
-The lines the old Blueprint held for this milestone, as the [M4 ledger](../M4-house/ledger.md) moved them. Each reaches its area file with the code that makes it true.
+The lines the old Blueprint held for this milestone, as the [M4 ledger](https://github.com/exocognito/agentpager/blob/m4-house-ledger/blueprint/milestones/M4-house/ledger.md) moved them. Each reaches its area file with the code that makes it true.
 
 **K1 · Visible within five seconds** (4 Getting paged)
 1. With the app open, a new decision shows on the phone within 5 seconds of the agent's ask reply.

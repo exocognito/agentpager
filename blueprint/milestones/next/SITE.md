@@ -33,7 +33,7 @@ Sam works through the page in several rounds of visual drafts before anything is
 
 ## From the old Blueprint (not built yet)
 
-The lines the old Blueprint held for this milestone, as the [M4 ledger](../M4-house/ledger.md) moved them. Each reaches its area file with the code that makes it true.
+The lines the old Blueprint held for this milestone, as the [M4 ledger](https://github.com/exocognito/agentpager/blob/m4-house-ledger/blueprint/milestones/M4-house/ledger.md) moved them. Each reaches its area file with the code that makes it true.
 
 **B18, widened** (7 Getting started)
 1. The front page says what AgentPager does and how to get the app, and gives the one line that installs the command (B29, once INSTALL builds it).

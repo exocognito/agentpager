@@ -12,7 +12,8 @@ Start here. [PRODUCT.md](PRODUCT.md) says what AgentPager is for, as Sam approve
 | ✅ | [M2 · PAGERS](milestones/M2-pagers.md) | Pagers on my phone |
 | ✅ | [M3 · COMMAND](milestones/M3-command.md) | The agentpager command |
 | ✅ | [M4 · HOUSE](milestones/M4-house.md) | House in order: the Blueprint by area, a dev stage and the id check |
-| ⏳ | [ENCRYPT](milestones/next/ENCRYPT.md) | Decisions the service can't read |
+| 🔨 | [M5 · ENCRYPT](milestones/M5-encrypt.md) | Decisions the service can't read |
+| ⏳ | [STORE](milestones/next/STORE.md) | One store per pager: its agents' lifecycle and lighter polls |
 | ⏳ | [CLIENTS](milestones/next/CLIENTS.md) | The agent apps AgentPager supports |
 | ⏳ | [INSTALL](milestones/next/INSTALL.md) | AgentPager installs in a minute |
 | ⏳ | [SITE](milestones/next/SITE.md) | A front page for AgentPager as it is now |
@@ -33,6 +34,6 @@ Start here. [PRODUCT.md](PRODUCT.md) says what AgentPager is for, as Sam approve
 | 6 | [Privacy](areas/6-privacy.md) | What the service is and what it can see: the keys and the number's fingerprint that tie a pager to its phone, and how keys and the service's own secrets are kept | I19 I23 · L19 |
 | 7 | [Getting started](areas/7-getting-started.md) | How someone new finds and sets up AgentPager: `/start` and setting up the command in agent apps | B18 B29 · L21 L22 L24 |
 
-Limits (`L`) are what people meet today and the fix that waits; they start at L9. Lines not built yet wait in their milestone's doc in [milestones/next/](milestones/next/).
+Limits (`L`) are what people meet today and the fix that waits; they start at L9. Lines not built yet wait in their milestone's doc, under [milestones/](milestones/).
 
 Also: [TERMS.md](TERMS.md) · [JOURNEYS.md](JOURNEYS.md) (J3 J4 J5) · [DECISIONS.md](DECISIONS.md) · [milestones/](milestones/) · [generated/screens/](generated/screens/README.md): the app's own screens and journeys, made by `pnpm designs` · [generated/by-milestone.md](generated/by-milestone.md): what each milestone added · [generated/untested.md](generated/untested.md): the clauses no test names, and tests that name an unknown id. The id check, `pnpm blueprint`, writes these two; it reports and never blocks, and `pnpm check` fails only when they are stale.

@@ -91,3 +91,7 @@ Added to earlier entries:
 - **B23.11**, in [B23 · Pagers and the Pager screen](../areas/1-pagers.md#b23--m2--pagers-and-the-pager-screen): A pager made on dev.agentpager.me is marked dev on its row in Pagers and on its own screen. A pager made on agentpager.me isn't.
 - **I23.4**, in [I23 · Keys stay secret](../areas/6-privacy.md#i23--m1--keys-stay-secret): The service answers only over HTTPS. A plain HTTP request to read a page is sent to the same address on HTTPS, and any other is refused unread. Every HTTPS reply tells browsers to keep to HTTPS.
 - **B18.5**, in [B18 · /start tells an agent how to install](../areas/7-getting-started.md#b18--m3--start-tells-an-agent-how-to-install): On a dev server, one whose address starts with `dev.`, such as dev.agentpager.me, /start and the page an agent reads at its address say it is a dev server, whose pagers are its own. agentpager.me and every other server don't.
+
+## [M5 · ENCRYPT](../milestones/M5-encrypt.md)
+
+0 entries with 0 clauses, and 0 clauses added to earlier entries.

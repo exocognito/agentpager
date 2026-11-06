@@ -25,6 +25,7 @@ This file is append only. A reversed or narrowed decision gets a new entry, and 
 - **Why:** "The repo is feeling VERY disorganized right now and I want to get our house in order before we commit to building E2EE and making the product available to others." (Sam, 5 Nov 2026, M4's objective)
 - **Serves:** METHOD.md, as amended in M4 (Where things live, Ids, Writing lines, When things get written, Decisions, History, Tests); README.md; AGENTS.md.
 - **Replaces, in part:** DEC-2026-10-31-method and DEC-2026-10-31-next-roadmap, as their entries say.
+- → DEC-2026-11-06-store-after-encrypt, in part: three of ENCRYPT's hardening items became their own milestone, between ENCRYPT and CLIENTS.
 
 ## DEC-2026-10-08-native-ios · The product Sam shares is a native iPhone app
 
@@ -135,3 +136,24 @@ This file is append only. A reversed or narrowed decision gets a new entry, and 
   - Older entries here stay as written, since this file is append only. Two of them quote agents' words: DEC-2026-10-08-native-ios names an agent's write-up as Sam's, and DEC-2026-10-29-v2-design quotes the v2 design record.
 - **Serves:** METHOD.md › Writing lines; PRODUCT.md; every area's Serves and Why lines.
 
+## DEC-2026-11-06-line-test · A line only where Sam wants one answer
+
+- **Decided by:** Sam, on 6 Nov 2026.
+- **Basis:** Sam in the M4 root's Claude Code session, reviewing every Blueprint line at M4's review ([M4-house.md](milestones/M4-house.md) › Sam reviews after merge, question 1): "I write lines for things the owner wants to specify where there are multiple objectively good/fitting answers that an LLM might reasonably choose but I want one solution, or I want to avoid certain solutions. If I don't mind what solution an LLM chooses, and we can easily read that decision in the code, that promise shouldn't get copied to ledger." Then, on how a screen looks: "look is generally held by screens, unless I need a specific non-obvious treatment that is not obvious to an agent refactoring the screen."
+- **Decided, and still standing:**
+  - A line holds what Sam wants specified where several good answers exist and Sam wants one of them, or wants some ruled out. A choice Sam doesn't mind, which reads plainly in the code, gets no line.
+  - How a screen looks is held by the screens, unless Sam needs a treatment that an agent refactoring the screen wouldn't find obvious.
+  - As #54 to #56 applied it: guarantees, such as data surviving, one owner per fact and outcomes that may be uncertain, count as things Sam minds; guards against harm count as ruling answers out.
+- **Why:** M4's conversion had carried lines into the areas that Sam didn't mind, and Sam gave the test to judge which to keep.
+- **Serves:** METHOD.md › Writing lines (What earns a line, Look lives in the screens); every area file and JOURNEYS.md; `generated/screens/`.
+
+## DEC-2026-11-06-store-after-encrypt · ENCRYPT keeps two hardening items; one store per pager follows it
+
+- **Decided by:** Sam, on 6 Nov 2026.
+- **Basis:** "Agree with all your recs, though for starting M5 I would like you to give to a herdr pane with fresh Opus 5.5 xhigh thinking bypass perms, and ask them to orchestrate subagents to see it through to green on dev and I'll test there" (Sam in the previous root's Claude Code session, answering its five numbered questions on starting M5; [M5-encrypt.md](milestones/M5-encrypt.md) › Owner decides first records each choice.)
+- **Decided, and still standing:**
+  - M5 ENCRYPT keeps encryption and two of its five hardening items, an ask request id and a client-version header, since both change the wire contract that encryption changes anyway.
+  - The other three become their own milestone, right after ENCRYPT and before CLIENTS, queued as STORE, the word M5's Plan proposed: one store per pager, holding its row, its agents and their decisions, which closes L10; both polls made smaller, so the phone reads one object per pager and a waiting agent is woken rather than checking storage; and the agent's lifecycle, in which finishing closes the agent's open decisions so they can't be answered.
+  - The order after M4 is ENCRYPT, STORE, CLIENTS, INSTALL, SITE, OPEN, FRIENDS, one at a time.
+- **Why:** the two items that change the wire contract go with the switch that breaks it; the other three are a different kind of change, to how the service stores and reads a pager.
+- **Serves:** README.md › Milestones; `milestones/M5-encrypt.md`; `milestones/next/STORE.md`; L10 in 1 Pagers.

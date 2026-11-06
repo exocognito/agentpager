@@ -1,7 +1,7 @@
 // The id check's parser, citations and freshness (scripts/blueprint.mjs). Run by `pnpm test`.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
@@ -84,7 +84,7 @@ test('warnings: duplicate ids, headings off the grammar, an unknown @M and a D i
   ]);
 });
 
-test('citations: only a test\'s name counts, never a comment or another string; untested lists the rest and unknown ids', () => {
+test('citations: only a test\'s name counts, never a test inside a comment or a string; untested lists the rest and unknown ids', () => {
   const cited = citations([
     { file: 'packages/a.test.ts', text: [
       "test('B5.1 Read the first clause', () => {",
@@ -94,8 +94,25 @@ test('citations: only a test\'s name counts, never a comment or another string; 
       'describe("I4.2 and C25.3, an old id", () => {});',
       "test.each([[1, f(2)]])('I4.3 a table, %s', () => {});",
       "it.skip(`I4.4 skipped`, () => {});",
+      "// test('B5.2 a commented-out test', () => {});",
+      "/* it('B5.2 a block-commented test', () => {});",
+      "   test('B5.2 still in the block', () => {}); */",
+      "const fixture = \"test('B5.2 a test inside a string')\", url = 'https://fixtures.invalid/'; test('I4.5 after a // in a string', f);",
+      "test('I4.6 a name with // in it', () => {});",
     ].join('\n') },
-    { file: 'packages/ios/FlowTests.swift', text: 'func test_B5_3_theThird() {\n    // B5_2 in a comment\n    XCTAssertEqual(row.label, "B5_2 is only a label")\n}\nfunc testB5_1Again() {}' },
+    { file: 'packages/ios/FlowTests.swift', text: [
+      'func test_B5_3_theThird() {',
+      '    // B5_2 in a comment',
+      '    XCTAssertEqual(row.label, "B5_2 is only a label")',
+      '}',
+      'func testB5_1Again() {}',
+      '// func test_B5_2_commentedOut() {}',
+      '/// func test_B5_2_inADocComment() {}',
+      'let page = """',
+      '    func test_B5_2_inAMultiLineString() {} // and "quoted"',
+      '    """',
+      'let line = "func test_B5_2_inAString() {}"',
+    ].join('\n') },
   ]);
   assert.deepEqual([...cited], [
     ['B5.1', ['packages/a.test.ts', 'packages/ios/FlowTests.swift']],
@@ -103,10 +120,12 @@ test('citations: only a test\'s name counts, never a comment or another string; 
     ['C25.3', ['packages/a.test.ts']],
     ['I4.3', ['packages/a.test.ts']],
     ['I4.4', ['packages/a.test.ts']],
+    ['I4.5', ['packages/a.test.ts']],
+    ['I4.6', ['packages/a.test.ts']],
     ['B5.3', ['packages/ios/FlowTests.swift']],
   ]);
   const report = untested([parse('blueprint/areas/9-sample.md', AREA, () => {})], cited);
-  assert.match(report, /\*\*1 of 3 clauses untested\*\*, 2 tested\. Tests name 4 unknown ids\./);
+  assert.match(report, /\*\*1 of 3 clauses untested\*\*, 2 tested\. Tests name 6 unknown ids\./);
   assert.match(report, /## 9 Sample\n\n- \[B5 · Read a decision\]\(\.\.\/areas\/9-sample\.md#b5--m1--read-a-decision\): B5\.2\n/);
   assert.match(report, /- `C25\.3` in `packages\/a\.test\.ts`\n- `I4\.2` in `packages\/a\.test\.ts`\n- `I4\.3` in/);
 });
@@ -131,4 +150,14 @@ test('main: --check fails only when a generated file is stale, never for a warni
   write('packages/x/a.test.ts', "test('B5.2 Read the second clause', () => {});\n");
   assert.equal(main(['--check'], root, log), 1, 'a test now names another clause');
   assert.equal(lines.at(-1), 'blueprint/generated/untested.md is stale: the Blueprint or the tests changed since. Run `pnpm blueprint` and commit blueprint/generated.');
+});
+
+test('run as a script through a symlink or a relative path, --check still compares', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'agentpager-blueprint-link-')); // on macOS, tmpdir is itself behind a symlink
+  symlinkSync(path.dirname(new URL(import.meta.url).pathname), path.join(dir, 'scripts'));
+  for (const script of [path.join(dir, 'scripts/blueprint.mjs'), 'scripts/blueprint.mjs']) {
+    let output;
+    try { output = execFileSync(process.execPath, [script, '--check'], { cwd: dir, encoding: 'utf8', stdio: 'pipe' }); } catch (error) { output = `${error.stdout}${error.stderr}`; }
+    assert.match(output, /Blueprint reports are current|is stale|are stale/, `${script} ran the check`);
+  }
 });

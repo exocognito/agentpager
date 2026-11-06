@@ -3,7 +3,7 @@
 //   node scripts/blueprint.mjs          (pnpm blueprint) rewrites both files and prints the warnings
 //   node scripts/blueprint.mjs --check  (in pnpm check) fails only when either file is stale; warnings never fail it
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -18,10 +18,13 @@ const D_ID = /(?<![\w-])D\d+(?![\w-])/;
 // A test counts when its name carries the id. A TypeScript test's name is the string given to `test(`, `it(` or
 // `describe(`, after modifiers such as `.skip` or `.each(table)`: `test('B25.2 Connect from MCP', …)`. Swift has no
 // dot in a name, so an iPhone test function's name is `test`, then the id with `_` for its dot, as in
-// `func test_B25_2_connectsFromMCP()` (METHOD.md › Tests) or `func testB25_2ConnectsFromMCP()`. Comments and other
-// strings name nothing. The letters of retired ids (C, D) are read too, so a test naming one is reported.
-const TS_NAME = /(?<![\w$.])(?:test|it|describe)(?:\.\w+)*(?:\((?:[^()]|\([^()]*\))*\))?\(\s*(['"`])(.*?)\1/g;
-const SWIFT_NAME = /\bfunc\s+test(\w*)/g;
+// `func test_B25_2_connectsFromMCP()` (METHOD.md › Tests) or `func testB25_2ConnectsFromMCP()`. One left-to-right
+// pass reads each test name, and skips each comment (`//`, `///`, `/* */`) and every other string whole, Swift's
+// `"""` ones included, so a test inside a comment or a string never counts, and a `//` inside a string is no comment.
+// The letters of retired ids (C, D) are read too, so a test naming one is reported.
+const STRING = String.raw`"""[\s\S]*?"""|'(?:\\.|[^\\'\n])*'|"(?:\\.|[^\\"\n])*"|\`(?:\\.|[^\\\`])*\``;
+const TS_TEST = String.raw`(?<![\w$.])(?:test|it|describe)(?:\.\w+)*(?:\((?:[^()]|\([^()]*\))*\))?\(\s*(${STRING})`;
+const NAMES = new RegExp(String.raw`${TS_TEST}|\bfunc\s+test(\w*)|${STRING}|\/\/.*|\/\*[\s\S]*?\*\/`, 'g');
 const CITED = /(?<![A-Za-z0-9])([BCDIJKL])(\d+)[._](\d+)(?!\d)/g;
 const TEST_FILE = /\.test\.[cm]?[jt]sx?$|Tests\.swift$/;
 
@@ -72,8 +75,8 @@ export function check(files, milestones, warn) {
 // The clause ids that tests' names carry, each with the files whose tests carry it.
 export function citations(tests) {
   const cited = new Map();
-  const names = (file, text) => file.endsWith('.swift') ? [...text.matchAll(SWIFT_NAME)].map(m => m[1]) : [...text.matchAll(TS_NAME)].map(m => m[2]);
-  for (const { file, text } of tests) for (const m of names(file, text).flatMap(name => [...name.matchAll(CITED)])) {
+  const names = text => [...text.matchAll(NAMES)].map(m => m[1] ?? m[2]).filter(name => name !== undefined);
+  for (const { file, text } of tests) for (const m of names(text).flatMap(name => [...name.matchAll(CITED)])) {
     const id = `${m[1]}${m[2]}.${m[3]}`;
     cited.set(id, [...new Set([...(cited.get(id) ?? []), file])]);
   }
@@ -166,4 +169,6 @@ export function main(argv, root = repo, log = console) {
   return 0;
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) process.exitCode = main(process.argv.slice(2));
+// Run as a script, by any path to it: relative, or through a symlink.
+const isMain = () => { try { return realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url)); } catch { return false; } };
+if (isMain()) process.exitCode = main(process.argv.slice(2));

@@ -68,15 +68,24 @@ try {
   for (const [name, className] of [['AGENT', 'Agent'], ['REGISTRY', 'Registry']]) if (!bindings.some(b => b.name === name && b.class_name === className && placement.some(n => n.id === b.namespace_id && n.class === className))) throw new Error(`Incorrect ${name} binding.`);
   console.log('Bindings:', JSON.stringify(bindings));
   if (!settings.bindings.some(b => b.type === 'secret_text' && b.name === 'APNS_KEY_P8')) throw new Error('The Worker secret APNS_KEY_P8 is missing, so no alerts go out.');
-  // A new hostname can take a moment to resolve, so a failed request is tried again like a stale build.
+  // A new hostname's record takes Cloudflare a moment to serve, and a resolver that asks before then keeps the
+  // negative answer for up to the zone's 30 minutes. So this machine asks only once public DNS answers.
+  let resolved = false;
+  for (let n = 0; n < 60 && !resolved; n++) {
+    const answer = await fetch(`https://cloudflare-dns.com/dns-query?name=${stage.host}&type=AAAA`, { headers: { accept: 'application/dns-json' } }).then(r => r.json()).catch(() => ({}));
+    resolved = Array.isArray(answer.Answer) && answer.Answer.length > 0;
+    if (!resolved) await new Promise(r => setTimeout(r, 2000));
+  }
+  if (!resolved) throw new Error(`Public DNS has no record for ${stage.host} yet; run this again with --verify in a few minutes.`);
   let seen = 'no reply';
-  for (let n = 0; n < 60; n++) {
+  for (let n = 0; n < 30; n++) {
     try {
       const response = await fetch(`https://${stage.host}/start`);
       seen = response.headers.get('x-agentpager-build') ?? `status ${response.status}`;
       if (seen === sha) { console.log(`Verified HTTPS candidate ${sha} at https://${stage.host}`); process.exit(0); }
-    } catch (error) { seen = error instanceof Error ? error.message : 'request failed'; }
+    } catch (error) { seen = error instanceof Error ? `${error.message}${error.cause?.code ? ` (${error.cause.code})` : ''}` : 'request failed'; }
     await new Promise(r => setTimeout(r, 2000));
   }
-  throw new Error(`https://${stage.host} did not report the candidate build (last seen: ${seen}).`);
+  const local = seen.includes('ENOTFOUND') ? '; public DNS has it, so this machine\'s resolver may still hold an earlier negative answer, for up to 30 minutes' : '';
+  throw new Error(`https://${stage.host} did not report the candidate build (last seen: ${seen}${local}).`);
 } catch (error) { console.error(error instanceof Error ? error.message : 'Deploy failed'); process.exit(1); }

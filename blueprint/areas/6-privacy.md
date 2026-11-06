@@ -11,7 +11,7 @@
 
 ### I19 · @M2 · The number names the pager's key
 
-Why: "The pager number binds my phone's key, so the service can't swap it."
+Why: "The pager number binds my phone's key". The rest of Sam's sentence, "so the service can't swap it", holds only once ENCRYPT builds the command's own check.
 
 1. Each pager's key pair is made on the phone (B26), and its private key stays there. The service gets only the public key.
 2. A pager's number names the pager and carries a fingerprint of the pager's public key.

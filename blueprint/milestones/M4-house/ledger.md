@@ -8,7 +8,7 @@ Every line of the old Blueprint, and where it went when M4 converted it to the a
 - **⚑ for Sam:** 63.
 - **The new Blueprint:** 7 areas with 23 entries (14 behaviors and 9 invariants) and 161 clauses, 16 limits (L9 to L24), and 3 journeys with 20 steps.
 - **Ids:** each C became B with the same number; I, J and K kept theirs; B32, B33 and I23 are new; limits are L9 to L24; no D id remains, and C28 is never reused. Not built, and waiting in `milestones/next/`: B19 (INSTALL), B30 and I20 (ENCRYPT), K1 (FRIENDS).
-- **Words:** the old Blueprint docs this pull request deletes held 25,769 words (strategy, design, roadmap, decisions and lessons), plus 5,219 in the workshop's notes. The new `blueprint/` holds 25,078, without `generated/` and this ledger. Its always-true part (README, PRODUCT, TERMS, the areas and JOURNEYS) holds 14,122, against 12,383 in the old strategy and design.
+- **Words:** the old Blueprint docs this pull request deletes held 25,769 words (strategy, design, roadmap, decisions and lessons), plus 5,219 in the workshop's notes. The new `blueprint/` holds 25,167, without `generated/` and this ledger. Its always-true part (README, PRODUCT, TERMS, the areas and JOURNEYS) holds 14,136, against 12,383 in the old strategy and design.
 
 ## ⚑ for Sam
 
@@ -32,7 +32,7 @@ Each row drops a line, changes its meaning, adds a line no old line held, or cut
 | 14 | C27 caveat 1, "nothing proves that the agent ran the review or followed it" | L16 · Nothing makes an agent review its card | New limit L16: nothing makes an agent run the review. The old ledger sent it to a test comment. |
 | 15 | C31 caveat 3 (deleting a pager leaves its history) | L15 · Deleting a pager leaves its agents' files | L15's fix, and revisiting it at FRIENDS, are the drafter's guesses. |
 | 16 | I5 body, "Repeating a send with the same request id returns the stored receipt. Changing its input, or answering again with a new request id, is refused." | I5.2 | I5.2's replay and second-answer refusals have no test. |
-| 17 | I19 serves SI2, SI10 | I19 Why: "The pager number binds my phone's key, so the service can't swap it." | I19's new Why quotes SI10, whose "can't swap it" holds only after ENCRYPT. |
+| 17 | I19 serves SI2, SI10 | I19 Why: "The pager number binds my phone's key" | I19's new Why quotes the half of SI10 that holds today; "so the service can't swap it" waits for ENCRYPT. |
 | 18 | I22 ¶1 s1, what broken in structure means | I22.2, I22.3, I22.5 | I22's "broken" is widened to what the command refuses today: an unreadable card, a character that breaks the table, an unreadable attachment. |
 | 19 | (none) | J5.6 "The agent's wait returns the owner's answer (B32)." | J5 gains a step, the wait returning the answer, which no old step said. |
 | 20 | D1 must supply: HTTPS on the apex, every plain HTTP request redirected, every response with Strict-Transport-Security; must never: answer over plain HTTP; deployed check: plain HTTP redirects and HTTPS carries HSTS | L20 · The service still answers plain HTTP (6 Privacy); next/ENCRYPT (I23's clause, unless M4 fixes it first) | D1's "HTTPS only" isn't true (5 Nov): new limit L20, and the clause waits in ENCRYPT. Sam was asked whether to fix it in M4. |
@@ -350,7 +350,7 @@ Old clause numbers are the old behaviour numbers: C26.3 is C26's third behaviour
 | C30.6 | next/ENCRYPT (B30, linking B17's new clause) | Not built: alerts carry ciphertext, and an extension on the phone decrypts them to show the real question. Area 4 sent the same clause as B17's change (ledger-4, C17.9); the ENCRYPT drafter keeps one home |  |
 | C30 caveat 1: the service still sees which pager and agent, when, and sizes | next/ENCRYPT | A limit once encryption is built (it describes the encrypted product). Also ENCRYPT's out of scope, as MENCRYPT.md says |  |
 | C30 caveat 2: nothing protects a phone or agent machine someone else controls | next/ENCRYPT | A limit once encryption is built |  |
-| C30 serves SI10 | I19 Why | Ids are gone; SI10's sentence is I19's Why |  |
+| C30 serves SI10 | I19 Why (its first half); next/ENCRYPT Objective (whole) | Ids are gone. The half of SI10's sentence that holds today is I19's Why, and ENCRYPT's Objective quotes the whole sentence |  |
 | — (C30 caveat 2) | next/ENCRYPT.md Out of scope 3 "Protecting a phone or an agent's machine that someone else controls." | ledger-6 sends the caveat to ENCRYPT; this is its home |  |
 
 ### `packages/blueprint/design/capabilities/C31-history-on-the-agents-machine.md`
@@ -459,7 +459,7 @@ Old clause numbers are the old behaviour numbers: C26.3 is C26's third behaviour
 | Old | New | Change | ⚑ |
 | --- | --- | --- | --- |
 | I19 heading "The number names the phone's key" | I19 · @M2 · The number names the pager's key | Retitled: "the phone's key" reads as TERMS' "phone key", the bearer key, but it means the pager's public key. Meaning kept |  |
-| I19 serves SI2, SI10 | I19 Why: "The pager number binds my phone's key, so the service can't swap it." | A new Why line, quoted exactly from SI10 (A7: Sam approves Why lines). SI10 may stay out of PRODUCT.md (A18), so the quote's source is STRATEGY.md. The "can't swap it" half holds only once ENCRYPT builds the command's check; I19's second note says so | ⚑ |
+| I19 serves SI2, SI10 | I19 Why: "The pager number binds my phone's key" | A new Why line, quoted exactly from SI10 (A7: Sam approves Why lines). SI10 may stay out of PRODUCT.md (A18), so the quote's source is STRATEGY.md, and ENCRYPT's Objective quotes it whole. The Why stops before "so the service can't swap it", which holds only once ENCRYPT builds the command's check (the sanity review's finding); the Why says so | ⚑ |
 | I19 statement, sentence 1 | I19.2 |  |  |
 | I19 statement, sentence 2, first half (makes no pager …) | I19.3 |  |  |
 | I19 statement, sentence 2, second half (connects no agent …) | I19.4 |  |  |

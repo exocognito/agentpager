@@ -121,15 +121,44 @@ export function encodePart<K extends ShapedKind>(kind: K, value: PartOf<K>): Uin
   if (Either.isLeft(result)) throw new PartInvalid(kind, problems(result.left));
   return utf8.encode(JSON.stringify(result.right));
 }
-// An opened part's bytes as its kind's shape: UTF-8 (no byte-order mark), JSON, then the shape, strictly; a preview's
-// bytes as they came, not as they encode again, are held to PREVIEW_MAX_BYTES, as the phone holds them. Anything else
-// is refused. Where a field is repeated, JavaScript keeps the last and the phone's Foundation the first; no sealer
-// writes one, and whoever can seal a part can write any content anyway.
+// Whether valid JSON names a field twice in one object. JavaScript keeps the last and the phone's Foundation the
+// first, so both sides refuse it rather than read one part two ways. Keys compare once unescaped, as JSON.parse
+// reads them.
+export function repeatsAField(json: string): boolean {
+  const objects: (Set<string> | null)[] = [];
+  let key = false;
+  for (let i = 0; i < json.length; i++) {
+    const c = json[i];
+    if (c === '"') {
+      let end = i + 1;
+      while (json[end] !== '"') end += json[end] === "\\" ? 2 : 1;
+      const fields = objects.at(-1);
+      if (key && fields) {
+        const name: string = JSON.parse(json.slice(i, end + 1));
+        if (fields.has(name)) return true;
+        fields.add(name);
+        key = false;
+      }
+      i = end;
+    } else if (c === "{") { objects.push(new Set()); key = true; }
+    else if (c === "[") { objects.push(null); key = false; }
+    else if (c === "}" || c === "]") { objects.pop(); key = false; }
+    else if (c === ",") key = objects.at(-1) instanceof Set;
+  }
+  return false;
+}
+
+// An opened part's bytes as its kind's shape: UTF-8 (no byte-order mark), JSON naming no field twice, then the
+// shape, strictly; a preview's bytes as they came, not as they encode again, are held to PREVIEW_MAX_BYTES, as the
+// phone holds them. Anything else is refused.
 export function decodePart<K extends ShapedKind>(kind: K, bytes: Uint8Array): PartOf<K> {
   if ((kind === "decisionPreview" || kind === "acknowledgementPreview") && bytes.length > PREVIEW_MAX_BYTES) throw new PartInvalid(kind, `a preview may not exceed ${PREVIEW_MAX_BYTES} bytes`);
   let value: unknown;
-  try { value = JSON.parse(new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes)); }
-  catch { throw new PartInvalid(kind, "not JSON as UTF-8"); }
+  try {
+    const text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
+    value = JSON.parse(text);
+    if (repeatsAField(text)) throw new Error("a field named twice");
+  } catch { throw new PartInvalid(kind, "not JSON as UTF-8 naming each field once"); }
   const shape: Schema.Schema.AnyNoContext = PartShapes[kind];
   const result = Schema.decodeUnknownEither(shape, { onExcessProperty: "error" })(value);
   if (Either.isLeft(result)) throw new PartInvalid(kind, problems(result.left));

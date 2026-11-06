@@ -311,10 +311,131 @@ export async function vectors(): Promise<string> {
     { name: "decision preview within the byte limit as JSON, over it as sent with spaces", kind: "decisionPreview", plaintext: b64(utf8(JSON.stringify(crowded, null, 40))) },
   ];
 
-  // The generator refuses to write a file whose part vectors its own shapes disagree with.
   const decodes = (kind: string, plaintext: string) => {
     try { decodePart(kind as ShapedKind, new Uint8Array(Buffer.from(plaintext, "base64url"))); return true; } catch { return false; }
   };
+  // A field named twice: JavaScript would keep the last and Foundation the first, so both refuse it.
+  partsInvalid.push(
+    { name: "identity naming app twice, null last", kind: "identity", plaintext: b64(utf8('{"app":"Codex","app":null,"project":"site"}')) },
+    { name: "identity naming app twice, null first", kind: "identity", plaintext: b64(utf8('{"app":null,"app":"Codex","project":"site"}')) },
+    { name: "identity naming app twice, once escaped", kind: "identity", plaintext: b64(utf8('{"app":"Codex","\\u0061pp":"Other","project":"site"}')) },
+    { name: "answer naming its kind twice", kind: "answer", plaintext: b64(utf8('{"choice":{"kind":"option","number":1,"kind":"option"}}')) },
+    { name: "card naming an option's title twice", kind: "card", plaintext: b64(utf8(JSON.stringify(c).replace('"title":"Ship today"', '"title":"Ship today","title":"Ship now"'))) },
+  );
+
+  // The brief's Markdown rules, case by case, as the contract reads them: each card goes to valid or invalid by what
+  // decodePart says, and the phone must say the same. Every case has an Options section unless it tests one.
+  const opts = "## Options\n";
+  const briefs: [string, string][] = [
+    ["no Options section", "## Context: x\nWhy.\n"],
+    ["Options heading ending in CR", "## Options\r\nWhy.\r\n"],
+    ["Options heading after a tab", "##\tOptions\n"],
+    ["Options heading after a no-break space", "##\u00a0Options\n"],
+    ["Options heading after NEL, not JavaScript whitespace", "##\u0085Options\n"],
+    ["Options heading with no space", "##Options\n"],
+    ["Options heading run into a letter", "## Optionsx\n"],
+    ["Options heading with a colon", "## Options: two plans\n"],
+    ["options heading in lower case", "## options\n"],
+    ["Options at heading level 3", "### Options\n"],
+    ["Options heading split by a line separator", "## Opt\u2028ions\n"],
+    ["Options heading ending in a line separator", "## Options\u2028\n"],
+    ["recommendation of another option", opts + "## Recommendation: A\n"],
+    ["recommendation with a star", opts + "## Recommendation: B✶\n"],
+    ["recommendation with no space after the colon", opts + "## Recommendation:B\n"],
+    ["recommendation with no colon", opts + "## Recommendation B\n"],
+    ["recommendation after a CR, not a heading", opts + "## Recommendation:\rB\n"],
+    ["recommendation after a CR, of another option", opts + "## Recommendation:\rA\n"],
+    ["recommendation with no letter", opts + "## Recommendation\n"],
+    ["Recommendations, another word", opts + "## Recommendations: A\n"],
+    ["recommendation in lower case", opts + "## Recommendation: b\n"],
+    ["recommendation in bold", opts + "## Recommendation: **B**\n"],
+    ["recommendation of two letters", opts + "## Recommendation: BC\n"],
+    ["recommendation after a no-break space", opts + "## Recommendation:\u00a0B\n"],
+    ["option block", opts + ":::option A\ntext\n:::\n"],
+    ["option block for no option", opts + ":::option C\ntext\n:::\n"],
+    ["option blocks for one option twice", opts + ":::option A\n:::\n:::option A\n:::\n"],
+    ["option block with spaces around its letter", opts + ":::option   A  \n:::\n"],
+    ["option block after a tab", opts + ":::option\tA\n:::\n"],
+    ["option block after a no-break space, not a block", opts + ":::option\u00a0A\n:::\n"],
+    ["option block run into its letter, not a block", opts + ":::optionA\n:::\n"],
+    ["block never closed", opts + ":::smallprint\n- one\n"],
+    ["close with no block", opts + ":::\n"],
+    ["nested blocks by fence length", opts + "::::option A\n:::chat\nme: hi\n:::\n::::\n"],
+    ["nested blocks of one length", opts + ":::option A\n:::chat\nme: hi\n:::\n:::\n"],
+    ["close shorter than its block", opts + "::::option A\n:::\n"],
+    ["block name with a digit, not a block", opts + ":::opt1on A\n"],
+    ["block name in capitals, not a block", opts + ":::OPTION A\n"],
+    ["blocks with CR line ends", opts + ":::option A\r\nx\r\n:::\r\n"],
+    ["chat line linking nowhere", opts + ":::chat\nFrom: [secret](notes.md)\n:::\n"],
+    ["chat fence markers are chat", opts + ":::chat\nFrom: hi\n~~~\nFrom: [secret](notes.md)\n~~~\n:::\n"],
+    ["link inside fenced code", opts + "```\n[More](notes.md)\n```\n"],
+    ["HTML inside fenced code", opts + "```diff\n- <div>old</div>\n```\n"],
+    ["HTML outside code", opts + "<b>bold</b>\n"],
+    ["an HTML comment", opts + "<!-- hidden -->\n"],
+    ["a less-than sign before a space", opts + "a < b\n"],
+    ["a less-than sign before a digit", opts + "<3 it\n"],
+    ["a less-than sign before a non-ASCII letter", opts + "<é>\n"],
+    ["HTML in a code span", opts + "Use `<div>` here.\n"],
+    ["HTML after an escaped backtick", opts + "See \\`<img src=x>` now\n"],
+    ["HTML inside a tilde fence", opts + "~~~\n<b>\n~~~\n"],
+    ["a tilde line doesn't close a backtick fence", opts + "```\n<b>\n~~~\n<i>\n"],
+    ["a shorter fence doesn't close a longer one", opts + "````\n<b>\n```\n<i>\n````\n<u>\n"],
+    ["indented fences", opts + "  ```\n<b>\n  ```  \n"],
+    ["a fence line with text doesn't close", opts + "```\n<b>\n``` x\n<i>\n"],
+    ["a fence after a vertical tab", opts + "\u000b```\n<b>\n```\n"],
+    ["a fence after NEL is not a fence", opts + "\u0085```\n<b>\n```\n"],
+    ["two backticks open no fence", opts + "``\n<b>\n``\n"],
+    ["link naming an image", opts + "[the diagram](diagram.png)\n"],
+    ["image naming a page", opts + "![bg](background.md)\n"],
+    ["image of an image", opts + "![x](diagram.png)\n"],
+    ["link to a page", opts + "[More](background.md)\n"],
+    ["https link", opts + "[Docs](https://example.com)\n"],
+    ["http link", opts + "[Site](http://example.com)\n"],
+    ["https image", opts + "![A](https://example.com/a.png)\n"],
+    ["link with a title to a missing page", opts + '[a](notes.md "title")\n'],
+    ["https link with a title", opts + '[a](https://x.com "t")\n'],
+    ["link with a title after a tab", opts + '[a](background.md\t"t")\n'],
+    ["link with a space before its close, no link", opts + '[a](notes.md "t" )\n'],
+    ["link with a space after its open, no link", opts + "[a]( notes.md)\n"],
+    ["escaped bracket in a link", opts + "[me\\]](tel:+15551234)\n"],
+    ["escaped brackets, no link", opts + "A \\[not a link\\](x) here\n"],
+    ["unpaired backticks hide no link", opts + "Call ``[me](tel:+15551234)` now\n"],
+    ["a code span then a link", opts + "``a ` b`` c [x](tel:1)\n"],
+    ["two bangs before an image", opts + "!![a](diagram.png)\n"],
+    ["empty link text to https", opts + "[](https://e.com)\n"],
+    ["link target with a non-ASCII space", opts + "[a](notes.md\u3000\"t\")\n"],
+    ["Tradeoffs table", opts + "## Tradeoffs\n| | A Delete | B✶ Keep |\n|-|-|-|\n| x | y | z |\n"],
+    ["Tradeoffs column with no letter", opts + "## Tradeoffs\n| | A | Cost |\n"],
+    ["Tradeoffs column of a word", opts + "## Tradeoffs\n| | Apple | B |\n"],
+    ["Tradeoffs column in bold", opts + "## Tradeoffs\n| | **A** | B |\n"],
+    ["Tradeoffs row with no closing bar", opts + "## Tradeoffs\n| | A | B\n"],
+    ["Tradeoffs column for no option", opts + "## Tradeoffs\n| | A | C |\n"],
+    ["Tradeoffs table after a line", opts + "## Tradeoffs\nintro\n| | A | B |\n"],
+    ["Tradeoffs checks its first row only", opts + "## Tradeoffs\n| | A | B |\n| | C | D |\n"],
+    ["Tradeoffs row with spaces around", opts + "## Tradeoffs\n  | | A | B |  \n"],
+    ["Tradeoffsx, another word", opts + "## Tradeoffsx\n| | A | Cost |\n"],
+    ["Tradeoffs row inside an option block", opts + "## Tradeoffs\n:::option A\n| | X |\n:::\n"],
+    ["Tradeoffs column with a non-ASCII letter after", opts + "## Tradeoffs\n| | Aé | B |\n"],
+    ["blank brief", " \n \t\n"],
+    ["brief of 20,000 characters", opts + "x".repeat(20_000 - 11)],
+    ["brief of 20,001 characters", opts + "x".repeat(20_000 - 10)],
+  ];
+  // And 150 briefs pieced together from the fragments those rules turn on, from a fixed seed.
+  const FRAGMENTS = ["## ", "##", "Options", "Recommendation", "Tradeoffs", ": ", "A", "B", "C", "✶", "*", ":::", "::::", "option ", "chat",
+    "```", "~~~", "`", "``", "\\", "[", "]", "(", ")", "!", '"', "<b>", "<", "diagram.png", "background.md", "https://e.com", "notes.md",
+    "|", " ", "\t", "\r", "\u000b", "\u00a0", "\u2028", "\u0085", "\ufeff", "\n", "\n", "\n", "x", "é", "👨‍👩‍👧"];
+  let state = 0x2545f491;
+  const next = () => { state ^= state << 13; state ^= state >>> 17; state ^= state << 5; return (state >>> 0) / 2 ** 32; };
+  for (let n = 1; n <= 150; n++) {
+    const length = 4 + Math.floor(next() * 40);
+    briefs.push([`pieced together ${n}`, opts + Array.from({ length }, () => FRAGMENTS[Math.floor(next() * FRAGMENTS.length)]).join("")]);
+  }
+  for (const [name, markdown] of briefs) {
+    const plaintext = b64(utf8(JSON.stringify({ ...c, card: { ...c.card, markdown } })));
+    (decodes("card", plaintext) ? partsValid : partsInvalid).push({ name: `brief: ${name}`, kind: "card", plaintext });
+  }
+
+  // The generator refuses to write a file whose part vectors its own shapes disagree with.
   for (const p of partsValid) if (!decodes(p.kind, p.plaintext)) throw new Error(`valid part refused: ${p.name}`);
   for (const p of partsInvalid) if (decodes(p.kind, p.plaintext)) throw new Error(`invalid part accepted: ${p.name}`);
   if (Buffer.from(json(crowded), "base64url").length > PREVIEW_MAX_BYTES) throw new Error("the shortened preview doesn't fit");

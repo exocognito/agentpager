@@ -2,9 +2,9 @@ import Foundation
 
 // The plaintext of each kind of encrypted part, mirroring packages/contract/parts.ts: JSON as UTF-8, decoded strictly
 // (a field the shape doesn't have, or null for one it may leave out, is refused) and held to the contract's limits.
-// An attachment's plaintext is the file's bytes and has no shape here. What this doesn't check, the command checks
-// before sealing: the brief's Markdown rules and that its links name its attachments. Anyone with the pager's public
-// key can seal a card, so the app keeps drawing a brief's Markdown as untrusted: only an https link leaves it.
+// An attachment's plaintext is the file's bytes and has no shape here. A card's brief is held to the contract's
+// Markdown rules too (BriefRules.swift). Anyone with the pager's public key can seal a card, so the app keeps
+// drawing a brief's Markdown as untrusted all the same: only an https link leaves it.
 
 public struct PartError: Error, Hashable, Sendable {
     public let problem: String
@@ -25,12 +25,42 @@ extension Part { public static var maxBytes: Int? { nil } }
 
 public enum Parts {
     // UTF-8 only, as the contract decodes it: Foundation would also read UTF-16 or UTF-32, which a NUL byte or a
-    // byte-order mark gives away, and JSON as UTF-8 has neither. Where a field is repeated, Foundation keeps the
-    // first and JavaScript the last; no sealer writes one, and whoever can seal a part can write any content anyway.
+    // byte-order mark gives away, and JSON as UTF-8 has neither. A field named twice is refused, as the contract
+    // refuses it: Foundation would keep the first and JavaScript the last.
     public static func decode<P: Part>(_ type: P.Type, from data: Data) throws(PartError) -> P {
         if let max = P.maxBytes, data.count > max { throw PartError("a preview may not exceed \(max) bytes") }
         guard !data.starts(with: [0xEF, 0xBB, 0xBF]), !data.contains(0), String(validating: data, as: UTF8.self) != nil else { throw PartError("not JSON as UTF-8") }
-        do { return try JSONDecoder().decode(P.self, from: data) } catch let error as PartError { throw error } catch { throw PartError("not its shape: \(error)") }
+        let part: P
+        do { part = try JSONDecoder().decode(P.self, from: data) } catch let error as PartError { throw error } catch { throw PartError("not its shape: \(error)") }
+        if repeatsAField(data) { throw PartError("a field is named twice") }
+        return part
+    }
+
+    // Whether valid JSON names a field twice in one object, keys compared once unescaped, code unit for code unit,
+    // as JavaScript compares them (packages/contract/parts.ts repeatsAField).
+    static func repeatsAField(_ data: Data) -> Bool {
+        let json = [UInt8](data)
+        var objects: [Set<[UInt16]>?] = [], key = false, i = 0
+        while i < json.count {
+            switch json[i] {
+            case UInt8(ascii: "\""):
+                var end = i + 1
+                while json[end] != UInt8(ascii: "\"") { end += json[end] == UInt8(ascii: "\\") ? 2 : 1 }
+                if key, case .some(.some(var fields)) = objects.last {
+                    guard let name = try? JSONDecoder().decode(String.self, from: Data(json[i...end])), fields.insert(Array(name.utf16)).inserted else { return true }
+                    objects[objects.count - 1] = fields
+                    key = false
+                }
+                i = end
+            case UInt8(ascii: "{"): objects.append([]); key = true
+            case UInt8(ascii: "["): objects.append(nil); key = false
+            case UInt8(ascii: "}"), UInt8(ascii: "]"): objects.removeLast(); key = false
+            case UInt8(ascii: ","): key = objects.last.map { $0 != nil } ?? false
+            default: break
+            }
+            i += 1
+        }
+        return false
     }
 }
 
@@ -163,6 +193,8 @@ extension BriefPart: Decodable {
         markdown = try c.required("markdown")
         if markdown.unicodeScalars.allSatisfy({ jsWhitespace.contains($0.value) }) { throw PartError("markdown: text may not be blank") }
         if markdown.count > Limits.brief { throw PartError("markdown: a brief may not exceed \(Limits.brief) characters") }
+        if BriefRules.htmlOutsideCode(markdown) { throw PartError("markdown: HTML is not allowed outside fenced code blocks") }
+        if let problem = BriefRules.briefProblem(markdown, optionCount: options.count, recommended: recommended) { throw PartError("card: \(problem)") }
     }
 }
 let extensions = ["text/markdown": [".md"], "image/png": [".png"], "image/jpeg": [".jpg", ".jpeg"]]
@@ -188,6 +220,7 @@ extension CardPart {
             guard a.count <= Limits.attachments else { throw PartError("attachments: at most \(Limits.attachments)") }
             guard Set(a.map(\.name)).count == a.count else { throw PartError("attachment names must be unique") }
         }
+        if let problem = BriefRules.missingAttachment(card.markdown, Dictionary((attachments ?? []).map { ($0.name, $0.type) }, uniquingKeysWith: { a, _ in a })) { throw PartError(problem) }
         answerKey = try c.required("answerKey")
         guard answerKey.utf8.count == 43, Envelope.fromBase64url(answerKey)?.count == 32 else { throw PartError("answerKey: a public key is 32 bytes as canonical base64url") }
     }

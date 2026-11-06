@@ -144,7 +144,10 @@ export async function ask(agent: string, card: Source, client?: string): Promise
   let decisionId = '';
   try {
     if (!updateAgent(a.id, x => { x.asking ??= {}; decisionId = x.asking[cardKey] ??= randomBytes(24).toString('base64url'); })) return unknownAgent(a.id);
-  } catch (e) { return unwritable(e instanceof Error && 'code' in e ? String(e.code) : 'write failed'); }
+  } catch (e) {
+    const code = e instanceof Error && 'code' in e ? String(e.code) : 'write failed';
+    return code === 'EBUSY' ? refused(`Agent ${a.id} is busy with another call on this machine. Nothing was sent; try again.`) : unwritable(code);
+  }
   const send = () => call(Asked, a.server, 'POST', `/api/agents/${a.agentId}/cards`, { key: a.agentKey, data: { decisionId, ...brief } });
   let r = await send();
   // A lost reply is sent once more. Either way the owner gets one decision; if that fails too, the first may still

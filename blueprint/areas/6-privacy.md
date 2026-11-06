@@ -1,7 +1,7 @@
 # 6 Privacy
 
 > **Definition:** What the service is and what it can see: where it runs, the keys and the number's fingerprint that tie a pager to its phone, and how keys and the service's own secrets are kept. Making a pager is 1 Pagers (B26), connecting with a number is 2 Agents (B25), and what an alert carries is 4 Getting paged (B17).
-> **Serves:** "It runs on a Cloudflare Worker at agentpager.me, with one Durable Object for the pagers and one per agent." · "The pager number binds my phone's key" · "Only agents I give a number reach my phone"
+> **Serves:** [Stack](../PRODUCT.md#stack) · [Only agents I give a number reach my phone](../PRODUCT.md#only-agents-i-give-a-number-reach-my-phone)
 > **Relies on:** Cloudflare, where the whole service runs: one Worker per stage, prod's at agentpager.me and dev's at dev.agentpager.me, each with its own data (AGENTS.md › Stages), behind Cloudflare's HTTPS, with its storage in Durable Objects, one for the pagers and one per agent · the iPhone's Keychain, which keeps each pager's private key and phone key on that phone · the cryptography built into iOS and into the Worker, which makes the key pair, the fingerprint and the digests
 > **Code:** `packages/app/src/worker.ts` (the number and its fingerprint), `https.ts` (HTTPS only), `registry.ts`, `agent.ts`, `shared.ts` (digests); `packages/app/scripts/build.mjs`, `deploy.mjs`; `packages/contract/exchange.ts`; `packages/ios/AgentPager/Model/Keychain.swift`
 > **Screens:** none
@@ -11,7 +11,7 @@
 
 ### I19 · @M2 · The number names the pager's key
 
-Why: "The pager number binds my phone's key". The rest of Sam's sentence, "so the service can't swap it", holds only once ENCRYPT builds the command's own check.
+Why: [Only agents I give a number reach my phone](../PRODUCT.md#only-agents-i-give-a-number-reach-my-phone). That the service can't swap the key holds only once ENCRYPT builds the command's own check.
 
 1. Each pager's key pair is made on the phone (B26), and its private key stays there. The service gets only the public key.
 2. A pager's number names the pager and carries a fingerprint of the pager's public key.
@@ -23,7 +23,7 @@ Why: "The pager number binds my phone's key". The rest of Sam's sentence, "so th
 
 ### I23 · @M1 · Keys stay secret
 
-Why: "Only agents I give a number reach my phone"
+Why: [Only agents I give a number reach my phone](../PRODUCT.md#only-agents-i-give-a-number-reach-my-phone)
 
 1. The service's storage holds each phone key and each agent key only as a digest, never the key itself. Whoever reads that storage can't act as the phone or as an agent.
 2. How long the service takes to refuse a key tells nothing about the digest it stores.
@@ -39,6 +39,6 @@ Why: "Only agents I give a number reach my phone"
 ### L19 · @M1 · The service can read every decision
 
 - What people meet: the service stores each decision, its attachments, the answer and the acknowledgement as readable text, with who asked, the project and the computer. Whoever runs the service, or gets into its storage, can read them. What alerts carry through Apple is L17, in 4 Getting paged.
-- Why it waits: encryption is its own milestone, ENCRYPT, so that pagers and the command could ship first. "Encryption comes before the friends rollout."
+- Why it waits: encryption is its own milestone, ENCRYPT, so that pagers and the command could ship first, and it comes before the friends rollout ([PRODUCT.md › Pinned design decisions](../PRODUCT.md#pinned-design-decisions)).
 - What would fix it: ENCRYPT. Decisions, attachments, answers and acknowledgements are encrypted between the agent's machine and the phone, and the command checks each pager's key against its number (I19).
 - When to revisit: ENCRYPT, which runs right after M4, and in any case before FRIENDS.

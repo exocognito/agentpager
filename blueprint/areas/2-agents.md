@@ -1,7 +1,7 @@
 # 2 Agents
 
 > **Definition:** The agent's side of an exchange, through the agentpager command: connecting with a pager number as a new agent, waiting for the answer in its own app, acknowledging it, and the history kept on its machine. Writing and checking a card belongs to 3 Cards, and installing and setting up the command to 7 Getting started.
-> **Serves:** "An agent I give the number to connects with the agentpager command, and appears on that pager with nothing for me to tap." · "Every connect is a new agent, shown by who asked (Claude Code, Codex) and grouped by project." · "Any agent that can run the agentpager command can use AgentPager" · "A waiting agent has my answer within a second of the Undo window closing, with nothing for me to nudge." · "then get the agent's acknowledgement and next steps" · "An acknowledgement is a real message from the agent, never an automatic message from AgentPager." · "Notes are answers to one decision, never standing guidance for other agents."
+> **Serves:** [Unblock my agent from my phone](../PRODUCT.md#unblock-my-agent-from-my-phone) · [Reach the agents owners actually use](../PRODUCT.md#reach-the-agents-owners-actually-use) · [An acknowledgement always comes from the agent](../PRODUCT.md#an-acknowledgement-always-comes-from-the-agent) · [Pinned design decisions](../PRODUCT.md#pinned-design-decisions)
 > **Relies on:** the agent apps owners already use, such as Claude Code, Claude Desktop, Codex, Cursor and pi, which the owner installs and signs in to. Each runs the command from its shell, or starts it as a local MCP server that setup adds without an agent's key or a pager number (B29.6), and says who it is. How an answer reaches a waiting agent depends on the app (B33).
 > **Code:** `packages/cli/src/commands.ts`, `detect.ts`, `mcp.ts`, `store.ts`, `client.ts`, `main.ts`; `packages/app/src/agent.ts`, `registry.ts` (connect)
 > **Screens:** [journeys/pager](../generated/screens/journeys/pager/README.md) · [phone/answered.png](../generated/screens/phone/answered.png) · [phone/notpickedup.png](../generated/screens/phone/notpickedup.png)
@@ -64,7 +64,7 @@
 
 ### I21 · @M3 · Every connect is a new agent
 
-Why: "Every connect is a new agent, shown by who asked (Claude Code, Codex) and grouped by project."
+Why: [Unblock my agent from my phone](../PRODUCT.md#unblock-my-agent-from-my-phone)
 
 1. Every connect makes a new agent on its pager, with its own id and key, and never joins an agent already there.
 2. Nothing matches agents by name or project, so two agents with the same app and project stay two agents.
@@ -93,7 +93,7 @@ Why: "Every connect is a new agent, shown by who asked (Claude Code, Codex) and 
 ### L13 · @M3 · Cloud sessions are untested
 
 - What people meet: an agent in a cloud session with a shell, such as one the Claude mobile app starts in a cloud VM, may work, but nothing promises it.
-- Why it waits: "Cloud sessions with a shell should work too, untested so far."
+- Why it waits: cloud sessions with a shell should work too, but none has been tried.
 - What would fix it: a recorded run of the command in one, including whether its network reaches agentpager.me and whether a long wait keeps the session from pausing. The 30 Oct lab saw a Claude Desktop chat's own cloud VM blocked from agentpager.me until the owner allowed it, and pause a few minutes after its turn ended.
 - When to revisit: CLIENTS.
 

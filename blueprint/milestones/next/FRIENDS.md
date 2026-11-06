@@ -6,7 +6,7 @@
 
 Sam, 5 Nov 2026, on starting M4, of what comes after it: "making the product available to others".
 
-In Sam's voice, as the old MFRIENDS doc had it:
+As the old MFRIENDS doc had it:
 
 I invite the first owners beyond me. They install the app and the command (INSTALL), can read what AgentPager is and what it stores (SITE), can inspect its code (OPEN), and know the service can't read their decisions (ENCRYPT). Their agents page them while they are away, and they answer from their phone. They have an easy way to tell me what works and what doesn't, and I decide what changes next from what they say. Every earlier promise still passes on the deployed product.
 
@@ -15,8 +15,8 @@ I invite the first owners beyond me. They install the app and the command (INSTA
 - Encryption comes before this rollout ([PRODUCT.md](../../PRODUCT.md)).
 - K1 waits here (below): it has never been measured, and its probe isn't built. When the probe is built, its second clause, an answer reaching a waiting agent, becomes its own metric in [2 Agents](../../areas/2-agents.md).
 - J5 is walked whole here, by an invited owner, with the TestFlight build and the demo agent from INSTALL.
-- The v2 design, as recorded on 29 Oct, set the goal "make it easy for ~10 friends and colleagues to install, use and give feedback", and noted "A way for testers' feedback to reach Sam, for example opting in to share their local history file." Its principle for feedback: "feedback rides on calls the agent already makes and taps the owner already does. No step is added for either, and nothing is put into the agent's context that it didn't ask for."
-- The same record parked one question as "must be handled": "Rules belong to each owner. If per-owner rules are ever needed, they come in layers: shipped defaults, then the owner's own, then per-pager. Not in v2; Sam edits the binary." Until then the card contract and review list ship in the command (B27), and "a correction that recurs becomes a check in the next binary", never a note (B6).
+- The v2 design, as recorded on 29 Oct, set the goal of making it easy for about 10 friends and colleagues to install, use and give feedback, and noted a way for testers' feedback to reach Sam, such as opting in to share their local history file. Its principle for feedback: feedback rides on calls the agent already makes and taps the owner already does, adds no step for either, and puts nothing into the agent's context that it didn't ask for.
+- The same record parked one question as one that must be handled: rules belong to each owner, and if per-owner rules are ever needed, they come in layers (shipped defaults, then the owner's own, then per-pager); not in v2, where Sam edits the binary. Until then the card contract and review list ship in the command (B27), and a correction that recurs becomes a check in the next binary, never a note (B6).
 
 ## Still open
 

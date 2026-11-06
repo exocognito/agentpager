@@ -18,7 +18,7 @@ The Blueprint is a folder; AGENTS.md says where.
 | Path | Holds | Lifetime |
 | --- | --- | --- |
 | `README.md` | Start here: the milestone table (✅ shipped, 🔨 running, ⏳ queued) and the areas | Living |
-| `PRODUCT.md` | Vision, principles, pinned design decisions, stack and the unnumbered roadmap, in the owner's words | Living |
+| `PRODUCT.md` | Vision, principles, pinned design decisions, stack and the unnumbered roadmap, as the owner approved it | Living |
 | `TERMS.md` | Words with a specific meaning in this product; short | Always true |
 | `areas/<n>-<name>.md` | One product area: its behaviors `Bx`, invariants `Ix`, metrics `Kx` and limits `Lx` | Always true |
 | `JOURNEYS.md` | Journeys `Jx`: end-to-end walks across areas | Always true |
@@ -54,12 +54,13 @@ The Blueprint is a folder; AGENTS.md says where.
 
 - **One shape for every item**: a heading, `### <id> · @M<n> · <short promise>`, then a `Why:` only when the code can't tell you, then numbered clauses and bulleted notes. Notes aren't tested.
 - **A clause** is one checkable statement in plain words: what a person sees, or what must hold. No implementation. A "never" is a clause too.
-- **An area file** opens with a header: Definition, Serves (PRODUCT.md's phrases, quoted), Relies on, Code, Screens and Walked by. Then `## Behaviors`, `## Invariants`, `## Metrics` and `## Limits`, when not empty.
-- **An invariant** always has a `Why:`, in the owner's words.
+- **An area file** opens with a header: Definition, Serves (links to the PRODUCT.md headings it serves), Relies on, Code, Screens and Walked by. Then `## Behaviors`, `## Invariants`, `## Metrics` and `## Limits`, when not empty.
+- **An invariant** always has a `Why:`: a link to the PRODUCT.md heading it rests on.
 - **A journey's** clauses are its steps; an `Areas:` note names the areas they walk.
 - **A metric's** clauses give its bar, and where and how it is measured.
 - **A limit** has only notes: what people meet, why it waits, what would fix it, and when to revisit.
 - **Words**: use TERMS.md's words and no synonyms. A new concept gets a TERMS entry before any line, decision or code comment uses it.
+- **Quotes** hold only what a person typed, word for word, with where they typed it. An agent's words are never quoted or given as a person's, a pager option's label and a first-person draft included: say plainly what was chosen, or leave it out when other lines already say it.
 - **Format**: lists over paragraphs. No hard line wraps in any markdown file. Follow the project's writing practices (AGENTS.md).
 
 ## When things get written
@@ -72,8 +73,8 @@ The Blueprint is a folder; AGENTS.md says where.
 
 - Only the owner adds, changes or retires lines and terms. Agents propose them as numbered questions, and write them once approved.
 - Rewording that keeps the meaning: edit in place.
-- The same promise, widened or narrowed: edit in place, keep its id, and quote the old line under Changes in the milestone doc.
-- A promise that no longer holds: delete it, quote it under Retires, and make sure no test names it.
+- The same promise, widened or narrowed: edit in place, keep its id, and name it under Changes in the milestone doc; git keeps the old text.
+- A promise that no longer holds: delete it, name it under Retires, and make sure no test names it; git keeps its text.
 - Each approval goes in the milestone doc, quoting the owner's words and where they said them.
 
 ## Decisions
@@ -147,7 +148,7 @@ Never fix a miss the owner cares about with a test alone. A test follows from a 
 ## The milestone loop
 
 1. **Plan.** Walk the owner through what the milestone's row commits to, the decisions and limits that bind it, and its open questions. Write its doc with status planning:
-   - its objective, in the owner's words;
+   - its objective, as the owner approved it;
    - its slice: a table of what it delivers in each layer;
    - what's out of scope, only where a builder would wrongly assume it's in;
    - **Owner decides first**: its numbered questions;

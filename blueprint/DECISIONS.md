@@ -112,6 +112,7 @@ This file is append only. A reversed or narrowed decision gets a new entry, and 
   - The Blueprint holds only what's built, plus what a running milestone has designed. A promise not built yet waits in its milestone's doc, or is a limit where people meet the gap today.
 - **Serves:** METHOD.md; PRODUCT.md; AGENTS.md.
 - → DEC-2026-11-05-blueprint-destination, in part: `@M<n>` on a heading replaced "Since" on every item; the id check reports untested clauses instead of `pnpm check` enforcing a test per id; the lessons' gotchas go to AGENTS.md, not to decisions.
+- → DEC-2026-11-06-verbatim-quotes, in part: PRODUCT.md is as Sam approved it, not in Sam's words.
 
 ## DEC-2026-10-31-next-roadmap · The next roadmap gets AgentPager ready for its first owners
 
@@ -123,3 +124,14 @@ This file is append only. A reversed or narrowed decision gets a new entry, and 
   - Everything else is off the roadmap until owners using AgentPager, Sam included, show they need it. Dropped with Android: the deferred Alchemy, owners' own writing rules, recovering lost keys, a deployed auto-off wait and outcome metrics.
 - **Serves:** README.md › Milestones; PRODUCT.md › Roadmap; `milestones/next/`.
 - → DEC-2026-11-05-blueprint-destination, in part: the first three "can be done in parallel" gave way to one milestone at a time, with CLIENTS after ENCRYPT.
+
+## DEC-2026-11-06-verbatim-quotes · Quote marks hold only what a person typed
+
+- **Decided by:** Sam, on 6 Nov 2026.
+- **Basis:** "agent words should never be quoted, quotations just for human verbatim inputs. Agent words are usually deducable from other info." (Sam in Claude Code, after a check of Sam's typed messages found that 29 of the 57 quotes the Blueprint gave as Sam's were agents' words.) Asked how Serves and Why lines should cite PRODUCT.md, which agents mostly wrote and Sam approved, Sam chose links to its headings.
+- **Decided, and still standing:**
+  - Quote marks hold only what a person typed, word for word, with where they typed it. An agent's words are never quoted or given as a person's, a pager option's label and a first-person draft included.
+  - PRODUCT.md is as Sam approved it, not in Sam's words. Serves and Why lines link its headings instead of quoting it.
+  - Older entries here stay as written, since this file is append only. Two of them quote agents' words: DEC-2026-10-08-native-ios names an agent's write-up as Sam's, and DEC-2026-10-29-v2-design quotes the v2 design record.
+- **Serves:** METHOD.md › Writing lines; PRODUCT.md; every area's Serves and Why lines.
+

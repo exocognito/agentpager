@@ -1,6 +1,6 @@
 # AgentPager
 
-What AgentPager is for and what it holds to, in Sam's words. Only Sam changes what it says, and it outranks every line below it ([METHOD.md](../METHOD.md)). The area files quote its phrases in their Serves and Why lines, so they are kept word for word.
+What AgentPager is for and what it holds to, as Sam approved it. Only Sam changes what it says, and it outranks every line below it ([METHOD.md](../METHOD.md)). The area files link its headings in their Serves and Why lines.
 
 ## What it's for
 
@@ -72,11 +72,11 @@ Use plain language I can understand without specialist knowledge. Options are di
 
 Any agent that can run the agentpager command can use AgentPager. Cloud sessions with a shell should work too, untested so far. Agents with no machine of their own, like claude.ai in a browser, are out. The command sets itself up in the agent apps it finds. A waiting agent has my answer within a second of the Undo window closing, with nothing for me to nudge.
 
-> **Note, not Sam's words (M4):** Sam's first sentence went on: "terminal agents, and desktop apps like Claude Desktop and Cursor". Which apps that covers is what [CLIENTS](milestones/next/CLIENTS.md) decides; today only Claude agents wake by themselves (L11).
+> **Note, added in M4:** the old strategy's sentence went on to name terminal agents, and desktop apps like Claude Desktop and Cursor. Which apps that covers is what [CLIENTS](milestones/next/CLIENTS.md) decides; today only Claude agents wake by themselves (L11).
 
 ### Feel native
 
-Use the platform's own components and conventions (lists, sheets, menus, alerts and notifications) rather than custom ones, so the app is familiar and the system does the work.
+Use the platform's own components and conventions (lists, sheets, menus, alerts and notifications) rather than custom ones, so the app is familiar and the system does the work. Helper text is minimal: the app keeps only lines that clearly help.
 
 ### Letters tell options apart; ✶ marks the recommendation
 

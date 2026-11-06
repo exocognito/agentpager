@@ -1,7 +1,7 @@
 # 3 Cards
 
 > **Definition:** What an agent writes and sends: the card in `card.yaml`, the card contract it is written by, the one review before sending, the checks that refuse a broken card, and the limits every decision and answer must meet. Connecting, waiting and acknowledging belong to 2 Agents, and how the phone shows and answers a decision to 5 Answering.
-> **Serves:** "my agent sends a decision: the question first, two to four options, its recommendation, and the detail one tap away" · "The agentpager command gives the agent its decision and a description of a good one to review once before sending." · "UTF-8 with Markdown is allowed; invalid or over-limit text is refused, never truncated" · "The agentpager command is the one home for the rules agents write by." · "A decision is written as card.yaml and compiled by the command."
+> **Serves:** [Unblock my agent from my phone](../PRODUCT.md#unblock-my-agent-from-my-phone) · [A decision is reviewed before it's sent](../PRODUCT.md#a-decision-is-reviewed-before-its-sent) · [UTF-8 with Markdown is allowed; invalid or over-limit text is refused, never truncated](../PRODUCT.md#utf-8-with-markdown-is-allowed-invalid-or-over-limit-text-is-refused-never-truncated) · [Pinned design decisions](../PRODUCT.md#pinned-design-decisions)
 > **Relies on:** the agent's own app, which starts the reviewer as a subagent; an agent whose app can't start one reviews its card itself
 > **Code:** `packages/cli/src/rules.ts` (the card contract, the review list, the template and the example); `packages/cli/src/card.ts` (the checks and the compile); `packages/cli/src/commands.ts`, `packages/cli/src/mcp.ts` (rules, review and ask); `packages/contract/` (`values.ts`, `brief.ts`, `exchange.ts`: what the service, the command and the phone accept); `packages/app/src/shared.ts`, `packages/app/src/agent.ts` (the service's checks)
 > **Screens:** [journeys/briefs](../generated/screens/journeys/briefs/README.md)
@@ -13,7 +13,7 @@
 
 1. The agentpager command is the one home of the card contract: how to write a decision the owner can answer on a phone in two minutes. `agentpager rules` prints it with the `card.yaml` template and a complete example. Connecting prompts the agent to read it before its first card (B25).
 2. An agent that uses the command's MCP server has the card contract in the ask tool's description.
-3. `agentpager review`, or the review tool, prints what a good card looks like and then the card, for a reviewer to grade each point ok, good to fix or must fix for this card, quoting the text to change. The command grades nothing itself.
+3. `agentpager review`, or the review tool, prints what a good card looks like and then the card, for a reviewer to grade each point ok, good to fix or must fix for this card, quoting the text to change. When a point falls short only because a small card leaves out an optional key, it is good to fix at most. The command grades nothing itself.
 4. The card contract tells the writing agent to give that to a subagent, or to review the card itself if it can't start one, then to fix the must-fixes, use its judgement on the rest and send. There is one round.
 <!-- B27.5 dropped in Sam's review, 6 Nov 2026; ids are never reused -->
 6. A card that passes is compiled to the brief and sent. The reply says it was sent, shows the question and detail as the owner sees them first, and says how to wait for the answer (B32).
@@ -28,7 +28,7 @@
 
 ### I4 · @M1 · What doesn't fit is refused whole, never cut
 
-Why: "Anything else is refused whole, with an error that tells the agent what to fix; nothing is truncated or silently cleaned." (PRODUCT.md)
+Why: [UTF-8 with Markdown is allowed; invalid or over-limit text is refused, never truncated](../PRODUCT.md#utf-8-with-markdown-is-allowed-invalid-or-over-limit-text-is-refused-never-truncated)
 
 1. The service checks every request, from an agent or the phone, and refuses whole what doesn't fit: an unknown field, text that isn't valid UTF-8, HTML, blank text, text over its limit, or an answer that doesn't fit its decision. A refused request stores nothing.
 2. A refusal says what to fix: what is wrong, and the field when there is one.
@@ -44,7 +44,7 @@ Why: "Anything else is refused whole, with an error that tells the agent what to
 
 ### I22 · @M3 · A broken card is never sent
 
-Why: "A decision that is broken in structure (no options, a missing attachment, over a limit) is refused with the reason, before it leaves the agent's machine." (PRODUCT.md)
+Why: [A decision is reviewed before it's sent](../PRODUCT.md#a-decision-is-reviewed-before-its-sent)
 
 1. The agentpager command refuses a broken card before anything leaves the agent's machine, with one line per problem, and sends nothing.
 2. Broken covers only what can be checked without judging the writing. A card is broken when it doesn't parse, misses a required key or has an unknown one, or doesn't have two to four options.

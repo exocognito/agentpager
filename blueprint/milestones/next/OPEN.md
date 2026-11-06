@@ -4,9 +4,9 @@
 
 ## Objective
 
-Sam, 31 Oct 2026, on the next roadmap: cleaned-up code and Blueprint published on GitHub with a clean history, "so people can inspect code, fork and self-host". Sam's principle in the strategy, waiting here until it is true: "The code is open: anyone can read it, fork it and run their own".
+Sam, 31 Oct 2026, on the next roadmap: cleaned-up code and Blueprint published on GitHub with a clean history, "so people can inspect code, fork and self-host". The old strategy's principle waits here until it is true: the code is open, and anyone can read it, fork it and run their own.
 
-In Sam's voice, as the old MOPEN doc had it:
+As the old MOPEN doc had it:
 
 Anyone can read AgentPager's code on GitHub, check what it does with their decisions, fork it, and run their own service and app. The repository starts with a clean history and holds no secret. Its code and Blueprint say only what is true now, with nothing left over from retired versions. A guide takes a developer from a fork to their own service on Cloudflare and their own build of the app. Every earlier promise still passes.
 
@@ -33,7 +33,7 @@ Sam decides these first:
 ## Adds · Changes · Retires
 
 - **Adds:** Sam's principle that the code is open, to [PRODUCT.md](../../PRODUCT.md), once it is published.
-- **Retires:** what the cleanup removes, quoted here when it goes.
+- **Retires:** what the cleanup removes, named here when it goes.
 
 ## Log
 

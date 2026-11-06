@@ -1,6 +1,6 @@
 # AgentPager Blueprint
 
-Start here. [PRODUCT.md](PRODUCT.md) says what AgentPager is for, in Sam's words. Each area file holds the promises for one part of the product, and only what is built. The milestones say how it got here, and [METHOD.md](../METHOD.md) says how it is built.
+Start here. [PRODUCT.md](PRODUCT.md) says what AgentPager is for, as Sam approved it. Each area file holds the promises for one part of the product, and only what is built. The milestones say how it got here, and [METHOD.md](../METHOD.md) says how it is built.
 
 **Reading a promise:** `### B25 · @M3 · Short promise` · numbered clauses are promises, each named by its id, such as B25.2, in the test that proves it · bullets are notes, not tested · `@M3` on a heading means since M3; `@M4:` at the start of a clause means M4 added it · the Blueprint on `main` describes dev.
 

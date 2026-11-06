@@ -11,7 +11,7 @@ import { briefsDir, loadBrief } from '../fixtures/briefs/load.ts';
 const OLD = [null, '', 'cli/0 9849671', 'agentpager 9849671', 'cli/1'];
 type Call = [string, string, { method?: string; data?: unknown; agent?: string }];
 
-test('an agent call from an old command is told to update on every route, before its key or input is read, and changes nothing', { timeout: 180_000 }, async () => {
+test('B25.14 An agent call from an old command is told to update on every route, before its key or input is read, and changes nothing', { timeout: 180_000 }, async () => {
   const f = await fixture('clients');
   try {
     const { p, a } = await f.connected('Codex', 'clients');

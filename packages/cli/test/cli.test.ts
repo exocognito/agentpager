@@ -241,7 +241,7 @@ async function lossy(target: string) {
   };
 }
 
-test('B32.10 A lost ask reply is never taken as success, and asking the same card again reaches the owner once', { timeout: 240_000 }, async () => {
+test('B27.9 B32.10 A lost ask reply is never taken as success, and asking the same card again reaches the owner once', { timeout: 240_000 }, async () => {
   const f = await fixture('cli-lost'), net = await lossy(f.origin);
   const home = mkdtempSync(path.join(tmpdir(), 'agentpager-cli-')), work = mkdtempSync(path.join(tmpdir(), 'agentpager-card-'));
   process.env.AGENTPAGER_HOME = home; process.env.AGENTPAGER_SERVER = net.origin; delete process.env.AGENTPAGER_PAGER;

@@ -161,7 +161,7 @@ test('not picked up: one alert and a warning when no agent collects an answer in
 // A lost ask reply: the command asks again under the decision id it chose. The owner gets one decision and one alert;
 // another question under that id is refused. Each alert goes out before its ask replies, so an ask that replies
 // without adding to the alerts below sent none.
-test('the same ask again under its id is one decision and one alert; another question under it is refused', { timeout: 180_000 }, async () => {
+test('B27.9 The same ask again under its id is one decision and one alert; another question under it is refused', { timeout: 180_000 }, async () => {
   const { sent, close } = await apple();
   const f = await fixture('push-again'), register = registered(f);
   try {

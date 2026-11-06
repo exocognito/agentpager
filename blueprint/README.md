@@ -11,7 +11,7 @@ Start here. [PRODUCT.md](PRODUCT.md) says what AgentPager is for, in Sam's words
 | ✅ | [M1 · APP](milestones/M1-app.md) | AgentPager on my iPhone |
 | ✅ | [M2 · PAGERS](milestones/M2-pagers.md) | Pagers on my phone |
 | ✅ | [M3 · COMMAND](milestones/M3-command.md) | The agentpager command |
-| 🔨 built, awaiting Sam's review | [M4 · HOUSE](milestones/M4-house.md) | House in order: the Blueprint by area, a dev stage and the id check |
+| ✅ released, awaiting Sam's review | [M4 · HOUSE](milestones/M4-house.md) | House in order: the Blueprint by area, a dev stage and the id check |
 | ⏳ | [ENCRYPT](milestones/next/ENCRYPT.md) | Decisions the service can't read |
 | ⏳ | [CLIENTS](milestones/next/CLIENTS.md) | The agent apps AgentPager supports |
 | ⏳ | [INSTALL](milestones/next/INSTALL.md) | AgentPager installs in a minute |
@@ -19,7 +19,7 @@ Start here. [PRODUCT.md](PRODUCT.md) says what AgentPager is for, in Sam's words
 | ⏳ | [OPEN](milestones/next/OPEN.md) | AgentPager in the open |
 | ⏳ | [FRIENDS](milestones/next/FRIENDS.md) | AgentPager for people I invite |
 
-✅ shipped · 🔨 building · ⏳ queued. One at a time, in this order. Prod runs 1ee6c27, M3's release, until Sam has reviewed M4.
+✅ shipped · 🔨 building · ⏳ queued. One at a time, in this order. Prod runs the `m4` release (9849671) since 6 Nov.
 
 ## Areas
 

@@ -1,6 +1,6 @@
 # M3 · The agentpager command
 
-> **Status:** shipped · **Shipped:** 30 Oct 2026, as Stage 2 of the v2 plan (PRs #23 and #24 on 29 Oct, #26 and #27 on 30 Oct) · **Tag:** none; prod runs 1ee6c27, and so does the command on air, mini and pro · **Word:** COMMAND
+> **Status:** shipped · **Shipped:** 30 Oct 2026, as Stage 2 of the v2 plan (PRs #23 and #24 on 29 Oct, #26 and #27 on 30 Oct) · **Tag:** none; released at 1ee6c27 · **Word:** COMMAND
 
 ## Objective
 

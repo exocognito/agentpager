@@ -1,27 +1,21 @@
 # Handoff to the next root session (5 Nov 2026, end of M4 HOUSE)
 
-Read `AGENTS.md`, then `blueprint/README.md`. This file covers only what those two files don't. Claims are marked [V] verified or [A] assumed; each [V] was checked on 5 Nov 2026, when this was written.
+Read `AGENTS.md`, then `blueprint/README.md`. This file covers only what those two files don't. Claims are marked [V] verified or [A] assumed; each [V] was checked on 5 Nov 2026, when this was written, or on 6 Nov for the release.
 
 ## Where things stand
 
-- **M4 HOUSE is built and awaiting Sam's review** (`blueprint/milestones/M4-house.md`). All its PRs are merged: #42 to #50, nine in all, the id check (#46) last, as d145f61. The wrap-up PR (#51), which marks M4 built and writes this file, is the last. [V]
-- **dev** (https://dev.agentpager.me) runs 87d6a66, #50's merge, and redirects plain HTTP to HTTPS. #46 and the wrap-up change no service code. [V, from its build header]
-- **The root deploys dev after the wrap-up merges**, from a clean checkout of `main`, and runs `pnpm smoke:dev`. Not done when this was written. [A]
-- **prod** (agentpager.me) still runs 1ee6c27, M3's release, from before M4. It still answers plain HTTP until the `m4` release. [V, from its build header]
-- **Binaries:** the ones on air, mini and pro are 1ee6c27. [V, `agentpager version` on each]
+- **M4 HOUSE is built, released on 6 Nov, and awaiting Sam's review** (`blueprint/milestones/M4-house.md`). All its PRs are merged: #42 to #50, nine in all, the id check (#46) last, as d145f61. The wrap-up PR (#51), which marked M4 built and wrote this file, merged last, as 9849671. [V]
+- **dev** (https://dev.agentpager.me) runs 9849671, #51's merge, and `pnpm smoke:dev` passed 7 of 7. [V, 6 Nov]
+- **prod** (agentpager.me) runs the `m4` release: the tag `m4`, on 9849671. Sam chose "Release all" on the pager before the review; `pnpm deploy:prod` ran from a clean checkout at the tag, and `pnpm smoke:prod` passed 7 of 7. [V, 6 Nov]
+- **Binaries:** the ones on air, mini and pro are 9849671, built at `m4`. [V, `agentpager version` on each, 6 Nov]
 - **Phones:**
   - HomePhoneLite, the dev phone, has the dev app (`me.agentpager.app.dev`) installed. This Mac's last `pnpm phone:dev` build, pointed at dev, is from 22:19 on 5 Nov, just after #50 merged. [V] That it is the build installed there is [A]; no app code changed after #50. [V]
-  - Sam's iPhone Air has 5599b15, the same app code as 1ee6c27, on prod. [A, from agent memory of 30 Oct; not rechecked]
+  - Sam's iPhone Air has 5599b15, the same app code as 1ee6c27, on prod. [A, from agent memory of 30 Oct; not rechecked] Its `m4` build is the one release step left.
 
 ## What Sam does next
 
 1. **Review M4 after the merge**, as M4-house.md › Sam reviews after merge lists: the 95 ⚑ rows in `blueprint/milestones/M4-house/ledger.md` come first, then numbered questions with ★. Sam answers them in the markdown viewer or by asking an agent. Git keeps the old Blueprint at tag `blueprint-old-format`, and the deleted history at `history-archive`. [V, both tags are on GitHub]
-2. **Approve the release** (question 11 there). Then the root:
-   - tags `m4` on the commit that was green on dev, and pushes the tag;
-   - runs `pnpm deploy:prod` from a clean checkout at that tag, which refuses anything else [V, `stages.ts`];
-   - runs `pnpm smoke:prod`, which pages no one and deletes its one throwaway pager with its agent [V, `smoke.mjs`]; Sam's go for the release covers it [A];
-   - builds the binary at `m4` (`pnpm --filter @agentpager/cli build`), copies it to `~/.agentpager/bin/` on air, mini and pro, and checks `agentpager version` on each. The service goes before the binaries.
-   - puts the `m4` build on Sam's iPhone Air: it needs the phone unlocked, so build to the generic iOS destination, then install with devicectl [A, from agent memory].
+2. **The release is done** (question 11, answered 6 Nov), except Sam's iPhone Air. When Sam is at pro with it unlocked, build the app from the `m4` checkout at `~/Projects/agentpager-worktrees/m4-release` to the generic iOS destination, then install it with devicectl [A, from agent memory].
 3. **Then M5 ENCRYPT starts** with its Plan step: `blueprint/milestones/next/ENCRYPT.md` becomes `milestones/M5-encrypt.md` (METHOD.md › When things get written, › Ids).
 
 ## Things you inherit
@@ -31,14 +25,13 @@ Read `AGENTS.md`, then `blueprint/README.md`. This file covers only what those t
 - **Left open, for Sam to decide** (question 9):
   - stale PRs #25, #16 and #13;
   - the unmerged remote branch `design/ended-copies`, from the closed PR #7;
-  - 22 merged branches still on the remote, 23 once `m4/wrap-up` merges [V, `git ls-remote` against `origin/main`].
+  - the merged branches still on the remote: 23 on 6 Nov [V, each remote branch checked against `origin/main`].
 - **Known leftovers** (question 10):
   - an App Intents log line in Xcode builds;
   - 489 Swift 6 concurrency warnings in the UI tests, shown only with strict checking;
   - the id check's "Known limits" at the top of `scripts/blueprint.mjs`;
   - `DECISIONS.md` still names the retired limit L20.
 - **For Sam to approve removing**, by the exact command:
-  - the 15 worktrees under `~/Projects/agentpager-worktrees/`: the 13 `m4-*` ones, of which `m4-dev-main` to `m4-dev-main3` are detached deploy checkouts, and `pr45-check-a` and `pr45-check-b` [V, `git worktree list`], plus any the root makes for the next dev deploy;
-  - the local refs `refs/remotes/origin/pr45` and `pr45b` in the primary clone, which are the root's own and not on GitHub [V];
+  - the 16 finished worktrees under `~/Projects/agentpager-worktrees/`: the 14 `m4-*` ones other than `m4-release` and `m4-release-record`, and `pr45-check-a` and `pr45-check-b`, with the local refs `refs/remotes/origin/pr45` and `pr45b`, which are the root's own and not on GitHub. All are merged or superseded [V, 6 Nov]. The pager card d_n47s asks Sam to trash them, with the exact commands; if Sam hasn't answered, ask again. `m4-release` stays for the iPhone Air build, and `m4-release-record` can go once its PR (the release record) merges;
   - `/private/tmp/claude-501/claude-501/`, which holds only empty folders [V].
 - **The primary clone** sits at ab86f39 on `main`, behind `origin/main`, with a clean tree [V]. No agent works in it.

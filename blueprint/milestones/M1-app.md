@@ -1,6 +1,6 @@
 # M1 · AgentPager on my iPhone
 
-> **Status:** shipped · **Started:** 8 Oct 2026 · **Shipped:** marked shipped on 30 Oct 2026, with M2 and M3; its code reached main on 27 Oct (PR #17) · **Tag:** none; prod runs 1ee6c27 · **Word:** APP
+> **Status:** shipped · **Started:** 8 Oct 2026 · **Shipped:** marked shipped on 30 Oct 2026, with M2 and M3; its code reached main on 27 Oct (PR #17) · **Tag:** none; released at 1ee6c27 · **Word:** APP
 
 ## Objective
 

@@ -79,7 +79,7 @@ The lines the old Blueprint held for this milestone, as the [M4 ledger](../M4-ho
 
 **From the design, not built:**
 - The service limits how fast a number can connect agents, which the design relies on, since a number carries its pager's id in the clear. Nothing limits it today. The v2 readiness review also suggested a cap on how many open agents a number can have.
-- A number whose version the command doesn't know is refused with a reply that says so. Today any other version is refused as not in use (B25.8).
+- A number whose version the command doesn't know is refused with a reply that says so. Today any other version is refused as not in use.
 
 ## Log
 

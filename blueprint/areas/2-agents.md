@@ -11,18 +11,15 @@
 
 ### B25 · @M3 · Connect with a pager number
 
-1. The owner gives an agent a pager's text from the app (B26). It names the pager's server (B26.4), whose /start tells an agent without the command how to install it (B18).
 2. The agent connects with the number, from the command line or through the command's MCP server. The number can instead come from `AGENTPAGER_PAGER`, so it needn't be written where transcripts show it.
-3. The command sends who asked, the project and the machine's name with the number. Who asked is the agent's app: the command names Claude Code and a Claude Desktop chat itself when it identifies them for certain (B33), whatever the agent passes, and any other app is detected or names itself. The project is the git repository's name, else the working folder's, unless the agent names one.
+<!-- B25.3 dropped in Sam's review, 6 Nov 2026; ids are never reused -->
 4. Each connect makes a new agent on the pager (I21). The phone shows its decisions under its project with who asked (B23), and the owner taps nothing to let it in.
 5. The reply gives the agent its agent id and says that it shows on the owner's phone as a new agent, that it should use that id for every question in this piece of work, and that connecting again adds another agent. It ends by prompting the agent to read the card contract before its first card (B27).
 6. The agent's key stays in a file on its machine that only the machine's user can read, and is never printed. Later calls name the agent only by its agent id.
 7. A pager number only connects agents. It never reads, answers, turns off or deletes anything, and once an agent is connected the number plays no further part.
-8. A number whose pager doesn't exist, has been deleted, or whose fingerprint doesn't match its pager's key (I19) is refused as not in use, and the agent is told to ask its owner for the current one.
-9. A connect to a pager that is off is refused and makes no agent. The agent is told its message wasn't delivered, and to ask its owner to turn the pager on or for another number (B22).
-10. When a connect may have reached the service but no usable reply came back, the agent is told to connect again, and that the owner's phone may show an extra agent from that try.
+<!-- B25.8, B25.9 and B25.10 dropped in Sam's review, 6 Nov 2026; ids are never reused -->
 11. An agent can connect to a server other than agentpager.me. Every later call for that agent, from the command line or MCP, goes to the same server.
-12. The command lists the agents on its machine, with each one's pager, project, who asked and open decisions.
+<!-- B25.12 dropped in Sam's review, 6 Nov 2026; ids are never reused -->
 13. An agent that finishes shows as finished on the phone and can ask nothing more. It can still wait for and acknowledge the answers to what it already asked, and finishing again changes nothing.
 
 - The text usually goes in the project's AGENTS.md.
@@ -31,15 +28,13 @@
 
 ### B32 · @M3 · Wait for the answer, then acknowledge it
 
-1. Once a card is sent, the reply gives the decision's id and says how to wait for the answer. An app the command identifies gets words for how it wakes (B33), and every other agent is told to wait with the command.
 2. One wait returns well within the time limits agent apps put on a single command or tool call, with the option chosen, the owner's note, or pending. An agent can ask a wait to return sooner.
-3. A pending reply names the question and says how to keep waiting.
-4. A chosen option arrives with when the owner sent it, its letter and its label, and a prompt to do it and then acknowledge.
+<!-- B32.3 and B32.4 dropped in Sam's review, 6 Nov 2026; ids are never reused -->
 5. A note arrives word for word. The agent is told to follow it, to ask a new card if it still needs a decision, and to acknowledge this one with what it will do (B6).
 6. An answer waits on the service for as long as its agent exists, so a wait that is cut off loses nothing.
 7. From the command line, an agent can wait with no end. That wait keeps going through an unreachable or restarting service until the answer arrives, and ends early only on a refusal or a reply that isn't AgentPager's.
 8. The agent acknowledges an answer with its next steps, and the owner sees them on the decision (B7, B17). Only the first acknowledgement counts, and one sent before the answer is refused, with how to wait first.
-9. The agent can check whether its pager is on, how many of its decisions are open, and which answers it hasn't acknowledged yet.
+<!-- B32.9 dropped in Sam's review, 6 Nov 2026; ids are never reused -->
 10. A reply the command can't get or can't read is never taken as success. When nothing left the machine, the agent is told so. When the request may have reached the owner, the agent is told to check its status before trying again.
 
 - An acknowledgement is the agent's own words, never AgentPager's. Collecting an answer is not acknowledging it (I6).
@@ -48,7 +43,7 @@
 
 ### B33 · @M3 · Each agent app is told how it wakes
 
-1. The command words its waiting for an agent's app only when it identifies the app for certain. Every other agent, Codex, Cursor and pi among them, gets the words in B32.
+1. The command words its waiting for an agent's app only when it identifies the app for certain. Every other agent, Codex, Cursor and pi among them, is told to wait with the command.
 2. Claude Code is told to run the wait with no end as a background command, by the command's full path, then carry on or end its turn: the command ends when the owner answers, and Claude Code wakes the agent with the answer. A pending wait says the same.
 3. A Claude Desktop chat is told not to end its turn until the answer comes, because the answer reaches it only while it works. It checks briefly between steps of other work, holds the wait again and again once its work runs out, and when the link to the computer drops, pauses and tries again. Two hours after it asked, it is told to stop waiting and tell its owner, and the answer stays on the service for its next wait.
 
@@ -58,7 +53,7 @@
 ### B31 · @M3 · History on the agent's machine
 
 1. The command records every decision asked from its machine, each answer its waits receive and each acknowledgement it sends, in one file per pager that only the machine's user can read.
-2. An agent can read its pager's history from this machine, newest first: when, who asked, the project, the question, the options, what was chosen and the next steps. It shows the most recent decisions unless asked for more.
+<!-- B31.2 dropped in Sam's review, 6 Nov 2026; ids are never reused -->
 3. Nothing from the history is printed unless an agent asks for it, and none of it is sent to the service.
 4. Each pager's file keeps its latest 1,000 lines, and older ones are dropped.
 

@@ -17,7 +17,6 @@ Why: "The pager number binds my phone's key". The rest of Sam's sentence, "so th
 2. A pager's number names the pager and carries a fingerprint of the pager's public key.
 3. The service makes no pager whose number doesn't name the public key it is given.
 4. The service connects no agent with a number whose fingerprint doesn't match its pager's key. It refuses the number as not in use (B25).
-5. A number for a pager that doesn't exist, or with any character changed, connects nothing.
 
 - The fingerprint is 8 bytes. That it is enough holds by construction, not by an attack.
 - These checks catch a mistyped or altered number. They don't catch a service that swaps the key, because the command doesn't check the key itself until ENCRYPT.

@@ -16,11 +16,9 @@
 3. A decision's alert is time sensitive, so it gets through a Focus mode while the owner allows AgentPager's time-sensitive alerts.
 4. Opening the alert opens that decision (B5). The owner answers there; the alert has no answer buttons.
 5. An acknowledgement alerts too, with the agent's words.
-6. With the app open, a new decision shows a banner only when its pager isn't on screen, and the only other alert that shows one is B17.8's. The screens update by themselves (B23.6).
+<!-- B17.6 dropped in Sam's review, 6 Nov 2026; ids are never reused -->
 7. The app icon's badge shows how many decisions are waiting.
 8. @M3: If no agent has picked up an answer 3 minutes after Send, one more alert says so. It names who asked, its computer, its project and the question, and opening it opens that decision, which says so too (B5). There is one such alert per answer, and none if the pager is off at that moment. With the app open, it shows as a banner unless its pager is on screen.
-9. @M2: While a pager is off, nothing on it alerts, since its agents can send nothing (I17, L10), and its waiting decisions leave the badge.
-10. @M2: An alert that Apple can't deliver within 24 hours is dropped.
 
 - Apple delivers each alert. How long that takes is Apple's, and nothing here measures it.
 - How soon a new decision shows while the app is open is K1, which FRIENDS measures.

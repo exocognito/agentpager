@@ -11,16 +11,16 @@
 
 ### B5 · @M1 · Read and answer a decision
 
-1. @M2: A decision opens full screen from its pager (B23) or its alert (B17). It names the pager it is on and who asked, and marks who asked as finished once that agent finishes. It leads with the question and when it was asked.
+1. @M2: A decision opens full screen from its pager (B23) or its alert (B17). It names the pager it is on and who asked, and marks who asked as finished once that agent finishes. It leads with the question, prefixed "Decision:", and when it was asked.
 2. @M2: The brief's sections follow: context, options, recommendation, next steps and small print. Each folds under its heading, and next steps and small print start folded.
 3. @M2: The options section holds the tradeoffs table, with each rated cell tinted from best to worst, then a way to read each option in full. The recommended option is marked ✶.
 4. @M2: Opened in full, the options show one at a time, and the owner moves between them by letter or by swiping. Each shows its title, what it prioritizes, what it changes, why to choose it or pass on it, what it assumes and what it looks like.
 5. @M2: Seeing an option never chooses it.
-6. @M2: Images show small in the brief and open full screen, where the owner swipes from one to the next.
+<!-- B5.6 dropped in Sam's review, 6 Nov 2026; ids are never reused -->
 7. @M2: A page the brief links to, such as the context's background page, opens in a sheet over the decision, and a page linked from that page opens in the same sheet. Only an https link leaves the app.
-8. @M2: Every sheet closes with a swipe down, back to the decision.
-9. Below the brief, each option shows its letter and short label. Tapping one picks it, and tapping it again unpicks it.
-10. With an option picked, the owner can send it (I6). With none picked, the owner can ask for changes instead (B6).
+<!-- B5.8 dropped in Sam's review, 6 Nov 2026; ids are never reused -->
+9. Below the brief, each option shows its letter and short label. Tapping one picks it and outlines its column in the tradeoffs table; tapping it again unpicks it.
+10. With an option picked, the owner can send it, and Send names the option's letter (I6). With none picked, the owner can ask for changes instead (B6).
 11. Send returns to the pager, which counts down the Undo window with a way to undo (I6).
 12. The decision moves to its project's answered decisions (B7). Until the agent acknowledges, its row and the decision itself say the answer is sending, then that it is waiting for the agent, naming who asked.
 13. @M3: If no agent has picked up the answer 3 minutes after Send while the pager is on, the row and the decision instead name who asked, its computer and its project, and say the agent may be asleep, closed or disconnected. The owner is also alerted once (B17). Once an agent picks the answer up, they go back to waiting.
@@ -36,7 +36,7 @@
 
 1. On any open decision whose pager is on, the owner can ask for changes instead of choosing an option, writing what the agent should change.
 2. A note has no HTML and keeps within the length a note allows (I4).
-3. A note has the same Undo window as an option (I6). It is the decision's final answer, and the decision never changes after it (I5).
+<!-- B6.3 dropped in Sam's review, 6 Nov 2026; ids are never reused -->
 4. @M3: The note answers that one decision. It is never kept as guidance for other agents.
 
 - The agent reads the note word for word when it waits, and is told what to do with it (B32).
@@ -44,12 +44,8 @@
 
 ### B7 · @M1 · Reopen an answered decision
 
-1. @M2: Each project on a pager gathers its answered decisions behind one row (B23), which lists them newest first.
-2. @M2: Each answered decision in that list shows the chosen option's letter or a note's mark, the question, who asked and the answer. It shows a green tick once the agent has acknowledged. Until then it says where the answer is (B5).
+2. @M2: Each answered decision in its project's list (B23.5) shows the chosen option's letter or a note's mark, the question, who asked and the answer. It shows a green tick once the agent has acknowledged. Until then it says where the answer is (B5).
 3. @M2: Reopening an answered decision shows the brief as it was asked, with when it was asked and answered, and the chosen option's whole column outlined in the tradeoffs table.
-4. @M2: In place of answering, it shows the closed record: that closed decisions can't be changed; the chosen option and when, or the owner's note in its place; then the agent's acknowledgement with its next steps, beside a green tick. There is nothing to choose or send (I5).
-5. @M2: Answered decisions stay readable while the pager is off. They last until the pager is deleted or their agent is forgotten (I17).
-6. While the service can't be reached, the phone shows its last read of each pager, answered decisions included (B23).
 
 - The proof reads answered decisions only on the phone that made the pager. Nothing proves it on another device.
 

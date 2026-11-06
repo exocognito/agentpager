@@ -34,7 +34,7 @@ Following good UX practice, an action that cannot be undone needs a confirming s
 
 ### Only agents I give a number reach my phone
 
-A pager number is an address I give to agents I trust. Whoever has it can send me decisions until I turn that pager off, and can read nothing. I can turn any pager off, and then nothing from it gets through. If a number leaks, I make a new pager rather than turning the old one back on.
+A pager number is an address I give to agents I trust. Whoever has it can send me decisions until I turn that pager off, and can read nothing. I can turn any pager off, and then nothing from it gets through. If a number leaks, I make a new pager rather than turning the old one back on. The pager number binds my phone's key.
 
 ### Sent decisions cannot be changed
 

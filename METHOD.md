@@ -44,7 +44,7 @@ The Blueprint is a folder; AGENTS.md says where.
 
 ## Ids
 
-- `Bx` behavior, `Ix` invariant, `Jx` journey, `Kx` metric and `Lx` limit, with clauses such as `B25.3`. No dependency ids; an area's header names what it relies on.
+- `Bx` behavior, `Ix` invariant, `Jx` journey, `Kx` metric and `Lx` limit, with clauses such as `B25.2`. No dependency ids; an area's header names what it relies on.
 - Never reuse or renumber an id: `B25` keeps the old `C25`'s number, and limits start at `L9`, after the retired lessons. Ids don't change when files move.
 - `@M<n>` on a heading is the milestone its item was born in. A clause starts with `@M<n>:` only when a later milestone added it.
 - A milestone is numbered when it starts and keeps its word: `M5 · ENCRYPT`, written `@M5`. A queued one has only its word.

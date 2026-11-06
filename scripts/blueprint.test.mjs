@@ -1,7 +1,7 @@
 // The id check's parser, citations and freshness (scripts/blueprint.mjs). Run by `pnpm test`.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
@@ -86,19 +86,21 @@ test('warnings: duplicate ids, headings off the grammar, an unknown @M and a D i
 
 test('citations: ids in test names and comments only, not in any other string, even after a // in it; untested lists the rest and unknown ids', () => {
   const cited = citations([
-    { file: 'packages/a.test.ts', text: "test('B5.1 Read the first clause', () => {\n  assert.equal(card.title, 'B5.2 is only a fixture');\n  const url = 'https://fixtures.invalid/B5.2', page = `a page\nhttps://fixtures.invalid/B5.2`; // and it's I4.2\n});\n/* I4.2 and\n   C25.3, an old id */\nconst png = 'D1-pricing/a.png';" },
+    { file: 'packages/a.test.ts', text: "test('B5.1 Read the first clause', () => {\n  assert.equal(card.title, 'B5.2 is only a fixture');\n  const url = 'https://fixtures.invalid/B5.2', page = `a page\nhttps://fixtures.invalid/B5.2`; // and it's I4.2\n});\n/* I4.2 and\n   C25.3, an old id */\nconst png = 'D1-pricing/a.png';\ntest.each([[1, f(2)]])('I4.3 a table, %s', () => {});\nit.concurrent.each`a | b`('I4.4 a tagged table', () => {});" },
     { file: 'packages/ios/FlowTests.swift', text: 'func test_B5_3_theThird() {\n    let url = "https://fixtures.invalid/B5_2" // also B5.1\n    XCTAssertEqual(row.label, "B5_2 is only a label")\n    let page = """\n    https://fixtures.invalid/B5_2 and "quoted" text\n    """\n}' },
   ]);
   assert.deepEqual([...cited], [
     ['B5.1', ['packages/a.test.ts', 'packages/ios/FlowTests.swift']],
     ['I4.2', ['packages/a.test.ts']],
     ['C25.3', ['packages/a.test.ts']],
+    ['I4.3', ['packages/a.test.ts']],
+    ['I4.4', ['packages/a.test.ts']],
     ['B5.3', ['packages/ios/FlowTests.swift']],
   ]);
   const report = untested([parse('blueprint/areas/9-sample.md', AREA, () => {})], cited);
-  assert.match(report, /\*\*1 of 3 clauses untested\*\*, 2 tested\. Tests name 2 unknown ids\./);
+  assert.match(report, /\*\*1 of 3 clauses untested\*\*, 2 tested\. Tests name 4 unknown ids\./);
   assert.match(report, /## 9 Sample\n\n- \[B5 · Read a decision\]\(\.\.\/areas\/9-sample\.md#b5--m1--read-a-decision\): B5\.2\n/);
-  assert.match(report, /- `C25\.3` in `packages\/a\.test\.ts`\n- `I4\.2` in `packages\/a\.test\.ts`/);
+  assert.match(report, /- `C25\.3` in `packages\/a\.test\.ts`\n- `I4\.2` in `packages\/a\.test\.ts`\n- `I4\.3` in/);
 });
 
 test('stale: a file is stale when it differs from what was just made, or is missing', () => {
@@ -113,7 +115,7 @@ test('main: --check fails only when a generated file is stale, never for a warni
   const root = mkdtempSync(path.join(tmpdir(), 'agentpager-blueprint-'));
   const write = (file, text) => { mkdirSync(path.dirname(path.join(root, file)), { recursive: true }); writeFileSync(path.join(root, file), text); };
   write('blueprint/README.md', README);
-  write('blueprint/areas/9-sample.md', `${AREA}\n### Off the grammar\n`);
+  write('blueprint/areas/9-sample.md', `${AREA}\n### Off the grammar\n`.replace(/\n/g, '\r\n')); // a CRLF checkout reads the same
   write('blueprint/JOURNEYS.md', '# Journeys\n');
   write('packages/x/a.test.ts', "test('B5.1 Read the first clause', () => {});\n");
   execFileSync('git', ['init', '-q'], { cwd: root });
@@ -123,6 +125,9 @@ test('main: --check fails only when a generated file is stale, never for a warni
   assert.equal(main([], root, log), 0);
   assert.equal(main(['--check'], root, log), 0, 'fresh, with a warning and two untested clauses');
   assert.match(lines.at(-1), /current: 2 entries, 3 clauses \(1 tested, 2 untested\) from 1 test file, 1 warning\./);
+  const report = path.join(root, 'blueprint/generated/untested.md');
+  writeFileSync(report, readFileSync(report, 'utf8').replace(/\n/g, '\r\n'));
+  assert.equal(main(['--check'], root, log), 0, 'a generated file checked out with CRLF line ends is still fresh');
   write('packages/x/a.test.ts', "test('B5.2 Read the second clause', () => {});\n");
   assert.equal(main(['--check'], root, log), 1, 'a test now names another clause');
   assert.equal(lines.at(-1), 'blueprint/generated/untested.md is stale: the Blueprint or the tests changed since. Run `pnpm blueprint` and commit blueprint/generated.');

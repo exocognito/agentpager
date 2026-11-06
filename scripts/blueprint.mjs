@@ -17,11 +17,13 @@ const HEADING = /^### ([BIJKL])(\d+) · @M(\d+) · (\S.*)$/;
 const CLAUSE = /^(\d+)\. (.*)$/;
 const ADDED = /^@M(\d+):\s*/;
 const D_ID = /(?<![\w-])D\d+(?![\w-])/;
-// Where a test file names ids: a comment, a TypeScript test's name (`test('…'`, `it(`, `describe(`, `test.skip(` and
-// the like), or a Swift test's name (`func test_B25_2_connects`). Any other string literal, Swift's multi-line
-// `"""` ones included, is matched only to be skipped, so a fixture's text names nothing, even after a `//` in it.
+// Where a test file names ids: a comment, a TypeScript test's name (`test('…'`, `it(`, `describe(`, `test.skip(`,
+// `test.each(table)('…'` and the like), or a Swift test's name (`func test_B25_2_connects`). Any other string
+// literal, Swift's multi-line `"""` ones included, is matched only to be skipped, so a fixture's text names nothing,
+// even after a `//` in it.
 const STRING = String.raw`"""[\s\S]*?"""|'(?:\\.|[^\\'\n])*'|"(?:\\.|[^\\"\n])*"|\`(?:\\.|[^\\\`])*\``;
-const NAMED = new RegExp(String.raw`\b(?:test|it|describe)(?:\.\w+)?\(\s*(?:${STRING})|(${STRING})|\/\/.*|\/\*[\s\S]*?\*\/|\bfunc\s+test\w*`, 'g');
+const TABLE = String.raw`\((?:[^()]|\([^()]*\))*\)|\`(?:\\.|[^\\\`])*\``; // test.each's table, before the name
+const NAMED = new RegExp(String.raw`\b(?:test|it|describe)(?:\.\w+)*(?:${TABLE})?\(\s*(?:${STRING})|(${STRING})|\/\/.*|\/\*[\s\S]*?\*\/|\bfunc\s+test\w*`, 'g');
 // A clause id there: B25.2, or B25_2 in a Swift name. The letters of retired ids (C, D) are read too, so a test
 // naming one is reported.
 const CITED = /(?<![A-Za-z0-9])([BCDIJKL])(\d+)[._](\d+)(?!\d)/g;
@@ -113,7 +115,8 @@ export function untested(files, cited) {
   const clauses = files.flatMap(f => f.entries.flatMap(e => e.clauses));
   const known = new Set(clauses.map(c => c.id));
   const open = clauses.filter(c => !cited.has(c.id));
-  const unknown = [...cited].filter(([id]) => !known.has(id)).sort(([a], [b]) => a.localeCompare(b, 'en', { numeric: true }));
+  const key = id => id.replace(/\d+/g, d => d.padStart(6, '0')); // B5.2 before B25.1, the same on every machine
+  const unknown = [...cited].filter(([id]) => !known.has(id)).sort(([a], [b]) => key(a) < key(b) ? -1 : 1);
   const out = ['# Untested clauses', '', HEADER, '',
     'A clause is tested when a test file in `packages/` (`*.test.ts` or an iPhone `*Tests.swift`) names its id in a test\'s name or a comment, such as `B25.2`, or `B25_2` in a Swift name (METHOD.md › Tests). Naming it is all this reads: it doesn\'t run the test. A retired id, such as an old `C` id, counts as unknown.', '',
     `**${open.length} of ${clauses.length} clauses untested**, ${clauses.length - open.length} tested. Tests name ${n(unknown.length, 'unknown id')}.`, ''];
@@ -130,11 +133,14 @@ export function stale(made, read) {
   return Object.keys(made).filter(file => read(file) !== made[file]);
 }
 
+// A file's text with LF line ends, so a checkout with CRLF ones reads the same.
+const text = (root, file) => readFileSync(path.join(root, file), 'utf8').replace(/\r\n/g, '\n');
+
 // Everything the check reads, from the repository as it is on disk.
 export function build(root = repo) {
   const warnings = [];
   const warn = text => warnings.push(text);
-  const read = file => readFileSync(path.join(root, file), 'utf8');
+  const read = file => text(root, file);
   const sources = [...readdirSync(path.join(root, 'blueprint/areas')).filter(f => f.endsWith('.md')).sort().map(f => `blueprint/areas/${f}`), 'blueprint/JOURNEYS.md'];
   const files = sources.map(file => parse(file, read(file), warn));
   const milestones = milestonesOf(read('blueprint/README.md'));
@@ -155,7 +161,7 @@ export function main(argv, root = repo, log = console) {
   for (const warning of warnings) log.warn(`warning: ${warning}`);
   const summary = `${counts.entries} entries, ${counts.clauses} clauses (${counts.tested} tested, ${counts.clauses - counts.tested} untested) from ${n(counts.tests, 'test file')}, ${n(warnings.length, 'warning')}`;
   if (argv.includes('--check')) {
-    const old = stale(made, file => existsSync(path.join(root, file)) ? readFileSync(path.join(root, file), 'utf8') : undefined);
+    const old = stale(made, file => existsSync(path.join(root, file)) ? text(root, file) : undefined);
     if (old.length) {
       log.error(`${old.join(' and ')} ${old.length > 1 ? 'are' : 'is'} stale: the Blueprint or the tests changed since. Run \`pnpm blueprint\` and commit ${OUT}.`);
       return 1;

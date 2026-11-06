@@ -54,3 +54,4 @@ The plan, with the pull requests in order, is [.agents/plans/2026-11-05-m4-house
 ## Log
 
 - 5 Nov · building: Sam agreed Destination v2, its six simplifications and all eight ★ answers. PR #43 amends METHOD.md, sets the roadmap order and starts this doc; `pnpm check` green, `pnpm test:all` 60 passed (34, 16 and 10).
+- 5 Nov · building: PR #42 moves the code out of `packages/blueprint`: the wire contract to `packages/contract`, the front page to `packages/app/src/site` and the screens catalogue to `blueprint/generated/screens`. The images needed no re-render, since nothing they are drawn from changed content; the catalogue carries the new fingerprint. `pnpm check` green, `pnpm test:all` 60 passed (32 and 2, 16 and 10).

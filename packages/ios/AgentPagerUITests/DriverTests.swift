@@ -4,6 +4,7 @@ import XCTest
 // $AGENTPAGER_DRIVE_DIR/cmd.json and answers in out.json. Drive it with `node drive.mjs <op> key=value ...`.
 // Run with: TEST_RUNNER_AGENTPAGER_DRIVE_DIR=<dir> xcodebuild test-without-building ... \
 //   -only-testing:AgentPagerUITests/DriverTests/testDrive
+@MainActor
 final class DriverTests: XCTestCase {
     private var app: XCUIApplication!
     private var dir: URL!

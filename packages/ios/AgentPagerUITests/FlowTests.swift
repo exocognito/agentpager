@@ -2,11 +2,12 @@ import XCTest
 
 // End-to-end flows: the app in the Simulator, the real local server, and this test playing the agent.
 // Run with: TEST_RUNNER_AGENTPAGER_SERVER_URL=http://<mac-ip>:8787 TEST_RUNNER_SCREENSHOT_DIR=<dir> xcodebuild test ...
+@MainActor
 final class FlowTests: XCTestCase {
     var app: XCUIApplication!
     var agent: AgentHarness!
 
-    override func setUpWithError() throws {
+    override func setUp() async throws {
         continueAfterFailure = false
         agent = AgentHarness(base: AgentHarness.server)
         app = XCUIApplication()

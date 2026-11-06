@@ -2,7 +2,7 @@ import XCTest
 
 // Plays the coding agent against the real local server over its HTTP API, as the agentpager command does (the
 // hosted MCP server is retired). Nothing is mocked.
-struct ToolError: Error, CustomStringConvertible {
+struct ToolError: Error, @unchecked Sendable, CustomStringConvertible {
     var body: [String: Any]
     var tag: String { body["error"] as? String ?? "?" }
     var description: String { "ToolError(\(body))" }
@@ -27,8 +27,8 @@ final class AgentHarness {
         for (k, v) in headers { r.setValue(v, forHTTPHeaderField: k) }
         r.httpBody = body
         let done = DispatchSemaphore(value: 0)
-        var result: (Int, Data)?
-        var failure: Error?
+        nonisolated(unsafe) var result: (Int, Data)?
+        nonisolated(unsafe) var failure: Error?
         URLSession.shared.dataTask(with: r) { data, response, error in
             if let error { failure = error } else { result = ((response as? HTTPURLResponse)?.statusCode ?? 0, data ?? Data()) }
             done.signal()
@@ -94,6 +94,7 @@ final class AgentHarness {
     }
 }
 
+@MainActor
 extension XCTestCase {
     // A frame of this test's journey: the screenshot, and the action that led to it. Kept in the test result and,
     // with SCREENSHOT_DIR set, saved as <dir>/<test>/<name>.png with a line "<name>\t<action>" in frames.tsv, so
@@ -134,6 +135,7 @@ extension XCTestCase {
     }
 }
 
+@MainActor
 extension XCUIApplication {
     // What is on screen as text: one line per element worth naming, indented by depth, as type #identifier "label"
     // value="…" [x,y wxh] in points, then disabled or selected. The keyboard is summarised.

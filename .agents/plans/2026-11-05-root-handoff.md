@@ -27,8 +27,7 @@ Read `AGENTS.md`, then `blueprint/README.md`. This file covers only what those t
   - the unmerged remote branch `design/ended-copies`, from the closed PR #7;
   - the merged branches still on the remote: 23 on 6 Nov [V, each remote branch checked against `origin/main`].
 - **Known leftovers** (question 10):
-  - an App Intents log line in Xcode builds;
-  - 489 Swift 6 concurrency warnings in the UI tests, shown only with strict checking;
+  - the App Intents log line and the UI tests' 489 concurrency warnings are fixed (6 Nov);
   - the id check's "Known limits" at the top of `scripts/blueprint.mjs`;
   - `DECISIONS.md` still names the retired limit L20.
 - **For Sam to approve removing**, by the exact command:

@@ -1,6 +1,6 @@
 # M4 HOUSE: the conversion ledger
 
-Every line of the old Blueprint, and where it went when M4 converted it to the area shape ([METHOD.md](../../../METHOD.md)). The old files are at tag `blueprint-old-format`. A specific that moved into code or a test names what holds it. Sam reviews the ⚑ rows after the merge ([M4-house.md](../M4-house.md#sam-reviews-after-merge)).
+Every line of the old Blueprint, and where it went when M4 converted it to the area shape ([METHOD.md](../../../METHOD.md)). The old files are at tag `blueprint-old-format`. A specific that moved into code or a test names what holds it. Sam reviewed the ⚑ rows, and every line, on 6 Nov 2026: what it changed is in [M4-house.md](../M4-house.md#sam-reviews-after-merge), under question 1 and Adds · Changes · Retires.
 
 ## Totals
 

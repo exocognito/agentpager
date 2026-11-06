@@ -153,7 +153,7 @@ export function untested(files, cited) {
   const clauses = files.flatMap(f => f.entries.flatMap(e => e.clauses));
   const known = new Set(clauses.map(c => c.id));
   const open = clauses.filter(c => !cited.has(c.id));
-  const key = id => id.replace(/\d+/g, d => d.padStart(6, '0')); // B5.2 before B25.1, the same on every machine
+  const key = id => id.replace(/\d+/g, d => d.padStart(6, '0')); // B5.2 before B25.2, the same on every machine
   const unknown = [...cited].filter(([id]) => !known.has(id)).sort(([a], [b]) => key(a) < key(b) ? -1 : 1);
   const out = ['# Untested clauses', '', HEADER, '',
     'A clause is tested when a test\'s name in `packages/` carries its id (METHOD.md › Tests): the string given to `test(`, `it(` or `describe(` in a `*.test.ts` file, such as `\'B25.2 Connect from MCP\'`, or an iPhone `*Tests.swift` function named `test`, then the id with `_` for its dot, such as `test_B25_2_connectsFromMCP`. Comments and other strings don\'t count. The name is all this reads: it doesn\'t run the test. A retired id, such as an old `C` id, counts as unknown.', '',

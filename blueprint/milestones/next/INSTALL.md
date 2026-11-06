@@ -32,7 +32,7 @@ Sam decides these first:
 
 - **Adds:** B19, whole; the one-line install in B29, with builds for each kind of machine Sam chooses and a command that can update itself; the TestFlight build, whose alerts use Apple's production push service; J5's steps with the demo agent and the TestFlight build.
 - **Changes:** B29's title widens back to installing the command with one line; B18, so /start gives that line instead of building from source.
-- **Retires:** the limits it fixes, quoted here when they go: L24 "The app installs only from Xcode", L22 "The command installs only from source" and L23 "Moving the command breaks its setup" (7 Getting started).
+- **Retires:** the limits it fixes, quoted here when they go: L24 "The app installs only from Xcode" and L22 "The command installs only from source" (7 Getting started).
 
 ## From the old Blueprint (not built yet)
 

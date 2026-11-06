@@ -5,7 +5,7 @@
 > **Relies on:** an iPhone with iOS 26, where the app runs · the iPhone's Keychain, which keeps each pager's keys on that phone only and out of its backups · iOS Settings, which holds the app's server address · Cloudflare, where the service keeps each pager's state and its agents (6 Privacy)
 > **Code:** `packages/ios/AgentPager/`, the app: `Views/PagersView.swift`, `Views/PagerView.swift`, `Views/PagerDetailView.swift`, `Model/AppModel.swift`, `Model/Keychain.swift`, `Model/Wording.swift`, `Settings.bundle` · `packages/app/src/registry.ts` (pagers, off, auto-off, delete) · `packages/app/src/agent.ts` (the off check on every call, forgetting idle agents) · `packages/app/src/contract.ts` (the auto-off and idle times)
 > **Screens:** [pagers](../generated/screens/phone/pagers.png) · [empty](../generated/screens/phone/empty.png) · [pager](../generated/screens/phone/pager.png) · [detail](../generated/screens/phone/detail.png) · [new](../generated/screens/phone/new.png) · journeys: [pager](../generated/screens/journeys/pager/README.md), [off-and-on](../generated/screens/journeys/off-and-on/README.md), [delete](../generated/screens/journeys/delete/README.md)
-> **Walked by:** J3, J4, J5
+> **Walked by:** J4, J5
 
 ## Behaviors
 
@@ -16,8 +16,8 @@
 3. The phone makes the pager's number itself (I19), so New pager shows the text to give agents, with the number, before Create. Copying it copies the text as one block.
 4. The text names the pager's server, agentpager.me unless the app is set to another (B23.10), and gives the command that connects an agent with this pager's number.
 5. @M3: On a server other than agentpager.me, the command in the text names that server too, so the agent connects there.
-6. Create registers the pager with the service and opens it, active and with no decisions yet.
-7. If the service refuses the pager, New pager says why. If the service can't be reached, it says so. Either way, nothing is made.
+<!-- B26.6 dropped in Sam's review, 6 Nov 2026; ids are never reused -->
+7. If Create gets no reply, pressing it again makes the same pager, not a second one.
 8. The same text is in the pager's detail at any time (B22). The number shows only there and in New pager, never on Pagers.
 9. A phone holds as many pagers as the owner makes, each with its own number, keys and switch.
 
@@ -26,14 +26,11 @@
 
 ### B23 · @M2 · Pagers and the Pager screen
 
-1. Pagers, the app's first screen, lists this phone's pagers. Each row shows the pager's name, its status (B22.2), and, while it is active, how many decisions are open on it.
-2. With no pagers, Pagers says to make one and give its number to agents (B26).
-3. Opening a pager shows its screen, titled with its name. The pager's detail opens from there (B22).
 4. A pager's decisions are grouped by project. Projects with open decisions come first, the one waiting longest on top. In each project, open decisions come oldest first, each with its question, who asked and how long ago.
 5. Each project folds its answered decisions into one row with their count, which opens them (B7). With nothing open in that project, the row also names who asked.
-6. While the app is open, its screens refresh by themselves, and pulling down on a pager refreshes it. A closed app learns of new decisions only through alerts (B17).
-7. The phone lists the pagers whose keys it holds, with the state the service reports for each. A pager the service says no longer exists is dropped from the phone.
-8. While the service can't be reached, the phone shows what it last read, and Pagers says it can't reach the server and when it last updated.
+<!-- B23.6 dropped in Sam's review, 6 Nov 2026; ids are never reused -->
+7. The phone lists the pagers whose keys it holds, with the state the service reports for each. A pager is dropped from the phone, with its keys, only when the service says it no longer exists.
+8. While the service can't be reached, the phone shows what it last read, and Pagers says it can't reach the server and when it last updated. While the service can be reached, Pagers shows no such line.
 9. A pager made on another phone never shows on this one.
 10. The server's address is set in iOS Settings; the app has no Settings screen of its own. The phone shows only the pagers made on the server it is set to.
 11. @M4: A pager made on dev.agentpager.me is marked dev on its row in Pagers and on its own screen. A pager made on agentpager.me isn't.
@@ -43,7 +40,6 @@
 
 ### B22 · @M2 · Turn a pager off and on, or delete it
 
-1. A pager's detail holds its switch, its name, when it turns off, the text to give agents (B26) and a way to delete it. Each change applies as soon as it is made.
 2. A pager's row says whether it is active and, if it turns off by itself, how soon; or that it is off, and since when.
 3. Turning a pager off stops its agents reaching the owner (I17). It doesn't stop the agents themselves.
 4. While a pager is off, the phone keeps everything, and its decisions stay readable. The owner can't answer until the pager is on again, and an open decision offers to turn it on (B5).
@@ -72,6 +68,12 @@ Why: "Whoever has it can send me decisions until I turn that pager off, and can 
 - A call the service has already checked when the owner turns the pager off can still land (L10).
 - Nothing is claimed about copies in the platform's own backups, such as Cloudflare's point-in-time recovery.
 - The agentpager command's files on an agent's machine, its history among them (B31), stay after a pager is deleted (L15, in 2 Agents).
+
+### I24 · @M3 · A restart loses nothing
+
+Why: "I can look back at an agent's decisions until its pager is deleted, or until it has been idle 30 days."
+
+1. Closing and reopening the app, or restarting the service on unchanged storage, loses no pager, decision or agent, and each agent's next call works with the same id.
 
 ## Limits
 

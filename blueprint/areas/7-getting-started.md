@@ -27,10 +27,9 @@
 ### B29 · @M3 · Set up the command in agent apps
 
 1. `agentpager setup` adds the command's local MCP server to each agent app it finds on the machine: Claude Code, Codex, Claude Desktop and Cursor.
-2. Running setup again changes nothing.
-3. The owner can see what setup would change without it changing anything.
+<!-- B29.2 and B29.3 dropped in Sam's review, 6 Nov 2026; ids are never reused -->
 4. A config file that setup can't read whole is left alone, and setup says what to add to it by hand.
-5. Claude Desktop needs a restart afterwards, and setup says so.
+<!-- B29.5 dropped in Sam's review, 6 Nov 2026; ids are never reused -->
 6. In an app's config, setup writes only where the command is: never an agent's key or a pager number.
 7. The command is one program: a command line, and a local MCP server that agent apps start, whose tools give the same replies as the commands.
 8. The built command is one file. Where it runs, it needs neither Bun, Node nor the AgentPager repository.
@@ -51,13 +50,6 @@
 - What people meet: there is no download of the agentpager command. As /start says, an agent or owner builds it from the AgentPager repository, which is private for now, with git, Node, pnpm and Bun. The build runs only on the kind of machine that built it.
 - Why it waits: release builds and a one-line install are INSTALL's work. Sam decides first where the command downloads from and which machines get a build.
 - What would fix it: one line that installs the command as a single file built for the machine.
-- When to revisit: INSTALL.
-
-### L23 · @M3 · Moving the command breaks its setup
-
-- What people meet: setup names the command by its full path in each app's config. If the command, or the repository it was built in, moves, those apps can't start it until setup runs again.
-- Why it waits: desktop apps don't get the shell's PATH, so each app's entry must name the command's full path.
-- What would fix it: an install that keeps the command in one place and runs setup itself.
 - When to revisit: INSTALL.
 
 ### L24 · @M1 · The app installs only from Xcode

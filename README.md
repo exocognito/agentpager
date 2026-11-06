@@ -1,8 +1,8 @@
 # AgentPager
 
-Bring an agent's decisions to the owner's phone. The [strategy](packages/blueprint/strategy/STRATEGY.md), [executable design](packages/blueprint/design/) with its [journeys](packages/blueprint/design/journeys/) and [wire contract](packages/contract/exchange.ts), and the [roadmap](packages/blueprint/roadmap/ROADMAP.md) are the product contract. The [workshop](packages/blueprint/records/workshop/) that preceded them is history: `strategy.md` there was promoted into the package with the edits `DEC-2026-09-25-mstart-scope` records, the tldraw board holds the round 3 proposal, and the visual workshop's variant E is the history behind the screens. The apps own appearance, and the [design catalogue](blueprint/generated/screens/README.md) records it.
+Bring an agent's decisions to the owner's phone. The [Blueprint](blueprint/README.md) is the product contract: [what it's for](blueprint/PRODUCT.md), the promises of each [area](blueprint/areas/), the [journeys](blueprint/JOURNEYS.md) and the [milestones](blueprint/README.md#milestones), with the [wire contract](packages/contract/exchange.ts) in code. [METHOD.md](METHOD.md) is how it is built. The apps own appearance, and the [design catalogue](blueprint/generated/screens/README.md) records it.
 
-MCARDS, the first milestone, created `packages/app/` from this contract in a cleanroom run using [recipe.json](recipe.json). That recipe is retired with v2: it still targets the retired hosted MCP, so don't run it (`docs/v2/06-blueprint-update-plan.md`). `design/` is the one design folder.
+MCARDS, the first milestone, created `packages/app/` from this contract in a cleanroom run using [recipe.json](recipe.json). That recipe is retired with v2: it still targets the retired hosted MCP, so don't run it (`docs/v2/06-blueprint-update-plan.md`). 
 
 ## Layout
 
@@ -10,9 +10,8 @@ MCARDS, the first milestone, created `packages/app/` from this contract in a cle
 | --- | --- |
 | `package.json`, `pnpm-workspace.yaml`, `pnpm-lock.yaml`, `tsconfig.json` | The pnpm workspace. Root scripts only delegate to the packages. |
 | `recipe.json` | The MCARDS cleanroom run's host, tools, setup and test command. Retired with v2; don't run it. |
-| `packages/blueprint/` | The contract and the records. |
+| `blueprint/` | The Blueprint: the product contract, its milestones and, in `generated/screens/`, the design catalogue written by `pnpm designs`. |
 | `packages/contract/` | The wire contract: the schemas the server, the binary and the phone exchange, with their unit tests. |
-| `blueprint/generated/screens/` | The design catalogue, written by `pnpm designs`. |
 | `packages/ios/` | The SwiftUI iPhone app, its UI tests and the Xcode project. |
 | `packages/app/` | Created by a run: the Worker, the front page (`src/site/`), deploy and dogfood scripts and acceptance tests. The root scripts delegate to it by name. |
 
@@ -34,7 +33,7 @@ pnpm test
 
 ## Build the product
 
-Runs use the [simple loop](https://github.com/exocognito/blueprint/blob/main/src/process/simple-loop.md). The app and the binary import the wire contract by relative path (`../../contract/...`). It supplies the Worker, the Durable Objects behind pagers and agents, the card API layer and routing. The HTTP API's routes, auth headers and error statuses are in `packages/app/src/worker.ts` and `contract.ts`; [D1](packages/blueprint/design/dependencies/D1-cloudflare.md) names the build header. `/start` and the retired `/mcp` send an arriving agent to the `agentpager` command (`packages/cli`). Test fixtures stay outside package exports.
+The app and the binary import the wire contract by relative path (`../../contract/...`). It supplies the Worker, the Durable Objects behind pagers and agents, the card API layer and routing. The HTTP API's routes, auth headers and error statuses are in `packages/app/src/worker.ts` and `contract.ts`; every reply carries the build header `X-AgentPager-Build` ([packages/app/README.md › Deployment](packages/app/README.md#deployment)). `/start` and the retired `/mcp` send an arriving agent to the `agentpager` command (`packages/cli`). Test fixtures stay outside package exports.
 
 ## Reset deployed data (retired)
 

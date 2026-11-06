@@ -1,9 +1,7 @@
-// The id check (METHOD.md › Tests): reads the Blueprint's promises and the clause ids the tests name, and writes
+// The id check (METHOD.md › Tests): reads the Blueprint's promises and the test names, and writes
 // blueprint/generated/by-milestone.md and blueprint/generated/untested.md. It reports and never blocks.
 //   node scripts/blueprint.mjs          (pnpm blueprint) rewrites both files and prints the warnings
 //   node scripts/blueprint.mjs --check  (in pnpm check) fails only when either file is stale; warnings never fail it
-// A test names a clause by its new id only, such as B25.2. An old id, such as C25.3, counts as unknown rather than
-// through the M4 ledger: no test named one when this was written, and METHOD.md says no test names a retired id.
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -17,15 +15,13 @@ const HEADING = /^### ([BIJKL])(\d+) · @M(\d+) · (\S.*)$/;
 const CLAUSE = /^(\d+)\. (.*)$/;
 const ADDED = /^@M(\d+):\s*/;
 const D_ID = /(?<![\w-])D\d+(?![\w-])/;
-// Where a test file names ids: a comment, a TypeScript test's name (`test('…'`, `it(`, `describe(`, `test.skip(`,
-// `test.each(table)('…'` and the like, but not a method such as `/re/.test('…')`), or a Swift test's name
-// (`func test_B25_2_connects`). Any other string literal, Swift's multi-line `"""` ones included, is matched only to
-// be skipped, so a fixture's text names nothing, even after a `//` in it.
-const STRING = String.raw`"""[\s\S]*?"""|'(?:\\.|[^\\'\n])*'|"(?:\\.|[^\\"\n])*"|\`(?:\\.|[^\\\`])*\``;
-const TABLE = String.raw`\((?:[^()]|\([^()]*\))*\)|\`(?:\\.|[^\\\`])*\``; // test.each's table, before the name
-const NAMED = new RegExp(String.raw`(?<![\w$.])(?:test|it|describe)(?:\.\w+)*(?:${TABLE})?\(\s*(?:${STRING})|(${STRING})|\/\/.*|\/\*[\s\S]*?\*\/|\bfunc\s+test\w*`, 'g');
-// A clause id there: B25.2, or B25_2 in a Swift name. The letters of retired ids (C, D) are read too, so a test
-// naming one is reported.
+// A test counts when its name carries the id. A TypeScript test's name is the string given to `test(`, `it(` or
+// `describe(`, after modifiers such as `.skip` or `.each(table)`: `test('B25.2 Connect from MCP', …)`. Swift has no
+// dot in a name, so an iPhone test function's name is `test`, then the id with `_` for its dot, as in
+// `func test_B25_2_connectsFromMCP()` (METHOD.md › Tests) or `func testB25_2ConnectsFromMCP()`. Comments and other
+// strings name nothing. The letters of retired ids (C, D) are read too, so a test naming one is reported.
+const TS_NAME = /(?<![\w$.])(?:test|it|describe)(?:\.\w+)*(?:\((?:[^()]|\([^()]*\))*\))?\(\s*(['"`])(.*?)\1/g;
+const SWIFT_NAME = /\bfunc\s+test(\w*)/g;
 const CITED = /(?<![A-Za-z0-9])([BCDIJKL])(\d+)[._](\d+)(?!\d)/g;
 const TEST_FILE = /\.test\.[cm]?[jt]sx?$|Tests\.swift$/;
 
@@ -73,10 +69,11 @@ export function check(files, milestones, warn) {
   }
 }
 
-// The clause ids the test files name in a test's name or a comment, each with the files that name it.
+// The clause ids that tests' names carry, each with the files whose tests carry it.
 export function citations(tests) {
   const cited = new Map();
-  for (const { file, text } of tests) for (const m of [...text.matchAll(NAMED)].filter(m => m[1] === undefined).flatMap(([named]) => [...named.matchAll(CITED)])) {
+  const names = (file, text) => file.endsWith('.swift') ? [...text.matchAll(SWIFT_NAME)].map(m => m[1]) : [...text.matchAll(TS_NAME)].map(m => m[2]);
+  for (const { file, text } of tests) for (const m of names(file, text).flatMap(name => [...name.matchAll(CITED)])) {
     const id = `${m[1]}${m[2]}.${m[3]}`;
     cited.set(id, [...new Set([...(cited.get(id) ?? []), file])]);
   }
@@ -96,13 +93,11 @@ export function byMilestone(files, milestones) {
   const count = letter => entries.filter(e => e.id.startsWith(letter)).length;
   const out = ['# What each milestone added', '', HEADER, '',
     `**${entries.length} entries** (${count('B')} behaviors, ${count('I')} invariants, ${count('J')} journeys, ${count('K')} metrics, ${count('L')} limits) **and ${clauses.length} clauses.** Each entry is under the milestone it was born in, \`@M<n>\` on its heading, with the clauses it was born with. A clause a later milestone added, \`@M<n>:\`, is under that milestone. A limit has notes only.`, ''];
-  const numbers = [...new Set([...milestones.keys(), ...entries.map(e => e.milestone), ...clauses.map(c => c.milestone)])].sort((a, b) => a - b);
-  for (const number of numbers) {
-    const m = milestones.get(number);
+  for (const [number, m] of [...milestones].sort(([a], [b]) => a - b)) {
     const born = entries.filter(e => e.milestone === number);
     const later = entries.flatMap(e => e.clauses.filter(c => c.added && c.milestone === number).map(c => ({ ...c, entry: e })));
     const bornClauses = born.flatMap(e => e.clauses.filter(c => !c.added)).length;
-    out.push(m ? `## [M${number} · ${m.word}](../${m.link})` : `## M${number} · not in README's table`, '');
+    out.push(`## [M${number} · ${m.word}](../${m.link})`, '');
     out.push(`${n(born.length, 'entry', 'entries')} with ${n(bornClauses, 'clause')}, and ${n(later.length, 'clause')} added to earlier entries.`, '');
     for (const e of born) out.push(`- ${link(e)} · ${e.area}${e.clauses.some(c => !c.added) ? `: ${ids(e.clauses.filter(c => !c.added))}` : ''}`);
     if (born.length) out.push('');
@@ -118,7 +113,7 @@ export function untested(files, cited) {
   const key = id => id.replace(/\d+/g, d => d.padStart(6, '0')); // B5.2 before B25.1, the same on every machine
   const unknown = [...cited].filter(([id]) => !known.has(id)).sort(([a], [b]) => key(a) < key(b) ? -1 : 1);
   const out = ['# Untested clauses', '', HEADER, '',
-    'A clause is tested when a test file in `packages/` (`*.test.ts` or an iPhone `*Tests.swift`) names its id in a test\'s name or a comment, such as `B25.2`, or `B25_2` in a Swift name (METHOD.md › Tests). Naming it is all this reads: it doesn\'t run the test. A retired id, such as an old `C` id, counts as unknown.', '',
+    'A clause is tested when a test\'s name in `packages/` carries its id (METHOD.md › Tests): the string given to `test(`, `it(` or `describe(` in a `*.test.ts` file, such as `\'B25.2 Connect from MCP\'`, or an iPhone `*Tests.swift` function named `test`, then the id with `_` for its dot, such as `test_B25_2_connectsFromMCP`. Comments and other strings don\'t count. The name is all this reads: it doesn\'t run the test. A retired id, such as an old `C` id, counts as unknown.', '',
     `**${open.length} of ${clauses.length} clauses untested**, ${clauses.length - open.length} tested. Tests name ${n(unknown.length, 'unknown id')}.`, ''];
   for (const file of files) {
     const rows = file.entries.map(e => [e, e.clauses.filter(c => !cited.has(c.id))]).filter(([, cs]) => cs.length);
@@ -126,11 +121,6 @@ export function untested(files, cited) {
   }
   out.push('## Tests naming an unknown id', '', ...(unknown.length ? unknown.map(([id, tests]) => `- \`${id}\` in ${tests.map(t => `\`${t}\``).join(', ')}`) : ['None.']), '');
   return out.join('\n');
-}
-
-// Which generated files differ from what was just made, or are missing; `read` gives a file's text or undefined.
-export function stale(made, read) {
-  return Object.keys(made).filter(file => read(file) !== made[file]);
 }
 
 // A file's text with LF line ends, so a checkout with CRLF ones reads the same.
@@ -155,13 +145,14 @@ export function build(root = repo) {
   return { warnings, counts, made: { [`${OUT}/by-milestone.md`]: byMilestone(files, milestones), [`${OUT}/untested.md`]: untested(files, cited) } };
 }
 
-// `pnpm blueprint`, or with --check the freshness check in `pnpm check`. Returns the exit code.
+// `pnpm blueprint`, or with --check the freshness check in `pnpm check`: it fails only when a generated file is missing
+// or differs from what the Blueprint and the tests make now. Returns the exit code.
 export function main(argv, root = repo, log = console) {
   const { warnings, counts, made } = build(root);
   for (const warning of warnings) log.warn(`warning: ${warning}`);
   const summary = `${counts.entries} entries, ${counts.clauses} clauses (${counts.tested} tested, ${counts.clauses - counts.tested} untested) from ${n(counts.tests, 'test file')}, ${n(warnings.length, 'warning')}`;
   if (argv.includes('--check')) {
-    const old = stale(made, file => existsSync(path.join(root, file)) ? text(root, file) : undefined);
+    const old = Object.keys(made).filter(file => !existsSync(path.join(root, file)) || text(root, file) !== made[file]);
     if (old.length) {
       log.error(`${old.join(' and ')} ${old.length > 1 ? 'are' : 'is'} stale: the Blueprint or the tests changed since. Run \`pnpm blueprint\` and commit ${OUT}.`);
       return 1;

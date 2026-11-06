@@ -5,7 +5,7 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
-import { check, citations, main, milestonesOf, parse, stale, untested } from './blueprint.mjs';
+import { check, citations, main, milestonesOf, parse, untested } from './blueprint.mjs';
 
 const README = `| | Milestone | What it delivers |
 | --- | --- | --- |
@@ -84,10 +84,18 @@ test('warnings: duplicate ids, headings off the grammar, an unknown @M and a D i
   ]);
 });
 
-test('citations: ids in test names and comments only, not in any other string, even after a // in it; untested lists the rest and unknown ids', () => {
+test('citations: only a test\'s name counts, never a comment or another string; untested lists the rest and unknown ids', () => {
   const cited = citations([
-    { file: 'packages/a.test.ts', text: "test('B5.1 Read the first clause', () => {\n  assert.equal(card.title, 'B5.2 is only a fixture');\n  const url = 'https://fixtures.invalid/B5.2', page = `a page\nhttps://fixtures.invalid/B5.2`; // and it's I4.2\n});\n/* I4.2 and\n   C25.3, an old id */\nconst png = 'D1-pricing/a.png';\ntest.each([[1, f(2)]])('I4.3 a table, %s', () => {});\nit.concurrent.each`a | b`('I4.4 a tagged table', () => {});\nexpect(/B5\\.2/.test('B5.2 is only a fixture')).toBe(true);" },
-    { file: 'packages/ios/FlowTests.swift', text: 'func test_B5_3_theThird() {\n    let url = "https://fixtures.invalid/B5_2" // also B5.1\n    XCTAssertEqual(row.label, "B5_2 is only a label")\n    let page = """\n    https://fixtures.invalid/B5_2 and "quoted" text\n    """\n}' },
+    { file: 'packages/a.test.ts', text: [
+      "test('B5.1 Read the first clause', () => {",
+      "  // B5.2 in a comment, and in a string: 'B5.2 is only a fixture', 'https://fixtures.invalid/B5.2'",
+      "  expect(/B5\\.2/.test('B5.2 is a method call, not a test')).toBe(true);",
+      '});',
+      'describe("I4.2 and C25.3, an old id", () => {});',
+      "test.each([[1, f(2)]])('I4.3 a table, %s', () => {});",
+      "it.skip(`I4.4 skipped`, () => {});",
+    ].join('\n') },
+    { file: 'packages/ios/FlowTests.swift', text: 'func test_B5_3_theThird() {\n    // B5_2 in a comment\n    XCTAssertEqual(row.label, "B5_2 is only a label")\n}\nfunc testB5_1Again() {}' },
   ]);
   assert.deepEqual([...cited], [
     ['B5.1', ['packages/a.test.ts', 'packages/ios/FlowTests.swift']],
@@ -101,14 +109,6 @@ test('citations: ids in test names and comments only, not in any other string, e
   assert.match(report, /\*\*1 of 3 clauses untested\*\*, 2 tested\. Tests name 4 unknown ids\./);
   assert.match(report, /## 9 Sample\n\n- \[B5 · Read a decision\]\(\.\.\/areas\/9-sample\.md#b5--m1--read-a-decision\): B5\.2\n/);
   assert.match(report, /- `C25\.3` in `packages\/a\.test\.ts`\n- `I4\.2` in `packages\/a\.test\.ts`\n- `I4\.3` in/);
-});
-
-test('stale: a file is stale when it differs from what was just made, or is missing', () => {
-  const made = { 'blueprint/generated/by-milestone.md': 'new\n', 'blueprint/generated/untested.md': 'same\n' };
-  const disk = { 'blueprint/generated/by-milestone.md': 'old\n', 'blueprint/generated/untested.md': 'same\n' };
-  assert.deepEqual(stale(made, file => made[file]), []);
-  assert.deepEqual(stale(made, file => disk[file]), ['blueprint/generated/by-milestone.md']);
-  assert.deepEqual(stale(made, () => undefined), Object.keys(made));
 });
 
 test('main: --check fails only when a generated file is stale, never for a warning or an untested clause', () => {

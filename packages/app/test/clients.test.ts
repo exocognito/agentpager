@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import { fixture, assert, token, C, question, pagerKeys } from './support.ts';
-import { loadBrief } from '../fixtures/briefs/load.ts';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { briefsDir, loadBrief } from '../fixtures/briefs/load.ts';
 
 // Every client names itself in C.CLIENT_HEADER. An agent's call that doesn't, as the m4 command's didn't, or that
 // names a protocol older than the service accepts, is refused as UpdateRequired with how to update. It is refused
@@ -60,7 +62,7 @@ test('the phone: an app from before the header is served; an older one is told t
   const f = await fixture('clients-phone');
   try {
     const { p, a } = await f.connected('Codex', 'phone');
-    const brief = { decisionId: token(), ...loadBrief('D2-checkout') } as { decisionId: string; attachments?: { name: string; text?: string }[] };
+    const brief: Record<string, unknown> = { decisionId: token(), ...loadBrief('D2-checkout') };
     const asked = await f.ok(C.Asked, `/api/agents/${a.agent.agentId}/cards`, { agent: a.agentKey, data: brief });
     const did = asked.decisionId, decision = `/api/agents/${a.agent.agentId}/cards/${did}`;
     const routes = (pagerId: string, keys = pagerKeys()): Call[] => [
@@ -87,7 +89,7 @@ test('the phone: an app from before the header is served; an older one is told t
     for (const [label, route, opts] of routes(p.pagerId, other)) {
       if (label === 'read an attachment') {
         const file = await fetch(f.origin + route, { headers: { 'x-phone-key': p.phone } });
-        assert.deepEqual([file.status, await file.text()], [200, String(brief.attachments?.find(x => x.name === 'design.md')?.text)], label);
+        assert.deepEqual([file.status, await file.text()], [200, readFileSync(path.join(briefsDir, 'D2-checkout', 'design.md'), 'utf8')], label);
         continue;
       }
       const r = await f.request(route, { ...opts, phone: p.phone, ...m4 }).catch(e => { throw new Error(`${label}: ${e}`); });

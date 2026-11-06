@@ -1442,7 +1442,7 @@ PR 4 deleted `docs/v2/`, the root `workshop/`, `recipe.json` and four superseded
 | docs/v2/mocks, docs/v2/pages | deleted | superseded by `generated/screens/`. `Previews.swift`'s mention of the mocks waits for the follow-up |  |
 | recipe.json | deleted | nothing reads it: no code, test, script or package.json names it. The root README and `packages/app/README.md` no longer cite it; AGENTS.md still names it among what v2 retired |  |
 | the root `workshop/`; plans `2026-10-30-design-catalogue.md`, `2026-10-31-method.md`, `2026-10-31-method-sample/`, `2026-10-31-next-roadmap-orchestration.md` | deleted | checked again: nothing in them is still true without a home |  |
-| `.agents/plans/2026-10-31-root-handoff.md` | kept | the row above said PR 4 deletes it. The root rewrites it at M4's end, which drops its links to the deleted plans |  |
+| `.agents/plans/2026-10-31-root-handoff.md` | `.agents/plans/2026-11-05-root-handoff.md` | the row above said PR 4 deletes it. It was kept until M4's wrap-up (PR #51), which deletes it and writes the new handoff, without its links to the deleted plans |  |
 | memory `agent-wake-research` and the report Ph2BtiR64UBSde6fbXW5LT | docs/research/2026-10-30-agent-wake-lab.md | the lasting record of what wakes which app and how it was tested; B33's note and CLIENTS cite it |  |
 | DECISIONS.md's citations of `docs/v2/` | kept as written | DECISIONS.md is append only, and "which git keeps" stays true: the tag is `history-archive` |  |
 

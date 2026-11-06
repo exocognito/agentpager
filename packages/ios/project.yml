@@ -1,6 +1,9 @@
 name: AgentPager
 options:
   bundleIdPrefix: me.agentpager
+  # The Xcode whose recommended settings this project has taken (LastUpgradeCheck 2720), so Xcode doesn't offer
+  # "Update to recommended settings". Raise it with the next Xcode after taking what that one recommends.
+  xcodeVersion: "27.2"
   deploymentTarget:
     iOS: "26.0"
   createIntermediateGroups: true
@@ -10,6 +13,10 @@ settings:
     MARKETING_VERSION: "0.1"
     CURRENT_PROJECT_VERSION: "1"
     CODE_SIGN_STYLE: Automatic
+    # Xcode 27.2's recommended project settings.
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS: YES
+    STRING_CATALOG_GENERATE_SYMBOLS: YES
     # Sam's paid Apple Developer team (alerts need it, D7); kept here so xcodegen does not drop it.
     DEVELOPMENT_TEAM: X3M532E87A
     # The server this build uses. Change it here, in the Settings app (AgentPager → Server, for self-hosters), or with

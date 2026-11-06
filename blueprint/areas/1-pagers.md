@@ -88,5 +88,12 @@ Why: [Unblock my agent from my phone](../PRODUCT.md#unblock-my-agent-from-my-pho
 
 - What people meet: an agent's call that the service has already checked against its pager when the owner turns the pager off still lands. The window is one check inside the service; everything sent after the switch is refused (I17.2).
 - Why it waits: accepted on 30 Oct 2026 for dogfooding, to fix later.
-- What would fix it: one writer per pager, which [STORE](../milestones/next/STORE.md) builds.
-- When to revisit: STORE, right after ENCRYPT.
+- What would fix it: one writer per pager, which [TIDY](../milestones/next/TIDY.md) builds.
+- When to revisit: TIDY, right after ENCRYPT.
+
+### L25 · @M5 · A leaked number can connect any number of agents
+
+- What people meet: nothing limits how fast a pager number can connect agents. Until the owner turns the pager off (I17.2), whoever has a leaked number can connect any number of agents, and each one can page the owner. Such a number still reads nothing.
+- Why it waits: on 6 Nov 2026 Sam chose to leave it out of ENCRYPT ([M5-encrypt.md](../milestones/M5-encrypt.md), question 9), since it isn't part of what encryption guarantees, and turning the pager off stops it.
+- What would fix it: the service limiting how fast one number can connect agents.
+- When to revisit: before other people get numbers, at [FRIENDS](../milestones/next/FRIENDS.md).

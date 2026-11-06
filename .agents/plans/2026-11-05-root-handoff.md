@@ -5,7 +5,7 @@ Read `AGENTS.md`, then `blueprint/README.md`. This file covers only what those t
 ## Where things stand
 
 - **The root** is session 9c483b84, a Claude Code session in Herdr pane w1:pK on pro, which pages Sam as agentpager agent ap-9tbn. The previous root, session 86f845ec, stepped back on 6 Nov and no longer merges, deploys or touches the repo. [V]
-- **M5 ENCRYPT is planning, then building** (`blueprint/milestones/M5-encrypt.md`). Sam answered its first five questions on 6 Nov; questions 6 to 9 wait for Sam. The root's plan, with the pull requests in order, is `.agents/plans/2026-11-06-m5-encrypt.md`. The root takes it to green on dev and stops before the release. [V]
+- **M5 ENCRYPT is planning, then building** (`blueprint/milestones/M5-encrypt.md`). Sam answered all nine of its questions on 6 Nov: 1 to 5 in the previous root's Claude Code session, 6 to 9 on the pager. The root's plan, with the pull requests in order, is `.agents/plans/2026-11-06-m5-encrypt.md`. The root takes it to green on dev and stops before the release. [V]
 - **M4 HOUSE is shipped:** released and reviewed on 6 Nov (`blueprint/milestones/M4-house.md`). Its ledger left the tree in M5's Plan, kept at tag `m4-house-ledger`. [V]
 - **dev** (https://dev.agentpager.me) runs 40f1802, #55's merge, by its `X-AgentPager-Build` header. [V] The root redeploys dev with `pnpm deploy:dev`, then runs `pnpm smoke:dev`, after each merge that changes service code.
 - **prod** (agentpager.me) runs the `m4` release: the tag `m4`, on 9849671, deployed from a clean checkout at the tag, and `pnpm smoke:prod` passed 7 of 7. [V]

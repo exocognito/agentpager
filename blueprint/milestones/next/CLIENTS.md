@@ -1,6 +1,6 @@
 # CLIENTS · The agent apps AgentPager supports
 
-> **Status:** queued · **Order:** after STORE; its list anchors INSTALL and SITE · numbered when it starts
+> **Status:** queued · **Order:** after TIDY; its list anchors INSTALL and SITE · numbered when it starts
 
 ## Objective
 

@@ -5,7 +5,7 @@ import { mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
-import { check, citations, main, milestonesOf, parse, untested } from './blueprint.mjs';
+import { check, citations, main, milestonesOf, parse, swiftNames, tsNames, untested } from './blueprint.mjs';
 
 const README = `| | Milestone | What it delivers |
 | --- | --- | --- |
@@ -84,50 +84,58 @@ test('warnings: duplicate ids, headings off the grammar, an unknown @M and a D i
   ]);
 });
 
-test('citations: only a test\'s name counts, never a test inside a comment or a string; untested lists the rest and unknown ids', () => {
+test('TypeScript test names come from the parser: one case per earlier miscount', () => {
+  assert.deepEqual(tsNames('a.test.ts', [
+    "test('B5.1 Read the first clause', () => {",
+    "  assert.equal(card.title, 'B5.2 a fixture string');", // round 1: a fixture's text
+    "  const url = 'https://fixtures.invalid/B5.2';", // round 2: a // inside a string
+    "  expect(/B5\\.2/.test('B5.2 a method call')).toBe(true);", // round 5: /re/.test('…')
+    '});',
+    "test.each([[1, f(2)]])('I4.3 a table, %s', () => {});", // round 4: .each names
+    "// test('B5.2 a commented-out test', () => {});", // round 6: comments and strings
+    "/* it('B5.2 a block-commented test', () => {}); */",
+    "const fixture = \"test('B5.2 a test inside a string')\";",
+    "const page = `a page \\", // round 7: a continued template literal, a regex literal
+    "test('B5.2 still in the template')`, pattern = /test('B5.2 in a regex')/;",
+    "test('I4.6 a name with // in it', () => {});",
+    'describe(`I4.2 ${area} and C25.3, an old id`, () => {});',
+  ].join('\n')), ['B5.1 Read the first clause', 'I4.3 a table, %s', 'I4.6 a name with // in it', 'I4.2 ']);
+});
+
+test('Swift test names skip comments, nested comments and every kind of string', () => {
+  assert.deepEqual(swiftNames([
+    'func test_B5_3_theThird() {',
+    '    XCTAssertEqual(row.label, "func test_B5_2_inAString() {}")', // round 6
+    '}',
+    '// func test_B5_2_commentedOut() {}',
+    '/// func test_B5_2_inADocComment() {}',
+    'let page = """', // round 3: a multi-line string
+    '    func test_B5_2_inAMultiLineString() {} // and "quoted"',
+    '    """',
+    '/* outer /* inner */ func test_B5_2_afterAnInnerClose() {} */', // round 7: nested block comments
+    'let raw = #"func test_B5_2_inARawString() "quoted" "#',
+    'let rawPage = #"""',
+    '    func test_B5_2_inARawMultiLineString() """ not the end',
+    '    """#',
+    'func testB5_1Again() {}',
+  ].join('\n')), ['_B5_3_theThird', 'B5_1Again']);
+});
+
+test('citations: the ids that test names carry; untested lists the rest and unknown ids', () => {
   const cited = citations([
-    { file: 'packages/a.test.ts', text: [
-      "test('B5.1 Read the first clause', () => {",
-      "  // B5.2 in a comment, and in a string: 'B5.2 is only a fixture', 'https://fixtures.invalid/B5.2'",
-      "  expect(/B5\\.2/.test('B5.2 is a method call, not a test')).toBe(true);",
-      '});',
-      'describe("I4.2 and C25.3, an old id", () => {});',
-      "test.each([[1, f(2)]])('I4.3 a table, %s', () => {});",
-      "it.skip(`I4.4 skipped`, () => {});",
-      "// test('B5.2 a commented-out test', () => {});",
-      "/* it('B5.2 a block-commented test', () => {});",
-      "   test('B5.2 still in the block', () => {}); */",
-      "const fixture = \"test('B5.2 a test inside a string')\", url = 'https://fixtures.invalid/'; test('I4.5 after a // in a string', f);",
-      "test('I4.6 a name with // in it', () => {});",
-    ].join('\n') },
-    { file: 'packages/ios/FlowTests.swift', text: [
-      'func test_B5_3_theThird() {',
-      '    // B5_2 in a comment',
-      '    XCTAssertEqual(row.label, "B5_2 is only a label")',
-      '}',
-      'func testB5_1Again() {}',
-      '// func test_B5_2_commentedOut() {}',
-      '/// func test_B5_2_inADocComment() {}',
-      'let page = """',
-      '    func test_B5_2_inAMultiLineString() {} // and "quoted"',
-      '    """',
-      'let line = "func test_B5_2_inAString() {}"',
-    ].join('\n') },
+    { file: 'packages/a.test.ts', text: "test('B5.1 Read', f);\ndescribe('I4.2 and C25.3, an old id', f);\n// test('B5.2 commented', f);" },
+    { file: 'packages/ios/FlowTests.swift', text: 'func test_B5_3_theThird() {}\nfunc testB5_1Again() {}' },
   ]);
   assert.deepEqual([...cited], [
     ['B5.1', ['packages/a.test.ts', 'packages/ios/FlowTests.swift']],
     ['I4.2', ['packages/a.test.ts']],
     ['C25.3', ['packages/a.test.ts']],
-    ['I4.3', ['packages/a.test.ts']],
-    ['I4.4', ['packages/a.test.ts']],
-    ['I4.5', ['packages/a.test.ts']],
-    ['I4.6', ['packages/a.test.ts']],
     ['B5.3', ['packages/ios/FlowTests.swift']],
   ]);
   const report = untested([parse('blueprint/areas/9-sample.md', AREA, () => {})], cited);
-  assert.match(report, /\*\*1 of 3 clauses untested\*\*, 2 tested\. Tests name 6 unknown ids\./);
+  assert.match(report, /\*\*1 of 3 clauses untested\*\*, 2 tested\. Tests name 2 unknown ids\./);
   assert.match(report, /## 9 Sample\n\n- \[B5 · Read a decision\]\(\.\.\/areas\/9-sample\.md#b5--m1--read-a-decision\): B5\.2\n/);
-  assert.match(report, /- `C25\.3` in `packages\/a\.test\.ts`\n- `I4\.2` in `packages\/a\.test\.ts`\n- `I4\.3` in/);
+  assert.match(report, /- `C25\.3` in `packages\/a\.test\.ts`\n- `I4\.2` in `packages\/a\.test\.ts`\n/);
 });
 
 test('main: --check fails only when a generated file is stale, never for a warning or an untested clause', () => {

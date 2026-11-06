@@ -6,6 +6,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
 
 const repo = fileURLToPath(new URL('..', import.meta.url));
 const OUT = 'blueprint/generated';
@@ -15,16 +16,12 @@ const HEADING = /^### ([BIJKL])(\d+) · @M(\d+) · (\S.*)$/;
 const CLAUSE = /^(\d+)\. (.*)$/;
 const ADDED = /^@M(\d+):\s*/;
 const D_ID = /(?<![\w-])D\d+(?![\w-])/;
-// A test counts when its name carries the id. A TypeScript test's name is the string given to `test(`, `it(` or
-// `describe(`, after modifiers such as `.skip` or `.each(table)`: `test('B25.2 Connect from MCP', …)`. Swift has no
-// dot in a name, so an iPhone test function's name is `test`, then the id with `_` for its dot, as in
-// `func test_B25_2_connectsFromMCP()` (METHOD.md › Tests) or `func testB25_2ConnectsFromMCP()`. One left-to-right
-// pass reads each test name, and skips each comment (`//`, `///`, `/* */`) and every other string whole, Swift's
-// `"""` ones included, so a test inside a comment or a string never counts, and a `//` inside a string is no comment.
+// A test counts when its name carries the id (METHOD.md › Tests). A TypeScript or JavaScript test's name is the first
+// argument of a call to `test`, `it` or `describe`, or to a property of one, such as `.skip` or `test.each(table)(…)`,
+// read with the TypeScript parser, so comments, regex literals and other strings can't count. Swift has no dot in a
+// name, so an iPhone test is `func test`, then the id with `_` for its dot: `func test_B25_2_connectsFromMCP()`.
 // The letters of retired ids (C, D) are read too, so a test naming one is reported.
-const STRING = String.raw`"""[\s\S]*?"""|'(?:\\.|[^\\'\n])*'|"(?:\\.|[^\\"\n])*"|\`(?:\\.|[^\\\`])*\``;
-const TS_TEST = String.raw`(?<![\w$.])(?:test|it|describe)(?:\.\w+)*(?:\((?:[^()]|\([^()]*\))*\))?\(\s*(${STRING})`;
-const NAMES = new RegExp(String.raw`${TS_TEST}|\bfunc\s+test(\w*)|${STRING}|\/\/.*|\/\*[\s\S]*?\*\/`, 'g');
+const SWIFT_STRING = /(#*)("(?:"")?)/y, SWIFT_TEST = /\bfunc\s+test(\w*)/y;
 const CITED = /(?<![A-Za-z0-9])([BCDIJKL])(\d+)[._](\d+)(?!\d)/g;
 const TEST_FILE = /\.test\.[cm]?[jt]sx?$|Tests\.swift$/;
 
@@ -72,11 +69,49 @@ export function check(files, milestones, warn) {
   }
 }
 
+// The names of the tests in a TypeScript or JavaScript file.
+export function tsNames(file, text) {
+  const names = [];
+  const runner = node => ts.isIdentifier(node) ? ['test', 'it', 'describe'].includes(node.text)
+    : (ts.isPropertyAccessExpression(node) || ts.isCallExpression(node)) ? runner(node.expression)
+    : ts.isTaggedTemplateExpression(node) && runner(node.tag); // it.each`table`(name, …)
+  const visit = node => {
+    const name = ts.isCallExpression(node) && runner(node.expression) ? node.arguments[0] : undefined;
+    if (name && (ts.isStringLiteral(name) || ts.isNoSubstitutionTemplateLiteral(name))) names.push(name.text);
+    if (name && ts.isTemplateExpression(name)) names.push(name.head.text);
+    ts.forEachChild(node, visit);
+  };
+  visit(ts.createSourceFile(file, text, ts.ScriptTarget.Latest));
+  return names;
+}
+
+// The names of the `func test…` functions in a Swift file, outside comments (`//`, `///`, nested `/* */`) and strings
+// (`"…"`, `"""…"""` and raw `#"…"#`).
+export function swiftNames(text) {
+  const names = [];
+  for (let i = 0; i < text.length;) {
+    const at = re => { re.lastIndex = i; return re.exec(text); };
+    let m;
+    if (text.startsWith('//', i)) i = text.indexOf('\n', i) < 0 ? text.length : text.indexOf('\n', i);
+    else if (text.startsWith('/*', i)) for (let depth = 0; i < text.length;) {
+      if (text.startsWith('/*', i)) { depth++; i += 2; } else if (text.startsWith('*/', i)) { i += 2; if (--depth === 0) break; } else i++;
+    }
+    else if ((m = at(SWIFT_STRING))) {
+      const [open, hashes, quotes] = m, close = quotes + hashes;
+      for (i += open.length; i < text.length && !text.startsWith(close, i);) i += !hashes && text[i] === '\\' ? 2 : 1;
+      i += close.length;
+    }
+    else if ((m = at(SWIFT_TEST))) { names.push(m[1]); i += m[0].length; }
+    else i++;
+  }
+  return names;
+}
+
 // The clause ids that tests' names carry, each with the files whose tests carry it.
 export function citations(tests) {
   const cited = new Map();
-  const names = text => [...text.matchAll(NAMES)].map(m => m[1] ?? m[2]).filter(name => name !== undefined);
-  for (const { file, text } of tests) for (const m of names(text).flatMap(name => [...name.matchAll(CITED)])) {
+  const names = (file, text) => file.endsWith('.swift') ? swiftNames(text) : tsNames(file, text);
+  for (const { file, text } of tests) for (const m of names(file, text).flatMap(name => [...name.matchAll(CITED)])) {
     const id = `${m[1]}${m[2]}.${m[3]}`;
     cited.set(id, [...new Set([...(cited.get(id) ?? []), file])]);
   }

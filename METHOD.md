@@ -111,7 +111,7 @@ Never fix a miss the owner cares about with a test alone. A test follows from a 
 ## Tests
 
 - **Naming.** A test is named by the id it proves when it is written or a milestone touches it, such as `B26.4 Create registers the pager`. Where a language allows no dot or space in a test's name, the id is written with underscores, such as Swift's `test_B26_4_createRegistersThePager`. No test names a retired or unknown id.
-- **The id check** reads the Blueprint and the test names, and writes what each milestone added and the untested list: clauses no test names, and tests naming a retired or unknown id. It reports and never blocks; the owner reads it at each walk.
+- **The id check** reads the Blueprint and the test names, and writes what each milestone added and the untested list: clauses no test names, and tests naming a retired or unknown id. A test counts when its name carries the id; a comment or other text doesn't. It reports and never blocks: the check fails only when what it writes is stale. The owner reads it at each walk.
 - **Proof is real.** Acceptance tests run on the real product: real storage, real endpoints. A unit test may fake the clock or inject a fault, never the thing it claims to prove. A test that proves a promise by waiting is a finding.
 - **Done.** A milestone is done when every suite passes locally, earlier milestones' tests included, and the smoke run passes on dev and, after release, on prod.
 - **Retries.** A run is green only when its command exits 0. A smoke run on dev or prod retries a failed step once; local runs never retry.

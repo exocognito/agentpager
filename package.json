@@ -7,13 +7,14 @@
     "node": ">=22.19"
   },
   "scripts": {
-    "check": "tsc --noEmit && pnpm --filter @agentpager/app lint && pnpm --filter @agentpager/app designs:check",
-    "test": "pnpm --filter @agentpager/contract test && pnpm --filter @agentpager/app test:unit",
-    "test:unit": "pnpm --filter @agentpager/contract test && pnpm --filter @agentpager/app test:unit",
+    "check": "tsc --noEmit && pnpm --filter @agentpager/app lint && pnpm --filter @agentpager/app designs:check && node scripts/blueprint.mjs --check",
+    "test": "pnpm --filter @agentpager/contract test && pnpm --filter @agentpager/app test:unit && node --test scripts/blueprint.test.mjs",
+    "test:unit": "pnpm --filter @agentpager/contract test && pnpm --filter @agentpager/app test:unit && node --test scripts/blueprint.test.mjs",
     "test:app": "node --test --experimental-strip-types --test-concurrency=4 packages/app/test/*.test.ts",
     "test:cli": "pnpm --filter @agentpager/cli build && pnpm --filter @agentpager/cli test",
     "test:all": "pnpm test && pnpm test:app && pnpm test:cli",
     "designs": "pnpm --filter @agentpager/app designs",
+    "blueprint": "node scripts/blueprint.mjs",
     "build:app": "pnpm --filter @agentpager/app build",
     "start:app": "pnpm --filter @agentpager/app start",
     "deploy:dev": "pnpm --filter @agentpager/app run deploy:dev",

@@ -18,12 +18,12 @@ const CLAUSE = /^(\d+)\. (.*)$/;
 const ADDED = /^@M(\d+):\s*/;
 const D_ID = /(?<![\w-])D\d+(?![\w-])/;
 // Where a test file names ids: a comment, a TypeScript test's name (`test('…'`, `it(`, `describe(`, `test.skip(`,
-// `test.each(table)('…'` and the like), or a Swift test's name (`func test_B25_2_connects`). Any other string
-// literal, Swift's multi-line `"""` ones included, is matched only to be skipped, so a fixture's text names nothing,
-// even after a `//` in it.
+// `test.each(table)('…'` and the like, but not a method such as `/re/.test('…')`), or a Swift test's name
+// (`func test_B25_2_connects`). Any other string literal, Swift's multi-line `"""` ones included, is matched only to
+// be skipped, so a fixture's text names nothing, even after a `//` in it.
 const STRING = String.raw`"""[\s\S]*?"""|'(?:\\.|[^\\'\n])*'|"(?:\\.|[^\\"\n])*"|\`(?:\\.|[^\\\`])*\``;
 const TABLE = String.raw`\((?:[^()]|\([^()]*\))*\)|\`(?:\\.|[^\\\`])*\``; // test.each's table, before the name
-const NAMED = new RegExp(String.raw`\b(?:test|it|describe)(?:\.\w+)*(?:${TABLE})?\(\s*(?:${STRING})|(${STRING})|\/\/.*|\/\*[\s\S]*?\*\/|\bfunc\s+test\w*`, 'g');
+const NAMED = new RegExp(String.raw`(?<![\w$.])(?:test|it|describe)(?:\.\w+)*(?:${TABLE})?\(\s*(?:${STRING})|(${STRING})|\/\/.*|\/\*[\s\S]*?\*\/|\bfunc\s+test\w*`, 'g');
 // A clause id there: B25.2, or B25_2 in a Swift name. The letters of retired ids (C, D) are read too, so a test
 // naming one is reported.
 const CITED = /(?<![A-Za-z0-9])([BCDIJKL])(\d+)[._](\d+)(?!\d)/g;

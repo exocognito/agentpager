@@ -565,7 +565,9 @@ struct TableBlock: View {
         if first {
             Text(Inline.text(text)).font(.footnote).foregroundStyle(.secondary).frame(width: labelWidth, alignment: .leading)
         } else if letters, let (l, rest) = letter(text) {
-            (Text(l + (l == star ? " ✶" : "")).fontWeight(.semibold).foregroundStyle(Color(.label)) + Text(rest.isEmpty ? "" : " " + rest).foregroundStyle(.secondary))
+            let head = Text(l + (l == star ? " ✶" : "")).fontWeight(.semibold).foregroundStyle(Color(.label))
+            let tail = Text(rest.isEmpty ? "" : " " + rest).foregroundStyle(.secondary)
+            Text("\(head)\(tail)")
                 .font(.footnote).padding(.horizontal, 6).padding(.top, 4).padding(.bottom, 2)
                 .frame(maxWidth: .infinity, alignment: .leading)
         } else {

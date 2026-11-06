@@ -6,7 +6,7 @@
 
 Sam, 31 Oct 2026, on the next roadmap: a redesigned marketing page that is "simple, clear, up to date and looks good". And on 5 Nov, of the CLIENTS list: "it will enable us to be opinionated in the marketing page redesign".
 
-In Sam's voice, as the old MSITE doc had it:
+As the old MSITE doc had it:
 
 Someone who lands on agentpager.me understands in a few seconds what AgentPager does for them, sees it on the phone, and knows how to get the app and the command. The page is simple, true to the product as it is now, and looks good on a phone and a laptop. It says what the service stores and for how long. Nothing on it describes the first version.
 
@@ -29,7 +29,7 @@ Sam works through the page in several rounds of visual drafts before anything is
 
 - **Adds:** B18's front page and its note on what the service stores, as the drafts settle them.
 - **Changes:** B18's title widens back to the whole site.
-- **Retires:** L21 "The front page still describes the first version" (7 Getting started), quoted here when it goes.
+- **Retires:** L21, the front page still describes the first version (7 Getting started), quoted here when it goes.
 
 ## From the old Blueprint (not built yet)
 

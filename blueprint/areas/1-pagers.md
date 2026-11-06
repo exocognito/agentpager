@@ -1,7 +1,7 @@
 # 1 Pagers
 
 > **Definition:** The pagers the owner makes on the phone, and the iPhone app that holds them: making a pager and giving out its number, the Pagers and Pager screens, turning a pager off and on, auto-off, deleting, and what an off or deleted pager means for its agents. Reading and answering a decision is 5 Answering, alerts and the badge are 4 Getting paged, connecting with a number is 2 Agents, the pager's keys and the number's fingerprint are 6 Privacy, and installing the app is 7 Getting started, with its limit L24.
-> **Serves:** "I make pagers on my phone, as many as I like: one for my AGENTS.md, one for a throwaway VM, one per shared project. Each has a number." · "A pager number is an address I give to agents I trust." · "I can turn any pager off, and then nothing from it gets through." · "If a number leaks, I make a new pager rather than turning the old one back on." · "A pager turns off when I turn it off, or by itself at the time I chose (never, or after 24 hours, 7 days or 30 days)." · "My phone keeps every decision while a pager is off, and turning it on makes open decisions answerable again." · "Deleting a pager deletes its agents and decisions from the service. None of this stops the agent itself." · "An agent lasts until it finishes or my pager is deleted; one idle for 30 days is forgotten." · "My side is a native iPhone app." · "Use the platform's own components and conventions (lists, sheets, menus, alerts and notifications) rather than custom ones, so the app is familiar and the system does the work." · "No Settings screen in the app: notifications and the server address live in iOS Settings."
+> **Serves:** [Unblock my agent from my phone](../PRODUCT.md#unblock-my-agent-from-my-phone) · [Only agents I give a number reach my phone](../PRODUCT.md#only-agents-i-give-a-number-reach-my-phone) · [A pager is on until I turn it off](../PRODUCT.md#a-pager-is-on-until-i-turn-it-off) · [Stack](../PRODUCT.md#stack) · [Feel native](../PRODUCT.md#feel-native) · [Pinned design decisions](../PRODUCT.md#pinned-design-decisions)
 > **Relies on:** an iPhone with iOS 26, where the app runs · the iPhone's Keychain, which keeps each pager's keys on that phone only and out of its backups · iOS Settings, which holds the app's server address · Cloudflare, where the service keeps each pager's state and its agents (6 Privacy)
 > **Code:** `packages/ios/AgentPager/`, the app: `Views/PagersView.swift`, `Views/PagerView.swift`, `Views/PagerDetailView.swift`, `Model/AppModel.swift`, `Model/Keychain.swift`, `Model/Wording.swift`, `Settings.bundle` · `packages/app/src/registry.ts` (pagers, off, auto-off, delete) · `packages/app/src/agent.ts` (the off check on every call, forgetting idle agents) · `packages/app/src/contract.ts` (the auto-off and idle times)
 > **Screens:** [pagers](../generated/screens/phone/pagers.png) · [empty](../generated/screens/phone/empty.png) · [pager](../generated/screens/phone/pager.png) · [detail](../generated/screens/phone/detail.png) · [new](../generated/screens/phone/new.png) · journeys: [pager](../generated/screens/journeys/pager/README.md), [off-and-on](../generated/screens/journeys/off-and-on/README.md), [delete](../generated/screens/journeys/delete/README.md)
@@ -56,7 +56,7 @@
 
 ### I17 · @M2 · Off pagers deliver nothing
 
-Why: "Whoever has it can send me decisions until I turn that pager off, and can read nothing. I can turn any pager off, and then nothing from it gets through."
+Why: [Only agents I give a number reach my phone](../PRODUCT.md#only-agents-i-give-a-number-reach-my-phone)
 
 1. A pager turns off only when its owner turns it off or its auto-off comes due (B22), and turns on only when its owner turns it on. No activity puts off its auto-off.
 2. Once a pager is off, every call from its agents that sends or collects something (asking, waiting for an answer, acknowledging, finishing), every connect with its number and every answer from its phone is refused. An agent is told plainly that its message was not delivered, and to ask again once its owner turns the pager on, or to ask for another number.
@@ -71,7 +71,7 @@ Why: "Whoever has it can send me decisions until I turn that pager off, and can 
 
 ### I24 · @M3 · A restart loses nothing
 
-Why: "I can look back at an agent's decisions until its pager is deleted, or until it has been idle 30 days."
+Why: [Unblock my agent from my phone](../PRODUCT.md#unblock-my-agent-from-my-phone)
 
 1. Closing and reopening the app, or restarting the service on unchanged storage, loses no pager, decision or agent, and each agent's next call works with the same id.
 

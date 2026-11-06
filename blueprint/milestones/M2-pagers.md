@@ -4,7 +4,7 @@
 
 ## Objective
 
-In Sam's voice, as the old MPAGERS doc had it:
+As the old MPAGERS doc had it:
 
 I make pagers on my phone, as many as I like, each with a name, a number and a switch. I turn one off and nothing from its agents gets through; I turn it on and its open decisions are answerable again. One can also turn off by itself, after 24 hours, 7 days or 30 days. Each pager shows its decisions grouped by project, with who asked. A decision opens full screen, with its options and pages as sheets, and once answered it is a closed record. When I delete a pager, the service forgets its agents and their decisions. The server's address lives in iOS Settings, not in the app.
 
@@ -27,13 +27,13 @@ I make pagers on my phone, as many as I like, each with a name, a number and a s
 
 Sam and Claude agreed the v2 design on 29–30 Oct, in a claude.ai Project; its record is `docs/v2/`, which M4 removed from the tree; git keeps it at the tag `history-archive`. For M2, as recorded there:
 - Sam's review of the "AgentPager v2 Screens" canvas chose the screens M2 built, on its page "Chosen screens".
-- Defaults Sam confirmed on 29 Oct: "v2 is a fresh install on the phone: no migration of today's pagers or decisions." · "Rename `session` → `agent` throughout the code in Stage 1."
+- Defaults Sam confirmed on 29 Oct: v2 is a fresh install on the phone, with no migration of the pagers or decisions there before it, and `session` is renamed `agent` throughout the code in Stage 1.
 
 ## Adds · Changes · Retires
 
 - **Adds:** B22, B23 and B26; I17 and I19; and the limits marked `@M2`. I19 also holds what was built of B30: the phone makes each pager's key pair, and the number names its public key.
 - **Changes:** B5 and B7, for a decision that opens full screen and reopens as a closed record; B17, so nothing alerts while a pager is off and an alert Apple can't deliver within 24 hours is dropped; I6, for a pager turned off inside the Undo window. Their clauses that M2 added start with `@M2:`.
-- **Retires:** pairing by link, QR code and emoji (C20, C21, C24); pager lifetimes and end reasons (C22 as "change or end a pager"); the Agents list (C23 as "Agents list"); one agent per phone (I16); and ended pagers (I17 as "ended pagers refuse and forget", with the phone's 24-hour copy of an ended pager). The v2 rewrite deleted their lines; their text is in git at ac75bcb.
+- **Retires:** pairing by link, QR code and emoji (C20, C21, C24); pager lifetimes and end reasons (C22); the Agents list (C23); one agent per phone (I16); and ended pagers, which refused and forgot their agents (the old I17, with the phone's 24-hour copy of an ended pager). The v2 rewrite deleted their lines; their text is in git at ac75bcb.
 
 ## Log
 

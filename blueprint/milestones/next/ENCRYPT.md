@@ -6,9 +6,9 @@
 
 Sam, 5 Nov 2026, on starting M4: "I want to get our house in order before we commit to building E2EE and making the product available to others."
 
-Sam's guarantee in the strategy, approved on 30 Oct and waiting here until it is true: "Decisions, attachments, answers and acknowledgements are encrypted on my agent's machine and on my phone. The service carries bytes and the little it needs to route them: which pager, which agent, when. The pager number binds my phone's key, so the service can't swap it."
+The old strategy's guarantee, which Sam approved on 30 Oct, waits here until it is true: decisions, attachments, answers and acknowledgements are encrypted on the agent's machine and on the phone; the service carries bytes and the little it needs to route them (which pager, which agent, when); and the pager number binds the phone's key, so the service can't swap it.
 
-In Sam's voice, as the old MENCRYPT doc had it:
+As the old MENCRYPT doc had it:
 
 My decisions, their attachments, my answers and my agents' acknowledgements are encrypted between my agent's machine and my phone, and the service carries only ciphertext and what it needs to route it. The agentpager command checks my pager's key against its number before it encrypts anything to it. Alerts still show me the real question: an extension on my phone decrypts them. Every earlier promise still passes.
 
@@ -29,7 +29,7 @@ My decisions, their attachments, my answers and my agents' acknowledgements are 
   4. A lifecycle state machine for an agent: connected, finished, idle, forgotten, and deleted with its pager. It includes what finish does to open decisions (question 3). Today finish stops new asks, and open decisions stay answerable, though no agent will pick up the answer.
   5. A smaller poll. While open, the app reads each of its pagers every 3 seconds, and each read asks every agent on that pager; one request per phone for what changed would be smaller. While an agent waits, the service checks for the answer every 100 ms. Plan settles which poll this means.
 - **What encryption doesn't hide,** for the site's note on what the service stores (SITE): who pages whom, when, how much and how often; and, to Apple, that an alert happened and its size. A compromised agent machine exposes that agent's cards, the answers to it and its history. A compromised phone exposes everything on it.
-- M4 left METHOD's rule "A release never loses data" as it was, for this milestone to settle with question 1.
+- M4 left METHOD's rule that a release never loses data as it was, for this milestone to settle with question 1.
 - INSTALL now comes after ENCRYPT, so at the switch the command is still built from the repository, and only Sam's machines run it.
 
 ## Still open
@@ -49,7 +49,7 @@ Sam decides these first:
 
 - **Adds:** B30, whole; I20, whole; I19's check on the agent's machine; B17's encrypted alert, with the App Group and the notification service extension on the phone; J5's encrypted alert step; a limit on how fast a number can connect agents, which the design assumed; and new clauses for the ask request id and for telling an old command to update.
 - **Changes:** I4 and I22, since the service can no longer read a card, so the command's checks are the only ones; B5 and B17, for a not-picked-up warning the service can no longer word.
-- **Retires:** the limits encryption fixes, quoted here when they go: L19 "The service can read every decision" (6 Privacy); L17 "Alerts pass through Apple as plain text" (4 Getting paged); and L10 "Turning a pager off can let one call through" (1 Pagers), if one writer per pager fixes it.
+- **Retires:** the limits encryption fixes, named here when they go: L19, the service can read every decision (6 Privacy); L17, alerts pass through Apple as plain text (4 Getting paged); and L10, turning a pager off can let one call through (1 Pagers), if one writer per pager fixes it.
 
 ## From the old Blueprint (not built yet)
 

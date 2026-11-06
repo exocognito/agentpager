@@ -1,7 +1,7 @@
 # 5 Answering
 
 > **Definition:** Reading and answering a decision on the phone: the brief and its sheets, picking an option or asking for changes, Send and Undo, what the phone says while the answer waits for the agent, and the closed record that never changes. How the agent waits for the answer and acknowledges it is in 2 Agents (B32), and the alerts are in 4 Getting paged (B17).
-> **Serves:** "When it needs me, my agent sends a decision: the question first, two to four options, its recommendation, and the detail one tap away." · "I answer, see that my answer was sent, then get the agent's acknowledgement and next steps." · "I can look back at an agent's decisions until its pager is deleted, or until it has been idle 30 days." · "So an answer always takes two taps: I choose an option or write a response, then press Send, and I have a few seconds to undo." · "Choosing alone never sends. The agent receives exactly what I sent." · "I can reread the question, my answer and the agent's acknowledgement, but not change them." · "An acknowledgement is a real message from the agent, never an automatic message from AgentPager." · "Several cards can be open at once and answered in any order." · "Asking for changes is always there when no option fits; it is the fallback, never an option." · "A decision opens on what I need to decide: the question, its context, each option's short label and the agent's recommendation." · "Notes are answers to one decision, never standing guidance for other agents."
+> **Serves:** [Unblock my agent from my phone](../PRODUCT.md#unblock-my-agent-from-my-phone) · [Sending a decision requires confirmation](../PRODUCT.md#sending-a-decision-requires-confirmation) · [Sent decisions cannot be changed](../PRODUCT.md#sent-decisions-cannot-be-changed) · [An acknowledgement always comes from the agent](../PRODUCT.md#an-acknowledgement-always-comes-from-the-agent) · [Cards are independent](../PRODUCT.md#cards-are-independent) · [Make the usual answer easy and clear](../PRODUCT.md#make-the-usual-answer-easy-and-clear) · [Lead with the decision; keep the rest one tap away](../PRODUCT.md#lead-with-the-decision-keep-the-rest-one-tap-away) · [Pinned design decisions](../PRODUCT.md#pinned-design-decisions)
 > **Relies on:** the owner's iPhone and iOS, which draw the screens, the sheets and the keyboard · the AgentPager service on Cloudflare, which stores each answer and acknowledgement (6 Privacy)
 > **Code:** `packages/ios/AgentPager/Views/DecisionView.swift`, `BriefView.swift`, `PagerView.swift`; `packages/ios/AgentPager/Model/AppModel.swift`, `InboxCache.swift`; `packages/app/src/agent.ts`; `packages/contract/`
 > **Screens:** [decision](../generated/screens/phone/decision.png) · [selected](../generated/screens/phone/selected.png) · [options](../generated/screens/phone/options.png) · [page](../generated/screens/phone/page.png) · [changes](../generated/screens/phone/changes.png) · [off](../generated/screens/phone/off.png) · [undo](../generated/screens/phone/undo.png) · [notconfirmed](../generated/screens/phone/notconfirmed.png) · [notpickedup](../generated/screens/phone/notpickedup.png) · [answered](../generated/screens/phone/answered.png) · journeys [briefs](../generated/screens/journeys/briefs/README.md) and [undo-and-changes](../generated/screens/journeys/undo-and-changes/README.md)
@@ -53,7 +53,7 @@
 
 ### I5 · @M1 · Answers never change
 
-Why: "I can reread the question, my answer and the agent's acknowledgement, but not change them."
+Why: [Sent decisions cannot be changed](../PRODUCT.md#sent-decisions-cannot-be-changed)
 
 1. A stored decision and its answer never change, a note included, whatever is retried.
 2. The phone's resend of an answer after a lost reply, as the same request, gets back the stored receipt. Any other send to an answered decision, even of the same option, is refused.
@@ -65,7 +65,7 @@ Why: "I can reread the question, my answer and the agent's acknowledgement, but 
 
 ### I6 · @M1 · Only Send sends, and only the agent acknowledges
 
-Why: "Following good UX practice, an action that cannot be undone needs a confirming step." · "An acknowledgement is a real message from the agent, never an automatic message from AgentPager."
+Why: [Sending a decision requires confirmation](../PRODUCT.md#sending-a-decision-requires-confirmation) · [An acknowledgement always comes from the agent](../PRODUCT.md#an-acknowledgement-always-comes-from-the-agent)
 
 1. Choosing an option or writing a note never sends. Only Send sends, and the agent receives exactly the answer as it stood when Send was pressed.
 2. The Undo window lasts five seconds. Undo cancels the send and reopens the decision with the choice kept.
@@ -80,7 +80,7 @@ Why: "Following good UX practice, an action that cannot be undone needs a confir
 
 ### I18 · @M1 · Decisions are independent
 
-Why: "Several cards can be open at once and answered in any order. Answering one never changes another."
+Why: [Cards are independent](../PRODUCT.md#cards-are-independent)
 
 1. Each decision has its own identity, and decisions can be asked, answered and acknowledged in any order.
 2. Answering or acknowledging one decision never changes another, whether they come from one agent or from several on the same pager.

@@ -4,7 +4,7 @@
 
 ## Objective
 
-In Sam's voice, as the old MINSTALL doc had it:
+As the old MINSTALL doc had it:
 
 Someone I invite opens a TestFlight link and installs AgentPager on their iPhone, and its alerts come through Apple's production push service. One line installs the agentpager command as a single file on the machine their agents run on, and `agentpager setup` adds it to their agent apps. App Review can try the whole exchange from the review notes, with the demo agent. Every earlier promise still passes.
 
@@ -12,7 +12,7 @@ Someone I invite opens a TestFlight link and installs AgentPager on their iPhone
 
 - Today the app is the development build, installed from Xcode, with Apple's sandbox push service. The command is built from the repository, for the kind of machine that builds it, and has no way to update itself. [7 Getting started](../../areas/7-getting-started.md) has the limits people meet.
 - A TestFlight build needs a release app id, the production push entitlement and an App Store Connect record, all on Sam's paid Apple team; Sam signs. The service already sends each device token to the push service it belongs to. M4 left separate app ids for the dev and prod builds to INSTALL.
-- The demo agent (B19) goes back to Sam's 8 Oct answer "Plan a demo agent for App Review". Sam's 27 Oct answer: it is a link, not a public demo on agentpager.me, and owners Sam invites get the link too.
+- The demo agent (B19) goes back to Sam's 8 Oct answer agreeing to a demo for App Review ("Good call on demo link"). Sam's 27 Oct answer: it is a link, not a public demo on agentpager.me, and owners Sam invites get the link too.
 - ENCRYPT's version header lets the service tell an old command to update. INSTALL gives it a way to.
 
 ## Still open
@@ -32,7 +32,7 @@ Sam decides these first:
 
 - **Adds:** B19, whole; the one-line install in B29, with builds for each kind of machine Sam chooses and a command that can update itself; the TestFlight build, whose alerts use Apple's production push service; J5's steps with the demo agent and the TestFlight build.
 - **Changes:** B29's title widens back to installing the command with one line; B18, so /start gives that line instead of building from source.
-- **Retires:** the limits it fixes, quoted here when they go: L24 "The app installs only from Xcode" and L22 "The command installs only from source" (7 Getting started).
+- **Retires:** the limits it fixes, named here when they go: L24, the app installs only from Xcode, and L22, the command installs only from source (7 Getting started).
 
 ## From the old Blueprint (not built yet)
 

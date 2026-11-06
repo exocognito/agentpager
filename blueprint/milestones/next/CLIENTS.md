@@ -34,7 +34,7 @@ CLIENTS decides which agent apps AgentPager supports, judged on one test: can an
 ## Adds · Changes · Retires
 
 - **Changes:** B33, for each app on the list; B29, so setup covers the apps on the list.
-- **Retires:** the limits in [2 Agents](../../areas/2-agents.md) that the list settles, quoted here when they go: L11 "Only Claude agents wake by themselves", L12 "A Desktop chat stops waiting after two hours" and L13 "Cloud sessions are untested".
+- **Retires:** the limits in [2 Agents](../../areas/2-agents.md) that the list settles, named here when they go: L11, only Claude agents wake by themselves; L12, a Desktop chat stops waiting after two hours; and L13, cloud sessions are untested.
 
 ## Log
 

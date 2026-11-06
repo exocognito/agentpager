@@ -80,7 +80,7 @@ Each row drops a line, changes its meaning, adds a line no old line held, or cut
 | 62 | docs/v2/02 §6.2, small decisions: should reviewers grade missing optional keys good to fix at most? | dropped | docs/v2/02's open question on grading small cards is dropped unsettled. |
 | 63 | docs/v2/02 §6.3, "tune after the first week" | dropped | docs/v2/02's "tune after the first week" is dropped; the reminder's numbers stay as built. |
 | 64 | docs/v2/03 §2 `agentpager agents` | B25.12 | New clause B25.12 (list the agents), built and tested, with no old line. |
-| 65 | docs/v2/03 §2 `agentpager finish`; TERMS "Agent"; Sam's 29 Oct "Keep `finish`" | B25.13 | New clause B25.13 (finish), built and tested, with no old line. |
+| 65 | docs/v2/03 §2 `agentpager finish`; TERMS "Agent"; Sam's 29 Oct default to keep `finish` | B25.13 | New clause B25.13 (finish), built and tested, with no old line. |
 | 66 | docs/v2/03 §2–§3, §6 (wait holds up to 50 s; `seconds` up to 50) | B32.2 | New clause B32.2 (one wait returns within apps' limits), from docs/v2/03. |
 | 67 | docs/v2/03 §4 wait, pending | B32.3 | New clause B32.3 (a pending reply), from docs/v2/03. |
 | 68 | docs/v2/03 §4 wait, option chosen | B32.4 | New clause B32.4 (a chosen option arrives), from docs/v2/03. |
@@ -106,7 +106,7 @@ Each row drops a line, changes its meaning, adds a line no old line held, or cut
 | 88 | (new) I23 Why: "Only agents I give a number reach my phone" | I23 Why | I23's Why quotes SI2's heading, the drafter's choice. |
 | 89 | — (new milestone) | next/CLIENTS.md | Sam's 5 Nov words quoted in CLIENTS and SITE have no record in the repo or memory before this pull request. |
 | 90 | docs/v2/01, Rejected as ceremony: "a pre-sorted must/nice list" | dropped (PR 4) | DEC-2026-10-29-v2-design's rejected list leaves it out, and DECISIONS.md is append only; B27.3, where the reviewer grades each point for the card at hand, holds it in effect. |
-| 91 | docs/v2/01, App structure: "Minimal helper text. Keep only lines that clearly help." | dropped (PR 4) | Sam's guidance for the app's words has no line; the screens in `generated/screens/` record the words as built. |
+| 91 | docs/v2/01, App structure: minimal helper text, keeping only lines that clearly help | dropped (PR 4) | The v2 design's guidance for the app's words has no line; the screens in `generated/screens/` record the words as built. |
 | 92 | docs/v2/03 §5, what history is for: "an agent that wants to know what was already decided …; a coordinator reviewing its helpers; and the owner's own analysis later" | dropped (PR 4) | B31 says what the history holds, not why; FRIENDS' question 2 names sharing it for feedback. |
 | 93 | (none; M4's plan, PR 5): a "dev" mark on the site | B18.6 · @M4: (PR 5b) | New clause B18.6: the front page on dev.agentpager.me says it is a dev server. Built and tested, with no old line. |
 | 94 | (none; M4's plan, PR 5, and M4's slice, Phone): a "dev" mark on the phone | B23.11 · @M4: (PR 5b) | New clause B23.11: a pager made on dev.agentpager.me is marked dev on Pagers and its screen. Built and tested, with no old line. |
@@ -345,7 +345,7 @@ Old clause numbers are the old behaviour numbers: C26.3 is C26's third behaviour
 | C27.4 the short id and how to wait in the agent's own app | B32.1 (2 Agents) | moved, per `areas.md` "Ids that don't fit"; B27.6 links (B32). The example id `d_2x8w` is left to B32 |  |
 | C27.5 an eleventh open decision, "10 unanswered" | B27.7 | outcome kept; "10" cut, held by `MAX_OPEN_DECISIONS` in `packages/contract/exchange.ts` and `pagers.test.ts › pagers and agents: the phone makes a pager, every connect is a new agent, the phone reads them all` ("Ten unanswered decisions per agent"). Exact refusal words in `packages/app/src/contract.ts` and `packages/cli/src/commands.ts` |  |
 | C27.5 "and anything while the pager is off (C22)" | B27 note 2 → I17 (1 Pagers) | one home: I17 says what an off pager refuses |  |
-| C27.6 reminder after 2 hours or 5 cards | B27.8 | kept with its numbers: Sam confirmed "contract reminder after 2 hours or 5 cards" as a default on 29 Oct (docs/v2/HANDOFF.md, "Decisions already made"), but docs/v2/02 §6.3 says "tune after the first week", so the drafter is unsure Sam means the numbers. If not, cut them to `REMINDER_MS` and `REMINDER_CARDS` in `commands.ts`. The fifth card is held by `cli.test.ts › the binary: …`; no test holds the 2 hours |  |
+| C27.6 reminder after 2 hours or 5 cards | B27.8 | kept with its numbers: Sam confirmed a contract reminder after 2 hours or 5 cards as a default on 29 Oct (docs/v2/HANDOFF.md, "Decisions already made"), but docs/v2/02 §6.3 says "tune after the first week", so the drafter is unsure Sam means the numbers. If not, cut them to `REMINDER_MS` and `REMINDER_CARDS` in `commands.ts`. The fifth card is held by `cli.test.ts › the binary: …`; no test holds the 2 hours |  |
 | C27.6, what restarts the count | B27 note 3 | new note, from the code: connect, `rules` with the agent's id, and each reminder reset `rulesShownAt` (`commands.ts`) |  |
 | C27 Never 1 "`ask` refuses or holds a card for how it is written" | I22.7 | merged with I22 ¶1 s3 and I22's breaking 2 and 3 |  |
 | C27 caveat 1, "the command judges nothing" | B27.3 | becomes a clause |  |
@@ -532,7 +532,7 @@ Old clause numbers are the old behaviour numbers: C26.3 is C26's third behaviour
 | I21 breaking 1 | I21.1 | test `pagers.test.ts › pagers and agents…` (a second connect gets another id) |  |
 | I21 breaking 2 | I21.2 | same test |  |
 | I21 breaking 3 | I21.3 | same test (one agent's key is refused on another agent) |  |
-| I21 caveat 1 (sharing works only on one machine) | L14 · An agent id works on one machine only | caveat → Limit. "Why it waits" is Sam's 29 Oct default, "no cross-machine sharing of agent ids; each machine connects" (docs/v2/HANDOFF.md); the fix is docs/v2/03 §7's export idea | ⚑ |
+| I21 caveat 1 (sharing works only on one machine) | L14 · An agent id works on one machine only | caveat → Limit. "Why it waits" is Sam's 29 Oct default that no agent id is shared across machines and each machine connects (docs/v2/HANDOFF.md); the fix is docs/v2/03 §7's export idea | ⚑ |
 | I21 caveat 2 (a lost connect reply may leave an unusable agent) | B25.10 | caveat → clause; exact words left to `decode.test.ts › a 200 that isn't…` and `› sent, no reply…` |  |
 
 ### `packages/blueprint/design/invariants/I22-a-broken-card-is-never-sent.md`
@@ -566,7 +566,7 @@ Old clause numbers are the old behaviour numbers: C26.3 is C26's third behaviour
 | J3 step 2 | J3.2 | `agentpager connect` → "connects with the number through the agentpager command"; `agentpager rules` → "the card contract" (TERMS). The connect reply's prompt is held by cli.test.ts › "the binary: connect, refusals, ask, wait, ack, status, history, off, finish, and the same over MCP" (asserts "Before your first card: agentpager rules") |  |
 | J3 step 3 | J3.3 | `agentpager review`, `agentpager ask` and the exact reply "Sent." left to cli.test.ts › same test (asserts the ask reply text and the review tool); `card.yaml` kept, a product name |  |
 | J3 step 4 | J3.4 | unchanged in meaning |  |
-| J3 step 5 | J3.5 | kept "the green tick": Sam chose it (DEC-2026-10-08-native-ios: "a green tick shows when the agent confirms"). FlowTests checks the "Agent confirmed" label, not the tick; the screens catalogue shows it. Unsure whether Sam means the specific |  |
+| J3 step 5 | J3.5 | kept "the green tick": Sam chose it (DEC-2026-10-08-native-ios). FlowTests checks the "Agent confirmed" label, not the tick; the screens catalogue shows it. Unsure whether Sam means the specific |  |
 
 ### `packages/blueprint/design/journeys/J4-longest-pager.md`
 
@@ -1143,7 +1143,7 @@ Old clause numbers are the old behaviour numbers: C26.3 is C26's third behaviour
 | Old | New | Change | ⚑ |
 | --- | --- | --- | --- |
 | docs/v2/03 §2 `agentpager agents` | B25.12 | new clause: built, held by `cli.test.ts › the binary…` and `decode.test.ts › an agent file…` | ⚑ |
-| docs/v2/03 §2 `agentpager finish`; TERMS "Agent"; Sam's 29 Oct "Keep `finish`" | B25.13 | new clause: built, held by `pagers.test.ts › pagers and agents…` (finished, asks nothing more, still acknowledges, finishing twice is harmless) | ⚑ |
+| docs/v2/03 §2 `agentpager finish`; TERMS "Agent"; Sam's 29 Oct default to keep `finish` | B25.13 | new clause: built, held by `pagers.test.ts › pagers and agents…` (finished, asks nothing more, still acknowledges, finishing twice is harmless) | ⚑ |
 | docs/v2/03 §2–§3, §6 (wait holds up to 50 s; `seconds` up to 50) | B32.2 | new clause; specifics as in the D2 long-wait row | ⚑ |
 | docs/v2/03 §4 wait, pending | B32.3 | new clause; exact words left to `cli.test.ts › the binary…` | ⚑ |
 | docs/v2/03 §4 wait, option chosen | B32.4 | new clause; exact words left to `cli.test.ts › the binary…` | ⚑ |

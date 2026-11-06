@@ -5,8 +5,8 @@ Read `AGENTS.md`, then `blueprint/README.md`. This file covers only what those t
 ## Where things stand
 
 - **M4 HOUSE is shipped: released and reviewed on 6 Nov** (`blueprint/milestones/M4-house.md`). Sam's review is applied in the pull request from `m4/review`. [V] All its PRs are merged: #42 to #50, nine in all, the id check (#46) last, as d145f61. The wrap-up PR (#51), which marked M4 built and wrote this file, merged last, as 9849671. [V]
-- **dev** (https://dev.agentpager.me) runs 9849671, #51's merge, and `pnpm smoke:dev` passed 7 of 7. [V, 6 Nov] The root redeploys dev with `pnpm deploy:dev`, then runs `pnpm smoke:dev`, after each merge that changes service code; #55, the dev-mark change, is next.
-- **prod** (agentpager.me) runs the `m4` release: the tag `m4`, on 9849671. Sam chose "Release all" on the pager before the review; `pnpm deploy:prod` ran from a clean checkout at the tag, and `pnpm smoke:prod` passed 7 of 7. [V, 6 Nov]
+- **dev** (https://dev.agentpager.me) runs 40f1802, #55's merge, and `pnpm smoke:dev` passed 7 of 7. [V, 6 Nov] The root redeploys dev with `pnpm deploy:dev`, then runs `pnpm smoke:dev`, after each merge that changes service code.
+- **prod** (agentpager.me) runs the `m4` release: the tag `m4`, on 9849671. Sam chose on the pager to release all, before the review; `pnpm deploy:prod` ran from a clean checkout at the tag, and `pnpm smoke:prod` passed 7 of 7. [V, 6 Nov]
 - **Binaries:** the ones on air, mini and pro are 9849671, built at `m4`. [V, `agentpager version` on each, 6 Nov]
 - **Phones:**
   - HomePhoneLite, the dev phone, has the dev app (`me.agentpager.app.dev`) installed. This Mac's last `pnpm phone:dev` build, pointed at dev, is from 22:19 on 5 Nov, just after #50 merged. [V] That it is the build installed there is [A]; no app code changed after #50. [V]
@@ -14,7 +14,7 @@ Read `AGENTS.md`, then `blueprint/README.md`. This file covers only what those t
 
 ## What Sam does next
 
-1. **M4's review is answered** (M4-house.md › Sam reviews after merge). Still open for Sam: question 8, whether the 29 quotes in agents' words lose their quote marks, and ⚑ rows 62 and 91. ⚑ row 82 goes to ENCRYPT's Plan. [V]
+1. **M4's review is answered** (M4-house.md › Sam reviews after merge). Sam answered every question on 6 Nov; ⚑ row 82 goes to ENCRYPT's Plan. [V]
 2. **Then M5 ENCRYPT starts** with its Plan step: `blueprint/milestones/next/ENCRYPT.md` becomes `milestones/M5-encrypt.md` (METHOD.md › When things get written, › Ids).
 
 ## Things you inherit
@@ -27,6 +27,6 @@ Read `AGENTS.md`, then `blueprint/README.md`. This file covers only what those t
   - the id check's "Known limits" at the top of `scripts/blueprint.mjs`;
   - `DECISIONS.md` still names the retired limit L20.
 - **For Sam to approve removing**, by the exact command:
-  - the worktrees `m4-release`, `m4-release-record` and `m4-leftovers` under `~/Projects/agentpager-worktrees/`, whose work is merged or done. Sam chose "Trash them" for the 16 before them (pager card d_n47s), and they and the refs `pr45` and `pr45b` are gone [V, 6 Nov];
+  - the worktrees `m4-release`, `m4-release-record` and `m4-leftovers` under `~/Projects/agentpager-worktrees/`, whose work is merged or done. Sam chose to trash the 16 before them (pager card d_n47s), and they and the refs `pr45` and `pr45b` are gone [V, 6 Nov];
   - `/private/tmp/claude-501/claude-501/`, which holds only empty folders [V].
 - **The primary clone** sits at ab86f39 on `main`, behind `origin/main`, with a clean tree [V]. No agent works in it.

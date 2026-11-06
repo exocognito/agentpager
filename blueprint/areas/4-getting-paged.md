@@ -1,7 +1,7 @@
 # 4 Getting paged
 
 > **Definition:** How a decision gets the owner's attention: alerts while AgentPager is closed, opening an alert to its decision, the app icon's badge, the one alert when no agent picks up an answer, and how the app shows a new decision while it is open. Reading and answering the decision belongs to 5 Answering.
-> **Serves:** "It is an app on my phone that pages me when an agent needs me, the way a pager would." · "When my agent asks, my phone alerts me with who asked, the project and the question, even when AgentPager is closed and, if I let its alerts through, a Focus mode is on." · "Opening the alert takes me to that decision." · "If no agent picks up my answer within 3 minutes, I'm told once, by an alert and on the decision." · "I can walk away while my agent works and come back to finished work, not a question I never saw."
+> **Serves:** [What it's for](../PRODUCT.md#what-its-for) · [Get paged when my agent needs me](../PRODUCT.md#get-paged-when-my-agent-needs-me) · [Return to completed work, not an unseen question](../PRODUCT.md#return-to-completed-work-not-an-unseen-question)
 > **Relies on:** Apple's push service (APNs), through Sam's paid Apple Developer Program team and its push key · the iPhone's own notification settings, where the owner allows AgentPager's alerts and its time-sensitive alerts
 > **Code:** `packages/app/src/push.ts`, `agent.ts`, `registry.ts`; `packages/ios/AgentPager/Model/Alerts.swift`, `AppModel.swift`
 > **Screens:** none
@@ -28,6 +28,6 @@
 ### L17 · @M1 · Alerts pass through Apple as plain text
 
 - What people meet: Apple's push service carries every alert's words as text. That is who asked and the project in the title, and in the body the question, its detail and the recommended option, the agent's acknowledgement, or the not-picked-up alert with the computer's name.
-- Why it waits: encryption is its own milestone, ENCRYPT, and "Encryption comes before the friends rollout."
+- Why it waits: encryption is its own milestone, ENCRYPT, which comes before the friends rollout ([PRODUCT.md › Pinned design decisions](../PRODUCT.md#pinned-design-decisions)).
 - What would fix it: alerts that travel encrypted, which the phone decrypts to show the real question.
 - When to revisit: ENCRYPT, which runs right after M4.

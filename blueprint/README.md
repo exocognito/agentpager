@@ -35,4 +35,4 @@ Start here. [PRODUCT.md](PRODUCT.md) says what AgentPager is for, in Sam's words
 
 Limits (`L`) are what people meet today and the fix that waits; they start at L9. Lines not built yet wait in their milestone's doc in [milestones/next/](milestones/next/).
 
-Also: [TERMS.md](TERMS.md) · [JOURNEYS.md](JOURNEYS.md) (J3 J4 J5) · [DECISIONS.md](DECISIONS.md) · [milestones/](milestones/) · [generated/screens/](generated/screens/README.md): the app's own screens and journeys, made by `pnpm designs`. What each milestone added, and the clauses no test names, will come from the id check, which M4 builds next.
+Also: [TERMS.md](TERMS.md) · [JOURNEYS.md](JOURNEYS.md) (J3 J4 J5) · [DECISIONS.md](DECISIONS.md) · [milestones/](milestones/) · [generated/screens/](generated/screens/README.md): the app's own screens and journeys, made by `pnpm designs` · [generated/by-milestone.md](generated/by-milestone.md): what each milestone added · [generated/untested.md](generated/untested.md): the clauses no test names, and tests that name an unknown id. The id check, `pnpm blueprint`, writes these two; it reports and never blocks, and `pnpm check` fails only when they are stale.

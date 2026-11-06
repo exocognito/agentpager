@@ -8,7 +8,7 @@ AgentPager brings an agent's decisions to Sam's phone. [METHOD.md](METHOD.md) is
 - Every change is a draft pull request, reviewed as METHOD.md says. When Sam gives the root the go for a milestone, the root merges each of its merge-ready pull requests (review passed, `pnpm check` and `pnpm test:all` green, no open finding), and Sam reviews after the merge.
 - Don't build to what v2 retired: link, QR and emoji pairing, sessions with end times, emoji cards, the web app, the hosted MCP and `recipe.json`.
 - Use pnpm and Node 22.19 or newer.
-- Before handing off, run `pnpm check` and `pnpm test:all`. `pnpm check` fails when what the screens are drawn from changed without `pnpm designs`, which needs a Mac with Xcode.
+- Before handing off, run `pnpm check` and `pnpm test:all`. `pnpm check` fails when what the screens are drawn from changed without `pnpm designs`, which needs a Mac with Xcode. It also fails when `blueprint/generated/by-milestone.md` or `untested.md` is stale, after a change to the areas, JOURNEYS.md or the ids the tests name: run `pnpm blueprint` and commit them.
 - When Sam is away, page Sam as `~/.agents/agentpager.md` says.
 
 ## Stages

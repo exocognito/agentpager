@@ -5,7 +5,7 @@ Read `AGENTS.md`, then `blueprint/README.md`. This file covers only what those t
 ## Where things stand
 
 - **M4 HOUSE is shipped: released and reviewed on 6 Nov** (`blueprint/milestones/M4-house.md`). Sam's review is applied in the pull request from `m4/review`. [V] All its PRs are merged: #42 to #50, nine in all, the id check (#46) last, as d145f61. The wrap-up PR (#51), which marked M4 built and wrote this file, merged last, as 9849671. [V]
-- **dev** (https://dev.agentpager.me) runs `main`: the root redeploys it and runs `pnpm smoke:dev` after each merge that changes service code, last for the dev-mark pull request on 6 Nov. [V, 6 Nov]
+- **dev** (https://dev.agentpager.me) runs 9849671, #51's merge, and `pnpm smoke:dev` passed 7 of 7. [V, 6 Nov] The root redeploys dev with `pnpm deploy:dev`, then runs `pnpm smoke:dev`, after each merge that changes service code; #55, the dev-mark change, is next.
 - **prod** (agentpager.me) runs the `m4` release: the tag `m4`, on 9849671. Sam chose "Release all" on the pager before the review; `pnpm deploy:prod` ran from a clean checkout at the tag, and `pnpm smoke:prod` passed 7 of 7. [V, 6 Nov]
 - **Binaries:** the ones on air, mini and pro are 9849671, built at `m4`. [V, `agentpager version` on each, 6 Nov]
 - **Phones:**

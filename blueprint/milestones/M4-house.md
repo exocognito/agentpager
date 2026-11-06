@@ -56,7 +56,7 @@ The plan, with the pull requests in order, is [.agents/plans/2026-11-05-m4-house
 6. **L10**, from `packages/app/README.md`: turning a pager off can let one call through. (a) ★ keep it as a limit until ENCRYPT's one writer per pager; (b) fix it sooner.
 7. **What tests don't show:** B29.8 (the built command needs no Bun, Node or repository) is proven only in part, and nothing tests dark appearance or the largest text size, which the old Blueprint claimed. (a) ★ leave both on the untested list; (b) add the tests before ENCRYPT starts.
 8. **Sam's words quoted from session notes** in M3's answers (29 and 30 Oct), which no repository file held. (a) ★ keep them; (b) take them out.
-9. **Stale pull requests and branches**, none of them M4's, left as they were: #25, which hides a project whose agents haven't asked anything (30 Oct, the app and its UI tests); #16 and #13, drafts from 27 Oct, before v2; the unmerged remote branch `design/ended-copies`, one commit from the closed PR #7, for the Storybook that is gone; and 22 merged branches still on the remote, 23 once this wrap-up's branch merges. (a) ★ close #16 and #13, delete `design/ended-copies` and the merged branches, and leave #25 for a later milestone, since it changes what an owner sees; (b) name what to keep.
+9. **Stale pull requests and branches**, none of them M4's, left as they were: #25, which hides a project whose agents haven't asked anything (30 Oct, the app and its UI tests); #16 and #13, drafts from 27 Oct, before v2; the unmerged remote branch `design/ended-copies`, one commit from the closed PR #7, for the Storybook that is gone; and the merged branches still on the remote (23 on 6 Nov). (a) ★ close #16 and #13, delete `design/ended-copies` and the merged branches, and leave #25 for a later milestone, since it changes what an owner sees; (b) name what to keep.
 10. **Known leftovers**, each written down where it is:
     - App Intents logs one "metadata extraction skipped" line per target in Xcode builds; it isn't an Xcode issue (PR #50).
     - The UI tests hold 489 Swift 6 concurrency warnings, shown only with complete (strict) checking; clearing them means moving the tests to Swift 6 (PR #50).
@@ -64,7 +64,7 @@ The plan, with the pull requests in order, is [.agents/plans/2026-11-05-m4-house
     - `DECISIONS.md` still names the retired limit L20, in DEC-2026-10-08-native-ios's Serves line; the file is append only.
 
     (a) ★ leave them; (b) name one to fix before ENCRYPT starts.
-11. **The release**, once Sam has reviewed: the root tags `m4` on the commit that is green on dev, runs `pnpm deploy:prod` from a clean checkout at the tag and then `pnpm smoke:prod`, copies the binary built at `m4` to air, mini and pro, and puts the `m4` build on Sam's iPhone Air, in the order AGENTS.md › Stages gives. Prod runs 1ee6c27 until then. (a) ★ release `m4` once the answers above are in; (b) hold prod at 1ee6c27.
+11. **The release**, once Sam has reviewed: the root tags `m4` on the commit that is green on dev, runs `pnpm deploy:prod` from a clean checkout at the tag and then `pnpm smoke:prod`, copies the binary built at `m4` to air, mini and pro, and puts the `m4` build on Sam's iPhone Air, in the order AGENTS.md › Stages gives. Prod ran 1ee6c27 until then. (a) ★ release `m4` once the answers above are in; (b) hold prod at 1ee6c27.
     **Answered 6 Nov** on the pager: "Release all", before the review. Done, except Sam's iPhone Air (Log).
 
 ## Adds · Changes · Retires

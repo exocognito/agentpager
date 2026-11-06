@@ -21,6 +21,7 @@
     "deploy:prod": "pnpm --filter @agentpager/app run deploy:prod",
     "smoke:dev": "pnpm --filter @agentpager/app run smoke:dev",
     "smoke:prod": "pnpm --filter @agentpager/app run smoke:prod",
+    "baseline:dev": "pnpm --filter @agentpager/app run baseline:dev",
     "phone:dev": "node packages/ios/phone-dev.mjs",
     "test:dogfood": "pnpm --filter @agentpager/app test:dogfood"
   },

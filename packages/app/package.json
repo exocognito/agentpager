@@ -9,6 +9,7 @@
     "deploy:prod": "node --experimental-strip-types scripts/deploy.mjs --stage prod",
     "smoke:dev": "node --experimental-strip-types scripts/smoke.mjs --stage dev",
     "smoke:prod": "node --experimental-strip-types scripts/smoke.mjs --stage prod",
+    "baseline:dev": "node --experimental-strip-types scripts/baseline.mjs --stage dev",
     "lint": "node scripts/lint.mjs",
     "dogfood": "node scripts/dogfood.mjs",
     "designs": "node scripts/designs.mjs",

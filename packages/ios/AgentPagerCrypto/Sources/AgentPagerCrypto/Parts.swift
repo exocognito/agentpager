@@ -3,7 +3,8 @@ import Foundation
 // The plaintext of each kind of encrypted part, mirroring packages/contract/parts.ts: JSON as UTF-8, decoded strictly
 // (a field the shape doesn't have, or null for one it may leave out, is refused) and held to the contract's limits.
 // An attachment's plaintext is the file's bytes and has no shape here. What this doesn't check, the command checks
-// before sealing: the brief's Markdown rules and that its links name its attachments.
+// before sealing: the brief's Markdown rules and that its links name its attachments. Anyone with the pager's public
+// key can seal a card, so the app keeps drawing a brief's Markdown as untrusted: only an https link leaves it.
 
 public struct PartError: Error, Hashable, Sendable {
     public let problem: String
@@ -23,8 +24,12 @@ public protocol Part: Decodable, Sendable {
 extension Part { public static var maxBytes: Int? { nil } }
 
 public enum Parts {
+    // UTF-8 only, as the contract decodes it: Foundation would also read UTF-16 or UTF-32, which a NUL byte or a
+    // byte-order mark gives away, and JSON as UTF-8 has neither. Where a field is repeated, Foundation keeps the
+    // first and JavaScript the last; no sealer writes one, and whoever can seal a part can write any content anyway.
     public static func decode<P: Part>(_ type: P.Type, from data: Data) throws(PartError) -> P {
         if let max = P.maxBytes, data.count > max { throw PartError("a preview may not exceed \(max) bytes") }
+        guard !data.starts(with: [0xEF, 0xBB, 0xBF]), !data.contains(0), String(validating: data, as: UTF8.self) != nil else { throw PartError("not JSON as UTF-8") }
         do { return try JSONDecoder().decode(P.self, from: data) } catch let error as PartError { throw error } catch { throw PartError("not its shape: \(error)") }
     }
 }
@@ -122,8 +127,9 @@ extension Object {
 }
 
 // Text as values.ts checks it: no HTML opener, not blank as JavaScript's trim() reads blank, and at most `max`
-// visible characters, which Swift counts as grapheme clusters, as Intl.Segmenter does. Swift strings are always
-// well-formed Unicode: JSON with a lone surrogate doesn't decode.
+// visible characters, which Swift counts as grapheme clusters, as Intl.Segmenter does (the two can differ on a rare
+// sequence that their Unicode versions segment differently). Swift strings are always well-formed Unicode: JSON with
+// a lone surrogate doesn't decode.
 let jsWhitespace = Set<UInt32>([0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x20, 0xA0, 0x1680, 0x2028, 0x2029, 0x202F, 0x205F, 0x3000, 0xFEFF] + Array(0x2000...0x200A))
 func prose(_ text: String, max: Int, _ field: String) throws -> String {
     let scalars = Array(text.unicodeScalars)

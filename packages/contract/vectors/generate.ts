@@ -7,8 +7,7 @@
 import { createHash } from "node:crypto";
 import { writeFileSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { Schema } from "effect";
-import { acknowledgementPreview, decisionPreview, encodePart, PartShapes, PREVIEW_MAX_BYTES, type CardPart, type IdentityPart, type ShapedKind } from "../parts.ts";
+import { acknowledgementPreview, decisionPreview, decodePart, encodePart, PREVIEW_MAX_BYTES, type CardPart, type IdentityPart, type ShapedKind } from "../parts.ts";
 
 const subtle = globalThis.crypto.subtle;
 type Bytes = Uint8Array<ArrayBuffer>;
@@ -259,6 +258,8 @@ export async function vectors(): Promise<string> {
     { name: "card, no detail, no attachments, no recommendation", kind: "card", plaintext: json({ title: "Pick one", card: { type: "brief", options: [{ number: 1, title: "A plan", prioritizes: "speed" }, { number: 2, title: "B plan", prioritizes: "care" }], markdown: "## Options\n" }, answerKey }) },
     { name: "card, keys in another order", kind: "card", plaintext: json({ answerKey, card: { markdown: "## Options\n", options: [{ prioritizes: "speed", title: "A plan", number: 1 }, { prioritizes: "care", title: "B plan", number: 2 }], type: "brief" }, title: "Pick one" }) },
     { name: "answer as the phone encodes it, sorted keys", kind: "answer", plaintext: json({ choice: { kind: "option", number: 1 } }) },
+    { name: "card recommending 2.0, a whole number", kind: "card", plaintext: b64(utf8(JSON.stringify(cards.card).replace('"recommended":2', '"recommended":2.0'))) },
+    { name: "identity with spaces between its fields", kind: "identity", plaintext: b64(utf8(JSON.stringify(identity, null, 2) + "\n")) },
     { name: "decision preview shortened to fit, four-byte characters", kind: "decisionPreview", plaintext: json(crowded) },
     { name: "decision preview, no detail, recommendation or machine", kind: "decisionPreview", plaintext: json({ title: "Pick one", app: "Codex", project: "site" }) },
     { name: "title of 100 characters, one a family emoji", kind: "acknowledgementPreview", plaintext: json({ nextSteps: "Done.", app: "Codex", project: "site", title: "x".repeat(99) + "👨‍👩‍👧" }) },
@@ -300,18 +301,19 @@ export async function vectors(): Promise<string> {
     { name: "acknowledgement not JSON", kind: "acknowledgement", plaintext: b64(utf8("{nextSteps: Done}")) },
     { name: "acknowledgement not UTF-8", kind: "acknowledgement", plaintext: b64(join(utf8('{"nextSteps":"Done '), Uint8Array.of(0xff), utf8('"}'))) },
     { name: "empty plaintext", kind: "identity", plaintext: "" },
+    { name: "identity after a UTF-8 byte-order mark", kind: "identity", plaintext: b64(join(Uint8Array.of(0xef, 0xbb, 0xbf), utf8(JSON.stringify(identity)))) },
+    { name: "identity as UTF-16 with a byte-order mark", kind: "identity", plaintext: b64(join(Uint8Array.of(0xff, 0xfe), new Uint8Array(Buffer.from(JSON.stringify(identity), "utf16le")))) },
+    { name: "identity as UTF-16 without one", kind: "identity", plaintext: b64(new Uint8Array(Buffer.from(JSON.stringify(identity), "utf16le"))) },
+    { name: "identity with a raw NUL byte in a field", kind: "identity", plaintext: b64(join(utf8('{"app":"Co'), Uint8Array.of(0), utf8('dex","project":"site"}'))) },
     { name: "decision preview recommending E", kind: "decisionPreview", plaintext: json({ title: "Pick", recommended: { letter: "E", title: "x" }, app: "Codex", project: "site" }) },
     { name: "decision preview over the byte limit, every field within its own", kind: "decisionPreview", plaintext: json({ title: four(100), detail: four(280), recommended: { letter: "B", title: four(280) }, app: four(60), project: four(60), machine: four(60) }) },
     { name: "acknowledgement preview without its title", kind: "acknowledgementPreview", plaintext: json({ nextSteps: "Done.", app: "Codex", project: "site" }) },
+    { name: "decision preview within the byte limit as JSON, over it as sent with spaces", kind: "decisionPreview", plaintext: b64(utf8(JSON.stringify(crowded, null, 40))) },
   ];
 
   // The generator refuses to write a file whose part vectors its own shapes disagree with.
   const decodes = (kind: string, plaintext: string) => {
-    try {
-      const text = new TextDecoder("utf-8", { fatal: true }).decode(Buffer.from(plaintext, "base64url"));
-      const shape: Schema.Schema.AnyNoContext = PartShapes[kind as ShapedKind];
-      return Schema.decodeUnknownEither(shape, { onExcessProperty: "error" })(JSON.parse(text))._tag === "Right";
-    } catch { return false; }
+    try { decodePart(kind as ShapedKind, new Uint8Array(Buffer.from(plaintext, "base64url"))); return true; } catch { return false; }
   };
   for (const p of partsValid) if (!decodes(p.kind, p.plaintext)) throw new Error(`valid part refused: ${p.name}`);
   for (const p of partsInvalid) if (decodes(p.kind, p.plaintext)) throw new Error(`invalid part accepted: ${p.name}`);

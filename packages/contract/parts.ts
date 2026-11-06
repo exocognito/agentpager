@@ -121,8 +121,12 @@ export function encodePart<K extends ShapedKind>(kind: K, value: PartOf<K>): Uin
   if (Either.isLeft(result)) throw new PartInvalid(kind, problems(result.left));
   return utf8.encode(JSON.stringify(result.right));
 }
-// An opened part's bytes as its kind's shape: UTF-8, JSON, then the shape, strictly. Anything else is refused.
+// An opened part's bytes as its kind's shape: UTF-8 (no byte-order mark), JSON, then the shape, strictly; a preview's
+// bytes as they came, not as they encode again, are held to PREVIEW_MAX_BYTES, as the phone holds them. Anything else
+// is refused. Where a field is repeated, JavaScript keeps the last and the phone's Foundation the first; no sealer
+// writes one, and whoever can seal a part can write any content anyway.
 export function decodePart<K extends ShapedKind>(kind: K, bytes: Uint8Array): PartOf<K> {
+  if ((kind === "decisionPreview" || kind === "acknowledgementPreview") && bytes.length > PREVIEW_MAX_BYTES) throw new PartInvalid(kind, `a preview may not exceed ${PREVIEW_MAX_BYTES} bytes`);
   let value: unknown;
   try { value = JSON.parse(new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes)); }
   catch { throw new PartInvalid(kind, "not JSON as UTF-8"); }

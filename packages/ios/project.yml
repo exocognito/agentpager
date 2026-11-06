@@ -32,11 +32,17 @@ targets:
       - path: AgentPager
     # Alerts (C17): Apple's push service, time-sensitive alerts, and a wake in the background to refresh the badge.
     # Xcode's automatic signing registers these for the app id the first time the owner builds.
+    # The keychain group is the app's own App ID, where every pager made so far already is (Model/Keychain.swift). Its
+    # first entry is where new pagers go, so it stays first. A development profile allows any TEAMID.* group.
     entitlements:
       path: AgentPager/AgentPager.entitlements
       properties:
         aps-environment: development
         com.apple.developer.usernotifications.time-sensitive: true
+        keychain-access-groups:
+          - $(AppIdentifierPrefix)me.agentpager.app.dev
+    dependencies:
+      - target: AgentPagerNotifications
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: me.agentpager.app.dev
@@ -64,6 +70,54 @@ targets:
         UIBackgroundModes:
           - remote-notification
         AgentPagerServerURL: $(AGENTPAGER_SERVER_URL)
+  # The alert extension (Notification Service Extension), embedded in the app. It reads pagers' keys from the app's
+  # keychain group and never touches the network. A new bundle id, so the owner's first build in Xcode with automatic
+  # signing registers its App ID and makes its development profile; the keychain group is in every such profile
+  # (TEAMID.*). Time-sensitive is here too, in case iOS checks it on the content an extension hands back.
+  AgentPagerNotifications:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: AgentPagerNotifications
+      - path: AgentPager/Model/Keychain.swift
+    entitlements:
+      path: AgentPagerNotifications/AgentPagerNotifications.entitlements
+      properties:
+        com.apple.developer.usernotifications.time-sensitive: true
+        keychain-access-groups:
+          - $(AppIdentifierPrefix)me.agentpager.app.dev
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: me.agentpager.app.dev.notifications
+        PRODUCT_NAME: AgentPagerNotifications
+        SWIFT_VERSION: "6.0"
+        TARGETED_DEVICE_FAMILY: "1"
+    info:
+      path: AgentPagerNotifications/Info.plist
+      properties:
+        CFBundleDisplayName: AgentPager Notifications
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.usernotifications.service
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).NotificationService
+  # Unit tests, run inside the app in the Simulator, so the Keychain they use is the app's own: the alert extension's
+  # code (compiled in here too) against pagers saved as the app saves them. They skip on a phone, where the app's
+  # Keychain holds real pagers.
+  AgentPagerTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: AgentPagerTests
+      - path: AgentPager/Model/Keychain.swift
+      - path: AgentPagerNotifications/NotificationService.swift
+    dependencies:
+      - target: AgentPager
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: me.agentpager.app.dev.tests
+        SWIFT_VERSION: "5.0"
+        GENERATE_INFOPLIST_FILE: YES
   AgentPagerUITests:
     type: bundle.ui-testing
     platform: iOS
@@ -82,10 +136,12 @@ schemes:
     build:
       targets:
         AgentPager: all
+        AgentPagerTests: [test]
         AgentPagerUITests: [test]
     run:
       config: Debug
     test:
       config: Debug
       targets:
+        - AgentPagerTests
         - AgentPagerUITests

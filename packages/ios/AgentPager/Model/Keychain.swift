@@ -38,6 +38,21 @@ nonisolated func base64url(_ data: Data) -> String {
     data.base64EncodedString().replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "")
 }
 
+nonisolated func randomToken() -> String {
+    var bytes = [UInt8](repeating: 0, count: 24)
+    _ = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
+    return Data(bytes).base64EncodedString()
+        .replacingOccurrences(of: "+", with: "-")
+        .replacingOccurrences(of: "/", with: "_")
+}
+
+// Each pager is one generic password: account = pager id, data = LocalPager as JSON. This file is compiled into the
+// app and into its alert extension (AgentPagerNotifications), and both read the same items.
+// Where the items live: an item added without an access group goes to the app's first keychain access group, which is
+// its own App ID, TEAMID.me.agentpager.app.dev. Every build before M5 had no keychain-access-groups entitlement, so
+// every pager made so far is already there; the app's entitlements name that group first, so new pagers go there too.
+// The extension's entitlements name the same group, which is how it reads them: nothing is moved or copied, so no
+// build can lose a pager to a move. Queries here name no access group, so they search every group the caller has.
 nonisolated enum Keychain {
     static let service = "me.agentpager.app.pagers.v2"
     // v1's pager keys and number. v2 is a fresh install: they are deleted at launch.
@@ -53,6 +68,22 @@ nonisolated enum Keychain {
         var result: CFTypeRef?
         guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess, let items = result as? [Data] else { return [] }
         return items.compactMap { try? JSONDecoder().decode(LocalPager.self, from: $0) }.sorted { $0.createdAt < $1.createdAt }
+    }
+
+    // One pager by its id, as the alert extension finds the key for an alert's pagerId. Nil when this phone doesn't
+    // hold that pager, or its item doesn't decode as the pager asked for.
+    static func pager(_ pagerId: String) -> LocalPager? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: pagerId,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+            kSecReturnData as String: true,
+        ]
+        var result: CFTypeRef?
+        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess, let data = result as? Data,
+              let pager = try? JSONDecoder().decode(LocalPager.self, from: data), pager.pagerId == pagerId else { return nil }
+        return pager
     }
 
     static func save(_ pager: LocalPager) {

@@ -53,7 +53,36 @@ In the Simulator, deliver an alert by hand with a payload like the server's (`ap
 xcrun simctl push booted me.agentpager.app.dev alert.apns
 ```
 
+### The alert extension
+
+`AgentPagerNotifications` (bundle id `me.agentpager.app.dev.notifications`) is a notification service extension
+embedded in the app. iOS runs it for an alert sent with `mutable-content: 1`, before the alert shows. For now it shows
+every alert exactly as sent; it looks up the key of the alert's pager, which ENCRYPT's encrypted previews will need. It
+has no network code.
+
+It reads pagers' keys from the Keychain group the app already keeps them in, its own App ID
+(`X3M532E87A.me.agentpager.app.dev`): both targets' entitlements name that group (`keychain-access-groups`), so
+nothing is moved. See `AgentPager/Model/Keychain.swift`.
+
+In the Simulator, iOS never runs a service extension for `xcrun simctl push`: the alert shows as pushed. It runs only for
+alerts that come through Apple's push service, so the extension itself runs only on a phone, with alerts from the
+deployed service.
+
+**Signing, once:** the extension's App ID has to be registered with Sam's team before any build for a phone signs. Open
+`AgentPager.xcodeproj` in Xcode, pick the AgentPager scheme and a connected iPhone, and build (⌘B) with automatic
+signing: Xcode registers `me.agentpager.app.dev.notifications` and makes its development profile. After that,
+`pnpm phone:dev` and command-line builds sign with the profiles already on the Mac.
+
 ## Tests
+
+`AgentPagerTests` are unit tests that run inside the app in the Simulator, so they use the app's own Keychain: the
+alert extension's code against pagers saved as the app saves them, and the extension's built entitlements. They skip on
+a phone, where the app's Keychain holds real pagers.
+
+```sh
+xcodebuild test -project AgentPager.xcodeproj -scheme AgentPager \
+  -destination 'platform=iOS Simulator,name=iPhone 17e' -only-testing:AgentPagerTests
+```
 
 `AgentPagerUITests` drive the app in the Simulator against a running server (`pnpm start:app`), playing the agent
 over its HTTP API, as the `agentpager` command does. `FlowTests` covers making a pager, two agents on it,

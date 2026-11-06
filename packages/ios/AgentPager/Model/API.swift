@@ -235,11 +235,3 @@ nonisolated struct APIClient: Sendable {
         try await raw("GET", "api/agents/\(agentId)/cards/\(decisionId)/files/\(name)", phoneKey: p.phoneKey, timeout: 30)
     }
 }
-
-nonisolated func randomToken() -> String {
-    var bytes = [UInt8](repeating: 0, count: 24)
-    _ = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
-    return Data(bytes).base64EncodedString()
-        .replacingOccurrences(of: "+", with: "-")
-        .replacingOccurrences(of: "/", with: "_")
-}

@@ -20,7 +20,7 @@ My agents reach my pagers through the agentpager command, as a command line or a
 ## Out of scope
 
 - The one-line install and release builds: [INSTALL](next/INSTALL.md). The command is built from the AgentPager repository.
-- Encryption: [ENCRYPT](next/ENCRYPT.md). The command sends cards over HTTPS, readable by the service.
+- Encryption: [M5 · ENCRYPT](M5-encrypt.md). The command sends cards over HTTPS, readable by the service.
 - Cloud sessions: untested (L13, in [2 Agents](../areas/2-agents.md)).
 
 ## Sam's answers

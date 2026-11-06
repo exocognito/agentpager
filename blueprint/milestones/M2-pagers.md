@@ -20,7 +20,7 @@ I make pagers on my phone, as many as I like, each with a name, a number and a s
 ## Out of scope
 
 - The agentpager command: M3.
-- Encryption: the service still reads every decision. The agentpager command's own key check (I19) comes with [ENCRYPT](next/ENCRYPT.md).
+- Encryption: the service still reads every decision. The agentpager command's own key check (I19) comes with [M5 · ENCRYPT](M5-encrypt.md).
 - Moving a pager to a new phone, or recovering its keys.
 
 ## Sam's answers

@@ -43,7 +43,7 @@ The plan, with the pull requests in order, is [.agents/plans/2026-11-05-m4-house
 
 ## Sam reviews after merge
 
-1. **The 89 ⚑ rows** in [the ledger's ⚑ section](M4-house/ledger.md#-for-sam). Each drops a line, changes its meaning, adds a line no old line held, or cuts a specific that no test holds. A specific moved into a test that holds it isn't flagged.
+1. **The 92 ⚑ rows** in [the ledger's ⚑ section](M4-house/ledger.md#-for-sam): 89 from the conversion and 3 from the history cleanup. Each drops a line, changes its meaning, adds a line no old line held, or cuts a specific that no test holds. A specific moved into a test that holds it isn't flagged.
 2. **HTTPS only** (L20): agentpager.me still answers plain HTTP. (a) ★ fix it in M4, in the dev-stage pull request, and delete L20; (b) leave it to ENCRYPT.
 3. **The old copy of AgentPager in exocognito/blueprint**, question 6 of DEC-2026-10-27-pr1-sign-off, has no home. (a) ★ it is OPEN's: add it to OPEN's questions; (b) it is no longer open.
 4. **New lines from what is built and tested**, with no old line behind them: B5.16 (an answer resent after a relaunch), B25.11–.13, B32.2–.4 and B32.7–.10, B33.1–.3, B27.1's `agentpager example`, I22.4, I22.6, and B18.5, the dev mark the dev-stage pull request (#44) built. (a) ★ keep them; (b) name the ones to retire.
@@ -56,10 +56,24 @@ The plan, with the pull requests in order, is [.agents/plans/2026-11-05-m4-house
 
 - **Adds:** nothing an owner sees on prod. A dev stage, whose addresses and deploy order are in AGENTS.md, and B18.5, the dev mark an agent reads there. B32 and B33, for promises that hold today but have no id of their own. Limits from L9, for what people meet today.
 - **Changes:** every `C` id becomes `B` with the same number. Promise text moves into areas, trimmed to outcomes, and each line that drops or changes its meaning has a ledger row. The D ids become "Relies on" lines, behaviors, invariants and facts in AGENTS.md. Unbuilt promises, such as B30 and K1, move to their milestones in `next/`.
-- **Retires:** lessons L1 to L8; the D ids; the old docs under `packages/blueprint/`, kept at tag `blueprint-old-format`; `docs/v2`, the workshop, parked work and superseded plans, kept in git. The 30 Oct wake lab moves to `docs/research/`.
+- **Retires:** lessons L1 to L8; the D ids; the old docs under `packages/blueprint/`, kept at tag `blueprint-old-format`; `docs/v2`, the workshop, `recipe.json`, parked work and superseded plans, kept at tag `history-archive`. The 30 Oct wake lab moves to [docs/research/](../../docs/research/2026-10-30-agent-wake-lab.md).
+
+## Left for the follow-up PR
+
+These files still cite `docs/v2`, which the history cleanup deleted. Each is drawn from by `pnpm designs` (its SOURCES in `packages/app/scripts/designs.mjs`), so even a comment change there fails `pnpm check` until the screens are made again on a Mac with Xcode. Re-point them in the next pull request that runs `pnpm designs`:
+- `packages/app/src/site/MarketingScreen.tsx:131`: `docs/v2/06-blueprint-update-plan.md` → L21 (7 Getting started).
+- `packages/contract/exchange.ts:5`: `docs/v2/01-decisions.md` → DEC-2026-10-29-v2-design.
+- `packages/contract/exchange.ts:27`: `docs/v2/04-encryption.md §2` → I19 (6 Privacy).
+- `packages/ios/AgentPager/Model/Keychain.swift:23`: `docs/v2/04-encryption.md §2` → I19.
+- `packages/ios/AgentPager/Model/AppModel.swift:150`: `docs/v2/01-decisions.md, App structure` → B26.3 (1 Pagers).
+- `packages/ios/AgentPager/Preview/Previews.swift:3`: `docs/v2/mocks` → drop: the sample data is inline.
+- `packages/ios/AgentPager/Preview/Previews.swift:32`: `docs/v2/card-example.yaml` → `EXAMPLE` in `packages/cli/src/rules.ts`.
 
 ## Log
 
 - 5 Nov · building: Sam agreed Destination v2, its six simplifications and all eight ★ answers. PR #43 amends METHOD.md, sets the roadmap order and starts this doc; `pnpm check` green, `pnpm test:all` 60 passed (34, 16 and 10).
 - 5 Nov · building: PR #42 moves the code out of `packages/blueprint`: the wire contract to `packages/contract`, the front page to `packages/app/src/site` and the screens catalogue to `blueprint/generated/screens`. The images needed no re-render, since nothing they are drawn from changed content; the catalogue carries the new fingerprint. `pnpm check` green, `pnpm test:all` 60 passed (32 and 2, 16 and 10).
 - 5 Nov · building: PR #45 writes `blueprint/` in the area shape: 7 areas with 23 entries and 162 clauses, limits L9 to L24, 3 journeys, and the six queued milestones' docs. The [ledger](M4-house/ledger.md) maps every old line in 743 rows, 89 flagged ⚑ for Sam after two fresh ledger checks. The old docs under `packages/blueprint` are deleted, kept at tag `blueprint-old-format`, and AGENTS.md is rewritten. `pnpm check` green, `pnpm test:all` 60 passed (32 and 2, 16 and 10).
+- 5 Nov · building: PR #44 adds the dev stage, live at https://dev.agentpager.me: Worker `ownerpager-dev` with its own data, `pnpm deploy:dev`, `pnpm deploy:prod` only at a release tag, `pnpm smoke:dev`, and the dev mark on /start and the page an agent reads. `pnpm check` green, `pnpm test:all` 66 passed (32 and 2, 22 and 10). After the merge (6c58e60) the root deployed dev, and `pnpm smoke:dev` passed 6 of 6; prod still runs 1ee6c27.
+- 5 Nov · building: PR #45 merged (64512bd) after #44, adding B18.5, the dev mark, and homing #44's D1 edits; 89 ⚑. `pnpm check` green, `pnpm test:all` 66 passed (32 and 2, 22 and 10).
+- 5 Nov · building: PR #47 deletes `docs/v2`, the root `workshop/`, `recipe.json` and four superseded plans (42 files, about 29,000 words), after the tag `history-archive` (64512bd). The regression cards move to `packages/cli/test/regression/`, and the 30 Oct wake lab to `docs/research/`. Four fresh checks found 14 still-true lines without a home: 11 now have one, and 3 are dropped ⚑ (the ledger's PR 4 section). Five files drawn from by `pnpm designs` keep seven stale references, listed above.

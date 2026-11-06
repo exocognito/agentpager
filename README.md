@@ -2,15 +2,13 @@
 
 Bring an agent's decisions to the owner's phone. The [Blueprint](blueprint/README.md) is the product contract: [what it's for](blueprint/PRODUCT.md), the promises of each [area](blueprint/areas/), the [journeys](blueprint/JOURNEYS.md) and the [milestones](blueprint/README.md#milestones), with the [wire contract](packages/contract/exchange.ts) in code. [METHOD.md](METHOD.md) is how it is built. The apps own appearance, and the [design catalogue](blueprint/generated/screens/README.md) records it.
 
-MCARDS, the first milestone, created `packages/app/` from this contract in a cleanroom run using [recipe.json](recipe.json). That recipe is retired with v2: it still targets the retired hosted MCP, so don't run it (`docs/v2/06-blueprint-update-plan.md`). 
-
 ## Layout
 
 | Path | Holds |
 | --- | --- |
 | `package.json`, `pnpm-workspace.yaml`, `pnpm-lock.yaml`, `tsconfig.json` | The pnpm workspace. Root scripts only delegate to the packages. |
-| `recipe.json` | The MCARDS cleanroom run's host, tools, setup and test command. Retired with v2; don't run it. |
 | `blueprint/` | The Blueprint: the product contract, its milestones and, in `generated/screens/`, the design catalogue written by `pnpm designs`. |
+| `docs/research/` | Findings that outlive a milestone, such as the [30 Oct wake lab](docs/research/2026-10-30-agent-wake-lab.md). |
 | `packages/contract/` | The wire contract: the schemas the server, the binary and the phone exchange, with their unit tests. |
 | `packages/ios/` | The SwiftUI iPhone app, its UI tests and the Xcode project. |
 | `packages/app/` | Created by a run: the Worker, the front page (`src/site/`), deploy and dogfood scripts and acceptance tests. The root scripts delegate to it by name. |

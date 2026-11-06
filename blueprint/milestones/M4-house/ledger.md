@@ -4,8 +4,8 @@ Every line of the old Blueprint, and where it went when M4 converted it to the a
 
 ## Totals
 
-- **Rows:** 743, from 109 old files and sources, grouped by old file below. 53 rows are gaps the integrator filled (listed under Gaps filled).
-- **⚑ for Sam:** 89.
+- **Rows:** 743, from 109 old files and sources, grouped by old file below. 53 rows are gaps the integrator filled (listed under Gaps filled). PR 4, the history cleanup, adds 24 more in its own section at the end.
+- **⚑ for Sam:** 92: 89 from the conversion and 3 from PR 4, the history cleanup ([PR 4](#pr-4-the-history-cleanup)).
 - **The new Blueprint:** 7 areas with 23 entries (14 behaviors and 9 invariants) and 162 clauses, 16 limits (L9 to L24), and 3 journeys with 20 steps.
 - **Ids:** each C became B with the same number; I, J and K kept theirs; B32, B33 and I23 are new; limits are L9 to L24; no D id remains, and C28 is never reused. Not built, and waiting in `milestones/next/`: B19 (INSTALL), B30 and I20 (ENCRYPT), K1 (FRIENDS).
 - **Words:** the old Blueprint docs this pull request deletes held 25,789 words (strategy, design, roadmap, decisions and lessons), plus 5,219 in the workshop's notes. The new `blueprint/` holds 25,343, without `generated/` and this ledger. Its always-true part (README, PRODUCT, TERMS, the areas and JOURNEYS) holds 14,186, against 12,403 in the old strategy and design.
@@ -105,6 +105,9 @@ Each row drops a line, changes its meaning, adds a line no old line held, or cut
 | 87 | (new) I23 · @M1 · Keys stay secret | I23 | New invariant id I23 (Sam's A4 ★), retitled "Keys stay secret" and widened to the service's own secrets. |
 | 88 | (new) I23 Why: "Only agents I give a number reach my phone" | I23 Why | I23's Why quotes SI2's heading, the drafter's choice. |
 | 89 | — (new milestone) | next/CLIENTS.md | Sam's 5 Nov words quoted in CLIENTS and SITE have no record in the repo or memory before this pull request. |
+| 90 | docs/v2/01, Rejected as ceremony: "a pre-sorted must/nice list" | dropped (PR 4) | DEC-2026-10-29-v2-design's rejected list leaves it out, and DECISIONS.md is append only; B27.3, where the reviewer grades each point for the card at hand, holds it in effect. |
+| 91 | docs/v2/01, App structure: "Minimal helper text. Keep only lines that clearly help." | dropped (PR 4) | Sam's guidance for the app's words has no line; the screens in `generated/screens/` record the words as built. |
+| 92 | docs/v2/03 §5, what history is for: "an agent that wants to know what was already decided …; a coordinator reviewing its helpers; and the owner's own analysis later" | dropped (PR 4) | B31 says what the history holds, not why; FRIENDS' question 2 names sharing it for feedback. |
 
 ## Gaps filled
 
@@ -1408,3 +1411,34 @@ Old clause numbers are the old behaviour numbers: C26.3 is C26's third behaviour
 | — (new milestone) | next/CLIENTS.md | new: Sam's 5 Nov words, quoted exactly; the wake lab report linked; order after ENCRYPT, anchoring INSTALL and SITE | ⚑ |
 | (new id) B32 · @M3 · Wait for the answer, then acknowledge it | B32 (2 Agents) | a new id Sam agreed (DEC-2026-11-05-blueprint-destination) for promises M3 built and no old id held alone: C27.4's how to wait, C6.2's note word for word, D2's long wait, and docs/v2/03's wait, acknowledge and status. The rows above map each clause |  |
 | (new id) B33 · @M3 · Each agent app is told how it wakes | B33 (2 Agents) | a new id Sam agreed for D2's per-app wake rules and the 30 Oct wake lab's words (memory `agent-wake-research`, docs/v2/03 §6). The rows above map each clause |  |
+
+## PR 4: the history cleanup
+
+PR 4 deleted `docs/v2/`, the root `workshop/`, `recipe.json` and four superseded plans, after the archive tag `history-archive` (64512bd), and moved the 30 Oct wake lab to `docs/research/`. Four fresh read-only checks, one per group of files, read each file whole against `blueprint/`, AGENTS.md, the package READMEs and the code. These rows home what the rows above missed, and correct three of them.
+
+| Old | New | Change | ⚑ |
+| --- | --- | --- | --- |
+| docs/v2/01, Rules and feedback, "Principle: feedback rides on calls the agent already makes and taps the owner already does …" | next/FRIENDS.md What's known | quoted; it bears on FRIENDS' question 2. DEC-2026-10-29-v2-design lists the rejected ideas but not this principle |  |
+| docs/v2/01, Multi-user (parked, must be handled): "Rules belong to each owner … in layers …"; Notes: "A correction that recurs becomes a check in the next binary" (also `pages/agent-journey-v2.html`) | next/FRIENDS.md What's known | quoted. The row above for "Goal and Multi-user" homed only the history-file idea |  |
+| docs/v2/01, Scope: Claude mobile-only users (the setup script, the number in the repository's AGENTS.md, whether a stdio MCP server from `.mcp.json` runs there) | next/CLIENTS.md What's known | L13 kept only network reach and pausing; the rest joins CLIENTS, untested |  |
+| docs/v2/01, App structure: "No install instructions in the app" | B26, second note | the meaning kept: the app gives none, and an agent finds them at /start (B18) |  |
+| docs/v2/01, Rejected as ceremony: "a pre-sorted must/nice list" | dropped | DECISIONS.md is append only; B27.3 holds it in effect | ⚑ |
+| docs/v2/01, App structure: "Minimal helper text. Keep only lines that clearly help." | dropped | design; the screens record the app's words | ⚑ |
+| docs/v2/03 §5, what history is for | dropped | context, not a promise; B31 holds what it does | ⚑ |
+| docs/v2/03 §6, "The chat also has a cloud shell where the binary isn't installed, so the words name the tool" | docs/research/2026-10-30-agent-wake-lab.md, Findings | the reason behind B33.3's words; `wait.test.ts` checks the words, not the reason |  |
+| docs/v2/03, the files citing it: `commands.ts`, `detect.ts`, `main.ts`, `mcp.ts`, `wait.test.ts`, `packages/app/src/start.ts`, `packages/cli/README.md` | B25, B27, B32, B33, B18 and the research doc | re-pointed in PR 4. The rows above had no row for them |  |
+| docs/v2/04 §1 "not the Secure Enclave, which can't hold this kind of key"; §4 "a leaked agent key exposes the answers sent to it", "45 bytes plus base64, so a 1 MB image stays under the server's limit"; §5 the acknowledgement's encrypted preview | next/ENCRYPT.md What's known › The design; its B17 clause names B17.5 | the rows above sent these to ENCRYPT, but ENCRYPT.md didn't hold them |  |
+| docs/v2/04, row 78 and "the file": "next/ENCRYPT.md names it" | next/ENCRYPT.md What's known › The design | now says how to read it: `git show history-archive:docs/v2/04-encryption.md` |  |
+| docs/v2/04, code comments citing §2: `worker.ts`, `test/support.ts` | I19 | re-pointed. `Keychain.swift` and `packages/contract/exchange.ts` are drawn from by `pnpm designs`, so they wait for the follow-up ([M4-house.md](../M4-house.md#left-for-the-follow-up-pr)) |  |
+| docs/v2/05, "worth a per-number cap on open agents" | next/ENCRYPT.md From the design | beside the connect rate limit; a rate isn't a cap |  |
+| docs/v2/06, "the file": "`MarketingScreen.tsx` cites it" | the root README; the follow-up | the root README cited it too, and its recipe paragraph is gone. `MarketingScreen.tsx` waits for the follow-up |  |
+| docs/v2/01, the files citing it: `worker.ts`'s retired-MCP comment | B18.4 | re-pointed. `AppModel.swift` and `exchange.ts` wait for the follow-up |  |
+| docs/v2/02, the files citing it: `rules.ts`, `card.ts`, `packages/cli/README.md` | B27 (and I22 for `card.ts`) | re-pointed |  |
+| docs/v2/card-example.yaml | deleted, not moved | `rules.ts` `EXAMPLE` holds it line for line, with its detail quoted, and `cli.test.ts` imports that. The comment in `rules.ts` is re-pointed; `Previews.swift` waits for the follow-up |  |
+| docs/v2/regression | `packages/cli/test/regression/` | moved, as the row above said, since `scripts/regression-cards.mjs` and the command's README use it. Its README now states the expected grades itself, instead of citing 02 §4 and §5 |  |
+| docs/v2/mocks, docs/v2/pages | deleted | superseded by `generated/screens/`. `Previews.swift`'s mention of the mocks waits for the follow-up |  |
+| recipe.json | deleted | nothing reads it: no code, test, script or package.json names it. The root README and `packages/app/README.md` no longer cite it; AGENTS.md still names it among what v2 retired |  |
+| the root `workshop/`; plans `2026-10-30-design-catalogue.md`, `2026-10-31-method.md`, `2026-10-31-method-sample/`, `2026-10-31-next-roadmap-orchestration.md` | deleted | checked again: nothing in them is still true without a home |  |
+| `.agents/plans/2026-10-31-root-handoff.md` | kept | the row above said PR 4 deletes it. The root rewrites it at M4's end, which drops its links to the deleted plans |  |
+| memory `agent-wake-research` and the report Ph2BtiR64UBSde6fbXW5LT | docs/research/2026-10-30-agent-wake-lab.md | the lasting record of what wakes which app and how it was tested; B33's note and CLIENTS cite it |  |
+| DECISIONS.md's citations of `docs/v2/` | kept as written | DECISIONS.md is append only, and "which git keeps" stays true: the tag is `history-archive` |  |

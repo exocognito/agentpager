@@ -13,7 +13,7 @@ Anyone can read AgentPager's code on GitHub, check what it does with their decis
 ## What's known
 
 - The repository is private today; /start tells an agent to ask its owner for access.
-- M4 removes `docs/v2`, the workshop notes, the lessons, the parked web milestone and superseded plans from the tree, and git keeps them. It also moves the wire contract to `packages/contract` and the front page to `packages/app/src/site`.
+- M4 removed `docs/v2`, the workshop notes, the lessons, the parked web milestone and superseded plans from the tree; git keeps them at the tags `blueprint-old-format` and `history-archive`. It also moved the wire contract to `packages/contract` and the front page to `packages/app/src/site`.
 - Built for self-hosters: the app's server address in iOS Settings, and the command's choice of server, which each agent's file keeps. In ENCRYPT's design, keys are made on the phone and on the agent's machine and never leave them, so a self-hoster needs nothing extra for encryption.
 - Apple delivers alerts only from the team that signed the app, so a service someone else runs can't alert the TestFlight app.
 

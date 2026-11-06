@@ -6,7 +6,7 @@ import { setup } from './setup.ts';
 import { VERSION } from './version.ts';
 import type { Source } from './card.ts';
 
-// agentpager: the CLI, and with `mcp` the stdio MCP server (docs/v2/03-binary-surface.md).
+// agentpager: the CLI, and with `mcp` the stdio MCP server (blueprint/areas/2-agents.md).
 const HELP = `agentpager: send your owner decisions on their phone, and get their answers.
 
   agentpager connect [<number>] [--app <name>] [--project <name>] [--server <url>]

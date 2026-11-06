@@ -20,7 +20,7 @@ async function phoneHash(request: Request) {
 }
 const hex = (bytes: Uint8Array) => Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
 const base64url = (text: string) => Uint8Array.from(atob(text.replaceAll('-', '+').replaceAll('_', '/')), c => c.charCodeAt(0));
-// The pager number names the pager and the first 8 bytes of its public key's SHA-256 (docs/v2/04-encryption.md §2).
+// The pager number names the pager and the first 8 bytes of its public key's SHA-256 (I19, blueprint/areas/6-privacy.md).
 function parseNumber(number: string) {
   if (!Schema.is(C.PagerNumber)(number)) throw C.refuse.numberInvalid();
   const bytes = hex(base64url(number.slice(4)));
@@ -109,7 +109,7 @@ const text = (value: string, type: string, status = 200) => new Response(value, 
 
 async function serve(request: Request, env: Env) {
   const u = new URL(request.url), origin = u.origin;
-  // The hosted MCP server is retired (docs/v2/01-decisions.md): an agent that arrives there, or at /start, is told to
+  // The hosted MCP server is retired (B18.4, blueprint/areas/7-getting-started.md): an agent that arrives there, or at /start, is told to
   // install the agentpager command. The HTTP API stays as that command's transport.
   if (u.pathname === '/mcp') return text(startDocument(origin), 'text/markdown', 410);
   if (u.pathname.startsWith('/api/')) return api(request, env);

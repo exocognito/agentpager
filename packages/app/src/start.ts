@@ -1,5 +1,5 @@
 // What an agent that arrives without the agentpager command reads, at /start and /mcp: how to install it, then the
-// one command. No API documentation for hand-rolled calls (docs/v2/03-binary-surface.md §4). A server other than
+// one command. No API documentation for hand-rolled calls (B18, blueprint/areas/7-getting-started.md). A server other than
 // agentpager.me names itself in the command (--server), since the binary defaults to agentpager.me.
 export const DEFAULT_ORIGIN = 'https://agentpager.me';
 // Any other server, dev.agentpager.me or a local one, says it is dev (METHOD.md › Stages and releases), since each

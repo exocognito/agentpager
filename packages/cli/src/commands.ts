@@ -7,7 +7,7 @@ import { REVIEW, SHORT, EXAMPLE, rulesText } from './rules.ts';
 import { UnreadableAgent, agentIds, appendHistory, home, loadAgent, pagerOf, readHistory, saveAgent, server, shortId, updateAgent, writable, type AgentFile } from './store.ts';
 
 // The operations, shared by the CLI and the MCP server, with their replies word for word
-// (docs/v2/03-binary-surface.md §4), so a model reads the same words whichever way it arrived.
+// (B25, B32 and B33, blueprint/areas/2-agents.md), so a model reads the same words whichever way it arrived.
 // Exit codes: 0 done, 2 refused, 4 pager off, 5 no usable reply from the server (unreachable, no reply, or a reply not understood), 6 unknown agent id.
 export type Result = { code: 0 | 2 | 4 | 5 | 6; text: string; json?: unknown };
 const done = (text: string, json?: unknown): Result => ({ code: 0, text, json });
@@ -52,7 +52,7 @@ const quote = (s: string, max = 60) => {
   const cut = s.slice(0, max - 1), space = cut.lastIndexOf(' ');
   return (space > max / 2 ? cut.slice(0, space) : cut).replace(/[\s,;:]+$/, '') + '…';
 };
-// How to wait, in the words of the harness that is waiting (docs/v2/03-binary-surface.md §6). Claude Code wakes when
+// How to wait, in the words of the harness that is waiting (B33; docs/research/2026-10-30-agent-wake-lab.md). Claude Code wakes when
 // a background command ends. A Claude Desktop chat is reached only while its turn lasts, through a link to this
 // computer that drops and comes back by itself. Every other agent gets the words in 'Keep waiting'.
 const background = (id: string, short: string) => `run \`${self()} wait --agent ${id} ${short} --forever\` as a background command, then carry on or end your turn. It ends when your owner answers, and you get the answer then.`;

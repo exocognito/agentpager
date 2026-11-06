@@ -5,7 +5,7 @@ import { Either, ParseResult, Schema } from 'effect';
 import { QuestionInput, TEXT_MAX_CHARACTERS, TITLE_MAX_CHARACTERS } from '../../contract/exchange.ts';
 import { briefProblem, missingAttachment, attachmentTypes, IMAGE_MAX_BYTES, ATTACHMENTS_MAX, ATTACHMENTS_MAX_BYTES, BRIEF_LABEL_MAX_CHARACTERS, BRIEF_MAX_CHARACTERS } from '../../contract/brief.ts';
 
-// card.yaml (docs/v2/02-writing-rules.md §2): the whole card as structure, each key landing in one place on the
+// card.yaml (TEMPLATE in rules.ts; B27 and I22, blueprint/areas/3-cards.md): the whole card as structure, each key landing in one place on the
 // phone. `ask` refuses only what is mechanically certain (R1–R4 here; R5 and R6 come from the server), one line per
 // problem, and compiles the rest to the brief the server and phone read today. The brief is then held to the server's
 // own QuestionInput, so nothing the server would refuse leaves this machine: once cards are end-to-end encrypted the

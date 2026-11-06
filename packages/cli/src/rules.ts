@@ -1,4 +1,4 @@
-// The card contract, the review list and the card.yaml format: their single home (docs/v2/02-writing-rules.md).
+// The card contract, the review list and the card.yaml format: their single home (B27, blueprint/areas/3-cards.md).
 // The MCP tool descriptions, `rules`, `review` and the reminder in `ask` all print from here.
 
 export const CONTRACT = `A decision card asks your owner one question and gives them everything they need to answer it on a phone.
@@ -89,8 +89,8 @@ next_steps:     # optional: one line per option letter, and if_no_answer
   if_no_answer:
 attachments: [] # files next to card.yaml that the card names: .md pages, .png or .jpg images`;
 
-// The M11 decision from the canvas (docs/v2/card-example.yaml, with its detail quoted: a plain YAML value can't hold
-// ": "). Its images are not shipped: add your own files.
+// The M11 decision from the v2 design canvas, with its detail quoted: a plain YAML value can't hold
+// ": ". Its images are not shipped: add your own files.
 export const EXAMPLE = `title: Which M11 guarantee should we build?
 detail: "Two real alternatives: a smaller fix with occasional manual recovery, or precise automatic recovery."
 

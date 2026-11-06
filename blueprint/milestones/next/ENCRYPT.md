@@ -15,12 +15,12 @@ My decisions, their attachments, my answers and my agents' acknowledgements are 
 ## What's known
 
 - **Built since M2:** the phone makes each pager's key pair, and the pager's number carries a fingerprint of its public key, which the service checks when the pager is made and at every connect (I19).
-- **The design,** agreed on 29 Oct. The full draft is `docs/v2/04-encryption.md`, which M4 removes from the tree and git keeps.
-  - Keys: a key pair per pager, made on the phone and kept where an alert extension can read it; a key pair per agent, made at connect and kept in the agent's file. The service holds only public keys and the digests of the phone and agent keys.
+- **The design,** agreed on 29 Oct. The full draft, with the byte layouts, payload sizes and routes this short form leaves out, is `docs/v2/04-encryption.md`, which M4 removed from the tree: read it with `git show history-archive:docs/v2/04-encryption.md`.
+  - Keys: a key pair per pager, made on the phone and kept in a Keychain the app shares with its alert extension (not the Secure Enclave, which can't hold this kind of key); a key pair per agent, made at connect and kept in the agent's file. The service holds only public keys and the digests of the phone and agent keys.
   - Encrypted to the pager's key: each card, each attachment, who asked with the project and the computer, and each acknowledgement. Encrypted to the agent's key: the answer. The service keeps only ids, timestamps, sizes, how many attachments, whether each pager is on and when it turns off, and the phone's device token.
-  - One format for every encrypted part, in both directions: X25519 with a fresh key for each part, HKDF-SHA256 and AES-256-GCM, which CryptoKit and Node's crypto both have. Each part is bound to its kind, its pager and its decision, so it can't be replayed as another kind or moved to another decision.
+  - One format for every encrypted part, in both directions: X25519 with a fresh key for each part, HKDF-SHA256 and AES-256-GCM, which CryptoKit and Node's crypto both have. Each part is bound to its kind, its pager and its decision, so it can't be replayed as another kind or moved to another decision. A leaked agent key exposes only the answers sent to that agent. The format adds 45 bytes before base64, so a 1 MB image still fits the service's limit.
   - Before it encrypts anything, the command fetches the pager's public key from the service and checks it against the number.
-  - An alert carries a small encrypted preview. A notification service extension decrypts it with the pager's key and shows the question; if it can't, iOS shows a plain "New decision". The not-picked-up warning becomes plain too, and the phone names the agent.
+  - An alert carries a small encrypted preview. A notification service extension decrypts it with the pager's key and shows the question; if it can't, iOS shows a plain "New decision". An acknowledgement's alert works the same way, with the agent's next steps as its preview. The not-picked-up warning becomes plain too, and the phone names the agent.
   - Sam's answers on 29 Oct: the fingerprint stays 8 bytes, so the number keeps its length, and attachment names are encrypted.
 - **Five hardening items,** held for this milestone by the 30 Oct engineering review, as Sam agreed:
   1. An ask request id. The phone's answer already has one, so sending it twice stores it once. An ask has none: if its reply is lost and the agent asks again, the owner gets a second decision.
@@ -71,7 +71,7 @@ The lines the old Blueprint held for this milestone, as the [M4 ledger](../M4-ho
 
 **B17, a clause added** (4 Getting paged)
 - The alert travels encrypted, and the phone decrypts it to show the real question (B30), with an App Group and a notification service extension in the app.
-- Once the service can't read decisions, it can't write who asked, the project or the question into an alert, so B17.2's title and body, and the names in B17.8's alert, come from the phone.
+- Once the service can't read decisions, it can't write who asked, the project or the question into an alert, so B17.2's title and body, the agent's words in B17.5's acknowledgement alert, and the names in B17.8's alert come from the phone.
 
 **J5, a step added:** after J5.3, the alert travels encrypted, and an extension on the phone decrypts it to show the question.
 
@@ -80,7 +80,7 @@ The lines the old Blueprint held for this milestone, as the [M4 ledger](../M4-ho
 **I22 and I4, changed** (3 Cards): once cards are encrypted, the service can't read a card to refuse it. The command's check (I22) becomes the only check of a card's text, and I4 then holds on the service only for what it can still read.
 
 **From the design, not built:**
-- The service limits how fast a number can connect agents, which the design relies on, since a number carries its pager's id in the clear. Nothing limits it today.
+- The service limits how fast a number can connect agents, which the design relies on, since a number carries its pager's id in the clear. Nothing limits it today. The v2 readiness review also suggested a cap on how many open agents a number can have.
 - A number whose version the command doesn't know is refused with a reply that says so. Today any other version is refused as not in use (B25.8).
 
 ## Log

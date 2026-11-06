@@ -2,8 +2,8 @@
 
 The only thing an agent talks to: a CLI for terminals and scripts, and with `agentpager mcp` a stdio MCP server for
 Claude Code, Claude Desktop, Codex and Cursor. Both expose the same operations with the same replies
-(`docs/v2/03-binary-surface.md`). The card contract, the review list and the `card.yaml` format live in `src/rules.ts`
-and nowhere else (`docs/v2/02-writing-rules.md`).
+([2 Agents](../../blueprint/areas/2-agents.md)). The card contract, the review list and the `card.yaml` format live in `src/rules.ts`
+and nowhere else ([3 Cards](../../blueprint/areas/3-cards.md), B27).
 
 ## Build and install (Stage 2: local only)
 
@@ -48,4 +48,4 @@ pnpm --filter @agentpager/cli test           # against local workerd, through th
 until it is built); `setup.test.ts` writes only into a throwaway home.
 
 The review list's regression set is the 10 cards of 28–29 Oct: `scripts/regression-cards.mjs` rebuilds them from
-`docs/v2/regression/cards-2026-10-28.txt`, `agentpager review` prints each, and a fresh subagent grades it.
+`test/regression/cards-2026-10-28.txt`, `agentpager review` prints each, and a fresh subagent grades it.

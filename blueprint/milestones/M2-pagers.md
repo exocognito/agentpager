@@ -25,7 +25,7 @@ I make pagers on my phone, as many as I like, each with a name, a number and a s
 
 ## Sam's answers
 
-Sam and Claude agreed the v2 design on 29–30 Oct, in a claude.ai Project; its record is `docs/v2/`, which M4 removes from the tree and git keeps. For M2, as recorded there:
+Sam and Claude agreed the v2 design on 29–30 Oct, in a claude.ai Project; its record is `docs/v2/`, which M4 removed from the tree; git keeps it at the tag `history-archive`. For M2, as recorded there:
 - Sam's review of the "AgentPager v2 Screens" canvas chose the screens M2 built, on its page "Chosen screens".
 - Defaults Sam confirmed on 29 Oct: "v2 is a fresh install on the phone: no migration of today's pagers or decisions." · "Rename `session` → `agent` throughout the code in Stage 1."
 

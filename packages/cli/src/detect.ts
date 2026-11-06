@@ -3,7 +3,7 @@ import { realpathSync } from 'node:fs';
 import { homedir, hostname } from 'node:os';
 import path from 'node:path';
 
-// Who asked ("Codex") and the project its decisions are grouped under on the phone (docs/v2/03-binary-surface.md §2).
+// Who asked ("Codex") and the project its decisions are grouped under on the phone (B25.3, blueprint/areas/2-agents.md).
 // A harness is known by a marker in its environment, else by its process name. Verified: CLAUDECODE (Claude Code,
 // 29 Oct 2026). The others are each harness's documented or observed variable and are checked again when the binary
 // is built; an agent can always pass --app.
@@ -13,7 +13,7 @@ const NAMES: [RegExp, string][] = [[/^claude$/i, 'Claude Code'], [/^Claude$/, 'C
 // (verified 30 Oct 2026: every tool call of 145 in the lab); its claude-ai client only lists them.
 const CLIENTS: [RegExp, string][] = [[/claude-code/i, 'Claude Code'], [/^local-agent-mode-/, 'Claude Desktop'], [/claude/i, 'Claude'], [/codex/i, 'Codex'], [/cursor/i, 'Cursor'], [/^pi/i, 'pi']];
 
-// The harness whose waiting the binary knows how to word (docs/v2/03-binary-surface.md §6). Only a positive
+// The harness whose waiting the binary knows how to word (B33.1, blueprint/areas/2-agents.md). Only a positive
 // identification counts: over MCP the client's own name, from a shell CLAUDECODE=1 with no other harness's
 // marker inherited around it. Anything else is null and gets the words every agent gets.
 export type Harness = 'claude-code' | 'claude-desktop';

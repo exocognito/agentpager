@@ -30,7 +30,7 @@ Three stages, each with its own data, as [METHOD.md › Stages and releases](MET
 | dev | https://dev.agentpager.me, Worker `ownerpager-dev` | `pnpm deploy:dev` from a clean checkout of `main`, then `pnpm smoke:dev` | the root after each merge; Sam's walk on the dev phone, HomePhoneLite, with Settings → Server set to dev; binaries built from `main` |
 | prod | https://agentpager.me, Worker `ownerpager` | `pnpm deploy:prod`, which refuses anything but a clean tree at a release tag, then `pnpm smoke:prod` | Sam's real agents and phone |
 
-- **The root deploys dev after each merge** and runs `pnpm smoke:dev`. The smoke run pages no one and needs no phone.
+- **The root deploys dev after each merge** and runs `pnpm smoke:dev`. The smoke run pages no one and needs no phone; the one pager it makes, with no alert target, it deletes.
 - **Release tags** are `m<n>` for a milestone and `m<n>.<k>` for a fix after it, such as `m4` and `m4.1`. Prod, and the clients used with it, come only from a tag that was green on dev. Those clients are the phone build and the binary on air, mini and pro.
 - **Deploy order:** the service, then the binary, then the app.
 - **A binary built from `main`** is tested under its own `AGENTPAGER_HOME`, with `--server https://dev.agentpager.me`. It never uses a machine's `~/.agentpager`, which Sam's real agents use.

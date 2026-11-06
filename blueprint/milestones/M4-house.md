@@ -1,0 +1,56 @@
+# M4 · House in order
+
+> **Status:** building · **Started:** 5 Nov 2026 · **Tag:** none yet · **Order:** runs alone, before ENCRYPT
+
+## Objective
+
+"The repo is feeling VERY disorganized right now and I want to get our house in order before we commit to building E2EE and making the product available to others." (Sam, 5 Nov 2026)
+
+## Decided
+
+Sam agreed the destination on the [Destination v2 canvas](https://claude.ai/artifact/S8LzZkCuAQjurJ1Yb4zLSN), in the root session on 5 Nov 2026:
+- "OK this looks much better"
+- to the six simplifications: "I agree with all of these, thank you"
+- "orchestrate subagents to get all this M4 House done, and then I'll review when it's merged (I approve you merging the merge-ready PRs) and before we start with MENCRYPT"
+- ★ on all eight of the canvas's questions, confirmed when Sam went ahead.
+
+What they settle:
+- [METHOD.md](../../METHOD.md), as amended in M4: one file per area, one shape for every promise, outcomes not wording, milestones numbered when they start, one milestone at a time, decisions only when they bind later milestones, history in git, and the dev stage. It changes here first; atomicpages takes it later.
+- Ids: each `C` becomes `B` with the same number; I, J and K keep theirs; limits start at L9; there are no D ids, and no id is reused.
+- The dev stage is built in M4.
+- The order after M4: ENCRYPT, CLIENTS, INSTALL, SITE, OPEN, FRIENDS, one at a time.
+- The earlier Step 0 calls stand at ★, except where the destination replaces them. Lessons L1 to L8 retire, and their gotchas go to AGENTS.md.
+- The ENCRYPT hardening items, agreed earlier, go in `next/ENCRYPT.md`: an ask request id, a client-version header, one writer per pager, a lifecycle state machine that says what finish does to open decisions, and a smaller poll.
+- The root merges each M4 pull request once it is merge-ready: review passed, `pnpm check` and `pnpm test:all` green, no open finding. Sam reviews M4 after it has merged.
+
+The plan, with the pull requests in order, is [.agents/plans/2026-11-05-m4-house.md](../../.agents/plans/2026-11-05-m4-house.md).
+
+## Slice
+
+| Layer | What M4 delivers there |
+| --- | --- |
+| Blueprint | `blueprint/` in the area shape; every old line has a row in the ledger: its new home, the code or test that now holds its specific, or dropped and why. The wire contract moves to `packages/contract` and the front page to `packages/app/src/site`, so the Blueprint holds no code |
+| Server | a dev Worker with its own data, at dev.agentpager.me; the root deploys `main` there after each merge |
+| Phone | the dev phone set to dev in Settings, with a "dev" mark; separate app ids wait for INSTALL |
+| Binary | builds from main talk to dev with `--server`; air, mini and pro run only tagged builds |
+| Tests | tests M4 touches are named by id; the id check writes what each milestone added and the untested list, and doesn't block; dev gets a smoke run, and the full suites stay local |
+
+## Out of scope
+
+- No new behavior for anyone using AgentPager. Prod changes only by its tag.
+- No prod deploy. Prod stays at 1ee6c27 until Sam has reviewed M4; then the root proposes the tag `m4` and a prod deploy as a question.
+- No mass rename of tests: only the ones M4 touches get ids.
+
+## Sam reviews after merge
+
+1. Every ledger row that drops a line or changes its meaning, in `M4-house/ledger.md`. A specific moved into a test that holds it isn't a change of meaning; one that no test holds is flagged.
+
+## Adds · Changes · Retires
+
+- **Adds:** nothing a person sees. A dev stage, whose addresses and deploy order go in AGENTS.md. B32 and B33, for promises that hold today but have no id of their own. Limits from L9, for what people meet today.
+- **Changes:** every `C` id becomes `B` with the same number. Promise text moves into areas, trimmed to outcomes, and each line that drops or changes its meaning has a ledger row. The D ids become "Relies on" lines, behaviors, invariants and facts in AGENTS.md. Unbuilt promises, such as B30 and K1, move to their milestones in `next/`.
+- **Retires:** lessons L1 to L8; the D ids; the old docs under `packages/blueprint/`, kept at tag `blueprint-old-format`; `docs/v2`, the workshop, parked work and superseded plans, kept in git. The 30 Oct wake lab moves to `docs/research/`.
+
+## Log
+
+- 5 Nov · building: Sam agreed Destination v2, its six simplifications and all eight ★ answers. PR #43 amends METHOD.md, sets the roadmap order and starts this doc; `pnpm check` green, `pnpm test:all` 60 passed (34, 16 and 10).

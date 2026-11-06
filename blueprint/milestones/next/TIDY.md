@@ -1,10 +1,10 @@
-# STORE · One store per pager
+# TIDY · Tidy state
 
-> **Status:** queued · **Order:** after ENCRYPT, before CLIENTS · numbered when it starts · its word is M5's question 7
+> **Status:** queued · **Order:** after ENCRYPT, before CLIENTS · numbered when it starts
 
 ## Objective
 
-Three of the hardening items the 30 Oct engineering review held for ENCRYPT, which Sam split off on 6 Nov into their own milestone, right after it (DEC-2026-11-06-store-after-encrypt):
+Three of the hardening items the 30 Oct engineering review held for ENCRYPT, which Sam split off on 6 Nov into their own milestone, right after it (DEC-2026-11-06-store-after-encrypt), under the word Sam chose the same day (DEC-2026-11-06-tidy):
 - **One writer per pager:** one store per pager, holding its row, its agents and their decisions. This is what closes L10, a call that lands as the pager turns off.
 - **Smaller polls,** both of them: the phone reads one object per pager instead of one per agent, and a waiting agent is woken when its answer arrives instead of checking storage every 100 ms.
 - **The agent's lifecycle:** connected, finished, idle, forgotten, and deleted with its pager, as one state machine. Finishing closes the agent's open decisions, so they can't be answered (Sam's answer to the question put on 6 Nov, recorded in [M5-encrypt.md](../M5-encrypt.md), question 5).
@@ -37,3 +37,4 @@ Sam decides these first, at its Plan:
 ## Log
 
 - 6 Nov · queued: Sam split three of ENCRYPT's hardening items into this milestone, to run right after ENCRYPT and before CLIENTS.
+- 6 Nov · Sam chose its word on the pager, TIDY over the proposed STORE ([M5-encrypt.md](../M5-encrypt.md), question 7).

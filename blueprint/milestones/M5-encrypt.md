@@ -1,6 +1,6 @@
 # M5 · Decisions the service can't read
 
-> **Status:** planning · **Started:** 6 Nov 2026 · **Order:** after M4; [STORE](next/STORE.md) follows · **Word:** ENCRYPT
+> **Status:** planning · **Started:** 6 Nov 2026 · **Order:** after M4; [TIDY](next/TIDY.md) follows · **Word:** ENCRYPT
 
 ## Objective
 
@@ -18,33 +18,31 @@ The guarantee Sam approved in the old strategy on 30 Oct, waiting here until it 
 Sam chose the recommended option of each of five numbered questions the previous root asked in its Claude Code session on 6 Nov 2026, answering: "Agree with all your recs, though for starting M5 I would like you to give to a herdr pane with fresh Opus 5.5 xhigh thinking bypass perms, and ask them to orchestrate subagents to see it through to green on dev and I'll test there". The choices:
 
 1. **M4's files.** The commit before the removal is tagged `m4-house-ledger`, M4's ledger is deleted from the tree, and [M4-house.md](M4-house.md) stays as M4's record, like M1 to M3. Sam's line test and look rule, which lived only there, move first to [METHOD.md › Writing lines](../../METHOD.md#writing-lines), with DEC-2026-11-06-line-test. Done in this milestone's first pull request.
-2. **Scope** (also the ledger's ⚑82). ENCRYPT keeps encryption and the two small hardening items, the ask request id and the client-version header: both change the wire contract the switch changes anyway, and the header is how question 4's refusal works from now on. The other three items become their own milestone, right after ENCRYPT and before CLIENTS: [STORE](next/STORE.md), with DEC-2026-11-06-store-after-encrypt.
+2. **Scope** (also the ledger's ⚑82). ENCRYPT keeps encryption and the two small hardening items, the ask request id and the client-version header: both change the wire contract the switch changes anyway, and the header is how question 4's refusal works from now on. The other three items become their own milestone, right after ENCRYPT and before CLIENTS: [TIDY](next/TIDY.md), with DEC-2026-11-06-store-after-encrypt and, for its word, question 7.
 3. **Decisions stored before the switch** are deleted at the switch. This is the release's exception to METHOD's rule that a release never loses data (below). The history on each agent's machine keeps its own copies (B31).
 4. **Clients from before the switch.** An agentpager command from before the switch is refused, and told how to update. An agent connected before the switch connects again, which gives it its key pair: agent keys are made at connect.
-5. **What finish does to open decisions:** they close and can't be answered. This goes to STORE, with the agent's lifecycle, not to M5.
+5. **What finish does to open decisions:** they close and can't be answered. This goes to TIDY, with the agent's lifecycle, not to M5.
 
-### Still open
+Sam answered questions 6 to 9 on Sam's pager on 6 Nov 2026, between 14:37 and 14:39, by choosing an option on each card. The choices:
 
-Sam decides these. None of them holds up the build: the format, its test vectors and the switch go ahead, and lines reach the areas only once approved.
-
-6. **The proposed lines** (below), trimmed by the line test: the guarantees stay, and what the code shows, such as which part is encrypted to which key, the alert extension and the byte layout, is dropped. (a) ★ Keep the set as written. (b) Name the lines to change or drop.
-7. **The word for the milestone after ENCRYPT.** (a) ★ STORE · One store per pager, since one store per pager is what the other two items rest on. (b) TIDY · Tidy state: one writer per pager, the agent's lifecycle and lighter polls.
-8. **The iPhone app from before the switch** can't be told plainly to update. On a refusal it shows only its general line that it can't reach the server, and keeps showing its last read; only a refusal that says the pager is gone drops a pager. (a) ★ Accept it for this release, as part of question 3's exception: Sam's own phones are the only ones, and each gets the new app right after the service. (b) Ship an interim app before the switch that shows an update refusal plainly.
-9. **A limit on how fast a number can connect agents,** which the 29 Oct design assumed and nothing enforces today. (a) ★ Leave it out of M5 and write it down as a limit: a leaked number can connect any number of agents until the owner turns its pager off; revisit at FRIENDS. (b) Build a simple per-pager limit in M5.
+6. **The lines** (below, trimmed by the line test): approved as written. Each reaches its area file with the code that makes it true: B25.14 and B27.9 with the hardening pull request (#59); B30, I20, I19.6, I19.7, B17.11 and I4.9, and the changes to I4.1, I4.7, I22 and TERMS › Keys, with the encryption switch, which retires L17 and L19.
+7. **The word for the milestone after ENCRYPT:** TIDY · Tidy state, chosen over the proposed STORE: one store per pager, lighter polls and the agent's lifecycle. Its doc is [next/TIDY.md](next/TIDY.md), with DEC-2026-11-06-tidy.
+8. **The iPhone app from before the switch** can't be told plainly to update. On a refusal it shows only its general line that it can't reach the server, and keeps showing its last read; only a refusal that says the pager is gone drops a pager. Accepted for this release, as part of the release's exception (below): Sam's own phones are the only ones, and each gets the new app right after the service.
+9. **A limit on how fast a number can connect agents,** which the 29 Oct design assumed and nothing enforces today: left out of M5, and written down as L25 in [1 Pagers](../areas/1-pagers.md), to revisit at FRIENDS.
 
 ## The release's exception (METHOD › Stages and releases)
 
-Sam's answers to questions 3, 4 and, if (a), 8, as METHOD now allows:
+Sam's answers to questions 3, 4 and 8, as METHOD now allows:
 - **What is lost:** every agent, decision, attachment, answer and acknowledgement the service stored before the switch, on dev now and on prod at the release. They were stored readable.
 - **What still opens:** every pager, with its key pair, number, switch and auto-off. The history on each agent's machine keeps that machine's decisions.
-- **What stops working:** a command from before the switch is refused and told how to update; an agent connected before the switch connects again; the app from before the switch can't read its pagers until it is updated (question 8).
+- **What stops working:** a command from before the switch is refused and told how to update; an agent connected before the switch connects again; the app from before the switch can't read its pagers until it is updated, and isn't told plainly to update: it shows only that it can't reach the server (question 8).
 - **What the upgrade check proves instead,** on dev against the baseline recorded from `m4`: the baseline's pager still exists with its key and number, its decisions are gone, a command from `m4` is refused with how to update, and a new command connects with the baseline's number.
 
 ## Slice
 
 | Layer | What M5 delivers there |
 | --- | --- |
-| Blueprint | this doc; METHOD's line test, look rule and release exception; the approved lines in their areas with the code that makes them true; L17 and L19 retired; STORE queued |
+| Blueprint | this doc; METHOD's line test, look rule and release exception; the approved lines in their areas with the code that makes them true; L17 and L19 retired; L25 written down; TIDY queued |
 | Service | holds only encrypted parts and what it needs to route them; gives anyone the pager's public key; refuses a command from before the switch with how to update; takes an ask's request id, so asking again stores one decision; deletes the agents and decisions stored before the switch and keeps every pager |
 | Command | checks the pager's key against the number before connecting; makes the agent's key pair at connect; encrypts each card, its attachments, who asked and each acknowledgement to the pager, and reads its answers; says its version on every call |
 | Phone app | reads the encrypted decisions, attachments, who asked and acknowledgements, and encrypts each answer to its agent; moves each pager's keys where the alert extension can read them, keeping every pager |
@@ -56,7 +54,7 @@ The pull requests, in order, are in [.agents/plans/2026-11-06-m5-encrypt.md](../
 
 ## Out of scope
 
-- One store per pager, the smaller polls and the agent's lifecycle, with what finish does to open decisions: [STORE](next/STORE.md).
+- One store per pager, the smaller polls and the agent's lifecycle, with what finish does to open decisions: [TIDY](next/TIDY.md).
 - Hiding which pager and which agent, when, and how big each part is.
 - Moving a pager's keys to a new phone, or recovering them (L9).
 - Protecting a phone or an agent's machine that someone else controls.
@@ -78,9 +76,9 @@ The pull requests, in order, are in [.agents/plans/2026-11-06-m5-encrypt.md](../
 - **Apple signing.** The alert extension is a new target with its own bundle id, so the development profile changes. Only Sam can do that step: one build in Xcode on pro, with automatic signing. The service and command don't wait for it; the dev phone's build does.
 - INSTALL comes after ENCRYPT, so at the switch the command is still built from the repository, and only Sam's machines run it.
 
-## Proposed lines
+## Approved lines
 
-For question 6. Each reaches its area file with the code that makes it true, and its tests name its id. What is one-time, such as deleting what was stored before the switch and connecting again, is this release's exception (above), proven by the upgrade check, not a line.
+Sam approved these as written (question 6). Each reaches its area file with the code that makes it true, and its tests name its id. What is one-time, such as deleting what was stored before the switch and connecting again, is this release's exception (above), proven by the upgrade check, not a line.
 
 **B30 · @M5 · Decisions are encrypted end to end** (6 Privacy)
 1. Each decision, its attachments, who asked with the project and the computer, the owner's answer and the agent's acknowledgement are encrypted on the agent's machine or the phone, and only the other end can read them.
@@ -120,8 +118,8 @@ Why: [Only agents I give a number reach my phone](../PRODUCT.md#only-agents-i-gi
 
 ## Adds · Changes · Retires
 
-- **Adds:** B30 and I20, whole; I19.6 and I19.7; B17.11; B25.14; B27.9; I4.9; each as Sam approves (question 6). The alert extension on the phone. The upgrade baseline from `m4` and the upgrade check on dev.
-- **Changes:** I4.1, I4.7 and I22's notes, since the service can't read a card; I19's Why and notes, since the command's check is built; TERMS › Keys; METHOD.md › Writing lines, which takes Sam's line test and look rule, and › Stages and releases, which allows an exception the owner approves; L10, whose fix and revisit move to STORE.
+- **Adds:** B30 and I20, whole; I19.6 and I19.7; B17.11; B25.14; B27.9; I4.9; each as Sam approved it (question 6). L25, a leaked number can connect any number of agents (1 Pagers), as Sam chose (question 9). The alert extension on the phone. The upgrade baseline from `m4` and the upgrade check on dev.
+- **Changes:** I4.1, I4.7 and I22's notes, since the service can't read a card; I19's Why and notes, since the command's check is built; TERMS › Keys; METHOD.md › Writing lines, which takes Sam's line test and look rule, and › Stages and releases, which allows an exception the owner approves; L10, whose fix and revisit move to TIDY.
 - **Retires:** L19 and L17, named above, once built. M4's ledger leaves the tree, at tag `m4-house-ledger`.
 
 ## Log
@@ -129,3 +127,4 @@ Why: [Only agents I give a number reach my phone](../PRODUCT.md#only-agents-i-gi
 - 31 Oct · queued, unchanged in scope, in the next roadmap.
 - 5 Nov · Sam set it first after M4, one milestone at a time. Its hardening items were added here.
 - 6 Nov · planning: Sam answered questions 1 to 5. The first pull request starts this doc, moves the line test and look rule into METHOD, adds METHOD's release exception, deletes M4's ledger after the tag `m4-house-ledger`, and queues STORE. Questions 6 to 9 wait for Sam.
+- 6 Nov · Sam answered questions 6 to 9 on the pager: the lines approved as written, the next milestone's word TIDY, the old app's missing update message accepted as part of the exception, and the connect limit written down. STORE renamed TIDY, with DEC-2026-11-06-tidy; L25 added to 1 Pagers.

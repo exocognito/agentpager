@@ -157,3 +157,14 @@ This file is append only. A reversed or narrowed decision gets a new entry, and 
   - The order after M4 is ENCRYPT, STORE, CLIENTS, INSTALL, SITE, OPEN, FRIENDS, one at a time.
 - **Why:** the two items that change the wire contract go with the switch that breaks it; the other three are a different kind of change, to how the service stores and reads a pager.
 - **Serves:** README.md › Milestones; `milestones/M5-encrypt.md`; `milestones/next/STORE.md`; L10 in 1 Pagers.
+- → DEC-2026-11-06-tidy, in part: the milestone after ENCRYPT is TIDY, not STORE.
+
+## DEC-2026-11-06-tidy · The milestone after ENCRYPT is TIDY
+
+- **Decided by:** Sam, on 6 Nov 2026, on Sam's pager.
+- **Basis:** answering M5's question 7, Sam chose TIDY over the proposed STORE ([M5-encrypt.md](milestones/M5-encrypt.md) › Owner decides first).
+- **Decided, and still standing:**
+  - The milestone after ENCRYPT, queued as STORE by DEC-2026-11-06-store-after-encrypt, is TIDY · Tidy state: one store per pager, lighter polls and the agent's lifecycle. Its scope and its place, right after ENCRYPT and before CLIENTS, are unchanged.
+  - The order after M4 is ENCRYPT, TIDY, CLIENTS, INSTALL, SITE, OPEN, FRIENDS, one at a time.
+- **Why:** a milestone keeps its word once it starts (METHOD.md › Ids), so the word is settled while it is queued.
+- **Serves:** README.md › Milestones; `milestones/next/TIDY.md`.

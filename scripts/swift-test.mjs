@@ -15,6 +15,6 @@ for (const stream of [child.stdout, child.stderr]) stream.on('data', chunk => { 
 child.on('close', code => {
   const ran = [...out.matchAll(/Executed (\d+) tests?, with (\d+) failures?/g)].at(-1);
   if (code === 0 && ran && Number(ran[1]) > 0 && ran[2] === '0') { console.log(`AgentPagerCrypto: ${ran[1]} Swift tests passed.`); process.exit(0); }
-  console.error(ran ? `AgentPagerCrypto: ${ran[2]} of ${ran[1]} Swift tests failed.` : 'AgentPagerCrypto: swift test ran no tests.');
+  console.error(ran ? `AgentPagerCrypto: ${ran[1]} Swift tests ran, with ${ran[2]} failures.` : 'AgentPagerCrypto: swift test ran no tests.');
   process.exit(code || 1);
 });

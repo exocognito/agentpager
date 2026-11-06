@@ -39,7 +39,7 @@ describe("the vectors", () => {
     expect(new Set(v.openRefused.map(o => o.why))).toEqual(new Set(["kind", "pager", "decision", "slot", "recipient", "version", "tampered", "truncated", "padded", "not canonical", "not base64url", "low order", "context"]));
   });
   it("pass in full under Node, through the check the Bun build runs", () => {
-    expect(verify(v)).toEqual({ sealed: 14, opened: 14, sealRefused: 29, openRefused: 48, partsDecoded: 179, partsRefused: 137, failures: [] });
+    expect(verify(v)).toEqual({ sealed: 14, opened: 14, sealRefused: 29, openRefused: 48, partsDecoded: 202, partsRefused: 179, failures: [] });
   });
   // The agentpager command is a Bun-compiled binary (packages/cli/scripts/build.sh): a crypto call that works in Node
   // but not in Bun would break it, so the same check is compiled the same way and run over the same file.

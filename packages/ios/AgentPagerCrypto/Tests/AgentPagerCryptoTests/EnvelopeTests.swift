@@ -34,8 +34,9 @@ struct Context: Decodable {
         struct Strict: Decodable {
             var value: PartContext
             init(from decoder: Decoder) throws {
-                let c = try decoder.object(["pagerId", "decisionId", "index"])
-                value = PartContext(pagerId: try c.required("pagerId"), decisionId: try c.optional("decisionId"), index: try c.optional("index"))
+                let c = try decoder.container(keyedBy: Key.self)
+                guard c.allKeys.allSatisfy({ ["pagerId", "decisionId", "index"].contains($0.stringValue) }) else { throw EnvelopeError() }
+                value = PartContext(pagerId: try c.decode(String.self, forKey: Key("pagerId")), decisionId: try c.decodeIfPresent(String.self, forKey: Key("decisionId")), index: try c.decodeIfPresent(Int.self, forKey: Key("index")))
             }
         }
         value = (try? Strict(from: decoder))?.value
@@ -173,8 +174,9 @@ final class PartsTests: XCTestCase {
 
     // The phone's answer is the bytes the vectors seal, so the command decodes exactly what the phone sends.
     func test_encodesAnswersAsTheVectorsDo() throws {
-        // The part vectors hold every sealed answer's plaintext too.
-        let answers = vectors.parts.valid.filter { $0.kind == "answer" }
+        // The part vectors hold every sealed answer's plaintext too; those filed under "JSON:" are spelled as no
+        // encoder spells them, to test reading.
+        let answers = vectors.parts.valid.filter { $0.kind == "answer" && !$0.name.hasPrefix("JSON:") }
         XCTAssertEqual(answers.count, 3)
         for a in answers {
             XCTAssertEqual(try Parts.decode(AnswerPart.self, from: bytes(a.plaintext)).encoded(), bytes(a.plaintext), a.name)

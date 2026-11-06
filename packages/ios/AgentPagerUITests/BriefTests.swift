@@ -4,10 +4,11 @@ import XCTest
 // (D1–D4), with every screenshot kept in the test result. A real agent asks them first, from the Mac:
 //   node --experimental-strip-types packages/app/scripts/briefs.ts http://<mac-ip>:8787 <pager number>
 // testPagerNumber makes the "Shop" pager if there is none and prints its number for that line (AGENTPAGER_NUMBER=…).
+@MainActor
 final class BriefTests: XCTestCase {
     private var app: XCUIApplication!
 
-    override func setUpWithError() throws {
+    override func setUp() async throws {
         continueAfterFailure = false
         app = XCUIApplication()
         app.launchArguments += ["-AgentPagerServerURL", AgentHarness.server.absoluteString]

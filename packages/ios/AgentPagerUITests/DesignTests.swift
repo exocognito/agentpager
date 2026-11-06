@@ -6,6 +6,7 @@ import XCTest
 // line on what the screen shows, then its accessibility tree. Light only: on the iOS 26.5 Simulator, setting dark appearance (XCUIDevice or simctl) left
 // the screenshots light (tried 30 Oct 2026). `pnpm designs` runs it; by hand:
 //   TEST_RUNNER_DESIGN_DIR=<dir> xcodebuild test ... -only-testing:AgentPagerUITests/DesignTests
+@MainActor
 final class DesignTests: XCTestCase {
     override func setUp() { continueAfterFailure = false }
 

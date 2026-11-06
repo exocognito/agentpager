@@ -1,7 +1,7 @@
 import type { DurableObjectState } from '@cloudflare/workers-types';
 import { Schema } from 'effect';
 import * as C from './contract.ts';
-import { AttachmentName, attachmentInfo, base64Bytes } from '../../blueprint/design/ui/components/cards/brief/schema.ts';
+import { AttachmentName, attachmentInfo, base64Bytes } from '../../contract/brief.ts';
 import { body, decode, emptyBody, iso, json, refusal, sameDigest, sha256, token } from './shared.ts';
 import { clocks, forward, type Env } from './env.ts';
 import { alert, pickupBody, PushTarget, questionBody, type Alert } from './push.ts';

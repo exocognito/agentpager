@@ -97,7 +97,7 @@ final class AgentHarness {
 extension XCTestCase {
     // A frame of this test's journey: the screenshot, and the action that led to it. Kept in the test result and,
     // with SCREENSHOT_DIR set, saved as <dir>/<test>/<name>.png with a line "<name>\t<action>" in frames.tsv, so
-    // the journey reads frame, action, frame (packages/blueprint/design/screens/journeys).
+    // the journey reads frame, action, frame (blueprint/generated/screens/journeys).
     func shot(_ name: String, after action: String) {
         let png = XCUIScreen.main.screenshot().pngRepresentation
         let attachment = XCTAttachment(data: png, uniformTypeIdentifier: "public.png")

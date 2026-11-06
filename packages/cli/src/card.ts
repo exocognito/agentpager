@@ -2,8 +2,8 @@ import { readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { parse } from 'yaml';
 import { Either, ParseResult, Schema } from 'effect';
-import { QuestionInput, TEXT_MAX_CHARACTERS, TITLE_MAX_CHARACTERS } from '../../blueprint/design/schemas/exchange.ts';
-import { briefProblem, missingAttachment, attachmentTypes, IMAGE_MAX_BYTES, ATTACHMENTS_MAX, ATTACHMENTS_MAX_BYTES, BRIEF_LABEL_MAX_CHARACTERS, BRIEF_MAX_CHARACTERS } from '../../blueprint/design/ui/components/cards/brief/schema.ts';
+import { QuestionInput, TEXT_MAX_CHARACTERS, TITLE_MAX_CHARACTERS } from '../../contract/exchange.ts';
+import { briefProblem, missingAttachment, attachmentTypes, IMAGE_MAX_BYTES, ATTACHMENTS_MAX, ATTACHMENTS_MAX_BYTES, BRIEF_LABEL_MAX_CHARACTERS, BRIEF_MAX_CHARACTERS } from '../../contract/brief.ts';
 
 // card.yaml (docs/v2/02-writing-rules.md §2): the whole card as structure, each key landing in one place on the
 // phone. `ask` refuses only what is mechanically certain (R1–R4 here; R5 and R6 come from the server), one line per

@@ -1,7 +1,7 @@
 import { Schema } from 'effect';
 import type { Env } from './env.ts';
 import { PICKUP_MS } from './contract.ts';
-import { letter, type Payload as BriefCard } from '../../blueprint/design/ui/components/cards/brief/schema.ts';
+import { letter, type Payload as BriefCard } from '../../contract/brief.ts';
 
 // Alerts through Apple's push service (C17::get-paged). The phone gives each pager it holds its device token, and
 // the pager alerts that phone when its agent asks or acknowledges. The token goes when the pager ends.

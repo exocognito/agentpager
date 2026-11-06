@@ -1,10 +1,10 @@
 import { Schema } from "effect";
 import { Token, Text, Title, Body, Timestamp, OptionNumber, ValidProse, characters } from "./values.ts";
-import { Attachments, AttachmentInfo, attachmentTypes, missingAttachment, Payload as BriefCard } from "../ui/components/cards/brief/schema.ts";
+import { Attachments, AttachmentInfo, attachmentTypes, missingAttachment, Payload as BriefCard } from "./brief.ts";
 
 // The live wire contract (v2, docs/v2/01-decisions.md): every shape the server, the agentpager binary and the phone
 // exchange. The server (packages/app) and the binary (packages/cli) decode with these schemas; the iPhone app mirrors
-// them in Model/API.swift. The primitives live in values.ts and the brief in ui/components/cards/brief; this module
+// them in Model/API.swift. The primitives live in values.ts and the brief in brief.ts; this module
 // re-exports the primitives so one import carries the whole contract.
 // A pager is made on the owner's phone and is either on or off; an agent is whatever connected to a pager with its
 // number, and lasts until it finishes or is forgotten.

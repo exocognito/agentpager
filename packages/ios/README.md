@@ -75,7 +75,7 @@ frames in order with the action that led to each.
 
 ## Design catalogue
 
-`pnpm designs`, from the repository root, remakes `packages/blueprint/design/screens/`, the app's screens as images
+`pnpm designs`, from the repository root, remakes `blueprint/generated/screens/`, the app's screens as images
 and text for agents without a Simulator. On the iPhone 17e Simulator, `DesignTests` saves each `-demo` state with its
 accessibility tree (`TEST_RUNNER_DESIGN_DIR`), and the journeys in `FlowTests` and `BriefTests` save
 their frames against a local server the command starts and stops. `pnpm check` fails when anything in `AgentPager/` or

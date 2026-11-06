@@ -1,7 +1,7 @@
 import { Either, Schema } from 'effect';
 
 // The HTTP API is the binary's transport (the server's /start documents it). A reply is decoded with its route's
-// schema from the wire contract (packages/blueprint/design/schemas/exchange.ts), so a page that isn't AgentPager's
+// schema from the wire contract (packages/contract/exchange.ts), so a page that isn't AgentPager's
 // (a proxy, a Wi-Fi sign-in page) is never taken for one: it is `NotUnderstood`. A refusal is the server's
 // {error, message, ...}. A call that never connected is `Unreachable`, and nothing was sent; one that timed out or
 // lost its connection is `NoReply`, and like `NotUnderstood` it may have reached the owner.

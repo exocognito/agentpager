@@ -9,7 +9,8 @@
     "lint": "node scripts/lint.mjs",
     "dogfood": "node scripts/dogfood.mjs",
     "designs": "node scripts/designs.mjs",
-    "designs:check": "node scripts/designs.mjs --check"
+    "designs:check": "node scripts/designs.mjs --check",
+    "test:unit": "vitest run"
   },
   "dependencies": {
     "effect": "3.22.1",
@@ -23,6 +24,7 @@
     "@types/react-dom": "19.2.5",
     "esbuild": "0.28.2",
     "playwright": "1.62.1",
-    "pngjs": "7.0.0"
+    "pngjs": "7.0.0",
+    "vitest": "4.1.11"
   }
 }

@@ -1,4 +1,4 @@
-// The design catalogue, packages/blueprint/design/screens: the real app's screens and journeys as checked-in images and
+// The design catalogue, blueprint/generated/screens: the real app's screens and journeys as checked-in images and
 // text, so an agent can see the design without a Simulator.
 //   node scripts/designs.mjs          (pnpm designs) regenerates it, on a Mac with Xcode and the iPhone 17e Simulator
 //   node scripts/designs.mjs --check  (in pnpm check) fails when its sources changed since; needs only git and Node
@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 
 const app = fileURLToPath(new URL('..', import.meta.url));
 const repo = path.resolve(app, '../..');
-const out = path.join(repo, 'packages/blueprint/design/screens');
+const out = path.join(repo, 'blueprint/generated/screens');
 const ios = path.join(repo, 'packages/ios');
 const DEVICE = 'iPhone 17e';
 
@@ -24,12 +24,11 @@ const SOURCES = [
   'packages/ios/AgentPagerUITests', // the screens and journeys, and what their agents ask
   'packages/app/fixtures/briefs', // the briefs journey's four briefs
   'packages/app/scripts/briefs.ts', // its agent, and the words it acknowledges with
-  'packages/blueprint/design/schemas', // the wire contract
+  'packages/contract', // the wire contract, and the brief's wire format
   'packages/app/src/contract.ts', // the server's side of it: its clocks and refusals
   'packages/app/src/browser.tsx', // the front page
   'packages/app/scripts/build.mjs', // its HTML shell and bundle
-  'packages/blueprint/design/ui/screens',
-  'packages/blueprint/design/ui/components', // the front page's parts, and the brief's wire format
+  'packages/app/src/site', // the front page's parts
   'packages/app/scripts/designs.mjs', // this script, which writes the index
 ];
 
@@ -59,7 +58,7 @@ if (process.argv.includes('--check')) {
   const stored = existsSync(index) ? readFileSync(index, 'utf8').match(/^Fingerprint: `([0-9a-f]+)`/m)?.[1] : undefined;
   const { hash } = fingerprint();
   if (stored !== hash) {
-    console.error('Design screens are stale: what they are drawn from (the iPhone app, its UI tests, the brief fixtures, the wire contract or the front page) changed since. Run `pnpm designs` on a Mac and commit packages/blueprint/design/screens.');
+    console.error('Design screens are stale: what they are drawn from (the iPhone app, its UI tests, the brief fixtures, the wire contract or the front page) changed since. Run `pnpm designs` on a Mac and commit blueprint/generated/screens.');
     process.exit(1);
   }
   console.log(`Design screens are current (fingerprint ${hash}).`);

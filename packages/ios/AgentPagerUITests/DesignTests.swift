@@ -1,6 +1,6 @@
 import XCTest
 
-// The design catalogue's phone screens (packages/blueprint/design/screens/phone): one test per `-demo` state in
+// The design catalogue's phone screens (blueprint/generated/screens/phone): one test per `-demo` state in
 // Sample.demo (Preview/Previews.swift), on the mocks' sample data with no network. Each keeps its screenshots in the
 // test result and, with DESIGN_DIR set, saves <state>.png and <state>.txt there: a line on what the screen shows, then
 // its accessibility tree. Light only: on the iOS 26.5 Simulator, setting dark appearance (XCUIDevice or simctl) left

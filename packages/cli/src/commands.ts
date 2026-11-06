@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { Acknowledgement, AgentStatus, AnswerStatus, Asked, Connected, Finished } from '../../blueprint/design/schemas/exchange.ts';
+import { Acknowledgement, AgentStatus, AnswerStatus, Asked, Connected, Finished } from '../../contract/exchange.ts';
 import { call, type Failure } from './client.ts';
 import { compile, type Source } from './card.ts';
 import { HARNESS_APP, detectApp, detectMachine, detectProject, harness, self, type Harness } from './detect.ts';

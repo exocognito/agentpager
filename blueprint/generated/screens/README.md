@@ -4,11 +4,11 @@ The real app, drawn from its code: read these to see the design without a Simula
 
 Fingerprint: `b16322b920617925`
 
-The phone is the SwiftUI app (`packages/ios`) in the iPhone 17e Simulator, iOS 26.5, saved at 2x. The web is the front page from the local server in headless Chromium.
+The phone is the SwiftUI app (`packages/ios`) in the iPhone 17e Simulator, iOS 27.2, saved at 2x. The web is the front page from the local server in headless Chromium.
 
 ## Regenerate
 
-On a Mac with Xcode and the iPhone 17e Simulator, run `pnpm designs` (the last run took about 12 min) and commit this folder. It starts a local server on a free port and stops it after, runs the UI tests (`DesignTests` and the journeys below), renders the front page, and rewrites this folder only once everything has passed. It prints the scratch folder that holds its full log.
+On a Mac with Xcode and the iPhone 17e Simulator, run `pnpm designs` (the last run took about 9 min) and commit this folder. It starts a local server on a free port and stops it after, runs the UI tests (`DesignTests` and the journeys below), renders the front page, and rewrites this folder only once everything has passed. It prints the scratch folder that holds its full log.
 
 The fingerprint is a hash of the 59 files it is drawn from: `packages/ios/AgentPager`, `packages/ios/AgentPagerUITests`, `packages/app/fixtures/briefs`, `packages/app/scripts/briefs.ts`, `packages/contract`, `packages/app/src/contract.ts`, `packages/app/src/browser.tsx`, `packages/app/scripts/build.mjs`, `packages/app/src/site`, `packages/app/scripts/designs.mjs`. TypeScript unit tests (`*.test.ts`) don't count; the iPhone UI tests do, since they draw the journeys. An untracked file counts only with one of these extensions: .swift, .ts, .tsx, .css, .mjs, .md, .json, .plist, .png, .jpg, .jpeg. The rest of the server (routing, storage, alerts) is left out: it changes often and draws nothing itself, so after a change there that shows on screen, run `pnpm designs` by hand. `pnpm check` fails when the fingerprint no longer matches.
 

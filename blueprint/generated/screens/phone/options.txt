@@ -2,9 +2,12 @@
 
 app "AgentPager" [0,0 390x844]
  window [0,0 390x844]
-  button "Sheet Grabber" value="Expanded" [157,42 76x25]
+  button "Sheet Grabber" value="Expanded" [145,43 100x24]
   navbar #Options [0,63 390x54]
    text "Options" [163,74 62x20]
+  segmented #option-picker [0,47 390x111]
+   button "A ✶" [123,117 72x32] selected
+   button "B" [195,117 72x32]
   collection [0,158 390x652]
    cell [0,158 390x652]
     scroll #option-page-A [0,158 390x652]
@@ -35,6 +38,4 @@ app "AgentPager" [0,0 390x844]
      other "Vertical scroll bar, 1 page" value="0%" [357,158 30x638]
    other "Vertical scroll bar, 2 pages" value="0%" [357,158 30x638]
    other "Vertical scroll bar, 2 pages" value="0%" [357,158 30x638]
-  segmented #option-picker [0,47 390x111]
-   button "A ✶" [123,117 72x32] selected
-   button "B" [195,117 72x32]
+  toolbar #Toolbar "Toolbar" [0,47 390x797]

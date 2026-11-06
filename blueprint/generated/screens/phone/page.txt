@@ -2,7 +2,7 @@
 
 app "AgentPager" [0,0 390x844]
  window [0,0 390x844]
-  button "Sheet Grabber" value="Expanded" [157,42 76x25]
+  button "Sheet Grabber" value="Expanded" [145,43 100x24]
   navbar #How the mix-up happens [0,63 390x54]
    text "How the mix-up happens" [95,74 198x20]
   scroll [0,47 390x797]
@@ -14,3 +14,4 @@ app "AgentPager" [0,0 390x844]
    text "We don't know how often this happens in production. Option A makes the stuck state visible so you can clear it by hand; option B makes the service remember the hand-off so a retry gets A back." [20,655 343x103]
    other "Vertical scroll bar, 1 page" value="0%" [357,117 30x679]
    other "Vertical scroll bar, 1 page" value="0%" [357,117 30x679]
+  toolbar #Toolbar "Toolbar" [0,47 390x797]

@@ -54,6 +54,7 @@ app "AgentPager" [0,0 390x844]
    text "B" [278,685 13x24] disabled
    text "Precise + automatic" [216,711 135x18] disabled
   other #pager-off-bar [20,747 350x54]
+   button #turn-on "Turn on" [265,755 96x38]
    image #power "Power" [37,766 17x18]
    text "Acme project pager is off" [68,766 165x17]
-   button #turn-on "Turn on" [265,755 96x38]
+  toolbar #Toolbar "Toolbar" [0,0 390x844]

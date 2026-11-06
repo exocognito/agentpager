@@ -49,10 +49,11 @@ app "AgentPager" [0,0 390x844]
    other "Vertical scroll bar, 3 pages" value="0%" [357,101 30x441]
   text "Closed decisions can’t be changed." [87,562 215x15]
   text #closed-choice "A, You chose A · Small + manual, Yesterday, 8:39 AM" [20,589 318x44]
-   text "A" [33,599 13x24]
    text "You chose A · Small + manual" [72,589 266x24]
+   text "A" [33,599 13x24]
    text "Yesterday, 8:39 AM" [72,615 131x18]
   text #agent-confirmation "Codex confirmed · 8:39 AM, Build the smaller fix, the exact wording and the uncertainty warning. Keep normal waits, live-run recovery and Cancel. Don't build receipt replay." [20,645 350x156] selected
-   image #checkmark "Selected" [42,668 11x11] selected
    text "Codex confirmed · 8:39 AM" [74,659 186x18]
+   image #checkmark "Selected" [42,668 11x11] selected
    text "Build the smaller fix, the exact wording and the uncertainty warning. Keep normal waits, live-run recovery and Cancel. Don't build receipt replay." [74,679 250x108]
+  toolbar #Toolbar "Toolbar" [0,0 390x844]

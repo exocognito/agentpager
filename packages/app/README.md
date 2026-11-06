@@ -27,7 +27,7 @@ While its pager is off, every call but status is refused `PagerOff` and nothing 
 ## Decision briefs (dogfood)
 
 `card.type: "brief"` carries Markdown sections (the canvas Kit) and 2 to 4 lettered options; `attachments` carry
-Markdown pages and PNG or JPEG images. The Blueprint schema (`design/ui/components/cards/brief/schema.ts`) refuses a
+Markdown pages and PNG or JPEG images. The contract's brief schema (`packages/contract/brief.ts`) refuses a
 brief whole with the reason: HTML outside code, a recommendation or option block or Tradeoffs column for a letter
 that is no option, a link to a missing attachment, or a size over its limit. The decision keeps each attachment's
 name, type and size; the bytes live in their own table, immutable, and go when the pager ends. The phone reads one

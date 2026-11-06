@@ -6,7 +6,6 @@ packages/app/dist/
 coverage/
 test-results/
 playwright-report/
-packages/blueprint/runs/
 .env
 .env.*
 .dev.vars

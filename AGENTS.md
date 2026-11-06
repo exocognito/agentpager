@@ -5,7 +5,7 @@ AgentPager brings an agent's decisions to its owner's phone. Its product contrac
 Read down the ladder before you judge or change anything:
 1. the strategy, `packages/blueprint/strategy/STRATEGY.md`;
 2. the promises in `packages/blueprint/design/`: capabilities, invariants, metrics, dependencies and journeys;
-3. the design code, and the design catalogue in `packages/blueprint/design/screens/`: the real app's screens and journeys as images and text, to read without a Simulator.
+3. the design code (the wire contract in `packages/contract/`, the front page in `packages/app/src/site/`), and the design catalogue in `blueprint/generated/screens/`: the real app's screens and journeys as images and text, to read without a Simulator.
 
 The roadmap, `packages/blueprint/roadmap/ROADMAP.md`, says what is next.
 
@@ -18,4 +18,4 @@ The Blueprint process lives in [exocognito/blueprint](https://github.com/exocogn
 - Work in an isolated worktree off `origin/main`, and preserve other agents' and the owner's edits.
 - Open changes as draft pull requests. The owner merges.
 - Install with pnpm. Use Node 22.19 or newer.
-- Before handing off a change, run `pnpm check` and `pnpm test:all`, which runs every suite: the design, the server and the binary. `pnpm check` fails when the iPhone app, its UI tests, the brief fixtures, the wire contract or the front page changed without `pnpm designs`, which remakes the catalogue on a Mac with Xcode.
+- Before handing off a change, run `pnpm check` and `pnpm test:all`, which runs every suite: the contract and the front page, the server and the binary. `pnpm check` fails when the iPhone app, its UI tests, the brief fixtures, the wire contract or the front page changed without `pnpm designs`, which remakes the catalogue on a Mac with Xcode.

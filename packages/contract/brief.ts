@@ -1,5 +1,5 @@
 import { Schema } from "effect";
-import { characters, OptionNumber, OPTIONS_MAX, OPTIONS_MIN, Text, ValidProse } from "../../../../schemas/values.ts";
+import { characters, OptionNumber, OPTIONS_MAX, OPTIONS_MIN, Text, ValidProse } from "./values.ts";
 
 // A decision brief: the agent writes the sections in Markdown (the Kit) and AgentPager draws the question, the
 // option rows, the answer bar and the ✶ on the recommended option. Options are lettered: number 1 is A.

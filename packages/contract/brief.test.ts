@@ -1,7 +1,7 @@
 import { expect, it } from "vitest";
 import { Schema } from "effect";
-import { QuestionInput } from "../../../../schemas/exchange.ts";
-import { briefProblem, missingAttachment, proseLines, withoutCodeSpans, Payload } from "./schema.ts";
+import { QuestionInput } from "./exchange.ts";
+import { briefProblem, missingAttachment, proseLines, withoutCodeSpans, Payload } from "./brief.ts";
 
 const options = [{ number: 1, title: "Delete them", label: "Delete", prioritizes: "a clean branch list" }, { number: 2, title: "Keep them", prioritizes: "old links" }];
 const brief = (markdown: string, extra: Record<string, unknown> = {}) => ({ title: "Delete 14 branches?", card: { type: "brief", options, recommended: 1, markdown }, ...extra });

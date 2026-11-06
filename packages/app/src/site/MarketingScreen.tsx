@@ -1,9 +1,9 @@
 import { useRef, useState } from "react";
 import "./marketing.css";
 import "./cards.css";
-import { LogoMark } from "../components/LogoMark.tsx";
-import { QrPicture } from "../components/QrPicture.tsx";
-import { CopyIcon } from "../components/CopyIcon.tsx";
+import { LogoMark } from "./LogoMark.tsx";
+import { QrPicture } from "./QrPicture.tsx";
+import { CopyIcon } from "./CopyIcon.tsx";
 
 const PRODUCTION_ORIGIN = "https://agentpager.me",
   host = new URL(PRODUCTION_ORIGIN).host,

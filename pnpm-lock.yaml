@@ -51,25 +51,6 @@ importers:
       pngjs:
         specifier: 7.0.0
         version: 7.0.0
-
-  packages/blueprint:
-    dependencies:
-      effect:
-        specifier: 3.22.1
-        version: 3.22.1
-      react:
-        specifier: 19.2.8
-        version: 19.2.8
-      react-dom:
-        specifier: 19.2.8
-        version: 19.2.8(react@19.2.8)
-    devDependencies:
-      '@types/react':
-        specifier: 19.2.18
-        version: 19.2.18
-      '@types/react-dom':
-        specifier: 19.2.5
-        version: 19.2.5(@types/react@19.2.18)
       vitest:
         specifier: 4.1.11
         version: 4.1.11(@types/node@24.13.3)(@vitest/browser-playwright@4.1.11)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(yaml@2.9.1))
@@ -85,6 +66,16 @@ importers:
       yaml:
         specifier: 2.9.1
         version: 2.9.1
+
+  packages/contract:
+    dependencies:
+      effect:
+        specifier: 3.22.1
+        version: 3.22.1
+    devDependencies:
+      vitest:
+        specifier: 4.1.11
+        version: 4.1.11(@types/node@24.13.3)(@vitest/browser-playwright@4.1.11)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(yaml@2.9.1))
 
 packages:
 

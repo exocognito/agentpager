@@ -1,9 +1,9 @@
-import { MAX_OPEN_DECISIONS, type Receipt, type RefusalTag } from '../../blueprint/design/schemas/exchange.ts';
+import { MAX_OPEN_DECISIONS, type Receipt, type RefusalTag } from '../../contract/exchange.ts';
 
-// The server's side of the contract. The wire contract itself, every shape a client sends or receives, is the
-// Blueprint's (packages/blueprint/design/schemas/exchange.ts); it is re-exported so the server reads one namespace.
+// The server's side of the contract. The wire contract itself, every shape a client sends or receives, is
+// packages/contract/exchange.ts; it is re-exported so the server reads one namespace.
 // What follows is the server's own: its clocks and the words of its refusals.
-export * from '../../blueprint/design/schemas/exchange.ts';
+export * from '../../contract/exchange.ts';
 
 // Housekeeping: an agent is forgotten this long after its last activity.
 export const AGENT_IDLE_MS = 30 * 24 * 3_600_000;

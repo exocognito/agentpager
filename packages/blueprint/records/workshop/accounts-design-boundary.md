@@ -1,5 +1,0 @@
-# Accounts design boundary
-
-Accounts add durable identity and explicit ownership, not a saved archive or paid entitlement. The [preview](https://github.com/exocognito/agentpager/blob/4dffc2a4c1380f7b6a67d9129113ccbfd9cd40c1/packages/blueprint/roadmap/parked/design/AccountsScreen.tsx) offers no working method and selects no authentication.
-
-Required behavior, including attaching, cross-device return and the free-session clock, is on [C14::return-across-devices](https://github.com/exocognito/blueprint/blob/7ad135c0ca84c721578a83f8c6becb83e620358c/toy-examples/ownerpager/packages/blueprint/roadmap/parked/C14-return-across-devices.md) and [I14::account-authorization](https://github.com/exocognito/blueprint/blob/7ad135c0ca84c721578a83f8c6becb83e620358c/toy-examples/ownerpager/packages/blueprint/roadmap/parked/I14-account-authorization.md). D3::account-authentication remains unsupplied. Choose sign-in methods and their verifier, recovery/device-revocation policy, and account deletion/consent before defining the executable auth schemas, machine, effects and callbacks. Prefer an existing tested identity system once selected; this draft does not invent one.

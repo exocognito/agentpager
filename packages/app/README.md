@@ -64,7 +64,7 @@ Commit and clean the checkout, then `pnpm deploy:dev`, and `pnpm smoke:dev` afte
 
 ### Alerts
 
-Alerts go through Apple's push service with the owner's APNs key (D7). Deployment also reads the vault item `AgentPager APN.p8 key` and gives the key to each stage's Worker as the secret `APNS_KEY_P8`, on Wrangler's stdin; `scripts/build.mjs` sets its key id, team id and topic. A local server (`dogfood`, `start`) cannot reach Apple's service, which speaks HTTP/2 only, so it sends no alerts; the tests point a local server at a stand-in for Apple.
+Alerts go through Apple's push service with the owner's APNs key (B17, in `blueprint/areas/4-getting-paged.md`). Deployment also reads the vault item `AgentPager APN.p8 key` and gives the key to each stage's Worker as the secret `APNS_KEY_P8`, on Wrangler's stdin; `scripts/build.mjs` sets its key id, team id and topic. A local server (`dogfood`, `start`) cannot reach Apple's service, which speaks HTTP/2 only, so it sends no alerts; the tests point a local server at a stand-in for Apple.
 
 ## Enforcement
 

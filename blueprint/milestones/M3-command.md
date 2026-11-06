@@ -25,7 +25,7 @@ My agents reach my pagers through the agentpager command, as a command line or a
 
 ## Sam's answers
 
-- **29 Oct, Sam:** "there is NO point in a pager if I have to then contact the receiver another way manually and say 'hey I replied to your pager'". B32 and B33 follow from it.
+- **29 Oct, Sam, recorded in session notes:** "there is NO point in a pager if I have to then contact the receiver another way manually and say 'hey I replied to your pager'". B32 and B33 follow from it.
 - **29 Oct, in the v2 design** (a claude.ai Project, recorded in `docs/v2/`, which git keeps): "Quality is reviewed by judgement, not pattern-matched", replacing regex checks on prose and a flag to override them. Sam's reasoning, as recorded: "deterministic prose checks are too hard to get right and an adversarial loop would make the tool feel slow and wasteful; start here and see."
 - **Defaults Sam confirmed on 29 Oct**, as recorded:
   - "'Defer' / 'leave as is' are real options, not padding."
@@ -34,7 +34,7 @@ My agents reach my pagers through the agentpager command, as a command line or a
   - "History cap 1,000 lines per pager; contract reminder after 2 hours or 5 cards."
   - "The binary is built locally with `bun build --compile` and symlinked on PATH; no GitHub Releases, no Actions, for now."
   - "The pager number lives in AGENTS.md; `AGENTPAGER_PAGER` is the opt-out for people who want it out of transcripts."
-- **30 Oct, after the wake lab** ([report](https://claude.ai/artifact/Ph2BtiR64UBSde6fbXW5LT)), Sam chose: Claude Code runs `wait --forever` in the background; a Claude Desktop chat makes quick waits between its other steps, then held waits, and stops after 2 hours; only Claude's apps get new words, and every other app's replies stay as they were.
+- **30 Oct, after the wake lab** ([report](https://claude.ai/artifact/Ph2BtiR64UBSde6fbXW5LT)), Sam chose, as recorded in session notes: Claude Code runs `wait --forever` in the background; a Claude Desktop chat makes quick waits between its other steps, then held waits, and stops after 2 hours; only Claude's apps get new words, and every other app's replies stay as they were.
 
 ## Adds · Changes · Retires
 

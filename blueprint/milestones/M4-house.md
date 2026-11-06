@@ -43,7 +43,14 @@ The plan, with the pull requests in order, is [.agents/plans/2026-11-05-m4-house
 
 ## Sam reviews after merge
 
-1. Every ledger row that drops a line or changes its meaning, in `M4-house/ledger.md`. A specific moved into a test that holds it isn't a change of meaning; one that no test holds is flagged.
+1. **The 63 ⚑ rows** in [the ledger's ⚑ section](M4-house/ledger.md#-for-sam). Each drops a line, changes its meaning, adds a line no old line held, or cuts a specific that no test holds. A specific moved into a test that holds it isn't flagged.
+2. **HTTPS only** (L20): agentpager.me still answers plain HTTP. (a) ★ fix it in M4, in the dev-stage pull request, and delete L20; (b) leave it to ENCRYPT.
+3. **The old copy of AgentPager in exocognito/blueprint**, question 6 of DEC-2026-10-27-pr1-sign-off, has no home. (a) ★ it is OPEN's: add it to OPEN's questions; (b) it is no longer open.
+4. **New lines from what is built and tested**, with no old line behind them: B5.16 (an answer resent after a relaunch), B25.11–.13, B32.2–.4 and B32.7–.10, B27.1's `agentpager example` and I22.4. (a) ★ keep them; (b) name the ones to retire.
+5. **B5.12 and B5.13** now say the decision itself, not only its row, shows sending, waiting and not picked up, as the app does. (a) ★ keep; (b) narrow back to the row.
+6. **L10**, from `packages/app/README.md`: turning a pager off can let one call through. (a) ★ keep it as a limit until ENCRYPT's one writer per pager; (b) fix it sooner.
+7. **What tests don't show:** B29.8 (the built command needs no Bun, Node or repository) is proven only in part, and nothing tests dark appearance or the largest text size, which the old Blueprint claimed. (a) ★ leave both on the untested list; (b) add the tests in M4.
+8. **Sam's words quoted from session notes** in M3's answers (29 and 30 Oct), which no repository file held. (a) ★ keep them; (b) take them out.
 
 ## Adds · Changes · Retires
 

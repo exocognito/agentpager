@@ -4,11 +4,11 @@ Every line of the old Blueprint, and where it went when M4 converted it to the a
 
 ## Totals
 
-- **Rows:** 736, from 109 old files and sources, grouped by old file below. 46 rows are gaps the integrator filled (listed under Gaps filled).
-- **⚑ for Sam:** 62.
-- **The new Blueprint:** {AREA_SUMMARY}
+- **Rows:** 738, from 109 old files and sources, grouped by old file below. 48 rows are gaps the integrator filled (listed under Gaps filled).
+- **⚑ for Sam:** 63.
+- **The new Blueprint:** 7 areas with 23 entries (14 behaviors and 9 invariants) and 161 clauses, 16 limits (L9 to L24), and 3 journeys with 20 steps.
 - **Ids:** each C became B with the same number; I, J and K kept theirs; B32, B33 and I23 are new; limits are L9 to L24; no D id remains, and C28 is never reused. Not built, and waiting in `milestones/next/`: B19 (INSTALL), B30 and I20 (ENCRYPT), K1 (FRIENDS).
-- **Words:** {WORDS}
+- **Words:** the old Blueprint docs this pull request deletes held 25,769 words (strategy, design, roadmap, decisions and lessons), plus 5,219 in the workshop's notes. The new `blueprint/` holds 25,078, without `generated/` and this ledger. Its always-true part (README, PRODUCT, TERMS, the areas and JOURNEYS) holds 14,122, against 12,383 in the old strategy and design.
 
 ## ⚑ for Sam
 
@@ -38,46 +38,47 @@ Each row drops a line, changes its meaning, adds a line no old line held, or cut
 | 20 | D1 must supply: HTTPS on the apex, every plain HTTP request redirected, every response with Strict-Transport-Security; must never: answer over plain HTTP; deployed check: plain HTTP redirects and HTTPS carries HSTS | L20 · The service still answers plain HTTP (6 Privacy); next/ENCRYPT (I23's clause, unless M4 fixes it first) | D1's "HTTPS only" isn't true (5 Nov): new limit L20, and the clause waits in ENCRYPT. Sam was asked whether to fix it in M4. |
 | 21 | D1 deployed check: every response surface, across repeated requests, carries the candidate's build | the dev stage's smoke run (M4's dev-stage pull request decides what it checks) | The deploy checks one path's build header, not every reply's; the dev-stage smoke run decides. |
 | 22 | D1 deployed check: a pager's turn-off time is exactly its auto-off after it was turned on | the dev stage's smoke run (M4's dev-stage pull request decides what it checks) | Nothing checks a deployed pager's auto-off time; the dev-stage smoke run decides. |
-| 23 | D2 setup list: Claude Code (`claude mcp add --scope user`, unless `claude mcp get` finds one), Codex (`codex mcp add`), Claude Desktop, Cursor, pi | code `setup.ts`; B29.1 names the apps (area 7) | How setup reaches Claude Code and Codex is code only, and no test runs those paths. |
-| 24 | D6 Proof runs on: "in light and dark appearance, with the Pager and decision screens also at the largest standard text size" | AGENTS.md › Gotchas, as a gap: light appearance only; dark and the largest text untested | The old claim that dark appearance and the largest text are tested was untrue; it is now a gap in AGENTS.md. |
-| 25 | D8 proof: "the compiled binary … connects with it, reads its status, serves MCP and runs setup with no Bun or Node on the PATH; it is skipped until the binary is built, and `pnpm test:cli` builds it first" | nothing (test comment) | B29.8 (no Bun, Node or repository needed) is proven only in part. |
-| 26 | SI6 · UTF-8 with Markdown … never truncated | PRODUCT › Principles › same heading, without its numbers, linking I4 | PRODUCT's text-limits principle loses its numbers; I4 and the schemas hold them. |
-| 27 | SP5 · Reach the agents owners actually use, first sentence "Any agent that can run the agentpager command can use AgentPager: terminal agents, and desktop apps like Claude Desktop and Cursor." | PRODUCT › Principles › Reach the agents owners actually use | SP5's first sentence is cut to its true part; the app list moves to a note pointing to CLIENTS. |
-| 28 | SP5, rest | PRODUCT › same principle | SP5's "within a second … nothing to nudge" stays as Sam's aim, though unmeasured and untrue for an agent that stops waiting. |
-| 29 | STRATEGY § Strategic Design Decisions, its italic note | PRODUCT › Pinned design decisions, lead line | The pinned decisions' lead note loses "Technically, SD:" and Sam's "Lets just see…" aside. |
-| 30 | SI6, a decision and each Markdown page 20,000 characters | I4.4 | SI6's 20,000 characters leave the Blueprint for the schemas, and no test holds them. |
-| 31 | SI6, at most 8 attachments | I4.4 | SI6's 8 attachments leave the Blueprint for the schemas, and no test holds them. |
-| 32 | SI6, at most 1 MB per image | I4.4 | SI6's 1 MB per image leaves the Blueprint for the schemas, and no test holds it. |
-| 33 | SI6, at most 3 MB of attachments in all | I4.4 | SI6's 3 MB in all leaves the Blueprint for the schemas, and no test holds it. |
-| 34 | (new) Serves: "The pager number binds my phone's key" | area 6 Serves | Area 6's Serves quotes only part of SI10's sentence. |
-| 35 | (term) "card contract" | TERMS | New TERMS entry "Card contract", a word the areas and the command already use. |
-| 36 | (term) the sheet that makes a pager | TERMS › Pagers, Pager, Pager detail, New pager | New TERMS name "New pager", for the sheet that makes a pager. |
-| 37 | MENCRYPT question 2 "What an agent sees when its command is from before the switch: refused, with how to update (MINSTALL)." | next/ENCRYPT.md Still open 2; What's known adds that INSTALL now comes after ENCRYPT | ENCRYPT's question 2 loses its tie to INSTALL, which now runs after it. |
-| 38 | MINSTALL question 3 "How an installed command learns it is out of date. MENCRYPT will refuse commands from before encryption, so their owners need an easy way to update." | next/INSTALL.md Still open 3 "How an installed command updates once the service says it is out of date." | INSTALL's question 3 is narrowed: how a command learns it is out of date moves to ENCRYPT. |
-| 39 | DEC-2026-10-27-pr1-sign-off, "Questions 5 and 6 (how MAPP gets built, and the old copy in the blueprint repo) change nothing here and stay open." | dropped | DEC-2026-10-27-pr1-sign-off's question 6, the old copy in exocognito/blueprint, has no home: is it still open? |
-| 40 | docs/v2/02 §6.2, small decisions: should reviewers grade missing optional keys good to fix at most? | dropped | docs/v2/02's open question on grading small cards is dropped unsettled. |
-| 41 | docs/v2/02 §6.3, "tune after the first week" | dropped | docs/v2/02's "tune after the first week" is dropped; the reminder's numbers stay as built. |
-| 42 | docs/v2/03 §2 `agentpager agents` | B25.12 | New clause B25.12 (list the agents), built and tested, with no old line. |
-| 43 | docs/v2/03 §2 `agentpager finish`; TERMS "Agent"; Sam's 29 Oct "Keep `finish`" | B25.13 | New clause B25.13 (finish), built and tested, with no old line. |
-| 44 | docs/v2/03 §2–§3, §6 (wait holds up to 50 s; `seconds` up to 50) | B32.2 | New clause B32.2 (one wait returns within apps' limits), from docs/v2/03. |
-| 45 | docs/v2/03 §4 wait, pending | B32.3 | New clause B32.3 (a pending reply), from docs/v2/03. |
-| 46 | docs/v2/03 §4 wait, option chosen | B32.4 | New clause B32.4 (a chosen option arrives), from docs/v2/03. |
-| 47 | docs/v2/03 §2, §4 `--forever` (50 s rounds, retry every 10 s through an unreachable service; a reply not understood ends it) | B32.7 | New clause B32.7 (a wait with no end), from docs/v2/03. |
-| 48 | docs/v2/03 §2–§4 ack (next steps, green tick, only the first counts, refused before the answer) | B32.8 | New clause B32.8 (acknowledge); "refused before the answer" has no test. |
-| 49 | docs/v2/03 §2 `agentpager status` | B32.9 | New clause B32.9 (status), from docs/v2/03. |
-| 50 | docs/v2/03 §4 unreachable, no reply, reply not understood | B32.10 | New clause B32.10 (a reply not got or not read is never success), from docs/v2/03. |
-| 51 | docs/v2/03 §6, the 2-hour stop | L12 · A Desktop chat stops waiting after two hours | New limit L12: a Desktop chat stops waiting after two hours. |
-| 52 | 04 §2 "the server rate-limits connects per pager" | next/ENCRYPT | docs/v2/04's connect rate limit isn't built; it waits in ENCRYPT. |
-| 53 | docs/v2/04 specifics: the number's byte layout (§2), the envelope's byte layout and info string (§4), the push payload, its 4 KB limit, the 1 KB preview and the extension's 30-second budget (§5), table columns and the key route's path (§6) | cut from the tree; `docs/v2/04-encryption.md` stays in git, and next/ENCRYPT.md names it | docs/v2/04's byte layouts and payload sizes leave the tree; git keeps them. |
-| 54 | (new) `packages/app/README.md` › Limits: "Off is not atomic with a write (accepted 30 Oct for dogfooding, to fix later)" | L10 "Turning a pager off can let one call through" + I17 note | New limit L10, from packages/app/README.md: turning a pager off can let one call through. |
-| 55 | memory `agent-wake-research` (30 Oct lab and the deployed run) | B33 notes, L11 · Only Claude agents wake by themselves | New limit L11 (only Claude agents wake), from the wake lab in agent memory. |
-| 56 | memory pager-must-deliver-unprompted (Sam, 29 Oct: "there is NO point in a pager…") and agent-wake-research (Sam's 30 Oct wake choices) | M3-command.md Sam's answers | M3 quotes Sam's words that exist only in agent memory. |
-| 57 | hardening item 3 "one writer per pager" and item 5 "a smaller poll" | next/ENCRYPT.md items 3 and 5 | Hardening items 3 and 5 are defined nowhere; ENCRYPT's Plan picks what they cover. |
-| 58 | code `commands.ts › connect` (`--server`, 8a64d0e) | B25.11 | New clause B25.11 (another server), built and tested, with no old line. |
-| 59 | (none; from the code) | I22.4 | New clause I22.4 (parts that don't match), built and tested, with no old line. |
-| 60 | (none): an answer still sending when the app is closed goes again on the next launch | B5.16 · @M3: | New clause B5.16: an unconfirmed answer is sent again when the app reopens. Built and tested, with no old line. |
-| 61 | (new) I23 · @M1 · Keys stay secret | I23 | New invariant id I23 (Sam's A4 ★), retitled "Keys stay secret" and widened to the service's own secrets. |
-| 62 | (new) I23 Why: "Only agents I give a number reach my phone" | I23 Why | I23's Why quotes SI2's heading, the drafter's choice. |
+| 23 | D1 caveat 1: a green deploy doesn't show the zone's DNS is the only path in, or anything about Cloudflare's availability | dropped | D1's caveat that a green deploy doesn't prove DNS is the only way in is dropped; no comment holds it yet. |
+| 24 | D2 setup list: Claude Code (`claude mcp add --scope user`, unless `claude mcp get` finds one), Codex (`codex mcp add`), Claude Desktop, Cursor, pi | code `setup.ts`; B29.1 names the apps (area 7) | How setup reaches Claude Code and Codex is code only, and no test runs those paths. |
+| 25 | D6 Proof runs on: "in light and dark appearance, with the Pager and decision screens also at the largest standard text size" | AGENTS.md › Gotchas, as a gap: light appearance only; dark and the largest text untested | The old claim that dark appearance and the largest text are tested was untrue; it is now a gap in AGENTS.md. |
+| 26 | D8 proof: "the compiled binary … connects with it, reads its status, serves MCP and runs setup with no Bun or Node on the PATH; it is skipped until the binary is built, and `pnpm test:cli` builds it first" | nothing (test comment) | B29.8 (no Bun, Node or repository needed) is proven only in part. |
+| 27 | SI6 · UTF-8 with Markdown … never truncated | PRODUCT › Principles › same heading, without its numbers, linking I4 | PRODUCT's text-limits principle loses its numbers; I4 and the schemas hold them. |
+| 28 | SP5 · Reach the agents owners actually use, first sentence "Any agent that can run the agentpager command can use AgentPager: terminal agents, and desktop apps like Claude Desktop and Cursor." | PRODUCT › Principles › Reach the agents owners actually use | SP5's first sentence is cut to its true part; the app list moves to a note pointing to CLIENTS. |
+| 29 | SP5, rest | PRODUCT › same principle | SP5's "within a second … nothing to nudge" stays as Sam's aim, though unmeasured and untrue for an agent that stops waiting. |
+| 30 | STRATEGY § Strategic Design Decisions, its italic note | PRODUCT › Pinned design decisions, lead line | The pinned decisions' lead note loses "Technically, SD:" and Sam's "Lets just see…" aside. |
+| 31 | SI6, a decision and each Markdown page 20,000 characters | I4.4 | SI6's 20,000 characters leave the Blueprint for the schemas, and no test holds them. |
+| 32 | SI6, at most 8 attachments | I4.4 | SI6's 8 attachments leave the Blueprint for the schemas, and no test holds them. |
+| 33 | SI6, at most 1 MB per image | I4.4 | SI6's 1 MB per image leaves the Blueprint for the schemas, and no test holds it. |
+| 34 | SI6, at most 3 MB of attachments in all | I4.4 | SI6's 3 MB in all leaves the Blueprint for the schemas, and no test holds it. |
+| 35 | (new) Serves: "The pager number binds my phone's key" | area 6 Serves | Area 6's Serves quotes only part of SI10's sentence. |
+| 36 | (term) "card contract" | TERMS | New TERMS entry "Card contract", a word the areas and the command already use. |
+| 37 | (term) the sheet that makes a pager | TERMS › Pagers, Pager, Pager detail, New pager | New TERMS name "New pager", for the sheet that makes a pager. |
+| 38 | MENCRYPT question 2 "What an agent sees when its command is from before the switch: refused, with how to update (MINSTALL)." | next/ENCRYPT.md Still open 2; What's known adds that INSTALL now comes after ENCRYPT | ENCRYPT's question 2 loses its tie to INSTALL, which now runs after it. |
+| 39 | MINSTALL question 3 "How an installed command learns it is out of date. MENCRYPT will refuse commands from before encryption, so their owners need an easy way to update." | next/INSTALL.md Still open 3 "How an installed command updates once the service says it is out of date." | INSTALL's question 3 is narrowed: how a command learns it is out of date moves to ENCRYPT. |
+| 40 | DEC-2026-10-27-pr1-sign-off, "Questions 5 and 6 (how MAPP gets built, and the old copy in the blueprint repo) change nothing here and stay open." | dropped | DEC-2026-10-27-pr1-sign-off's question 6, the old copy in exocognito/blueprint, has no home: is it still open? |
+| 41 | docs/v2/02 §6.2, small decisions: should reviewers grade missing optional keys good to fix at most? | dropped | docs/v2/02's open question on grading small cards is dropped unsettled. |
+| 42 | docs/v2/02 §6.3, "tune after the first week" | dropped | docs/v2/02's "tune after the first week" is dropped; the reminder's numbers stay as built. |
+| 43 | docs/v2/03 §2 `agentpager agents` | B25.12 | New clause B25.12 (list the agents), built and tested, with no old line. |
+| 44 | docs/v2/03 §2 `agentpager finish`; TERMS "Agent"; Sam's 29 Oct "Keep `finish`" | B25.13 | New clause B25.13 (finish), built and tested, with no old line. |
+| 45 | docs/v2/03 §2–§3, §6 (wait holds up to 50 s; `seconds` up to 50) | B32.2 | New clause B32.2 (one wait returns within apps' limits), from docs/v2/03. |
+| 46 | docs/v2/03 §4 wait, pending | B32.3 | New clause B32.3 (a pending reply), from docs/v2/03. |
+| 47 | docs/v2/03 §4 wait, option chosen | B32.4 | New clause B32.4 (a chosen option arrives), from docs/v2/03. |
+| 48 | docs/v2/03 §2, §4 `--forever` (50 s rounds, retry every 10 s through an unreachable service; a reply not understood ends it) | B32.7 | New clause B32.7 (a wait with no end), from docs/v2/03. |
+| 49 | docs/v2/03 §2–§4 ack (next steps, green tick, only the first counts, refused before the answer) | B32.8 | New clause B32.8 (acknowledge); "refused before the answer" has no test. |
+| 50 | docs/v2/03 §2 `agentpager status` | B32.9 | New clause B32.9 (status), from docs/v2/03. |
+| 51 | docs/v2/03 §4 unreachable, no reply, reply not understood | B32.10 | New clause B32.10 (a reply not got or not read is never success), from docs/v2/03. |
+| 52 | docs/v2/03 §6, the 2-hour stop | L12 · A Desktop chat stops waiting after two hours | New limit L12: a Desktop chat stops waiting after two hours. |
+| 53 | 04 §2 "the server rate-limits connects per pager" | next/ENCRYPT | docs/v2/04's connect rate limit isn't built; it waits in ENCRYPT. |
+| 54 | docs/v2/04 specifics: the number's byte layout (§2), the envelope's byte layout and info string (§4), the push payload, its 4 KB limit, the 1 KB preview and the extension's 30-second budget (§5), table columns and the key route's path (§6) | cut from the tree; `docs/v2/04-encryption.md` stays in git, and next/ENCRYPT.md names it | docs/v2/04's byte layouts and payload sizes leave the tree; git keeps them. |
+| 55 | (new) `packages/app/README.md` › Limits: "Off is not atomic with a write (accepted 30 Oct for dogfooding, to fix later)" | L10 "Turning a pager off can let one call through" + I17 note | New limit L10, from packages/app/README.md: turning a pager off can let one call through. |
+| 56 | memory `agent-wake-research` (30 Oct lab and the deployed run) | B33 notes, L11 · Only Claude agents wake by themselves | New limit L11 (only Claude agents wake), from the wake lab in agent memory. |
+| 57 | memory pager-must-deliver-unprompted (Sam, 29 Oct: "there is NO point in a pager…") and agent-wake-research (Sam's 30 Oct wake choices) | M3-command.md Sam's answers | M3 quotes Sam's words that exist only in agent memory. |
+| 58 | hardening item 3 "one writer per pager" and item 5 "a smaller poll" | next/ENCRYPT.md items 3 and 5 | Hardening items 3 and 5 are defined nowhere; ENCRYPT's Plan picks what they cover. |
+| 59 | code `commands.ts › connect` (`--server`, 8a64d0e) | B25.11 | New clause B25.11 (another server), built and tested, with no old line. |
+| 60 | (none; from the code) | I22.4 | New clause I22.4 (parts that don't match), built and tested, with no old line. |
+| 61 | (none): an answer still sending when the app is closed goes again on the next launch | B5.16 · @M3: | New clause B5.16: an unconfirmed answer is sent again when the app reopens. Built and tested, with no old line. |
+| 62 | (new) I23 · @M1 · Keys stay secret | I23 | New invariant id I23 (Sam's A4 ★), retitled "Keys stay secret" and widened to the service's own secrets. |
+| 63 | (new) I23 Why: "Only agents I give a number reach my phone" | I23 Why | I23's Why quotes SI2's heading, the drafter's choice. |
 
 ## Gaps filled
 
@@ -615,8 +616,8 @@ Old clause numbers are the old behaviour numbers: C26.3 is C26's third behaviour
 | D1 deployed check: every response surface, across repeated requests, carries the candidate's build | the dev stage's smoke run (M4's dev-stage pull request decides what it checks) | Narrower today: `deploy.mjs` stops at the first `/start` that matches; only the local test checks every path | ⚑ |
 | D1 deployed check: a pager's turn-off time is exactly its auto-off after it was turned on | the dev stage's smoke run (M4's dev-stage pull request decides what it checks) | Not checked on deploy today; no deployed test holds it | ⚑ |
 | D1 deployed check: the Worker's namespace, classes and SQLite placement, inspected apart from the product | `packages/app/README.md` › Deployment, which AGENTS.md points to | `deploy.mjs` does it |  |
-| D1 caveat 1: a green deploy doesn't show the zone's DNS is the only path in, or anything about Cloudflare's availability | AGENTS.md › Deploying and secrets | A gap in proof, not something people meet. A comment beside `deploy.mjs`'s checks could hold it, in M4's dev-stage PR |  |
-| D1 caveat 2: the deploy doesn't show the credential's scope; if it can't create the binding or deploy, ask Sam for scoped access | AGENTS.md › Deploying and secrets | `deploy.mjs` says so on a failed Cloudflare call; the global rules forbid minting a credential |  |
+| D1 caveat 1: a green deploy doesn't show the zone's DNS is the only path in, or anything about Cloudflare's availability | dropped | a gap in what a green deploy proves (that the zone's DNS is the only way in, and Cloudflare's availability), which nobody using AgentPager meets. METHOD puts such a gap in a comment beside its check; none is beside `deploy.mjs`'s checks yet, and the dev-stage pull request owns them | ⚑ |
+| D1 caveat 2: the deploy doesn't show the credential's scope; if it can't create the binding or deploy, ask Sam for scoped access | AGENTS.md › Deploying and secrets (ask Sam for scoped access; never make a credential) | `deploy.mjs` says so on a failed Cloudflare call; the global rules forbid minting a credential |  |
 
 ### `packages/blueprint/design/dependencies/D2-agent-clients.md`
 
@@ -647,7 +648,7 @@ Old clause numbers are the old behaviour numbers: C26.3 is C26's third behaviour
 | D6 id | dissolved | no D ids |  |
 | D6 statement (native SwiftUI app on iPhone) | Relies on line (iPhone, iOS 26) + Definition + Serves ("My side is a native iPhone app.") | SwiftUI and iOS 26 as stack facts → PRODUCT.md › Stack (PRODUCT drafter); iOS 26 held by `project.yml` deploymentTarget |  |
 | D6 providedBy / provided (Xcode and Simulator on Sam's Mac; Sam's iPhone in Developer Mode over USB, signed with Sam's team; Sam signs, no agent creates or uses a signing credential) | AGENTS.md › Deploying and secrets (Sam signs) and › Gotchas (Sam's walk on Sam's iPhone) | text: "The app builds and runs with Xcode on a Mac. Sam's walk runs on Sam's iPhone in Developer Mode over USB, signed with Sam's Apple developer team. Sam signs: never create, request or use an Apple signing identity, certificate or account on Sam's behalf." |  |
-| D6 Must supply: macOS, Xcode, iOS 26 Simulator runtime driven through the app's interface; Sam's iPhone for the walk | AGENTS.md › Gotchas (UI tests drive the real app in a Simulator, one run at a time; a second phone is a second Simulator) | text: "UI tests drive the real app in an iPhone Simulator with the iOS that Xcode ships. A second phone is a second Simulator. One Simulator run at a time." |  |
+| D6 Must supply: macOS, Xcode, iOS 26 Simulator runtime driven through the app's interface; Sam's iPhone for the walk | AGENTS.md › Gotchas (UI tests drive the real app in Simulators, one run at a time). A second phone being a second Simulator is how `AgentHarness.swift` runs it | text: "UI tests drive the real app in an iPhone Simulator with the iOS that Xcode ships. A second phone is a second Simulator. One Simulator run at a time." |  |
 | D6 Must supply: Keychain keeps each pager's keys on this device only | Relies on line + L9 "A pager lives only on the phone that made it" | held by `Keychain.swift` |  |
 | D6 Must supply: Settings bundle Server field for self-hosters; no Settings screen | B23.10 + B23 note + Relies on | Settings field held by `Settings.bundle/Root.plist`; "no Settings screen" is also a pinned decision in PRODUCT.md |  |
 | D6 Must never: a preview or fixture stands in for the app's own screen | dropped | held by METHOD ("the product's own screens, in `generated/`, are the record") and `DesignTests.swift`, which captures the real app |  |
@@ -1373,3 +1374,5 @@ Old clause numbers are the old behaviour numbers: C26.3 is C26's third behaviour
 | Limits INSTALL retires | next/INSTALL | Text for INSTALL's Retires: L22 "The command installs only from source", L23 "Moving the command breaks its setup", L24 "The app installs only from Xcode" |  |
 | Limits SITE retires | next/SITE | Text for SITE's Retires: L21 "The front page still describes the first version" |  |
 | — (new milestone) | next/CLIENTS.md | new: Sam's 5 Nov words, quoted exactly; the wake lab report linked; order after ENCRYPT, anchoring INSTALL and SITE |  |
+| (new id) B32 · @M3 · Wait for the answer, then acknowledge it | B32 (2 Agents) | a new id Sam agreed (DEC-2026-11-05-blueprint-destination) for promises M3 built and no old id held alone: C27.4's how to wait, C6.2's note word for word, D2's long wait, and docs/v2/03's wait, acknowledge and status. The rows above map each clause |  |
+| (new id) B33 · @M3 · Each agent app is told how it wakes | B33 (2 Agents) | a new id Sam agreed for D2's per-app wake rules and the 30 Oct wake lab's words (memory `agent-wake-research`, docs/v2/03 §6). The rows above map each clause |  |

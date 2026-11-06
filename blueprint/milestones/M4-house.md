@@ -43,10 +43,10 @@ The plan, with the pull requests in order, is [.agents/plans/2026-11-05-m4-house
 
 ## Sam reviews after merge
 
-1. **The 88 ⚑ rows** in [the ledger's ⚑ section](M4-house/ledger.md#-for-sam). Each drops a line, changes its meaning, adds a line no old line held, or cuts a specific that no test holds. A specific moved into a test that holds it isn't flagged.
+1. **The 89 ⚑ rows** in [the ledger's ⚑ section](M4-house/ledger.md#-for-sam). Each drops a line, changes its meaning, adds a line no old line held, or cuts a specific that no test holds. A specific moved into a test that holds it isn't flagged.
 2. **HTTPS only** (L20): agentpager.me still answers plain HTTP. (a) ★ fix it in M4, in the dev-stage pull request, and delete L20; (b) leave it to ENCRYPT.
 3. **The old copy of AgentPager in exocognito/blueprint**, question 6 of DEC-2026-10-27-pr1-sign-off, has no home. (a) ★ it is OPEN's: add it to OPEN's questions; (b) it is no longer open.
-4. **New lines from what is built and tested**, with no old line behind them: B5.16 (an answer resent after a relaunch), B25.11–.13, B32.2–.4 and B32.7–.10, B33.1–.3, B27.1's `agentpager example`, I22.4 and I22.6. (a) ★ keep them; (b) name the ones to retire.
+4. **New lines from what is built and tested**, with no old line behind them: B5.16 (an answer resent after a relaunch), B25.11–.13, B32.2–.4 and B32.7–.10, B33.1–.3, B27.1's `agentpager example`, I22.4, I22.6, and B18.5, the dev mark the dev-stage pull request (#44) built. (a) ★ keep them; (b) name the ones to retire.
 5. **B5.12 and B5.13** now say the decision itself, not only its row, shows sending, waiting and not picked up, as the app does. (a) ★ keep; (b) narrow back to the row.
 6. **L10**, from `packages/app/README.md`: turning a pager off can let one call through. (a) ★ keep it as a limit until ENCRYPT's one writer per pager; (b) fix it sooner.
 7. **What tests don't show:** B29.8 (the built command needs no Bun, Node or repository) is proven only in part, and nothing tests dark appearance or the largest text size, which the old Blueprint claimed. (a) ★ leave both on the untested list; (b) add the tests in M4.
@@ -54,7 +54,7 @@ The plan, with the pull requests in order, is [.agents/plans/2026-11-05-m4-house
 
 ## Adds · Changes · Retires
 
-- **Adds:** nothing a person sees. A dev stage, whose addresses and deploy order go in AGENTS.md. B32 and B33, for promises that hold today but have no id of their own. Limits from L9, for what people meet today.
+- **Adds:** nothing an owner sees on prod. A dev stage, whose addresses and deploy order are in AGENTS.md, and B18.5, the dev mark an agent reads there. B32 and B33, for promises that hold today but have no id of their own. Limits from L9, for what people meet today.
 - **Changes:** every `C` id becomes `B` with the same number. Promise text moves into areas, trimmed to outcomes, and each line that drops or changes its meaning has a ledger row. The D ids become "Relies on" lines, behaviors, invariants and facts in AGENTS.md. Unbuilt promises, such as B30 and K1, move to their milestones in `next/`.
 - **Retires:** lessons L1 to L8; the D ids; the old docs under `packages/blueprint/`, kept at tag `blueprint-old-format`; `docs/v2`, the workshop, parked work and superseded plans, kept in git. The 30 Oct wake lab moves to `docs/research/`.
 
@@ -62,4 +62,4 @@ The plan, with the pull requests in order, is [.agents/plans/2026-11-05-m4-house
 
 - 5 Nov · building: Sam agreed Destination v2, its six simplifications and all eight ★ answers. PR #43 amends METHOD.md, sets the roadmap order and starts this doc; `pnpm check` green, `pnpm test:all` 60 passed (34, 16 and 10).
 - 5 Nov · building: PR #42 moves the code out of `packages/blueprint`: the wire contract to `packages/contract`, the front page to `packages/app/src/site` and the screens catalogue to `blueprint/generated/screens`. The images needed no re-render, since nothing they are drawn from changed content; the catalogue carries the new fingerprint. `pnpm check` green, `pnpm test:all` 60 passed (32 and 2, 16 and 10).
-- 5 Nov · building: PR #45 writes `blueprint/` in the area shape: 7 areas with 23 entries and 161 clauses, limits L9 to L24, 3 journeys, and the six queued milestones' docs. The [ledger](M4-house/ledger.md) maps every old line in 740 rows, 88 flagged ⚑ for Sam after two fresh ledger checks. The old docs under `packages/blueprint` are deleted, kept at tag `blueprint-old-format`, and AGENTS.md is rewritten. `pnpm check` green, `pnpm test:all` 60 passed (32 and 2, 16 and 10).
+- 5 Nov · building: PR #45 writes `blueprint/` in the area shape: 7 areas with 23 entries and 162 clauses, limits L9 to L24, 3 journeys, and the six queued milestones' docs. The [ledger](M4-house/ledger.md) maps every old line in 743 rows, 89 flagged ⚑ for Sam after two fresh ledger checks. The old docs under `packages/blueprint` are deleted, kept at tag `blueprint-old-format`, and AGENTS.md is rewritten. `pnpm check` green, `pnpm test:all` 60 passed (32 and 2, 16 and 10).

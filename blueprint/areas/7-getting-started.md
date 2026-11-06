@@ -15,6 +15,7 @@
 2. An agent that can't install or run the command where it runs is told to stop and tell its owner, and not to work around it.
 3. An agent that reads agentpager.me itself, rather than a person in a browser, is pointed to /start.
 4. An agent that arrives at the retired hosted MCP server's address gets the same instructions, and is told that server is retired.
+5. @M4: On any server other than agentpager.me, /start and the page an agent reads at its address say it is a dev server, whose pagers are its own.
 
 - An agent finds agentpager.me through the text its owner copies from a pager (B25).
 - Today the install that /start describes is a build from the repository (L22). It also tells the agent to run setup (B29).

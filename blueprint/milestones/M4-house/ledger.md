@@ -4,11 +4,11 @@ Every line of the old Blueprint, and where it went when M4 converted it to the a
 
 ## Totals
 
-- **Rows:** 740, from 109 old files and sources, grouped by old file below. 50 rows are gaps the integrator filled (listed under Gaps filled).
-- **⚑ for Sam:** 88.
-- **The new Blueprint:** 7 areas with 23 entries (14 behaviors and 9 invariants) and 161 clauses, 16 limits (L9 to L24), and 3 journeys with 20 steps.
+- **Rows:** 743, from 109 old files and sources, grouped by old file below. 53 rows are gaps the integrator filled (listed under Gaps filled).
+- **⚑ for Sam:** 89.
+- **The new Blueprint:** 7 areas with 23 entries (14 behaviors and 9 invariants) and 162 clauses, 16 limits (L9 to L24), and 3 journeys with 20 steps.
 - **Ids:** each C became B with the same number; I, J and K kept theirs; B32, B33 and I23 are new; limits are L9 to L24; no D id remains, and C28 is never reused. Not built, and waiting in `milestones/next/`: B19 (INSTALL), B30 and I20 (ENCRYPT), K1 (FRIENDS).
-- **Words:** the old Blueprint docs this pull request deletes held 25,769 words (strategy, design, roadmap, decisions and lessons), plus 5,219 in the workshop's notes. The new `blueprint/` holds 25,271, without `generated/` and this ledger. Its always-true part (README, PRODUCT, TERMS, the areas and JOURNEYS) holds 14,142, against 12,383 in the old strategy and design.
+- **Words:** the old Blueprint docs this pull request deletes held 25,789 words (strategy, design, roadmap, decisions and lessons), plus 5,219 in the workshop's notes. The new `blueprint/` holds 25,343, without `generated/` and this ledger. Its always-true part (README, PRODUCT, TERMS, the areas and JOURNEYS) holds 14,186, against 12,403 in the old strategy and design.
 
 ## ⚑ for Sam
 
@@ -100,16 +100,17 @@ Each row drops a line, changes its meaning, adds a line no old line held, or cut
 | 82 | hardening item 3 "one writer per pager" and item 5 "a smaller poll" | next/ENCRYPT.md items 3 and 5 | Hardening items 3 and 5 are defined nowhere; ENCRYPT's Plan picks what they cover. |
 | 83 | code `commands.ts › connect` (`--server`, 8a64d0e) | B25.11 | New clause B25.11 (another server), built and tested, with no old line. |
 | 84 | (none; from the code) | I22.4 | New clause I22.4 (parts that don't match), built and tested, with no old line. |
-| 85 | (none): an answer still sending when the app is closed goes again on the next launch | B5.16 · @M3: | New clause B5.16: an unconfirmed answer is sent again when the app reopens. Built and tested, with no old line. |
-| 86 | (new) I23 · @M1 · Keys stay secret | I23 | New invariant id I23 (Sam's A4 ★), retitled "Keys stay secret" and widened to the service's own secrets. |
-| 87 | (new) I23 Why: "Only agents I give a number reach my phone" | I23 Why | I23's Why quotes SI2's heading, the drafter's choice. |
-| 88 | — (new milestone) | next/CLIENTS.md | Sam's 5 Nov words quoted in CLIENTS and SITE have no record in the repo or memory before this pull request. |
+| 85 | (PR #44, `start.ts`) a server other than agentpager.me says it is dev, at / and /start | B18.5 · @M4: | New clause B18.5, the dev mark #44 built and tested, with no old line. |
+| 86 | (none): an answer still sending when the app is closed goes again on the next launch | B5.16 · @M3: | New clause B5.16: an unconfirmed answer is sent again when the app reopens. Built and tested, with no old line. |
+| 87 | (new) I23 · @M1 · Keys stay secret | I23 | New invariant id I23 (Sam's A4 ★), retitled "Keys stay secret" and widened to the service's own secrets. |
+| 88 | (new) I23 Why: "Only agents I give a number reach my phone" | I23 Why | I23's Why quotes SI2's heading, the drafter's choice. |
+| 89 | — (new milestone) | next/CLIENTS.md | Sam's 5 Nov words quoted in CLIENTS and SITE have no record in the repo or memory before this pull request. |
 
 ## Gaps filled
 
 Old files and lines that no drafter's part covered, checked against the step-0 inventory of every old file:
 - I3, a deprecated tombstone; the eight lessons L1 to L8; the old AGENTS.md's lines; the workshop and `roadmap/parked`, deleted here; the code PR #42 moved; and what PR 4 deletes outside `packages/blueprint`: the rest of `docs/v2`, the root `workshop/`, `recipe.json` and superseded plans.
-- A clause the root asked for: B5.16, an unconfirmed answer sent again on relaunch.
+- A clause the root asked for: B5.16, an unconfirmed answer sent again on relaunch. And B18.5, the dev mark the dev-stage pull request (#44) built, with D1's edits from #44, which merged before this one.
 - Two TERMS entries: "Card contract" and "New pager".
 - I17.2's last sentence, from C22.2: an agent of an off pager is told to ask again once it is on, or to ask for another number.
 - L20, the plain HTTP limit, in place of I23's note that HTTPS only isn't built (the root's call).
@@ -644,6 +645,8 @@ Old clause numbers are the old behaviour numbers: C26.3 is C26's third behaviour
 | D1 deployed check: the Worker's namespace, classes and SQLite placement, inspected apart from the product | `packages/app/README.md` › Deployment, which AGENTS.md points to | `deploy.mjs` does it |  |
 | D1 caveat 1: a green deploy doesn't show the zone's DNS is the only path in, or anything about Cloudflare's availability | dropped | a gap in what a green deploy proves (that the zone's DNS is the only way in, and Cloudflare's availability), which nobody using AgentPager meets. METHOD puts such a gap in a comment beside its check; none is beside `deploy.mjs`'s checks yet, and the dev-stage pull request owns them | ⚑ |
 | D1 caveat 2: the deploy doesn't show the credential's scope; if it can't create the binding or deploy, ask Sam for scoped access | AGENTS.md › Deploying and secrets (ask Sam for scoped access; never make a credential) | `deploy.mjs` says so on a failed Cloudflare call; the global rules forbid minting a credential |  |
+| (edited by PR #44 after the tag) the statement: one Worker per stage, prod's `ownerpager` at agentpager.me and dev's `ownerpager-dev` at dev.agentpager.me, each with its own Durable Objects | area 6 Relies on; AGENTS.md › Stages | this pull request deletes D1, which #44 edited after tag `blueprint-old-format`; git keeps that version at 6c58e60. AGENTS.md's Stages table, from #44, names each Worker and address, and area 6 says each stage has its own data |  |
+| (edited by PR #44 after the tag) must supply: deploy with `deploy:dev`, or `deploy:prod` at a release tag only | AGENTS.md › Stages; `packages/app/README.md` › Deployment | both say it, as #44 wrote them |  |
 
 ### `packages/blueprint/design/dependencies/D2-agent-clients.md`
 
@@ -1387,6 +1390,7 @@ Old clause numbers are the old behaviour numbers: C26.3 is C26's third behaviour
 | (none; from the code) | I22.4 | new clause: a recommendation, tradeoffs cell or next step naming a letter that isn't an option, a row with no cell for an option, or a cell with no rating. Built in `card.ts › compile` and listed under R1 in docs/v2/02 §2; held by `cli.test.ts › the binary: …` ("tradeoffs[0] has no cell for B.", "recommendation.option is C but there are two options.") | ⚑ |
 | (none; from `start.ts`) an agent finds agentpager.me through its owner's text | B18, first note | new note, true in the code: the pager's text names its server (B25.1), and `start.ts` serves /start there |  |
 | (none; from `start.ts`) /start tells the agent to run setup | B18, second note | new note, true in the code: /start ends its install steps with setup (`start.ts`) |  |
+| (PR #44, `start.ts`) a server other than agentpager.me says it is dev, at / and /start | B18.5 · @M4: | new line: the dev mark the dev-stage pull request built and tested (`start.test.ts › A server other than agentpager.me says it is dev, at / and /start`), so the Blueprint on main describes dev | ⚑ |
 
 ### `new in M4`
 

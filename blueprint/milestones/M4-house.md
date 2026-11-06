@@ -53,4 +53,4 @@ The plan, with the pull requests in order, is [.agents/plans/2026-11-05-m4-house
 
 ## Log
 
-- 5 Nov · building: Sam agreed Destination v2, its six simplifications and all eight ★ answers. PR 1 amends METHOD.md, sets the roadmap order and starts this doc; `pnpm check` green, `pnpm test:all` 60 passed (34, 16 and 10).
+- 5 Nov · building: Sam agreed Destination v2, its six simplifications and all eight ★ answers. PR #43 amends METHOD.md, sets the roadmap order and starts this doc; `pnpm check` green, `pnpm test:all` 60 passed (34, 16 and 10).

@@ -60,7 +60,7 @@ The plan, with the pull requests in order, is [.agents/plans/2026-11-05-m4-house
 
 ## Left for the follow-up PR
 
-Nothing: PR 5b re-pointed the seven references to `docs/v2` in files `pnpm designs` draws from, and made the screens again.
+Nothing: PR #49 re-pointed the seven references to `docs/v2` in files `pnpm designs` draws from, and made the screens again.
 
 ## Log
 
@@ -70,3 +70,4 @@ Nothing: PR 5b re-pointed the seven references to `docs/v2` in files `pnpm desig
 - 5 Nov · building: PR #44 adds the dev stage, live at https://dev.agentpager.me: Worker `ownerpager-dev` with its own data, `pnpm deploy:dev`, `pnpm deploy:prod` only at a release tag, `pnpm smoke:dev`, and the dev mark on /start and the page an agent reads. `pnpm check` green, `pnpm test:all` 66 passed (32 and 2, 22 and 10). After the merge (6c58e60) the root deployed dev, and `pnpm smoke:dev` passed 6 of 6; prod still runs 1ee6c27.
 - 5 Nov · building: PR #45 merged (64512bd) after #44, adding B18.5, the dev mark, and homing #44's D1 edits; 89 ⚑. `pnpm check` green, `pnpm test:all` 66 passed (32 and 2, 22 and 10).
 - 5 Nov · building: PR #47 deletes `docs/v2`, the root `workshop/`, `recipe.json` and four superseded plans (42 files, about 29,000 words), after the tag `history-archive` (64512bd). The regression cards move to `packages/cli/test/regression/`, and the 30 Oct wake lab to `docs/research/`. Four fresh checks found 14 still-true lines without a home: 11 now have one, and 3 are dropped ⚑ (the ledger's PR 4 section). Five files drawn from by `pnpm designs` keep seven stale references, listed above.
+- 5 Nov · building: PR #49 adds B18.6 and B23.11, the dev marks: the front page on dev.agentpager.me shows a dev strip, and the phone marks a pager made there on Pagers and its screen. It re-points the seven `docs/v2` references in files `pnpm designs` draws from. The screens were made again on iOS 27.2: no image shows a mark, and the 18 that changed differ only in clock times, random pager numbers and keyboard predictions. `pnpm check` green, `pnpm test:all` 67 passed (32 and 3, 22 and 10).

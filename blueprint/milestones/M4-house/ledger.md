@@ -1447,7 +1447,7 @@ PR 4 deleted `docs/v2/`, the root `workshop/`, `recipe.json` and four superseded
 
 ## PR 5b: the dev marks
 
-PR 5b built the two "dev" marks M4's plan gave PR 5 that need the screens made again: the front page and the phone. Both count a server as dev when its address starts with `dev.`, so the catalogue, drawn from a local server, shows neither.
+PR 5b (#49) built the two "dev" marks M4's plan gave PR 5 that need the screens made again: the front page and the phone. Both count a server as dev when its address starts with `dev.`, so the catalogue, drawn from a local server, shows neither.
 
 | Old | New | Change | ⚑ |
 | --- | --- | --- | --- |

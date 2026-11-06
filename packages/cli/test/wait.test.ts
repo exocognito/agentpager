@@ -9,7 +9,7 @@ import type { Result } from '../src/commands.ts';
 // A field of a command's --json result, read without a cast.
 const field = (r: { json?: unknown }, key: string) => String(typeof r.json === 'object' && r.json !== null ? Reflect.get(r.json, key) : undefined);
 
-// How to wait follows the harness that waits (docs/v2/03-binary-surface.md §6). Only a positive identification
+// How to wait follows the harness that waits (B33, blueprint/areas/2-agents.md). Only a positive identification
 // changes the words; every other agent keeps the ones cli.test.ts checks.
 test('harness: Claude Code and Claude Desktop only when positively identified', () => {
   for (const v of ['CLAUDECODE', 'CODEX_SANDBOX', 'CODEX_HOME', 'CURSOR_TRACE_ID', 'PI_CODING_AGENT']) delete process.env[v];

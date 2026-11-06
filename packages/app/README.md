@@ -1,6 +1,6 @@
 # AgentPager app
 
-From `toy-examples/agentpager`:
+From the repository root:
 
 ```sh
 pnpm install --frozen-lockfile
@@ -11,7 +11,7 @@ pnpm start:app
 
 The front page runs the Blueprint's imported React marketing screen; the owner's side of the product is the iPhone app in `../ios`, and the old web app address `/app` redirects to the front page. `/start` and the retired `/mcp` tell an arriving agent to install the `agentpager` command (`../cli`), whose transport is the HTTPS API. The API uses one SQLite-backed Durable Object per agent (`Agent`) and one `Registry` for pagers. No accounts, and no action execution.
 
-## Pagers and agents (v2, `docs/v2/`)
+## Pagers and agents
 
 A **pager** is made on the phone: `POST /api/pagers {number, publicKey, autoOff}` with the phone key. The phone makes
 a Curve25519 key pair and the number `ap1_` + base64url(pager id ‖ the first 8 bytes of the public key's SHA-256); the
@@ -56,7 +56,7 @@ AGENTPAGER_URL=https://agentpager.me BLUEPRINT_EVIDENCE_DIR=/tmp/agentpager-depl
   node --test --experimental-strip-types --test-concurrency=4 packages/app/test/**/*.test.ts
 ```
 
-Cold agent arrivals are **reviewer dogfood**, not acceptance tests: D2 and `recipe.json` supply the exact isolated pi HTTPS and Codex fetch-only start/resume commands and allowed owner steps. No agent-specific adapter or global client configuration is installed by this product.
+Cold agent arrivals are not acceptance tests: Sam's walks and dogfood sample real agent apps (AGENTS.md › Gotchas).
 
 ## Deployment
 

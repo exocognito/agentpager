@@ -22,7 +22,7 @@
 9. A phone holds as many pagers as the owner makes, each with its own number, keys and switch.
 
 - The text, as chosen on 29 Oct 2026: "When I'm away and you need my decision, use agentpager.me MCP or CLI to send me decisions:", then "$ agentpager connect ap1_…" on its own line.
-- The owner gives the text to an agent, for example in AGENTS.md, and the agent connects with it (B25). It works for an agent only once the agentpager command is installed where it runs (B29); an agent without it can find how to install it at the server's /start (B18).
+- The owner gives the text to an agent, for example in AGENTS.md, and the agent connects with it (B25). It works for an agent only once the agentpager command is installed where it runs (B29); an agent without it can find how to install it at the server's /start (B18). The app itself gives no install instructions, as chosen on 29 Oct.
 
 ### B23 · @M2 · Pagers and the Pager screen
 

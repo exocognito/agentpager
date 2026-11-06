@@ -1,6 +1,6 @@
-// Rebuilds the 10 cards of 28–29 Oct (docs/v2/regression/) from the Codex transcript extract by running each snippet
+// Rebuilds the 10 cards of 28–29 Oct (test/regression/) from the Codex transcript extract by running each snippet
 // with stubbed I/O, for `agentpager review`. Images and pages the transcript doesn't hold are named, not included.
-// Usage: node scripts/regression-cards.mjs <docs/v2/regression/cards-2026-10-28.txt> <out dir>
+// Usage: node scripts/regression-cards.mjs <test/regression/cards-2026-10-28.txt> <out dir>
 import { readFileSync, writeFileSync } from 'node:fs';
 import vm from 'node:vm';
 const [src, out] = process.argv.slice(2);

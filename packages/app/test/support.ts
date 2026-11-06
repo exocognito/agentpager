@@ -32,7 +32,7 @@ export function question(title = 'Which plan?', detail?: string) {
 export const emojiCard = { title: 'Which plan?', card: { type: 'generic', options: [{ number: 1, emoji: '🚀', title: 'One' }, { number: 2, emoji: '🛠️', title: 'Two' }] } };
 
 // What the phone makes for a new pager: a Curve25519 key pair, a 16-byte pager id, and the number naming both
-// (docs/v2/04-encryption.md §2).
+// (I19, blueprint/areas/6-privacy.md).
 export function pagerKeys() {
   const publicKey = String(generateKeyPairSync('x25519').publicKey.export({ format: 'jwk' }).x);
   const id = randomBytes(16), fingerprint = createHash('sha256').update(Buffer.from(publicKey, 'base64url')).digest().subarray(0, 8);

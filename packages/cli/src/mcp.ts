@@ -6,7 +6,7 @@ import { CONTRACT } from './rules.ts';
 import { VERSION } from './version.ts';
 
 // The stdio MCP server: the CLI's operations as tools, with the same replies. Because a harness resends tool
-// descriptions every turn, an MCP agent has the contract in context for the whole session (docs/v2/03 §3).
+// descriptions every turn, an MCP agent has the contract in context for the whole session (B27.2, blueprint/areas/3-cards.md).
 const text = (description: string) => ({ type: 'string', description });
 const agent = text('Your agent id from connect, such as ap-7f3k.');
 const decision = text('The decision id from ask, such as d_2x8w.');

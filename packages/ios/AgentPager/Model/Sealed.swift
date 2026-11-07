@@ -1,5 +1,6 @@
 import Foundation
 import CryptoKit
+import Security
 import AgentPagerCrypto
 
 // The phone's end of end-to-end encryption (B30, blueprint/areas/6-privacy.md). It opens what the server holds with
@@ -11,8 +12,9 @@ import AgentPagerCrypto
 // decision with such a card or acknowledgement, or whose agent's identity won't open, shows as one this phone can't
 // read, with nothing of it and nothing to answer. So does a card that names another key than its agent's identity
 // does: the server can seal a card to the pager's key as anyone can, but not with the agent's key in it, which it
-// never sees, so an answer the phone seals reaches only that agent. And so does an answered decision whose answer
-// isn't exactly one this phone sent, since only the agent can open what the phone sent.
+// never sees, so an answer the phone seals reaches only that agent. So does an agent whose identity names another key
+// than the one it first named (Pins, below). And so does an answered decision whose answer isn't exactly one this
+// phone sent, since only the agent can open what the phone sent.
 
 // An answer this phone sent, by the request id it went with: the choice, and the part it sealed, which the server
 // must hand back unchanged for the phone to show the choice as the answer.
@@ -29,14 +31,15 @@ nonisolated enum Sealed {
 
     // A pager's read, opened with this phone's key for that pager and bound to its id as the phone holds it, never the
     // id the server's reply names. A reply that names another pager isn't this pager's read: nil.
-    static func inbox(_ sealed: SealedPagerInbox, pager: LocalPager, answers: [String: SentAnswer]) -> PagerInbox? {
+    static func inbox(_ sealed: SealedPagerInbox, pager: LocalPager, answers: [String: SentAnswer], pins: Pins) -> PagerInbox? {
         guard sealed.pager.pagerId == pager.pagerId else { return nil }
         guard let key = try? Curve25519.KeyAgreement.PrivateKey(rawRepresentation: pager.privateKey) else {
             return PagerInbox(pager: sealed.pager, agents: sealed.agents.map { unreadableAgent($0) })
         }
         let pagerId = pager.pagerId
         return PagerInbox(pager: sealed.pager, agents: sealed.agents.map { a in
-            guard let identity: IdentityPart = open(a.agent.identity, key, .identity, PartContext(pagerId: pagerId)) else { return unreadableAgent(a) }
+            guard let identity: IdentityPart = open(a.agent.identity, key, .identity, PartContext(pagerId: pagerId)),
+                  pins.keep(identity.answerKey, pagerId: pagerId, agentId: a.agent.agentId) == identity.answerKey else { return unreadableAgent(a) }
             let agent = AgentInfo(agentId: a.agent.agentId, app: identity.app, project: identity.project, machine: identity.machine,
                                   createdAt: a.agent.createdAt, finishedAt: a.agent.finishedAt, lastActivityAt: a.agent.lastActivityAt, openCount: a.agent.openCount)
             return AgentInbox(agent: agent, open: a.open.map { decision($0, key, pagerId, identity.answerKey, answers) }, answered: a.answered.map { decision($0, key, pagerId, identity.answerKey, answers) })
@@ -111,6 +114,38 @@ nonisolated enum Sealed {
         }
         let part = AnswerPart(choice: chosen)
         return try? Envelope.seal(to: key, kind: .answer, context: PartContext(pagerId: pagerId, decisionId: decisionId), plaintext: part.encoded())
+    }
+}
+
+// The key each agent first named, by pager and agent id (B30.3, blueprint/areas/6-privacy.md). Anyone can seal to a
+// pager, the service included, so a service could replace an agent's identity with one naming a key of its own and
+// show its own cards in that agent's place. An agent's identity is written once, at connect (packages/app/src/agent.ts),
+// so the phone keeps the key named by the first of an agent's identities that opens, and takes the agent as readable
+// only while its identity names that key. An identity that doesn't open never reaches here, so it pins nothing.
+// Pins are kept in the Keychain with their pager (Keychain.swift › Kept), so neither a relaunch nor a reinstall resets
+// them, and they go only with it. A pin is only ever added: the Keychain refuses a second for the same agent, and
+// whatever it holds is the pin, so two reads racing to pin agree on the one that was stored first.
+nonisolated final class Pins: @unchecked Sendable {
+    private let lock = NSLock()
+    // Pins read or made this run, by pager and agent id. A pin never changes, so it is read once.
+    private var known: [String: [String: String]] = [:]
+
+    // The key pinned for this agent: the one it first named, which is this one when none was pinned before. Nil when
+    // the Keychain can't keep or read it: the phone can't tell, so it shows the agent as one it can't read.
+    func keep(_ answerKey: String, pagerId: String, agentId: String) -> String? {
+        lock.withLock {
+            if let pinned = known[pagerId]?[agentId] { return pinned }
+            let added = Keychain.add(.pins, pagerId: pagerId, account: agentId, data: Data(answerKey.utf8))
+            guard added == errSecSuccess || added == errSecDuplicateItem,
+                  let data = Keychain.record(.pins, pagerId: pagerId, account: agentId), let pinned = String(data: data, encoding: .utf8) else { return nil }
+            known[pagerId, default: [:]][agentId] = pinned
+            return pinned
+        }
+    }
+
+    // The pager is gone: Keychain.delete took its pins.
+    func forget(_ pagerId: String) {
+        lock.withLock { known[pagerId] = nil }
     }
 }
 

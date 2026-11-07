@@ -242,11 +242,10 @@ final class AppModel {
         pagers.removeAll { $0.pagerId == pagerId }
         inFlight = inFlight.filter { $0.value.pagerId != pagerId }
         notConfirmed.removeAll { $0.pagerId == pagerId }
-        let agents = Set(inboxes[pagerId]?.agents.map(\.agent.agentId) ?? [])
         inboxes[pagerId] = nil
         sealedInboxes[pagerId] = nil
         sentAnswers = sentAnswers.filter { $0.value.pagerId != pagerId }
-        files = files.filter { !agents.contains(String($0.key.split(separator: "/").first ?? "")) }
+        files = files.filter { !$0.key.hasPrefix(pagerId + "/") }
         path.removeAll { route in
             switch route {
             case .pager(let id), .pagerDetail(let id), .decision(let id, _, _), .answered(let id, _): id == pagerId
@@ -366,9 +365,6 @@ final class AppModel {
 
     func agents(_ pagerId: String) -> [AgentInbox] { inboxes[pagerId]?.agents ?? [] }
     func agent(_ agentId: String) -> AgentInfo? { inboxes.values.lazy.flatMap(\.agents).first { $0.agent.agentId == agentId }?.agent }
-    private func pagerOf(_ agentId: String) -> LocalPager? {
-        myPagers.first { p in agents(p.pagerId).contains { $0.agent.agentId == agentId } }
-    }
     private func sending(_ decisionId: String) -> Bool { undo?.decisionId == decisionId || inFlight[decisionId] != nil }
 
     func asked(_ pagerId: String, _ agentId: String, _ decisionId: String) -> Asked? {
@@ -417,18 +413,27 @@ final class AppModel {
     }
 
     // A brief's attachments, kept in memory once read and opened: a decision never changes (I5). They go with the
-    // pager when the phone drops it. Each is fetched by its slot in the card's list and opened bound to that slot; one
-    // that won't open is refused, and the brief shows it as one it couldn't load.
+    // pager when the phone drops it. Each is fetched by its slot in the card's list and opened bound to its pager,
+    // decision and slot; one that won't open is refused, and the brief shows it as one it couldn't load. They are kept
+    // by pager, agent, decision and slot, so one pager's never shows for another's.
     @ObservationIgnored var files: [String: Data] = [:]
+    // The one pager on this phone whose read lists this agent's decision. Ids are the server's, and a decision is on one
+    // pager only, so a second pager listing the same agent and decision is the server's doing: then neither is used.
+    func holder(_ agentId: String, _ decisionId: String) -> LocalPager? {
+        let holders = myPagers.filter { asked($0.pagerId, agentId, decisionId) != nil }
+        return holders.count == 1 ? holders[0] : nil
+    }
     func attachment(_ agentId: String, _ decisionId: String, _ name: String) async throws(APIError) -> Data {
-        let id = agentId + "/" + decisionId + "/" + name
+        // The catalogue's sample pages, with no pager behind them (Previews.swift).
+        guard live else { if let data = files["\(agentId)/\(decisionId)/\(name)"] { return data }; throw .transport("No sample attachment \(name).") }
+        guard let p = holder(agentId, decisionId), let entries = asked(p.pagerId, agentId, decisionId)?.decision.attachments,
+              let slot = entries.firstIndex(where: { $0.name == name }) else { throw .transport("This attachment can’t be read.") }
+        let id = "\(p.pagerId)/\(agentId)/\(decisionId)/\(slot)"
         if let data = files[id] { return data }
-        guard live, let p = pagerOf(agentId) else { throw .transport("This phone holds no key for the pager.") }
-        guard let slot = asked(p.pagerId, agentId, decisionId)?.decision.attachments?.firstIndex(where: { $0.name == name }) else { throw .transport("This decision has no attachment \(name).") }
         let part = try await client.file(p, agentId: agentId, decisionId: decisionId, slot: slot)
         guard let data = Sealed.attachment(part, pager: p, decisionId: decisionId, slot: slot) else { throw .transport("This attachment can’t be read.") }
         // A page is held to the page contract before any of it shows, since the server can't check it (I4.9).
-        if let entries = asked(p.pagerId, agentId, decisionId)?.decision.attachments, entries[slot].type == "text/markdown" {
+        if entries[slot].type == "text/markdown" {
             do throws(PartError) { _ = try Parts.page(data, attachments: entries.map { (name: $0.name, type: $0.type) }) } catch { throw .transport("This page can’t be read.") }
         }
         files[id] = data

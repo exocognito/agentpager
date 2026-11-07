@@ -44,6 +44,21 @@ final class SealedTests: XCTestCase {
         XCTAssertFalse(shown.agents.flatMap { $0.open }.contains { $0.title == "On pager B?" })
     }
 
+    // An attachment is fetched for the one pager whose read lists its decision. Two pagers listing the same agent and
+    // decision, as only a server could make them, leave neither: one pager's attachment never shows for another's.
+    @MainActor
+    func test_B30_2_anAttachmentIsOnlyEverTheOnePagersThatListsItsDecision() throws {
+        let model = AppModel(live: false)
+        let a = AppPager.make(name: "A", server: model.server.absoluteString), b = AppPager.make(name: "B", server: model.server.absoluteString)
+        model.pagers = [a, b]
+        let readA = try XCTUnwrap(Sealed.inbox(try read(of: a, title: "On A?"), pager: a, answers: [:]))
+        model.inboxes = [a.pagerId: readA]
+        XCTAssertEqual(model.holder(String(repeating: "A", count: 32), decisionId)?.pagerId, a.pagerId)
+        // B's read names the same agent and decision.
+        model.inboxes[b.pagerId] = try XCTUnwrap(Sealed.inbox(try read(of: b, title: "On B?"), pager: b, answers: [:]))
+        XCTAssertNil(model.holder(String(repeating: "A", count: 32), decisionId))
+    }
+
     func test_B30_1_aCardNamingAnotherKeyThanItsAgentsIdentityIsOneThePhoneCantRead() throws {
         let a = AppPager.make(name: "A", server: "http://127.0.0.1:9")
         let other = Envelope.base64url(Curve25519.KeyAgreement.PrivateKey().publicKey.rawRepresentation)

@@ -1,4 +1,5 @@
 import SwiftUI
+import AgentPagerCrypto
 import Observation
 import UIKit
 import UserNotifications
@@ -59,8 +60,8 @@ final class AppModel {
     // shows while the server can't be reached.
     var inboxes: [String: PagerInbox] = [:]
     private var sealedInboxes: [String: SealedPagerInbox] = [:] { didSet { if live { InboxCache.save(sealedInboxes) } } }
-    // Every answer this phone sent, by its request id: only the agent can open the answer itself, so this is how the
-    // phone shows its own answers. Kept until the pager goes.
+    // Every answer this phone sent, by its request id, with the part it sealed: only the agent can open the answer
+    // itself, so this is how the phone shows its own answers. Kept until the pager goes.
     private var sentAnswers: [String: SentAnswer] = [:] { didSet { if live { AnswerCache.save(sentAnswers) } } }
     var now = Date()
     var lastSuccess: Date?
@@ -425,6 +426,10 @@ final class AppModel {
         guard let slot = asked(p.pagerId, agentId, decisionId)?.decision.attachments?.firstIndex(where: { $0.name == name }) else { throw .transport("This decision has no attachment \(name).") }
         let part = try await client.file(p, agentId: agentId, decisionId: decisionId, slot: slot)
         guard let data = Sealed.attachment(part, pager: p, decisionId: decisionId, slot: slot) else { throw .transport("This attachment can’t be read.") }
+        // A page is held to the page contract before any of it shows, since the server can't check it (I4.9).
+        if let entries = asked(p.pagerId, agentId, decisionId)?.decision.attachments, entries[slot].type == "text/markdown" {
+            do throws(PartError) { _ = try Parts.page(data, attachments: entries.map { (name: $0.name, type: $0.type) }) } catch { throw .transport("This page can’t be read.") }
+        }
         files[id] = data
         return data
     }
@@ -472,7 +477,7 @@ final class AppModel {
         inFlight[p.decisionId] = p
         drafts[p.decisionId] = nil
         // Kept before it is sent, so whichever send the server stores, the phone can show it.
-        if live, sentAnswers[p.requestId] == nil { sentAnswers[p.requestId] = SentAnswer(pagerId: p.pagerId, decisionId: p.decisionId, choice: p.choice) }
+        if live, sentAnswers[p.requestId] == nil { sentAnswers[p.requestId] = SentAnswer(pagerId: p.pagerId, decisionId: p.decisionId, choice: p.choice, sealed: p.sealed) }
         // An answer goes only to the server its pager was made on; it waits while the phone points elsewhere.
         guard live, let pager = pager(p.pagerId), !sendingNow.contains(p.requestId) else { return }
         sendingNow.insert(p.requestId)
@@ -490,10 +495,10 @@ final class AppModel {
                     return
                 } catch {
                     if !error.isTransport {
-                        // AlreadyAnswered, a pager turned off and the like: the server's state wins, and it didn't store
-                        // this send, so this send is never shown as the answer.
+                        // AlreadyAnswered, a pager turned off and the like: the server's state wins. The send stays on
+                        // record: an earlier try of it may have been stored before its reply was lost, and it shows as
+                        // the answer only if the server hands back exactly the part it sealed.
                         inFlight[p.decisionId] = nil
-                        sentAnswers[p.requestId] = nil
                         notConfirmed.removeAll { $0.requestId == p.requestId }
                         await refresh(p.pagerId)
                         return

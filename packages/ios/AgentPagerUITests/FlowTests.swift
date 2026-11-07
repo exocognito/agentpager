@@ -196,20 +196,25 @@ final class FlowTests: XCTestCase {
         XCTAssertEqual(((try XCTUnwrap(try agent.waitForAnswer(readable, seconds: 20)))["choice"] as! [String: Any])["number"] as? Int, 1)
     }
 
-    // B30.1: the phone seals its answer to the key inside the card it answers, never one the service hands it. Here
-    // the card names a second key of the agent's: the answer opens with that one and not with the first.
-    func test_B30_1_theAnswerIsSealedToTheKeyInsideItsCard() throws {
+    // B30.1: an answer reaches only the agent that asked. The phone seals it to the key inside the card, and takes a
+    // card as its agent's only when the card names the key the agent's identity names: a card naming another key, as
+    // one the service sealed to the pager's key would, shows as one the phone can't read, with nothing to answer, while
+    // the agent's own card answers and opens with its key.
+    func test_B30_1_aCardNamingAnotherKeyThanItsAgentsShowsAsOneThePhoneCantRead() throws {
         launch()
         let number = makePager("Answer key")
         try agent.connect(number: number, app: "Codex", project: "answer key")
-        let second = Curve25519.KeyAgreement.PrivateKey()
-        let asked = try agent.ask("Sealed to which key?", options: ["This one", "That one"], answerKey: Envelope.base64url(second.publicKey.rawRepresentation))
-        open("Sealed to which key?")
+        let other = Curve25519.KeyAgreement.PrivateKey()
+        _ = try agent.ask("Sealed for someone else?", options: ["This one", "That one"], answerKey: Envelope.base64url(other.publicKey.rawRepresentation))
+        let own = try agent.ask("Sealed for its own agent?", options: ["This one", "That one"])
+        let unreadable = app.buttons.matching(identifier: "open-A decision this phone can’t read")
+        waitUntil(15, "one unreadable row") { unreadable.count == 1 }
+        XCTAssertFalse(app.staticTexts["Sealed for someone else?"].exists, "nothing of it shows")
+        open("Sealed for its own agent?")
         app.buttons["tile-B"].tap()
         app.buttons["send-option"].tap()
-        waitUntil(20, "the answer arrives") { ((try? self.agent.call("GET", "api/agents/\(self.agent.agentId)/cards/\(asked)/answer"))?["status"] as? String) == "answered" }
-        XCTAssertThrowsError(try agent.waitForAnswer(asked, seconds: 1), "the agent's first key can't open it")
-        XCTAssertEqual(((try XCTUnwrap(try agent.waitForAnswer(asked, seconds: 1, key: second)))["choice"] as! [String: Any])["number"] as? Int, 2)
+        XCTAssertEqual(((try XCTUnwrap(try agent.waitForAnswer(own, seconds: 20)))["choice"] as! [String: Any])["number"] as? Int, 2)
+        XCTAssertThrowsError(try agent.waitForAnswer(own, seconds: 1, key: other), "another key can't open it")
     }
 
     // I6: two answers that both fail are both reported, by name, and Retry sends both; neither is lost.

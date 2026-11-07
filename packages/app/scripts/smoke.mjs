@@ -39,7 +39,7 @@ function throwawayPager() {
   return { pagerId: id.toString('hex'), publicKey, privateKey: k.privateKey, number: 'ap1_' + Buffer.concat([id, fingerprint]).toString('base64url'), phone: randomBytes(24).toString('base64url') };
 }
 // A connect's body, its identity sealed to a stranger's key: only the Registry's answer about the number matters.
-const strangerConnect = number => ({ number, identity: seal(keyPair().publicKey, 'identity', { pagerId: '0'.repeat(32) }, encodePart('identity', { app: 'smoke', project: 'smoke' })) });
+const strangerConnect = number => ({ number, identity: seal(keyPair().publicKey, 'identity', { pagerId: '0'.repeat(32) }, encodePart('identity', { app: 'smoke', project: 'smoke', answerKey: toBase64url(keyPair().publicKey) })) });
 // The smoke run's own calls name it as their client, as every client of the API does.
 const asClient = { 'content-type': 'application/json', [CLIENT_HEADER]: clientVersion('smoke', sha.slice(0, 7)) };
 const phoneCall = (key, route, data) => fetch(origin + route, { method: data === undefined ? 'GET' : 'POST', headers: { ...asClient, 'x-phone-key': key }, body: data === undefined || data === null ? undefined : JSON.stringify(data) });
@@ -137,9 +137,12 @@ await step('The binary built from this commit checks a pager\'s key, asks it a c
     check(!text.includes(marker) && !text.includes('smoke run'), 'the phone\'s read holds the card readable');
     const inbox = JSON.parse(text), agent = inbox.agents[0], d = agent?.open[0];
     check(inbox.agents.length === 1 && agent.open.length === 1, `the pager lists ${inbox.agents.length} agents and ${agent?.open.length} open decisions`);
-    check(decodePart('identity', open(pager.privateKey, 'identity', { pagerId: pager.pagerId }, agent.agent.identity)).project === 'smoke', 'the identity doesn\'t open to its project');
+    const identity = decodePart('identity', open(pager.privateKey, 'identity', { pagerId: pager.pagerId }, agent.agent.identity));
+    check(identity.project === 'smoke', 'the identity doesn\'t open to its project');
     const card = decodePart('card', open(pager.privateKey, 'card', { pagerId: pager.pagerId, decisionId: d.decisionId }, d.card));
     check(card.title === marker, 'the card doesn\'t open to the question asked');
+    // As the phone takes a card: only when it names the key its agent's identity names.
+    check(card.answerKey === identity.answerKey, 'the card names another key than its agent\'s identity');
     // The phone answers, sealed to the key inside the card.
     const answer = seal(fromBase64url(card.answerKey), 'answer', { pagerId: pager.pagerId, decisionId: d.decisionId }, encodePart('answer', { choice: { kind: 'option', number: 1 } }));
     const sent = await phoneCall(pager.phone, `/api/agents/${agent.agent.agentId}/cards/${d.decisionId}/answer`, { requestId: randomBytes(24).toString('base64url'), answer });

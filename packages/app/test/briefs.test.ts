@@ -7,6 +7,7 @@ import { fixture, assert, token, until, C, emojiCard, asClient, openDecision, as
 import { briefNames, briefsDir, loadBrief } from '../fixtures/briefs/load.ts';
 import { decodePart, encodePart } from '../../contract/parts.ts';
 import { fromBase64url, open, seal } from '../../contract/envelope.ts';
+import { publicOf } from '../../cli/src/seal.ts';
 
 // Decision briefs: an agent sends Markdown with lettered options and attachments, each sealed to the pager's key; the
 // phone opens the decision and fetches and opens each attachment by its slot.
@@ -134,7 +135,7 @@ test('I4.9 A broken card is refused by the command before it is sent, and by the
       const requestId = token(), decisionId = await decision(requestId);
       const { attachments, ...rest } = question;
       const listed = Array.isArray(attachments) ? attachments.map(x => ({ name: x?.name, type: x?.type })) : [];
-      const part = { ...rest, ...(listed.length ? { attachments: listed } : {}), answerKey: s.keys.pagerKey };
+      const part = { ...rest, ...(listed.length ? { attachments: listed } : {}), answerKey: publicOf(s.keys.privateKey) };
       const at = { pagerId: p.pagerId, decisionId }, to = fromBase64url(s.keys.pagerKey) ?? new Uint8Array();
       const sealed = seal(to, 'card', at, new TextEncoder().encode(JSON.stringify(part)));
       const preview = seal(to, 'decisionPreview', at, encodePart('decisionPreview', { title: 'Broken?', app: 'Claude Code', project: 'shop' }));

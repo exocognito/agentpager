@@ -32,14 +32,20 @@ function plaintext<K extends ShapedKind & SealedKind>(kind: K, value: PartOf<K>,
   return encoded;
 }
 
-export function sealIdentity(k: Keys, identity: IdentityPart) {
-  return seal(bytes(k.pagerKey), 'identity', { pagerId: k.pager }, plaintext('identity', identity, 'Who asked, the project and the computer'));
+// Who asked, the project and the computer, as the agent says them.
+export type Who = { app: string; project: string; machine?: string };
+// The identity names this agent's own public key too, the one each of its cards names: the phone takes a card as this
+// agent's only when the two match (B30).
+const identityOf = (k: Keys, who: Who): IdentityPart => ({ ...who, answerKey: publicOf(k.privateKey) });
+
+export function sealIdentity(k: Keys, who: Who) {
+  return seal(bytes(k.pagerKey), 'identity', { pagerId: k.pager }, plaintext('identity', identityOf(k, who), 'Who asked, the project and the computer'));
 }
 
 // What a card holds once compiled (card.ts Brief): the question, its brief and its attachments with their contents.
 export type Question = { title: string; detail?: string; card: CardPart['card']; attachments?: readonly Attachment[] };
 // A card, each attachment in its slot and the alert's preview, all bound to the decision the request id names.
-export function sealAsk(k: Keys, identity: IdentityPart, brief: Question, decisionId: string) {
+export function sealAsk(k: Keys, who: Who, brief: Question, decisionId: string) {
   const to = bytes(k.pagerKey), at = { pagerId: k.pager, decisionId };
   const card: CardPart = {
     title: brief.title, ...(brief.detail ? { detail: brief.detail } : {}), card: brief.card,
@@ -51,7 +57,7 @@ export function sealAsk(k: Keys, identity: IdentityPart, brief: Question, decisi
   return {
     card: seal(to, 'card', at, plaintext('card', card, 'The card')),
     ...(attachments.length ? { attachments } : {}),
-    preview: seal(to, 'decisionPreview', at, plaintext('decisionPreview', decisionPreview(card, identity), 'The alert')),
+    preview: seal(to, 'decisionPreview', at, plaintext('decisionPreview', decisionPreview(card, who), 'The alert')),
   };
 }
 
@@ -62,12 +68,12 @@ export function askDigest(k: Keys, brief: Question) {
   return createHmac('sha256', key).update(JSON.stringify(brief)).digest('base64url');
 }
 
-export function sealAcknowledgement(k: Keys, identity: IdentityPart, decisionId: string, nextSteps: string, title: string) {
+export function sealAcknowledgement(k: Keys, who: Who, decisionId: string, nextSteps: string, title: string) {
   const to = bytes(k.pagerKey), at = { pagerId: k.pager, decisionId };
   const ack = { nextSteps };
   return {
     acknowledgement: seal(to, 'acknowledgement', at, plaintext('acknowledgement', ack, 'The acknowledgement')),
-    preview: seal(to, 'acknowledgementPreview', at, plaintext('acknowledgementPreview', acknowledgementPreview(ack, identity, title), 'The alert')),
+    preview: seal(to, 'acknowledgementPreview', at, plaintext('acknowledgementPreview', acknowledgementPreview(ack, who, title), 'The alert')),
   };
 }
 

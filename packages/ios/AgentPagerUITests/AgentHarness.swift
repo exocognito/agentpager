@@ -73,7 +73,8 @@ final class AgentHarness {
         guard let raw = Envelope.fromBase64url(key["publicKey"] as? String ?? ""), Data(SHA256.hash(data: raw).prefix(8)) == bytes.dropFirst(16) else { throw ToolError(body: ["error": "KeyMismatch"]) }
         pagerKey = try Curve25519.KeyAgreement.PublicKey(rawRepresentation: raw)
         ownKey = Curve25519.KeyAgreement.PrivateKey()
-        identity = ["app": app, "project": project]
+        // Its identity names its own key, as each of its cards does.
+        identity = ["app": app, "project": project, "answerKey": Envelope.base64url(ownKey.publicKey.rawRepresentation)]
         if let machine { identity["machine"] = machine }
         let r = try call("POST", "api/agents", ["number": number, "identity": try seal(.identity, identity, PartContext(pagerId: pagerId))])
         agentId = (r["agent"] as! [String: Any])["agentId"] as! String

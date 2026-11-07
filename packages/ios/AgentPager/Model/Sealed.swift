@@ -9,14 +9,18 @@ import AgentPagerCrypto
 //
 // A part that doesn't open, or opens to something that isn't its kind's shape, is never shown in part (I4.9): a
 // decision with such a card or acknowledgement, or whose agent's identity won't open, shows as one this phone can't
-// read, with nothing of it and nothing to answer. So does an answered decision whose answer this phone doesn't hold,
-// since only the agent can open what the phone sent.
+// read, with nothing of it and nothing to answer. So does a card that names another key than its agent's identity
+// does: the server can seal a card to the pager's key as anyone can, but not with the agent's key in it, which it
+// never sees, so an answer the phone seals reaches only that agent. And so does an answered decision whose answer
+// isn't exactly one this phone sent, since only the agent can open what the phone sent.
 
-// An answer this phone sent, by the request id it went with, so its own answer shows once the server stores it.
+// An answer this phone sent, by the request id it went with: the choice, and the part it sealed, which the server
+// must hand back unchanged for the phone to show the choice as the answer.
 nonisolated struct SentAnswer: Codable, Hashable, Sendable {
     var pagerId: String
     var decisionId: String
     var choice: Choice
+    var sealed: String
 }
 
 nonisolated enum Sealed {
@@ -32,19 +36,19 @@ nonisolated enum Sealed {
             guard let identity: IdentityPart = open(a.agent.identity, key, .identity, PartContext(pagerId: pagerId)) else { return unreadableAgent(a) }
             let agent = AgentInfo(agentId: a.agent.agentId, app: identity.app, project: identity.project, machine: identity.machine,
                                   createdAt: a.agent.createdAt, finishedAt: a.agent.finishedAt, lastActivityAt: a.agent.lastActivityAt, openCount: a.agent.openCount)
-            return AgentInbox(agent: agent, open: a.open.map { decision($0, key, pagerId, answers) }, answered: a.answered.map { decision($0, key, pagerId, answers) })
+            return AgentInbox(agent: agent, open: a.open.map { decision($0, key, pagerId, identity.answerKey, answers) }, answered: a.answered.map { decision($0, key, pagerId, identity.answerKey, answers) })
         })
     }
 
-    private static func decision(_ d: SealedDecision, _ key: Curve25519.KeyAgreement.PrivateKey, _ pagerId: String, _ answers: [String: SentAnswer]) -> Decision {
+    private static func decision(_ d: SealedDecision, _ key: Curve25519.KeyAgreement.PrivateKey, _ pagerId: String, _ agentKey: String, _ answers: [String: SentAnswer]) -> Decision {
         let at = PartContext(pagerId: pagerId, decisionId: d.decisionId)
-        guard let card: CardPart = open(d.card, key, .card, at) else { return unreadable(d) }
+        guard let card: CardPart = open(d.card, key, .card, at), card.answerKey == agentKey else { return unreadable(d) }
         // The card names each attachment, the server only how many and how big: they must agree.
         let entries = card.attachments ?? []
         guard entries.count == d.attachments.count else { return unreadable(d) }
         var answer: Answer?
         if let a = d.answer {
-            guard let sent = answers[a.requestId], sent.decisionId == d.decisionId, sent.pagerId == pagerId else { return unreadable(d) }
+            guard let sent = answers[a.requestId], sent.decisionId == d.decisionId, sent.pagerId == pagerId, sent.sealed == a.answer else { return unreadable(d) }
             answer = Answer(answerId: a.answerId, decisionId: d.decisionId, choice: sent.choice, sentAt: a.sentAt)
         }
         var acknowledgement: Acknowledgement?

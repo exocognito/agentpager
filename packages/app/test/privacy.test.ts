@@ -3,8 +3,8 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fixture, assert, token, until, C, apple, device, registered, openDecision, openIdentity, openAnswer, sealAnswer, asQuestion, type AgentCreds } from './support.ts';
 import { briefsDir } from '../fixtures/briefs/load.ts';
-import { fromBase64url, open } from '../../contract/envelope.ts';
-import { decodePart } from '../../contract/parts.ts';
+import { fromBase64url, keyPair, open, seal, toBase64url } from '../../contract/envelope.ts';
+import { decodePart, encodePart } from '../../contract/parts.ts';
 import { publicOf } from '../../cli/src/seal.ts';
 
 // End-to-end encryption (6 Privacy): what the service holds, logs, replies and sends to Apple, read as bytes.
@@ -107,6 +107,15 @@ test('B30.1 Each part opens only at the other end', { timeout: 120_000 }, async 
     assert.deepEqual(openAnswer(a, asked.decisionId, answer), { kind: 'feedback', text: 'Only you read this.' });
     assert.throws(() => open(phone, 'answer', at, answer), /can't be opened/, 'the phone can\'t open the answer it sent');
     assert.equal(openDecision(p.pagerId, d).answerKey, publicOf(a.keys.privateKey), 'the card names the agent\'s own key');
+    // The identity names that key too, and the phone takes a card as this agent's only when they match: a card the
+    // service sealed to the pager's key, naming a key of its own, is one the phone refuses, so no answer goes to it.
+    const identity = openIdentity(p.pagerId, wire.agents[0].agent.identity);
+    assert.equal(identity.answerKey, publicOf(a.keys.privateKey));
+    assert.equal(openDecision(p.pagerId, d, identity.answerKey).title, 'Who opens this?');
+    const forgedId = await C.decisionIdOf(a.agent.agentId, token()), rogue = keyPair();
+    const { answerKey: _, ...plain } = decodePart('card', open(phone, 'card', at, d.card));
+    const forged = seal(fromBase64url(p.publicKey) ?? new Uint8Array(), 'card', { pagerId: p.pagerId, decisionId: forgedId }, encodePart('card', { ...plain, answerKey: toBase64url(rogue.publicKey) }));
+    assert.throws(() => openDecision(p.pagerId, { ...d, decisionId: forgedId, card: forged, status: 'open', answer: undefined, acknowledgement: undefined }, identity.answerKey), /another key/);
   } finally { await f.stop(); }
 });
 

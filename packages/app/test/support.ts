@@ -16,7 +16,7 @@ import { decode, token } from '../src/shared.ts';
 import { fromBase64url, keyPair, open, seal, toBase64url } from '../../contract/envelope.ts';
 import { decodePart, encodePart, type AcknowledgementPreview, type CardPart, type DecisionPreview, type IdentityPart } from '../../contract/parts.ts';
 import { AlertPayload, PREVIEW_KINDS } from '../../contract/alerts.ts';
-import { askDigest, newKeys, sealAcknowledgement, sealAsk, sealIdentity, type Keys, type Question } from '../../cli/src/seal.ts';
+import { askDigest, newKeys, sealAcknowledgement, sealAsk, sealIdentity, type Keys, type Question, type Who } from '../../cli/src/seal.ts';
 export { token, C, decode, assert };
 
 export const app = fileURLToPath(new URL('..', import.meta.url));
@@ -82,19 +82,22 @@ export type ReadDecision = {
   acknowledgement?: { decisionId: string; answerId: string; nextSteps: string; acknowledgedAt: string };
 };
 // An agent as the tests play it, through the command's own sealing (packages/cli/src/seal.ts): its keys and identity.
-export type AgentCreds = { agent: { agentId: string }; agentKey: string; keys: Keys; identity: IdentityPart };
+export type AgentCreds = { agent: { agentId: string }; agentKey: string; keys: Keys; identity: Who };
 const raw32 = (key: string) => { const b = fromBase64url(key); if (!b || b.length !== 32) throw new Error('not a key'); return b; };
-const sentAnswers = new Map<string, C.Choice>();
+const sentAnswers = new Map<string, { choice: C.Choice; part: string }>();
 // Who each test agent is on which pager, and what it asked, for the parts that name them.
 const agentPagers = new Map<string, string>();
 const titles = new Map<string, string>();
 export function openIdentity(pagerId: string, identity: string): IdentityPart {
   return decodePart('identity', open(raw32(phoneKeys.get(pagerId) ?? ''), 'identity', { pagerId }, identity));
 }
-export function openDecision(pagerId: string, d: C.Decision): ReadDecision {
+// A decision as the phone reads it: its card must name the key its agent's identity names (agentKey), and its answer
+// shows only when it is exactly a part this phone sent.
+export function openDecision(pagerId: string, d: C.Decision, agentKey?: string): ReadDecision {
   const key = raw32(phoneKeys.get(pagerId) ?? ''), at = { pagerId, decisionId: d.decisionId };
   const card = decodePart('card', open(key, 'card', at, d.card));
-  const choice = d.answer && sentAnswers.get(d.answer.requestId);
+  if (agentKey !== undefined && card.answerKey !== agentKey) throw new Error('This card names another key than its agent\'s.');
+  const sent = d.answer && sentAnswers.get(d.answer.requestId), choice = sent && sent.part === d.answer?.answer ? sent.choice : undefined;
   return {
     decisionId: d.decisionId, status: d.status, title: card.title, ...(card.detail === undefined ? {} : { detail: card.detail }), card: card.card,
     ...(card.attachments ? { attachments: card.attachments.map((a, i) => ({ ...a, bytes: d.attachments[i]?.bytes ?? 0 })) } : {}), answerKey: card.answerKey, askedAt: d.askedAt,
@@ -107,10 +110,13 @@ export function readable(inbox: C.PagerInbox): Readable {
   const pagerId = inbox.pager.pagerId;
   return {
     pager: inbox.pager,
-    agents: inbox.agents.map(x => ({
-      agent: { agentId: x.agent.agentId, ...openIdentity(pagerId, x.agent.identity), createdAt: x.agent.createdAt, finishedAt: x.agent.finishedAt, lastActivityAt: x.agent.lastActivityAt, openCount: x.agent.openCount },
-      open: x.open.map(d => openDecision(pagerId, d)), answered: x.answered.map(d => openDecision(pagerId, d)),
-    })),
+    agents: inbox.agents.map(x => {
+      const { answerKey, ...who } = openIdentity(pagerId, x.agent.identity);
+      return {
+        agent: { agentId: x.agent.agentId, ...who, createdAt: x.agent.createdAt, finishedAt: x.agent.finishedAt, lastActivityAt: x.agent.lastActivityAt, openCount: x.agent.openCount },
+        open: x.open.map(d => openDecision(pagerId, d, answerKey)), answered: x.answered.map(d => openDecision(pagerId, d, answerKey)),
+      };
+    }),
   };
 }
 // A question sealed as the command seals it: the card, its attachments in slot order and the alert's preview, bound
@@ -122,8 +128,9 @@ export async function sealQuestion(a: AgentCreds, q: { requestId: string } & Que
 }
 // The phone's answer, sealed to the key inside the card it answers, and kept so the phone can read its own answer.
 export function sealAnswer(card: { answerKey: string }, pagerId: string, decisionId: string, choice: C.Choice, requestId = token()) {
-  sentAnswers.set(requestId, choice);
-  return { requestId, answer: seal(raw32(card.answerKey), 'answer', { pagerId, decisionId }, encodePart('answer', { choice })) };
+  const answer = seal(raw32(card.answerKey), 'answer', { pagerId, decisionId }, encodePart('answer', { choice }));
+  if (!sentAnswers.has(requestId)) sentAnswers.set(requestId, { choice, part: answer });
+  return { requestId, answer };
 }
 export function openAnswer(a: AgentCreds, decisionId: string, part: string): C.Choice {
   return decodePart('answer', open(raw32(a.keys.privateKey), 'answer', { pagerId: a.keys.pager, decisionId }, part)).choice;
@@ -194,7 +201,7 @@ export async function fixture(name: string, clocks: { autoOffMs: number; idleMs:
     const key = await ok(C.PagerKey, `/api/pagers/${pagerId}/key`);
     assert.equal(createHash('sha256').update(raw32(key.publicKey)).digest().subarray(0, 8).toString('base64url'), Buffer.from(number.slice(4), 'base64url').subarray(16, 24).toString('base64url'), 'the key the number names');
     const own = newKeys(), keys = { pager: pagerId, pagerKey: key.publicKey, privateKey: own.privateKey };
-    const identity: IdentityPart = { app, project, ...(machine ? { machine } : {}) };
+    const identity: Who = { app, project, ...(machine ? { machine } : {}) };
     const c = await ok(C.Connected, '/api/agents', { data: { number, identity: sealIdentity(keys, identity) } });
     agentPagers.set(c.agent.agentId, pagerId);
     return { ...c, agent: { ...c.agent, ...openIdentity(pagerId, c.agent.identity) }, keys, identity };

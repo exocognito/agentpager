@@ -130,7 +130,8 @@ async function readBack(record) {
   lines.push('the pager is on, auto-off never');
   check(inbox.agents.length === 1 && inbox.agents[0].agent.agentId === record.agent.agentId && !inbox.agents[0].agent.finishedAt, `the pager lists ${inbox.agents.length} agents, not its one agent`);
   const { agent, open: waiting, answered } = inbox.agents[0], { acknowledged, open: left } = record.decisions;
-  check(opened(record, 'identity', {}, agent.identity).project === `${record.tag} baseline`, 'its identity doesn\'t open to its project');
+  const identity = opened(record, 'identity', {}, agent.identity);
+  check(identity.project === `${record.tag} baseline`, 'its identity doesn\'t open to its project');
   lines.push(`one agent (${record.agent.id}), its identity opened, last active ${agent.lastActivityAt}`);
   check(waiting.length === 1 && waiting[0].decisionId === left.decisionId && waiting[0].status === 'open' && opened(record, 'card', { decisionId: left.decisionId }, waiting[0].card).title === left.title, `${waiting.length} open decisions, not ${left.id}`);
   lines.push(`one open decision (${left.id}), its card opened`);
@@ -139,7 +140,7 @@ async function readBack(record) {
     && opened(record, 'acknowledgement', { decisionId: d.decisionId }, d.acknowledgement.acknowledgement).nextSteps === acknowledged.nextSteps,
   `${answered.length} answered decisions, not ${acknowledged.id} answered, collected and acknowledged`);
   const card = opened(record, 'card', { decisionId: d.decisionId }, d.card);
-  check(card.title === acknowledged.title, 'its card doesn\'t open to its question');
+  check(card.title === acknowledged.title && card.answerKey === identity.answerKey, 'its card doesn\'t open to its question, naming its agent\'s key');
   lines.push(`one acknowledged decision (${acknowledged.id}), its answer collected, its card and acknowledgement opened`);
   const listed = (card.attachments ?? []).map((a, i) => `${a.name} ${a.type} ${d.attachments[i]?.bytes}`).sort().join(', ');
   check(listed === acknowledged.attachments.map(a => `${a.name} ${a.type} ${a.bytes}`).sort().join(', '), `its attachments read back as ${listed || 'none'}`);

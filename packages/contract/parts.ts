@@ -63,8 +63,11 @@ export const CardPart = Schema.Struct({
 }).annotations(strict).pipe(Schema.filter(c => missingAttachment(c.card.markdown, attachmentTypes(c.attachments)) ?? true));
 export type CardPart = typeof CardPart.Type;
 
-// Who asked, the project and the computer, sealed once at connect.
-export const IdentityPart = Schema.Struct({ app: Label, project: Label, machine: Schema.optional(Label) }).annotations(strict);
+// Who asked, the project and the computer, sealed once at connect, with the agent's own public key: the phone takes a
+// card as this agent's only when the card names the same key, so a card the service made, with a key of its own, is one
+// the phone can't read, and an answer to this agent's card reaches only this agent's key. (The service, which can make
+// a number from what it stores, can still connect as an agent of its own, as anyone with the number can.)
+export const IdentityPart = Schema.Struct({ app: Label, project: Label, machine: Schema.optional(Label), answerKey: AnswerKey }).annotations(strict);
 export type IdentityPart = typeof IdentityPart.Type;
 export const AnswerPart = Schema.Struct({ choice: Choice }).annotations(strict);
 export type AnswerPart = typeof AnswerPart.Type;
@@ -193,7 +196,9 @@ function fit<P extends object>(preview: P, steps: ((p: P) => P)[]): P {
 }
 const required = <P extends object>(text: string, rebuild: (text: string) => P) => shorten(text, rebuild) ?? rebuild(ELLIPSIS);
 
-export function decisionPreview(card: CardPart, identity: IdentityPart): DecisionPreview {
+// Who asked, the project and the computer: what a preview names of an identity.
+type Who = Pick<IdentityPart, "app" | "project" | "machine">;
+export function decisionPreview(card: CardPart, identity: Who): DecisionPreview {
   const option = card.card.options.find(o => o.number === card.card.recommended);
   const full: DecisionPreview = {
     title: card.title,
@@ -213,7 +218,7 @@ export function decisionPreview(card: CardPart, identity: IdentityPart): Decisio
   ]));
 }
 
-export function acknowledgementPreview(ack: AcknowledgementPart, identity: IdentityPart, title: string): AcknowledgementPreview {
+export function acknowledgementPreview(ack: AcknowledgementPart, identity: Who, title: string): AcknowledgementPreview {
   const full: AcknowledgementPreview = { nextSteps: ack.nextSteps, app: identity.app, project: identity.project, title };
   return Schema.decodeUnknownSync(AcknowledgementPreview)(fit<AcknowledgementPreview>(full, [
     p => required(p.nextSteps, nextSteps => ({ ...p, nextSteps })),

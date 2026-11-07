@@ -36,7 +36,7 @@ Read `AGENTS.md`, then `blueprint/README.md`. This file covers only what those t
 - **Known leftovers** from M4 (question 10):
   - the id check's "Known limits" at the top of `scripts/blueprint.mjs`;
   - `DECISIONS.md` still names the retired limit L20.
-- **The primary clone** sits on `main` at cfb78c0, behind `origin/main`, with one untracked file, `review.txt`, from 6 Nov at 15:19, which this handoff didn't make. No agent works in it. [V]
+- **The primary clone** sits on `main` at cfb78c0, behind `origin/main`. No agent works in it. [V]
 
 ## For Sam to approve trashing
 

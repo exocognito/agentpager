@@ -1,7 +1,7 @@
 import CryptoKit
 import Foundation
 import XCTest
-@testable import AgentPagerCrypto
+import AgentPagerCrypto
 
 // packages/contract/vectors/alerts.json, read where it is: the same file the contract's tests read.
 let alertVectorsURL = URL(fileURLWithPath: #filePath)

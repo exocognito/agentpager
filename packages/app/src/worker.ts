@@ -40,9 +40,42 @@ async function ownPager(env: Env, request: Request, pagerId: string) {
   return { hash, hit: decode(PagerHit, await relay(reply).json()) };
 }
 
+// Which side calls each route: the phone, with its pager's key, or an agent. Anything else is no route, refused before
+// anything is read, so every route below has a side and its client is checked.
+type Side = 'agent' | 'phone';
+function sideOf(parts: string[], method: string): Side | null {
+  const [top, , sub, , leaf] = parts, n = parts.length;
+  if (top === 'pagers') {
+    if (n === 1) return method === 'POST' ? 'phone' : null;
+    if (n === 2) return method === 'GET' ? 'phone' : null;
+    return n === 3 && method === 'POST' && ['settings', 'push', 'delete'].includes(sub) ? 'phone' : null;
+  }
+  if (top !== 'agents') return null;
+  if (n === 1) return method === 'POST' ? 'agent' : null;
+  if (n === 2) return method === 'GET' ? 'agent' : null;
+  if (n === 3) return method === 'POST' && (sub === 'cards' || sub === 'finish') ? 'agent' : null;
+  if (n === 5 && sub === 'cards' && leaf === 'answer') return method === 'GET' ? 'agent' : method === 'POST' ? 'phone' : null;
+  if (n === 5 && sub === 'cards' && leaf === 'acknowledge') return method === 'POST' ? 'agent' : null;
+  if (n === 6 && sub === 'cards' && leaf === 'files') return method === 'GET' ? 'phone' : null;
+  return null;
+}
+// Each call's client (CLIENT_HEADER), checked first, before its key and its input: a client older than the service
+// accepts is told to update, and nothing it sent is read or stored. An app without the header is still served
+// (OLDEST_PROTOCOL), and is never told its pager is unknown, which would make it drop the pager and its keys.
+function admit(request: Request, side: Side, origin: string) {
+  const header = request.headers.get(C.CLIENT_HEADER), client = C.readClientVersion(header);
+  if (side === 'phone' && header === null && !C.PHONE_NEEDS_CLIENT_HEADER) return;
+  if (client && client.protocol >= C.OLDEST_PROTOCOL[side]) return;
+  console.warn(`UpdateRequired: ${side === 'agent' ? 'an agent' : 'a phone'} call ${client ? `from ${client.client}/${client.protocol} ${client.build}` : header === null ? 'with no client header' : 'with a client header that does not read'}`);
+  throw side === 'agent' ? C.refuse.commandTooOld(origin) : C.refuse.appTooOld();
+}
+
 // Public HTTPS routes -> the Registry (pagers) or one agent's object.
 async function api(request: Request, env: Env): Promise<Response> {
   const u = new URL(request.url), method = request.method, parts = u.pathname.split('/').filter(Boolean).slice(1);
+  const side = sideOf(parts, method);
+  if (!side) throw C.refuse.notFound();
+  admit(request, side, u.origin);
   const pass = async (agentId: string, path: string) => method === 'GET'
     ? read(path + u.search, p => forward(env.AGENT, agentId, p, { method, headers: request.headers }))
     : forward(env.AGENT, agentId, path + u.search, { method, headers: request.headers, body: await request.arrayBuffer() });

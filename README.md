@@ -31,7 +31,7 @@ pnpm test
 
 ## Build the product
 
-The app and the binary import the wire contract by relative path (`../../contract/...`). It supplies the Worker, the Durable Objects behind pagers and agents, the card API layer and routing. The HTTP API's routes, auth headers and error statuses are in `packages/app/src/worker.ts` and `contract.ts`; every reply carries the build header `X-AgentPager-Build` ([packages/app/README.md › Deployment](packages/app/README.md#deployment)). `/start` and the retired `/mcp` send an arriving agent to the `agentpager` command (`packages/cli`). Test fixtures stay outside package exports.
+The app and the binary import the wire contract by relative path (`../../contract/...`). It supplies the Worker, the Durable Objects behind pagers and agents, the card API layer and routing. The HTTP API's routes, auth headers and error statuses are in `packages/app/src/worker.ts` and `contract.ts`; every request names its client in `X-AgentPager-Client` and every reply carries the build header `X-AgentPager-Build` ([packages/app/README.md › Deployment](packages/app/README.md#deployment)). `/start` and the retired `/mcp` send an arriving agent to the `agentpager` command (`packages/cli`). Test fixtures stay outside package exports.
 
 ## Reset deployed data (retired)
 

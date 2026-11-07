@@ -38,12 +38,15 @@ async function port() { const s = createServer(); await new Promise<void>(r => s
 
 export const ErrorBody = Schema.Struct({ error: Schema.String, message: Schema.String, reason: Schema.optional(Schema.String), limit: Schema.optional(Schema.Number) });
 export type ErrorBody = typeof ErrorBody.Type;
-// A brief's short form: every card an agent asks is a brief.
+// Every client of the API names itself (C.CLIENT_HEADER); the tests do too.
+export const CLIENT = C.clientVersion('tests', 'local');
+export const asClient = { [C.CLIENT_HEADER]: CLIENT };
+// A brief's short form: every card an agent asks is a brief, with a request id of its own.
 export function question(title = 'Which plan?', detail?: string) {
-  return { title, ...(detail ? { detail } : {}), card: { type: 'brief', recommended: 2, options: [{ number: 1, title: 'First plan', label: 'First', prioritizes: 'speed' }, { number: 2, title: 'Second plan', label: 'Second', prioritizes: 'safety' }], markdown: '## Context: two plans\nBoth are ready to start.\n\n## Options\n\n## Tradeoffs\n|       | A First        | B Second       |\n|-------|----------------|----------------|\n| Speed | :green[Fast]   | :yellow[Slower] |\n\n## Recommendation: B\n**Why:** It is safer.\n' } };
+  return { requestId: token(), title, ...(detail ? { detail } : {}), card: { type: 'brief', recommended: 2, options: [{ number: 1, title: 'First plan', label: 'First', prioritizes: 'speed' }, { number: 2, title: 'Second plan', label: 'Second', prioritizes: 'safety' }], markdown: '## Context: two plans\nBoth are ready to start.\n\n## Options\n\n## Tradeoffs\n|       | A First        | B Second       |\n|-------|----------------|----------------|\n| Speed | :green[Fast]   | :yellow[Slower] |\n\n## Recommendation: B\n**Why:** It is safer.\n' } };
 }
 // An emoji card, as agents sent before briefs; the contract has no such card.
-export const emojiCard = { title: 'Which plan?', card: { type: 'generic', options: [{ number: 1, emoji: '🚀', title: 'One' }, { number: 2, emoji: '🛠️', title: 'Two' }] } };
+export const emojiCard = { requestId: token(), title: 'Which plan?', card: { type: 'generic', options: [{ number: 1, emoji: '🚀', title: 'One' }, { number: 2, emoji: '🛠️', title: 'Two' }] } };
 
 // What the phone makes for a new pager: a Curve25519 key pair, a 16-byte pager id, and the number naming both
 // (I19, blueprint/areas/6-privacy.md).
@@ -84,8 +87,10 @@ export async function fixture(name: string, clocks: { autoOffMs: number; idleMs:
   async function restart() { await stop(); await launch(); }
   await launch();
 
-  async function request(route: string, opts: { method?: string; data?: unknown; agent?: string; phone?: string; raw?: string } = {}) {
-    const r = await fetch(origin + route, { method: opts.method || (opts.data !== undefined || opts.raw !== undefined ? 'POST' : 'GET'), headers: { ...(opts.agent ? { authorization: `Bearer ${opts.agent}` } : {}), ...(opts.phone ? { 'x-phone-key': opts.phone } : {}), 'content-type': 'application/json' }, body: opts.raw ?? (opts.data === undefined ? undefined : JSON.stringify(opts.data)) });
+  // Each request names its client as CLIENT, unless `client` names another, or is null for none, as before the header.
+  async function request(route: string, opts: { method?: string; data?: unknown; agent?: string; phone?: string; raw?: string; client?: string | null } = {}) {
+    const client = opts.client === undefined ? CLIENT : opts.client;
+    const r = await fetch(origin + route, { method: opts.method || (opts.data !== undefined || opts.raw !== undefined ? 'POST' : 'GET'), headers: { ...(opts.agent ? { authorization: `Bearer ${opts.agent}` } : {}), ...(opts.phone ? { 'x-phone-key': opts.phone } : {}), ...(client === null ? {} : { [C.CLIENT_HEADER]: client }), 'content-type': 'application/json' }, body: opts.raw ?? (opts.data === undefined ? undefined : JSON.stringify(opts.data)) });
     assert.equal(r.headers.get('x-agentpager-build'), sha, `candidate build on ${route}`);
     const value: unknown = await r.json();
     return { status: r.status, value };

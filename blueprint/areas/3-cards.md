@@ -36,7 +36,7 @@ Why: [UTF-8 with Markdown is allowed; invalid or over-limit text is refused, nev
 3. Limits count visible characters, spaces and Markdown punctuation included, so a combined emoji counts as one.
 4. Every text an agent or the phone sends has a limit. A question's title holds at most 100 visible characters, its detail and an acknowledgement at most 280, and a note at most 1,000. Each option's label, title and what it prioritizes, the brief and each page have their own. A decision's attachments are PNG or JPEG images and Markdown pages, with limits on how many and how big.
 5. Text may use `<` and `>` as plain characters: what is refused is HTML. In a brief or its pages, HTML inside code is allowed, and it shows as text and is never rendered.
-6. A request with a wrong key is refused as unauthorized, even when its input is also invalid.
+6. A request with a wrong key is refused as unauthorized, even when its input is also invalid. A client too old for the service is told to update before its key is checked (B25.14).
 7. The service stores exactly what it accepts.
 8. @M3: Compiling `card.yaml`, the command trims the spaces around each value and joins a prose paragraph's wrapped lines so the phone can reflow them. It changes nothing else, and holds the result to these same checks before it leaves the machine (I22).
 9. @M5: Text the service can't read is checked by the command before it leaves the agent's machine (I22), and by the phone when it reads it. A decision that fails the phone's check shows as one it can't read, never in part.

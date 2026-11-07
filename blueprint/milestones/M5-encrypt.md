@@ -1,6 +1,6 @@
 # M5 · Decisions the service can't read
 
-> **Status:** built and on dev, awaiting Sam's walk · **Started:** 6 Nov 2026 · **On dev:** 6 Nov 2026, at 6df2016 · **Order:** after M4; [TIDY](next/TIDY.md) follows · **Word:** ENCRYPT
+> **Status:** built and on dev; the two phone changes from Sam's answers of 7 Nov are being built, and Sam's walk follows on the new build · **Started:** 6 Nov 2026 · **On dev:** 6 Nov 2026, at 6df2016 · **Order:** after M4; [TIDY](next/TIDY.md) follows · **Word:** ENCRYPT
 
 ## Objective
 
@@ -129,20 +129,28 @@ On HomePhoneLite, which runs `main`'s app with dev as its server, and with the w
 6. Run the `m4` command installed on Sam's machines with a throwaway `AGENTPAGER_HOME` and `--server https://dev.agentpager.me`. It is refused and told how to update.
 7. Read this doc, [6 Privacy](../areas/6-privacy.md) (B30, I20, I19.6–7), [4 Getting paged](../areas/4-getting-paged.md) (B17.11) and [generated/untested.md](../generated/untested.md).
 
-## Sam decides at the walk
+## Answered on 7 Nov, before the walk
 
-Found while building. What is built follows ★ on 1 to 3; 4 and 5 change only words, once Sam answers.
+Five questions found while building, for the walk. Sam answered them in the root's Claude Code session on 7 Nov 2026, after the root showed a page of the system's encryption and each question's options, answering: "1B 2B 3A 4a 5a". On 1 and 2 Sam chose the option the root didn't recommend. The choices:
 
-1. **A service that replaces an agent's who-asked.** A service that replaces an existing agent's who-asked with its own can show its own decisions in that agent's place, and read the answers to those. It still can't read real agents' decisions or the answers to them. (a) ★ Accept it, as recorded under What encryption doesn't hide (What's known, above); (b) the phone pins each agent's first-seen key and shows later changes as unreadable.
-2. **Answers after a reinstall.** After the app is deleted and installed again, the pagers stay in the Keychain but the phone's record of its own answers doesn't, so every answered decision shows as one it can't read: only the agent can open an answer. (a) ★ Accept it for now, written down as a limit; (b) keep each answer's record in the Keychain with its pager.
-3. **The client check comes before the key check.** A client too old for the service that also has a wrong key is told to update rather than refused as unauthorized, which reads against [I4.6](../areas/3-cards.md#i4--m1--what-doesnt-fit-is-refused-whole-never-cut). (a) ★ Narrow I4.6: a client too old for the service is told to update before its key is checked; (b) check the key first.
-4. **A term for what is encrypted.** [B30.2](../areas/6-privacy.md#b30--m5--decisions-are-encrypted-end-to-end) uses the words encrypted part, which have no entry in [TERMS.md](../TERMS.md). (a) ★ Add one: a card, one of its attachments, who asked, an answer, an acknowledgement or an alert's preview, encrypted on one end for the other to read; (b) keep it a word of the code.
-5. **I5's note on decisions stored before 31 Oct 2026.** The note in [I5](../areas/5-answering.md#i5--m1--answers-never-change) describes code the switch removed, and those decisions are gone. (a) ★ Delete the note; (b) keep it as history.
+1. **A service that replaces an agent's who-asked** could show its own decisions in that agent's place and read the answers to those. Sam chose that the phone pins each agent's first-seen key and shows later changes as unreadable, over accepting it. This adds B30.3, below, built in a phone pull request.
+2. **Answers after a reinstall:** the pagers stayed in the Keychain but the phone's record of its own answers didn't, so every answered decision showed as one the phone can't read. Sam chose to keep each answer's record in the Keychain with its pager, over accepting it as a limit. This adds B7.4, below, built in the same phone pull request.
+3. **The client check came before the key check,** so a client too old for the service that also had a wrong key was told to update, not refused as unauthorized, against [I4.6](../areas/3-cards.md#i4--m1--what-doesnt-fit-is-refused-whole-never-cut). Sam chose to narrow I4.6: a client too old for the service is told to update before its key is checked.
+4. **A term for what is encrypted:** [B30.2](../areas/6-privacy.md#b30--m5--decisions-are-encrypted-end-to-end) used the words encrypted part, which had no entry in [TERMS.md](../TERMS.md). Sam chose to add Encrypted part to TERMS.
+5. **I5's note on decisions stored before 31 Oct 2026** described code the switch removed, for decisions that are gone. Sam chose to delete it from [I5](../areas/5-answering.md#i5--m1--answers-never-change).
+
+Questions 1 and 2 add these lines, worded by the root from the options Sam chose, for Sam's review after the merge. Each reaches its area file with the phone pull request that makes it true, and its tests name its id.
+
+**B30, a clause added** (6 Privacy)
+3. @M5: The phone keeps the key each agent first names. When that agent's who-asked later names another key, the phone shows the agent and its decisions as ones it can't read, with nothing to answer.
+
+**B7, a clause added** (5 Answering)
+4. @M5: An answered decision still shows the owner's answer after the app is deleted and installed again, as long as its pager is still on the phone.
 
 ## Adds · Changes · Retires
 
-- **Adds:** B30 and I20, whole; I19.6 and I19.7; B17.11; B25.14; B27.9; I4.9; each as Sam approved it (question 6). L25, a leaked number can connect any number of agents (1 Pagers), as Sam chose (question 9). The alert extension on the phone. The upgrade baseline from `m4` and the upgrade check on dev.
-- **Changes:** I4.1, I4.7 and I22's notes, since the service can't read a card; I19's Why and notes, since the command's check is built; TERMS › Keys; METHOD.md › Writing lines, which takes Sam's line test and look rule, and › Stages and releases, which allows an exception the owner approves; L10, whose fix and revisit move to TIDY.
+- **Adds:** B30 and I20, whole; I19.6 and I19.7; B17.11; B25.14; B27.9; I4.9; each as Sam approved it (question 6). L25, a leaked number can connect any number of agents (1 Pagers), as Sam chose (question 9). The alert extension on the phone. The upgrade baseline from `m4` and the upgrade check on dev. B30.3 and B7.4, with the phone pull request that makes them true, from Sam's answers to questions 1 and 2 of 7 Nov. TERMS › Encrypted part (question 4 of 7 Nov).
+- **Changes:** I4.1, I4.7 and I22's notes, since the service can't read a card; I4.6, narrowed so that a client too old for the service is told to update before its key is checked (question 3 of 7 Nov); I5's notes, which lose the one on decisions stored before 31 Oct 2026 (question 5 of 7 Nov); I19's Why and notes, since the command's check is built; TERMS › Keys; METHOD.md › Writing lines, which takes Sam's line test and look rule, and › Stages and releases, which allows an exception the owner approves; L10, whose fix and revisit move to TIDY.
 - **Retires:** L19, the service can read every decision (6 Privacy), which B30 and I20 fix, and L17, alerts pass through Apple as plain text (4 Getting paged), which B17.11 fixes. Their ids are never reused. M4's ledger leaves the tree, at tag `m4-house-ledger`.
 
 ## Log

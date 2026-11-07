@@ -215,7 +215,10 @@ final class AppModel {
     }
 
     // Returns a failure description for transport problems; drops pagers the server no longer knows.
-    private func apply(_ p: LocalPager, _ result: Result<SealedPagerInbox, APIError>) -> String? {
+    func apply(_ p: LocalPager, _ result: Result<SealedPagerInbox, APIError>) -> String? {
+        // A read that comes back after its pager went from this phone (Delete, or the server saying it's gone) is
+        // dropped unopened, so nothing of the pager comes back, its pins included.
+        guard pagers.contains(where: { $0.pagerId == p.pagerId }) else { return nil }
         switch result {
         case .success(let sealed):
             // A reply that names another pager isn't this pager's read: shown as a failure, and nothing of it kept.
@@ -242,7 +245,7 @@ final class AppModel {
     // The pager goes from this phone with everything kept with it: Keychain.delete takes its pins and answers too.
     func drop(_ pagerId: String) {
         Keychain.delete(pagerId)
-        answers.forget(pagerId)
+        answers.forget(pagerId, file: live ? KeptAnswers.file : nil)
         pins.forget(pagerId)
         pagers.removeAll { $0.pagerId == pagerId }
         inFlight = inFlight.filter { $0.value.pagerId != pagerId }
@@ -486,8 +489,13 @@ final class AppModel {
         }
         inFlight[p.decisionId] = p
         drafts[p.decisionId] = nil
-        // Kept before it is sent, so whichever send the server stores, the phone can show it.
-        if live { answers.keep(SentAnswer(pagerId: p.pagerId, decisionId: p.decisionId, choice: p.choice, sealed: p.sealed), requestId: p.requestId) }
+        // Kept before it is sent, so whichever send the server stores, the phone can show it, after a reinstall too
+        // (B7.4). An answer whose record the Keychain won't keep isn't sent: it waits as not confirmed, and Retry, or
+        // the next launch, tries the Keychain again.
+        if live, !answers.keep(SentAnswer(pagerId: p.pagerId, decisionId: p.decisionId, choice: p.choice, sealed: p.sealed), requestId: p.requestId) {
+            if !notConfirmed.contains(where: { $0.requestId == p.requestId }) { notConfirmed.append(p) }
+            return
+        }
         // An answer goes only to the server its pager was made on; it waits while the phone points elsewhere.
         guard live, let pager = pager(p.pagerId), !sendingNow.contains(p.requestId) else { return }
         sendingNow.insert(p.requestId)

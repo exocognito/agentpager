@@ -1,4 +1,5 @@
 import Foundation
+import Security
 
 // The last read of each pager, as the server sent it, sealed, so its decisions show while the server can't be
 // reached. Removed with the pager.
@@ -55,8 +56,10 @@ nonisolated enum SendCache {
 // refuses is tried again the next time.
 nonisolated final class KeptAnswers: @unchecked Sendable {
     private let lock = NSLock()
-    // Each pager's answers known this run, by request id, and the pagers whose Keychain records are among them.
+    // Each pager's answers known this run, by request id; those known to be in the Keychain; and the pagers whose
+    // Keychain records have been read.
     private var known: [String: [String: SentAnswer]] = [:]
+    private var saved: [String: Set<String>] = [:]
     private var read: Set<String> = []
 
     func of(_ pagerId: String) -> [String: SentAnswer] {
@@ -66,6 +69,7 @@ nonisolated final class KeptAnswers: @unchecked Sendable {
                     // The service names the pager, so a record names its own; one that doesn't is no answer of this pager's.
                     guard let a = try? JSONDecoder().decode(SentAnswer.self, from: data), a.pagerId == pagerId else { continue }
                     if known[pagerId]?[requestId] == nil { known[pagerId, default: [:]][requestId] = a }
+                    saved[pagerId, default: []].insert(requestId)
                 }
                 read.insert(pagerId)
             }
@@ -74,18 +78,29 @@ nonisolated final class KeptAnswers: @unchecked Sendable {
     }
 
     // Kept before the answer is first sent (AppModel.commit), and never replaced: the first record of a request id is
-    // the one the phone sealed. Still shown this run if the Keychain refuses it.
-    func keep(_ a: SentAnswer, requestId: String) {
+    // the one the phone sealed, and it shows this run whatever the Keychain does. True once it is in the Keychain; a
+    // write the Keychain refused is tried again on the next call, and until then the answer isn't sent.
+    @discardableResult
+    func keep(_ a: SentAnswer, requestId: String) -> Bool {
         lock.withLock {
-            guard known[a.pagerId]?[requestId] == nil else { return }
-            known[a.pagerId, default: [:]][requestId] = a
-            if let data = try? JSONEncoder().encode(a) { _ = Keychain.add(.answers, pagerId: a.pagerId, account: requestId, data: data) }
+            if known[a.pagerId]?[requestId] == nil { known[a.pagerId, default: [:]][requestId] = a }
+            if saved[a.pagerId]?.contains(requestId) == true { return true }
+            guard let first = known[a.pagerId]?[requestId], let data = try? JSONEncoder().encode(first) else { return false }
+            let added = Keychain.add(.answers, pagerId: a.pagerId, account: requestId, data: data)
+            guard added == errSecSuccess || added == errSecDuplicateItem else { return false }
+            saved[a.pagerId, default: []].insert(requestId)
+            return true
         }
     }
 
-    // The pager is gone: Keychain.delete took its records.
-    func forget(_ pagerId: String) {
-        lock.withLock { known[pagerId] = nil; read.remove(pagerId) }
+    // The pager is gone: Keychain.delete took its records. Any of its answers still waiting in the old file to move
+    // (below) go from there too, so none comes back at the next launch.
+    func forget(_ pagerId: String, file: URL?) {
+        lock.withLock { known[pagerId] = nil; saved[pagerId] = nil; read.remove(pagerId) }
+        guard let file, let data = try? Data(contentsOf: file), let old = try? JSONDecoder().decode([String: SentAnswer].self, from: data) else { return }
+        let rest = old.filter { $0.value.pagerId != pagerId }
+        guard rest.count < old.count, let left = try? JSONEncoder().encode(rest) else { return }
+        try? left.write(to: file, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
     }
 
     // Before the Keychain kept them, this build's predecessors kept these records in answers.json in Application

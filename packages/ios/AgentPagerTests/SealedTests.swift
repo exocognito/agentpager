@@ -168,6 +168,23 @@ final class SealedTests: XCTestCase {
         XCTAssertEqual(pinned(b), keyB)
     }
 
+    // A read that comes back after its pager went, as a poll started before Delete can, is dropped unopened: it shows
+    // nothing and pins nothing, so no pin outlives its pager.
+    @MainActor
+    func test_B30_3_aReadThatComesBackAfterItsPagerWentPinsNothing() throws {
+        let model = AppModel(live: false)
+        let a = pager("A", server: model.server.absoluteString)
+        model.pagers = [a]
+        XCTAssertNil(model.apply(a, .success(try read(of: a, title: "Before Delete?"))))
+        XCTAssertEqual(model.inboxes[a.pagerId]?.agents.first?.open.first?.title, "Before Delete?")
+        XCTAssertEqual(pinned(a), answerKey)
+        model.drop(a.pagerId)
+        XCTAssertNil(pinned(a))
+        XCTAssertNil(model.apply(a, .success(try read(of: a, title: "After Delete?"))))
+        XCTAssertNil(model.inboxes[a.pagerId])
+        XCTAssertEqual(AppKeychain.records(.pins, pagerId: a.pagerId), [:])
+    }
+
     // MARK: B7.4 · answers kept with their pager
 
     // The read with its decision answered under a request id, the service holding the part it was handed.
@@ -245,13 +262,25 @@ final class SealedTests: XCTestCase {
         let model = AppModel(live: false)
         let a = pager("A", server: model.server.absoluteString), b = pager("B", server: model.server.absoluteString)
         let kept = KeptAnswers()
-        kept.keep(SentAnswer(pagerId: a.pagerId, decisionId: decisionId, choice: .option(1), sealed: "on A"), requestId: "r-a")
-        kept.keep(SentAnswer(pagerId: b.pagerId, decisionId: decisionId, choice: .option(1), sealed: "on B"), requestId: "r-b")
+        XCTAssertTrue(kept.keep(SentAnswer(pagerId: a.pagerId, decisionId: decisionId, choice: .option(1), sealed: "on A"), requestId: "r-a"))
+        XCTAssertTrue(kept.keep(SentAnswer(pagerId: b.pagerId, decisionId: decisionId, choice: .option(1), sealed: "on B"), requestId: "r-b"))
         model.pagers = [a, b]
         model.drop(a.pagerId)
         XCTAssertEqual(AppKeychain.records(.answers, pagerId: a.pagerId), [:])
         XCTAssertEqual(KeptAnswers().of(a.pagerId), [:])
         XCTAssertEqual(KeptAnswers().of(b.pagerId).keys.sorted(), ["r-b"])
+
+        // An old file still waiting to move, as when the Keychain refused part of a move, loses the dropped pager's
+        // answers too, so the next launch's move doesn't bring them back.
+        let file = FileManager.default.temporaryDirectory.appending(path: "answers-\(UUID().uuidString).json")
+        let waitingOnB = SentAnswer(pagerId: b.pagerId, decisionId: decisionId, choice: .option(2), sealed: "on B, waiting")
+        try JSONEncoder().encode(["r-a2": SentAnswer(pagerId: a.pagerId, decisionId: decisionId, choice: .option(2), sealed: "on A, waiting"), "r-b2": waitingOnB]).write(to: file)
+        KeptAnswers().forget(a.pagerId, file: file)
+        XCTAssertEqual(try JSONDecoder().decode([String: SentAnswer].self, from: Data(contentsOf: file)), ["r-b2": waitingOnB])
+        KeptAnswers().move(from: file)
+        XCTAssertEqual(AppKeychain.records(.answers, pagerId: a.pagerId), [:])
+        XCTAssertEqual(KeptAnswers().of(b.pagerId).keys.sorted(), ["r-b", "r-b2"])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: file.path))
     }
 
     // Pins and answers are kept as the pager is: the same access group and accessibility, this device only.

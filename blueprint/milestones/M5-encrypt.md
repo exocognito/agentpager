@@ -1,6 +1,6 @@
 # M5 · Decisions the service can't read
 
-> **Status:** planning · **Started:** 6 Nov 2026 · **Order:** after M4; [TIDY](next/TIDY.md) follows · **Word:** ENCRYPT
+> **Status:** built and on dev, awaiting Sam's walk · **Started:** 6 Nov 2026 · **On dev:** 6 Nov 2026, at 6df2016 · **Order:** after M4; [TIDY](next/TIDY.md) follows · **Word:** ENCRYPT
 
 ## Objective
 
@@ -45,8 +45,8 @@ Sam's answers to questions 3, 4 and 8, as METHOD now allows:
 | Blueprint | this doc; METHOD's line test, look rule and release exception; the approved lines in their areas with the code that makes them true; L17 and L19 retired; L25 written down; TIDY queued |
 | Service | holds only encrypted parts and what it needs to route them; gives anyone the pager's public key; refuses a command from before the switch with how to update; takes an ask's request id, so asking again stores one decision; deletes the agents and decisions stored before the switch and keeps every pager |
 | Command | checks the pager's key against the number before connecting; makes the agent's key pair at connect; encrypts each card, its attachments, who asked and each acknowledgement to the pager, and reads its answers; says its version on every call |
-| Phone app | reads the encrypted decisions, attachments, who asked and acknowledgements, and encrypts each answer to its agent; moves each pager's keys where the alert extension can read them, keeping every pager |
-| Alert extension | new on the phone: decrypts each alert to show the real question, and shows a plain alert when it can't |
+| Phone app | reads the encrypted decisions, attachments, who asked and acknowledgements, and encrypts each answer to its agent; each pager's keys stay where they are, and the alert extension can read them, so every pager is kept |
+| Alert extension | new on the phone: decrypts each alert to show its real words, such as the question, and shows the plain alert when it can't |
 | Tests | test vectors for the format, which the TypeScript and Swift sides both pass; tests named by the ids M5 adds and touches |
 | Dev stage | the upgrade baseline recorded from `m4` before M5's code reaches dev; the upgrade check in `pnpm smoke:dev` |
 
@@ -61,9 +61,9 @@ The pull requests, in order, are in [.agents/plans/2026-11-06-m5-encrypt.md](../
 
 ## What's known
 
-- **Built since M2:** the phone makes each pager's key pair, which is already X25519, and the pager's number carries a fingerprint of its public key, which the service checks when the pager is made and at every connect (I19). The command doesn't check the key itself yet.
+- **Built since M2:** the phone makes each pager's key pair, which is already X25519, and the pager's number carries a fingerprint of its public key, which the service checks when the pager is made and at every connect (I19). Until M5 the command didn't check the key itself (I19.6).
 - **The design,** agreed on 29 Oct. The full draft, with the byte layouts, payload sizes and routes this short form leaves out, is `docs/v2/04-encryption.md`, which M4 removed from the tree: read it with `git show history-archive:docs/v2/04-encryption.md`.
-  - Keys: a key pair per pager, made on the phone and kept in the Keychain where the app and its alert extension can both read it (not the Secure Enclave, which can't hold this kind of key); a key pair per agent, made at connect and kept in the agent's file. The service holds only public keys and the digests of the phone and agent keys.
+  - Keys: a key pair per pager, made on the phone and kept in the Keychain where the app and its alert extension can both read it (not the Secure Enclave, which can't hold this kind of key); a key pair per agent, made at connect and kept in the agent's file. As built, the service holds the pager's public key and the digests of the phone and agent keys, and never an agent's public key: that travels only inside who asked and each card, both encrypted to the pager. The 29 Oct draft had the command give it to the service at connect; the root chose otherwise on #61, so the service can't seal an answer the agent would open.
   - Encrypted to the pager's key: each card, each attachment, who asked with the project and the computer, and each acknowledgement. Encrypted to the agent's key: the answer. The service keeps only ids, timestamps, sizes, how many attachments, whether each pager is on and when it turns off, and the phone's device token.
   - One format for every encrypted part, in both directions: X25519 with a fresh key for each part, HKDF-SHA256 and AES-256-GCM, which CryptoKit and Node's crypto both have. Each part is bound to its kind, its pager and its decision, so it can't be replayed as another kind or moved to another decision. A leaked agent key exposes only the answers sent to that agent.
   - Before it encrypts anything, the command fetches the pager's public key from the service and checks it against the number.
@@ -74,7 +74,7 @@ The pull requests, in order, are in [.agents/plans/2026-11-06-m5-encrypt.md](../
   - A client-version header. The command doesn't say which version it is, so the service can't tell an old one to update, as METHOD's release rule needs. Replies already name the service's build.
 - **What encryption doesn't hide,** for the site's note on what the service stores (SITE): who pages whom, when, how much and how often; and, to Apple, that an alert happened and its size. A compromised agent machine exposes that agent's cards, the answers to it and its history. A compromised phone exposes everything on it.
   - The service can show decisions of its own, as a new agent or in place of an existing agent's who-asked, and read the answers to those; it can't read real agents' decisions, attachments or acknowledgements, or the answers to them.
-- **Apple signing.** The alert extension is a new target with its own bundle id, so the development profile changes. Only Sam can do that step: one build in Xcode on pro, with automatic signing. The service and command don't wait for it; the dev phone's build does.
+- **Apple signing.** The alert extension is a new target with its own bundle id, so the development profile changes, and only Sam can do that step. Sam's Xcode session on pro registered the extension on 6 Nov, after its time-sensitive entitlement was removed, since Apple allows that only on apps; a device build now signs the extension with the team profile. The service and command didn't wait for it.
 - INSTALL comes after ENCRYPT, so at the switch the command is still built from the repository, and only Sam's machines run it.
 
 ## Approved lines
@@ -112,10 +112,20 @@ Why: [Only agents I give a number reach my phone](../PRODUCT.md#only-agents-i-gi
 **Retires,** once built: L19, the service can read every decision (6 Privacy); L17, alerts pass through Apple as plain text (4 Getting paged).
 
 **Dropped from the old draft by the line test:**
-- B30's clauses on which part is encrypted to which key, and on giving the service the agent's public key at connect: mechanism the code shows. What's known keeps them as the design.
+- B30's clauses on which part is encrypted to which key, and on giving the service the agent's public key at connect: mechanism the code shows. What's known keeps the first as the design; the second wasn't built, since the agent's public key never reaches the service.
 - B17's clauses on the alert extension, and on who asked and the project coming from the phone: mechanism. B17.2, B17.5 and B17.8 still promise what the owner sees.
 - J5's step that the alert travels encrypted and an extension decrypts it: J5.3 already walks what the owner sees, and I20 holds the guarantee.
 - A number of an unknown version refused with a reply that says so: no other version exists yet, so there is nothing to choose.
+
+## Sam decides at the walk
+
+Found while building. What is built follows ★ on 1 to 3; 4 and 5 change only words, once Sam answers.
+
+1. **A service that replaces an agent's who-asked.** A service that replaces an existing agent's who-asked with its own can show its own decisions in that agent's place, and read the answers to those. It still can't read real agents' decisions or the answers to them. (a) ★ Accept it, as recorded under What encryption doesn't hide (What's known, above); (b) the phone pins each agent's first-seen key and shows later changes as unreadable.
+2. **Answers after a reinstall.** After the app is deleted and installed again, the pagers stay in the Keychain but the phone's record of its own answers doesn't, so every answered decision shows as one it can't read: only the agent can open an answer. (a) ★ Accept it for now, written down as a limit; (b) keep each answer's record in the Keychain with its pager.
+3. **The client check comes before the key check.** A client too old for the service that also has a wrong key is told to update rather than refused as unauthorized, which reads against [I4.6](../areas/3-cards.md#i4--m1--what-doesnt-fit-is-refused-whole-never-cut). (a) ★ Narrow I4.6: a client too old for the service is told to update before its key is checked; (b) check the key first.
+4. **A term for what is encrypted.** [B30.2](../areas/6-privacy.md#b30--m5--decisions-are-encrypted-end-to-end) uses the words encrypted part, which have no entry in [TERMS.md](../TERMS.md). (a) ★ Add one: a card, one of its attachments, who asked, an answer, an acknowledgement or an alert's preview, encrypted on one end for the other to read; (b) keep it a word of the code.
+5. **I5's note on decisions stored before 31 Oct 2026.** The note in [I5](../areas/5-answering.md#i5--m1--answers-never-change) describes code the switch removed, and those decisions are gone. (a) ★ Delete the note; (b) keep it as history.
 
 ## Adds · Changes · Retires
 
@@ -127,5 +137,11 @@ Why: [Only agents I give a number reach my phone](../PRODUCT.md#only-agents-i-gi
 
 - 31 Oct · queued, unchanged in scope, in the next roadmap.
 - 5 Nov · Sam set it first after M4, one milestone at a time. Its hardening items were added here.
-- 6 Nov · planning: Sam answered questions 1 to 5. The first pull request starts this doc, moves the line test and look rule into METHOD, adds METHOD's release exception, deletes M4's ledger after the tag `m4-house-ledger`, and queues STORE. Questions 6 to 9 wait for Sam.
-- 6 Nov · Sam answered questions 6 to 9 on the pager: the lines approved as written, the next milestone's word TIDY, the old app's missing update message accepted as part of the exception, and the connect limit written down. STORE renamed TIDY, with DEC-2026-11-06-tidy; L25 added to 1 Pagers.
+- 6 Nov · planning: Sam answered questions 1 to 5. PR #57 starts this doc, moves the line test and look rule into METHOD, adds METHOD's release exception, deletes M4's ledger after the tag `m4-house-ledger`, and queues STORE. Questions 6 to 9 wait for Sam. `pnpm check` green, `pnpm test:all` 78 passed (32, 3, 8, 25 and 10).
+- 6 Nov · building: PR #58 adds `pnpm baseline:dev`, which records an upgrade baseline, and records `m4`'s on dev before any M5 code reached it: a pager with no alert target, an agent connected by the binary built at `m4`, one decision answered and acknowledged and one left open. `pnpm check` green, `pnpm test:all` 78 passed (32, 3, 8, 25 and 10).
+- 6 Nov · Sam answered questions 6 to 9 on the pager: the lines approved as written, the next milestone's word TIDY, the old app's missing update message accepted as part of the exception, and the connect limit written down. PR #60 records them: STORE renamed TIDY, with DEC-2026-11-06-tidy; L25 added to 1 Pagers. `pnpm check` green, `pnpm test:all` 78 passed (32, 3, 8, 25 and 10).
+- 6 Nov · building: PR #59, the hardening. Every call names its client and version, and a command too old for the service is refused before anything is read and told how to update (B25.14). An ask carries a request id the command chooses, from which the decision's id is made, so asking again makes one decision (B27.9). `pnpm check` green, `pnpm test:all` 87 passed (37, 3, 8, 28 and 11), FlowTests 7 of 7 in the Simulator. Grok and Codex MERGEABLE in round 4.
+- 6 Nov · building: PR #61, the encrypted-part format, in TypeScript and in a Swift package, with each kind's plaintext shape, pinned by shared test vectors both sides pass; nothing used it yet. The root chose that the agent's public key travels only inside cards, never to the service, so only the phone can seal an answer the agent opens, and that the switch holds a Markdown page to 1,000,000 bytes. `pnpm check` green, `pnpm test:all` 587 passed (526, 3, 8, Swift 11, 28 and 11). Grok and Codex MERGEABLE in round 4.
+- 6 Nov · building: PR #62, the alert extension. Each pager's keys stay where they were, and the extension can read them there, so no pager moved. It opens an alert's encrypted preview with its pager's key and shows its words, and shows the alert as sent when it can't. Sam's Xcode session on pro registered it, after its time-sensitive entitlement came off, since Apple allows that only on apps. A Simulator push never starts the extension, so its code is tested inside the app. `pnpm check` green, `pnpm test:all` 620 passed (555, 3, 8, Swift 15, 28 and 11), AgentPagerTests 11 of 11 in the Simulator. Grok and Codex MERGEABLE in round 2.
+- 6 Nov · building: PR #63, the switch. The service holds only encrypted parts and what it needs to route them. The command checks the pager's key against its number before it encrypts anything, and makes the agent's key pair at connect. The phone opens what it reads, encrypts each answer to its agent, and shows a decision it can't read as one, with nothing to answer. Alerts carry plain words and the encrypted preview. At its first start the service deletes the agents and decisions stored before the switch, and keeps every pager. The approved lines are in their areas, and L17 and L19 are retired. The upgrade check joins `pnpm smoke:dev`; it passed locally against an `m4` baseline. `pnpm check` green (152 clauses, 23 tested), `pnpm test:all` 629 passed (556, 3, 8, Swift 17, 32 and 13), FlowTests 9 of 9 and AgentPagerTests 14 of 14 in the Simulator. Grok and Codex MERGEABLE in round 4.
+- 6 Nov · built and on dev, awaiting Sam's walk: after each code merge the root deployed `main` to dev and ran `pnpm smoke:dev`, which passed 8 of 8 at 4e8dbf5, 5061308 and 1ee603d, and 14 of 14 at 6df2016, the switch. Its upgrade check against the `m4` baseline found the pager kept with its key and number, everything stored before the switch gone, the `m4` command refused and told how to update, an `m4` agent's file told to connect again, and the new command connecting to the baseline's number. Dev runs 6df2016, and prod still runs `m4`. HomePhoneLite's app from `main` (`pnpm phone:dev`) is pending. PR #64 marks M5 built, asks Sam's five questions for the walk, and points SITE's note at What encryption doesn't hide.

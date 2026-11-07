@@ -1,27 +1,58 @@
-# Handoff to the next root session (6 Nov 2026, M5 ENCRYPT started)
+# Handoff to the next root session (6 Nov 2026, M5 ENCRYPT green on dev)
 
 Read `AGENTS.md`, then `blueprint/README.md`. This file covers only what those two files don't. Claims are marked [V] verified or [A] assumed; each [V] was checked on 6 Nov 2026, when this was written.
 
 ## Where things stand
 
 - **The root** is session 9c483b84, a Claude Code session in Herdr pane w1:pK on pro, which pages Sam as agentpager agent ap-9tbn. The previous root, session 86f845ec, stepped back on 6 Nov and no longer merges, deploys or touches the repo. [V]
-- **M5 ENCRYPT is planning, then building** (`blueprint/milestones/M5-encrypt.md`). Sam answered all nine of its questions on 6 Nov: 1 to 5 in the previous root's Claude Code session, 6 to 9 on the pager. The root's plan, with the pull requests in order, is `.agents/plans/2026-11-06-m5-encrypt.md`. The root takes it to green on dev and stops before the release. [V]
+- **M5 ENCRYPT is built and on dev, awaiting Sam's walk** (`blueprint/milestones/M5-encrypt.md`). Its pull requests merged on 6 Nov in this order: #57, #58, #60, #59, #61, #62 and #63; #64 records the milestone as built. The root's plan, with each pull request's merge, is `.agents/plans/2026-11-06-m5-encrypt.md`. [V]
 - **M4 HOUSE is shipped:** released and reviewed on 6 Nov (`blueprint/milestones/M4-house.md`). Its ledger left the tree in M5's Plan, kept at tag `m4-house-ledger`. [V]
-- **dev** (https://dev.agentpager.me) runs 40f1802, #55's merge, by its `X-AgentPager-Build` header. [V] The root redeploys dev with `pnpm deploy:dev`, then runs `pnpm smoke:dev`, after each merge that changes service code.
-- **prod** (agentpager.me) runs the `m4` release: the tag `m4`, on 9849671, deployed from a clean checkout at the tag, and `pnpm smoke:prod` passed 7 of 7. [V]
-- **Binaries:** the ones on air, mini and pro are 9849671, built at `m4`. [V, `agentpager version` on each]
+- **dev** (https://dev.agentpager.me) runs 6df2016, #63's merge, by its `X-AgentPager-Build` header. `pnpm smoke:dev` passed 14 of 14 there, the upgrade check against the `m4` baseline included. [V]
+- **prod** (agentpager.me) runs the `m4` release: the tag `m4`, on 9849671, by its header. [V]
+- **Binaries:** the ones on air, mini and pro are 9849671, built at `m4`. [V at the `m4` release, by `agentpager version` on each; no M5 agent touches them]
 - **Phones:**
-  - HomePhoneLite, the dev phone, has the dev app (`me.agentpager.app.dev`) installed, from a `pnpm phone:dev` build of 22:19 on 5 Nov, just after #50 merged. That it is the build installed there is [A]; no app code changed after #50 [V].
-  - Sam's iPhone Air has the `m4` build. [V]
+  - HomePhoneLite, the dev phone, gets `main`'s app from `pnpm phone:dev` once it is connected to pro: pending. Until then it has a dev app from before the switch [A], which on dev shows only that it can't reach the server (M5 question 8).
+  - Sam's iPhone Air has the `m4` build, which works with prod until the release. [V]
+
+## What Sam does next
+
+1. **Walk M5 on dev,** on HomePhoneLite with `main`'s app, and with a binary built from `main` under its own `AGENTPAGER_HOME`, with `--server https://dev.agentpager.me` (AGENTS.md › Stages).
+2. **Answer the five questions** in `M5-encrypt.md` › Sam decides at the walk: the service replacing an agent's who-asked, answers after a reinstall, I4.6 and the client check, a TERMS entry for encrypted part, and I5's note. An answer that changes a line or a term goes into its own docs pull request.
+3. **Give the go for the release.** The root then tags `m5` on the commit that was green on dev, runs `pnpm deploy:prod` from a clean checkout at the tag and then `pnpm smoke:prod`, and rebuilds the clients in AGENTS.md's order: the binary built at `m5` on air, mini and pro, then the `m5` app on Sam's iPhone Air. The release's exception applies on prod (`M5-encrypt.md` › The release's exception): what prod stored before the switch is deleted, every pager is kept, Sam's agents connect again, and the iPhone Air can't read its pagers until it has the new app. The root then marks M5 shipped and records the `m5` upgrade baseline on dev (`pnpm baseline:dev --tag m5`, with the binary built at the tag) before the next milestone's code reaches dev.
+
+## The upgrade baselines
+
+- The `m4` baseline is in `~/.agentpager-baselines/dev/m4/` on pro, outside every worktree. It holds keys, so nothing prints it. `pnpm smoke:dev` reads it for the upgrade check. [V]
+- Its agent would have been forgotten after 2026-12-06T21:48Z with no activity. That is moot: the switch deleted the agent, and the upgrade check now proves it gone. The pager stays. [V, #58 and #63]
+- The `m5` baseline, recorded at the release, holds an agent the service forgets after 30 days with no activity, so the next milestone's upgrade check runs within 30 days of recording it (`packages/app/README.md` › Upgrade baseline). [V]
 
 ## Things you inherit
 
-- **Reviews on pro:** Grok stands in for DeepSeek, since there's no Fireworks key [V]: pi in print mode, with `blueprint-loop-grok-review.env` under masked `op run`. Codex runs via `codex exec` with its stored login, read-only; never accept its prompt to trust the primary clone.
-- **Renders:** `pnpm designs` runs on pro, with Xcode 27.2 and the iPhone 17e Simulator on iOS 27.2 [V]. Its fingerprint hashes every byte of its sources, so a comment change in one needs a re-render too [V, `designs.mjs`]. Agents run Simulators one at a time, under `lockf -k ~/Projects/agentpager-worktrees/.simulator.lock`.
-- **The upgrade baseline** for M5 lives outside every worktree, under `~/.agentpager-baselines/dev/m4/`, once its pull request records it; it holds keys, so nothing prints it.
+- **Reviews on pro:** [V]
+  - Grok, through Sam's xAI subscription login: `env -u XAI_API_KEY pi --model xai/grok-latest --thinking high` in print mode, `--thinking low` for a sanity check, with no `op run`. Sam disabled the old xAI API key on purpose on 6 Nov.
+  - Codex, via `codex exec -m gpt-6.1-sol --sandbox read-only` with its stored login; never accept its prompt to trust the primary clone.
+  - DeepSeek over Fireworks is Sam's fallback when Grok is unavailable, and has no key on pro.
+- **Renders:** `pnpm designs` runs on pro, with Xcode 27.2 and the iPhone 17e Simulator on iOS 27.2 [V]. Its fingerprint hashes every byte of its sources, so a comment change in one needs a re-render too [V, `designs.mjs`]. Agents run Simulators one at a time, under `lockf -k ~/Projects/agentpager-worktrees/.simulator.lock`; never delete the lock file.
 - **Known leftovers** from M4 (question 10):
   - the id check's "Known limits" at the top of `scripts/blueprint.mjs`;
   - `DECISIONS.md` still names the retired limit L20.
-- **Cleaned up on 6 Nov:** the M4 worktrees `m4-release`, `m4-release-record` and `m4-leftovers`, with every other M4 worktree and local branch, are trashed, as Sam approved. [V]
-- **For Sam to approve removing:** `/private/tmp/claude-501/claude-501/`, which holds only empty folders [A, as of 5 Nov].
-- **The primary clone** sat on `main` at cfb78c0 with a clean tree when M5 started [V]. No agent works in it.
+- **The primary clone** sits on `main` at cfb78c0, behind `origin/main`. No agent works in it. [V]
+
+## For Sam to approve trashing
+
+Nothing is trashed until Sam approves the exact command. Every worktree below but `m5-wrapup` is clean, and its branch or head is on `main`. [V]
+
+- **Worktrees** in `~/Projects/agentpager-worktrees/`:
+  - Merged pull requests, with their local branches: `m5-plan` (#57), `m5-baseline` (#58), `m5-answers` (#60), `m5-hardening` (#59), `m5-envelope` (#61), `m5-extension` (#62) and `m5-switch` (#63). Their branches are still on GitHub too.
+  - Review copies, done: `m5-envelope-review` (26271ec) and `m5-switch-review` (0bef035).
+  - Builds at `m4`, done: `m5-baseline-m4` and `m5-hardening-m4`, detached at 9849671. The `m4` baseline keeps its own copy of the binary.
+  - `m5-switch-before`, detached at 5f5fd4d, the `m4`-era server for the local upgrade check: done.
+  - `m5-deploy`, detached at 6df2016, from which the root deployed dev: done, since each deploy starts from a fresh one [A].
+  - `m5-root-phone`, detached at 7a7a16d, the root's phone build [A]: done once HomePhoneLite has `main`'s app.
+  - `m5-wrapup` (#64): once it merges.
+- **Temp folders:**
+  - `/private/tmp/claude-501/-Users-smcllns-Projects-agentpager/9c483b84-af30-4404-8405-a682adc7cdf1/`, this root's, 5.3 GB: logs, review briefs, build output, and test baselines whose keys are for local servers only. After the walk.
+  - `/private/tmp/claude-501/-Users-smcllns-Projects-agentpager/86f845ec-30ed-4f3f-8a1b-48f4067f3344/`, the previous root's, 5.2 GB.
+  - `/private/tmp/claude-501/-Users-smcllns-Projects-agentpager/73b382d5-966c-4273-83a1-29b5ba84ea15/` (636 KB) and `/private/tmp/claude-501/-Users-smcllns-Projects-agentpager/9896b490-6d8f-4eca-85ec-86cb7768a7dc/` (empty), from other sessions.
+  - `/private/tmp/claude-501/claude-501/`, which holds only empty folders.
+  - `/private/tmp/claude-501/ap-*.log`, eleven logs from the morning of 6 Nov, before M5 [A: the `m4` release's].

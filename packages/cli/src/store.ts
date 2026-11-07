@@ -7,14 +7,21 @@ import { Token } from '../../contract/exchange.ts';
 
 // Everything the binary keeps lives under ~/.agentpager (AGENTPAGER_HOME moves it), never in the project:
 //   config.json            { "server": "https://agentpager.me" }, optional
-//   agents/<id>.json       one file per agent, mode 600: its server key and its reminder clock
+//   agents/<id>.json       one file per agent, mode 600: its server key, its own private key, its pager's public key
+//                          as checked at connect, and its reminder clock
 //   history/<pager>.jsonl  every decision asked from this machine on that pager, with its answer
 export const DEFAULT_SERVER = 'https://agentpager.me';
 export const home = () => process.env.AGENTPAGER_HOME || path.join(homedir(), '.agentpager');
 
+// A key as the agent file keeps it: 32 bytes, base64url.
+const Key = Schema.String.pipe(Schema.pattern(/^[A-Za-z0-9_-]{43}$/));
 const AgentFile = Schema.mutable(Schema.Struct({
   id: Schema.String, server: Schema.String, pager: Schema.String, agentId: Token, agentKey: Token,
-  app: Schema.String, project: Schema.String, createdAt: Schema.String,
+  // The agent's own X25519 private key, made at connect: its public key goes in every card, as the key the phone seals
+  // the answer to, and this opens the answers. Never printed and never sent. pagerKey: the pager's public key, checked
+  // against the number at connect (I19); every part this agent sends is sealed to it and no other.
+  privateKey: Key, pagerKey: Key,
+  app: Schema.String, project: Schema.String, machine: Schema.optional(Schema.String), createdAt: Schema.String,
   rulesShownAt: Schema.NullOr(Schema.String), cardsSinceRules: Schema.Number,
   // Short decision ids for the agent (d_2x8w): the server's id, the question and its option labels, and how far it got.
   // askedAt came later, so a file from before it still loads.
@@ -93,17 +100,23 @@ export function writable(): string | null {
   } catch (e) { return e instanceof Error && 'code' in e ? String(e.code) : 'not writable'; }
 }
 // A file that is there but isn't an agent file is refused by its id, never taken for a missing agent or written over,
-// and never quoted: it holds the agent's key. Fields it doesn't know (a newer binary's) are kept.
+// and never quoted: it holds the agent's key. Fields it doesn't know (a newer binary's) are kept. A file from before
+// the encryption switch (M5) has no keys of its own: that agent can't ask or wait any more, and is told to connect
+// again, which makes a new agent with its keys.
 export class UnreadableAgent extends Error {}
+const PreSwitch = Schema.Struct({ id: Schema.String, agentId: Token, agentKey: Token, privateKey: Schema.optional(Schema.Never), pagerKey: Schema.optional(Schema.Never) });
 export function loadAgent(id: string): AgentFile | null {
   if (!/^ap-[a-z0-9]{4}$/.test(id)) return null;
   let why: string;
   try {
-    const decoded = Schema.decodeUnknownEither(AgentFile, { onExcessProperty: 'preserve' })(JSON.parse(readFileSync(agentPath(id), 'utf8')));
+    const raw: unknown = JSON.parse(readFileSync(agentPath(id), 'utf8'));
+    const decoded = Schema.decodeUnknownEither(AgentFile, { onExcessProperty: 'preserve' })(raw);
     if (Either.isRight(decoded)) return decoded.right;
+    if (Schema.is(PreSwitch)(raw)) throw new UnreadableAgent(`Agent ${id} was connected before this version of agentpager, which encrypts every decision, so it can't ask or wait any more. Connect again with your owner's pager number for a new agent.`);
     const field = ParseResult.ArrayFormatter.formatErrorSync(decoded.left)[0]?.path.map(String).join('.');
     why = field ? `${field} is missing or wrong` : 'not an agent file';
   } catch (e) {
+    if (e instanceof UnreadableAgent) throw e;
     if (e instanceof Error && 'code' in e && e.code === 'ENOENT') return null;
     why = e instanceof SyntaxError ? 'not JSON' : e instanceof Error && 'code' in e ? String(e.code) : 'unreadable';
   }
@@ -131,4 +144,9 @@ export function readHistory(pager: string): HistoryEvent[] {
 export function pagerOf(number: string): string | null {
   if (!/^ap1_[A-Za-z0-9_-]{32}$/.test(number)) return null;
   return Buffer.from(number.slice(4), 'base64url').subarray(0, 16).toString('hex');
+}
+// The fingerprint inside a number: the first 8 bytes of the SHA-256 of the pager's public key, as hex.
+export function fingerprintOf(number: string): string | null {
+  if (!/^ap1_[A-Za-z0-9_-]{32}$/.test(number)) return null;
+  return Buffer.from(number.slice(4), 'base64url').subarray(16, 24).toString('hex');
 }

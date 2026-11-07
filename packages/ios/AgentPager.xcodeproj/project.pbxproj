@@ -9,17 +9,20 @@
 /* Begin PBXBuildFile section */
 		06FED050D6A559D46D34656D /* Wording.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD17272A74255F239FAD6E9D /* Wording.swift */; };
 		0AE10F87ED71A7A8D285283E /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB19ECFF29AD36C959FEAD73 /* NotificationService.swift */; };
+		0E549CC090F0DD941ADB7B31 /* AgentPagerCrypto in Frameworks */ = {isa = PBXBuildFile; productRef = 3AD5EAC96F4C784E03368F5C /* AgentPagerCrypto */; };
 		0F7AA15769E525FC61177B38 /* BriefTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57E1AC6210B30DBB74AD19A2 /* BriefTests.swift */; };
 		1655CE8CF0DB8A15966CE731 /* PagersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B808EA77BF31A9E9EB5EF48 /* PagersView.swift */; };
 		3428FF1B8E7A65A2E432903C /* DecisionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF476350295D66EA56CCB835 /* DecisionView.swift */; };
 		3F448983E7E7739C5FE1181E /* AgentPagerCrypto in Frameworks */ = {isa = PBXBuildFile; productRef = 321E88A1CCC103518FFAB306 /* AgentPagerCrypto */; };
 		46313B6F9E033060AE5534C9 /* Brief.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD59DFBAC6C122CA69B4865F /* Brief.swift */; };
 		521E0DBC4606B0E0987A2DF7 /* AlertExtensionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCA60458492252A60DB7858D /* AlertExtensionTests.swift */; };
+		5A1B4EEBDFEDBFA954CB104D /* Sealed.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4461E1B09B2D6B779D5DCCBB /* Sealed.swift */; };
 		5C7A268057B477EB532A8908 /* Keychain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78E73231572661B6E2EE463F /* Keychain.swift */; };
 		5C897A0AF3230A685E5B5650 /* Keychain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78E73231572661B6E2EE463F /* Keychain.swift */; };
 		5E6C6BB9249E9B5362AB9EB3 /* AgentPagerCrypto in Frameworks */ = {isa = PBXBuildFile; productRef = AB4CA846C7C4400F95329F59 /* AgentPagerCrypto */; };
 		60B6A80E03538535F102F484 /* AgentPagerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BBA529C5DA5D28180A8B4FE /* AgentPagerApp.swift */; };
 		70BFBD2E5191D0A402206B10 /* DriverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4201AE0E7919CEB179790B7E /* DriverTests.swift */; };
+		74DBF89BB1EEBFDCA116B9B9 /* AgentPagerCrypto in Frameworks */ = {isa = PBXBuildFile; productRef = F6C6DF5D48A98D003E499EDE /* AgentPagerCrypto */; };
 		758203350C880E33428A6AF7 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB19ECFF29AD36C959FEAD73 /* NotificationService.swift */; };
 		7F5E0495F402C7A78CC3E56C /* InboxCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = E31CF340E88CC54075AE9B7D /* InboxCache.swift */; };
 		8D9C942B00B958A5192B9BD2 /* AgentPagerNotifications.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 460DF02709CDC2C2452DDA34 /* AgentPagerNotifications.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -36,6 +39,7 @@
 		DD3DFD921630978FF1CEB7C8 /* AgentHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD4C535AB23CF5192F290774 /* AgentHarness.swift */; };
 		DF3350557E5F9D7E2A01B318 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A27A68C79B4A7080DFE2CB13 /* AppModel.swift */; };
 		ED43F6BB3082EA03DD2438B2 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 83DEE6CF5EAF6D4642D1EAB5 /* Assets.xcassets */; };
+		F6860D8B183BB6780CA5C397 /* SealedTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF01597E2C118E56B11C7BE3 /* SealedTests.swift */; };
 		F9A5352D4CF1434626249917 /* API.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61CEF972485C3A4967C99E99 /* API.swift */; };
 /* End PBXBuildFile section */
 
@@ -81,6 +85,7 @@
 		13A6CC9EE49B28DEF16144E7 /* AgentPager.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = AgentPager.entitlements; sourceTree = "<group>"; };
 		35980E9CEB116C7C6CB88011 /* Alerts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Alerts.swift; sourceTree = "<group>"; };
 		4201AE0E7919CEB179790B7E /* DriverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverTests.swift; sourceTree = "<group>"; };
+		4461E1B09B2D6B779D5DCCBB /* Sealed.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sealed.swift; sourceTree = "<group>"; };
 		460DF02709CDC2C2452DDA34 /* AgentPagerNotifications.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = AgentPagerNotifications.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		565EF476D2E237A540F4A73B /* AgentPagerNotifications.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = AgentPagerNotifications.entitlements; sourceTree = "<group>"; };
 		57E1AC6210B30DBB74AD19A2 /* BriefTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BriefTests.swift; sourceTree = "<group>"; };
@@ -110,15 +115,32 @@
 		F2672FD861C315A4EAEFB3DA /* Flowchart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Flowchart.swift; sourceTree = "<group>"; };
 		FCA60458492252A60DB7858D /* AlertExtensionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertExtensionTests.swift; sourceTree = "<group>"; };
 		FE1EF4216A2BDFB97FAAD13C /* PagerDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PagerDetailView.swift; sourceTree = "<group>"; };
+		FF01597E2C118E56B11C7BE3 /* SealedTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SealedTests.swift; sourceTree = "<group>"; };
 		FF476350295D66EA56CCB835 /* DecisionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		12D5E0F679E7E6D21B6A52EB /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0E549CC090F0DD941ADB7B31 /* AgentPagerCrypto in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		27A9E68AD694F70673909ACC /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 				5E6C6BB9249E9B5362AB9EB3 /* AgentPagerCrypto in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E078AF8EC18E43AEB50682C7 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				74DBF89BB1EEBFDCA116B9B9 /* AgentPagerCrypto in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -137,6 +159,7 @@
 			isa = PBXGroup;
 			children = (
 				FCA60458492252A60DB7858D /* AlertExtensionTests.swift */,
+				FF01597E2C118E56B11C7BE3 /* SealedTests.swift */,
 			);
 			path = AgentPagerTests;
 			sourceTree = "<group>";
@@ -179,6 +202,7 @@
 				F2672FD861C315A4EAEFB3DA /* Flowchart.swift */,
 				E31CF340E88CC54075AE9B7D /* InboxCache.swift */,
 				78E73231572661B6E2EE463F /* Keychain.swift */,
+				4461E1B09B2D6B779D5DCCBB /* Sealed.swift */,
 				CD17272A74255F239FAD6E9D /* Wording.swift */,
 			);
 			path = Model;
@@ -272,6 +296,7 @@
 			buildPhases = (
 				60959C1436A074F1FC01EBDB /* Sources */,
 				E27E5C55B201864C4214F674 /* Resources */,
+				12D5E0F679E7E6D21B6A52EB /* Frameworks */,
 				EA971012758FE397B198F52D /* Embed Foundation Extensions */,
 			);
 			buildRules = (
@@ -281,6 +306,7 @@
 			);
 			name = AgentPager;
 			packageProductDependencies = (
+				3AD5EAC96F4C784E03368F5C /* AgentPagerCrypto */,
 			);
 			productName = AgentPager;
 			productReference = C163651D71BC75F596F15012 /* AgentPager.app */;
@@ -291,6 +317,7 @@
 			buildConfigurationList = 6B2E6E0B74C3B64EF864B68D /* Build configuration list for PBXNativeTarget "AgentPagerUITests" */;
 			buildPhases = (
 				8957F9C73ACCF4F57AFF33D3 /* Sources */,
+				E078AF8EC18E43AEB50682C7 /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -299,6 +326,7 @@
 			);
 			name = AgentPagerUITests;
 			packageProductDependencies = (
+				F6C6DF5D48A98D003E499EDE /* AgentPagerCrypto */,
 			);
 			productName = AgentPagerUITests;
 			productReference = 7A32223AB3E66B95D6171A3E /* AgentPagerUITests.xctest */;
@@ -397,6 +425,7 @@
 				521E0DBC4606B0E0987A2DF7 /* AlertExtensionTests.swift in Sources */,
 				C01C4BD97EF2120B97949177 /* Keychain.swift in Sources */,
 				0AE10F87ED71A7A8D285283E /* NotificationService.swift in Sources */,
+				F6860D8B183BB6780CA5C397 /* SealedTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -427,6 +456,7 @@
 				BC69438BC2D729C4178CE693 /* PagerView.swift in Sources */,
 				1655CE8CF0DB8A15966CE731 /* PagersView.swift in Sources */,
 				B046AD611FE5C412661A5399 /* Previews.swift in Sources */,
+				5A1B4EEBDFEDBFA954CB104D /* Sealed.swift in Sources */,
 				06FED050D6A559D46D34656D /* Wording.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -815,7 +845,15 @@
 			isa = XCSwiftPackageProductDependency;
 			productName = AgentPagerCrypto;
 		};
+		3AD5EAC96F4C784E03368F5C /* AgentPagerCrypto */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AgentPagerCrypto;
+		};
 		AB4CA846C7C4400F95329F59 /* AgentPagerCrypto */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AgentPagerCrypto;
+		};
+		F6C6DF5D48A98D003E499EDE /* AgentPagerCrypto */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = AgentPagerCrypto;
 		};

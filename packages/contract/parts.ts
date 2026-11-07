@@ -1,6 +1,6 @@
 import { Either, ParseResult, Schema } from "effect";
 import { characters, OPTIONS_MAX, Text, Title, Token } from "./values.ts";
-import { Choice, Label, PagerId, PublicKey } from "./exchange.ts";
+import { Choice, ENVELOPE_OVERHEAD_BYTES, Label, PagerId, PREVIEW_MAX_BYTES, PublicKey } from "./exchange.ts";
 import { ATTACHMENTS_MAX, AttachmentName, AttachmentType, attachmentTypes, letter, missingAttachment, named, Payload as BriefCard } from "./brief.ts";
 
 // What travels encrypted between an agent's machine and the phone: each encrypted part's kind, what it is bound to,
@@ -28,8 +28,9 @@ export const PartContexts = {
 export type PartContext<K extends PartKind> = (typeof PartContexts)[K]["Type"];
 
 // Sizes, for a check that needs no key: an encrypted part is a version byte, the sender's one-time public key (32
-// bytes), a nonce (12) and the ciphertext with its tag (16), as base64url without padding.
-export const ENVELOPE_OVERHEAD_BYTES = 61;
+// bytes), a nonce (12) and the ciphertext with its tag (16), as base64url without padding (exchange.ts, where the
+// service's check of a part's shape and size is).
+export { ENVELOPE_OVERHEAD_BYTES, PREVIEW_MAX_BYTES };
 export const envelopeCharacters = (plaintextBytes: number) => Math.ceil(((plaintextBytes + ENVELOPE_OVERHEAD_BYTES) * 4) / 3);
 
 const utf8 = new TextEncoder();
@@ -62,8 +63,11 @@ export const CardPart = Schema.Struct({
 }).annotations(strict).pipe(Schema.filter(c => missingAttachment(c.card.markdown, attachmentTypes(c.attachments)) ?? true));
 export type CardPart = typeof CardPart.Type;
 
-// Who asked, the project and the computer, sealed once at connect.
-export const IdentityPart = Schema.Struct({ app: Label, project: Label, machine: Schema.optional(Label) }).annotations(strict);
+// Who asked, the project and the computer, sealed once at connect, with the agent's own public key: the phone takes a
+// card as this agent's only when the card names the same key, so a card the service made, with a key of its own, is one
+// the phone can't read, and an answer to this agent's card reaches only this agent's key. (The service, which can make
+// a number from what it stores, can still connect as an agent of its own, as anyone with the number can.)
+export const IdentityPart = Schema.Struct({ app: Label, project: Label, machine: Schema.optional(Label), answerKey: AnswerKey }).annotations(strict);
 export type IdentityPart = typeof IdentityPart.Type;
 export const AnswerPart = Schema.Struct({ choice: Choice }).annotations(strict);
 export type AnswerPart = typeof AnswerPart.Type;
@@ -73,7 +77,6 @@ export type AcknowledgementPart = typeof AcknowledgementPart.Type;
 // An alert's preview, which the phone's alert extension opens to show the real question. Apple takes at most 4096
 // bytes of payload: a preview of PREVIEW_MAX_BYTES seals to envelopeCharacters(PREVIEW_MAX_BYTES) = 2812 characters,
 // leaving the rest for the alert's plain words and ids. decisionPreview() and acknowledgementPreview() shorten to fit.
-export const PREVIEW_MAX_BYTES = 2048;
 const fits = (preview: object) => utf8Length(JSON.stringify(preview)) <= PREVIEW_MAX_BYTES || `a preview may not exceed ${PREVIEW_MAX_BYTES} bytes as JSON`;
 export const OptionLetter = Schema.Literal(...Array.from({ length: OPTIONS_MAX }, (_, i) => letter(i + 1)));
 // A decision's: the question, its detail, the recommended option and who asked, from where. The service sends it
@@ -193,7 +196,9 @@ function fit<P extends object>(preview: P, steps: ((p: P) => P)[]): P {
 }
 const required = <P extends object>(text: string, rebuild: (text: string) => P) => shorten(text, rebuild) ?? rebuild(ELLIPSIS);
 
-export function decisionPreview(card: CardPart, identity: IdentityPart): DecisionPreview {
+// Who asked, the project and the computer: what a preview names of an identity.
+type Who = Pick<IdentityPart, "app" | "project" | "machine">;
+export function decisionPreview(card: CardPart, identity: Who): DecisionPreview {
   const option = card.card.options.find(o => o.number === card.card.recommended);
   const full: DecisionPreview = {
     title: card.title,
@@ -213,7 +218,7 @@ export function decisionPreview(card: CardPart, identity: IdentityPart): Decisio
   ]));
 }
 
-export function acknowledgementPreview(ack: AcknowledgementPart, identity: IdentityPart, title: string): AcknowledgementPreview {
+export function acknowledgementPreview(ack: AcknowledgementPart, identity: Who, title: string): AcknowledgementPreview {
   const full: AcknowledgementPreview = { nextSteps: ack.nextSteps, app: identity.app, project: identity.project, title };
   return Schema.decodeUnknownSync(AcknowledgementPreview)(fit<AcknowledgementPreview>(full, [
     p => required(p.nextSteps, nextSteps => ({ ...p, nextSteps })),

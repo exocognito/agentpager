@@ -9,7 +9,8 @@ options:
   createIntermediateGroups: true
   generateEmptyDirectories: true
 # The phone's side of the encrypted-part format and of alerts (packages/contract), as a local Swift package that
-# `swift test` also runs on its own (pnpm test).
+# `swift test` also runs on its own (pnpm test). The app opens what it reads and seals its answers with it; the alert
+# extension opens previews; the UI tests' agent seals and opens as the agentpager command does.
 packages:
   AgentPagerCrypto:
     path: AgentPagerCrypto
@@ -48,6 +49,7 @@ targets:
           - $(AppIdentifierPrefix)me.agentpager.app.dev
     dependencies:
       - target: AgentPagerNotifications
+      - package: AgentPagerCrypto
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: me.agentpager.app.dev
@@ -132,6 +134,8 @@ targets:
       - path: AgentPagerUITests
     dependencies:
       - target: AgentPager
+      # Its agent seals cards and opens answers as the agentpager command does.
+      - package: AgentPagerCrypto
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: me.agentpager.app.dev.uitests

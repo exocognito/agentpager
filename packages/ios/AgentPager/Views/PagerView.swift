@@ -110,14 +110,18 @@ struct AnsweredDecisionRow: View {
             ChoiceBadge(decision: d, choice: model.choice(d), size: 26)
             VStack(alignment: .leading, spacing: 3) {
                 Text(d.title).lineLimit(2)
-                HStack(spacing: 6) {
-                    if state == .confirmed {
-                        Image(systemName: "checkmark").font(.footnote.weight(.bold)).foregroundStyle(.green).accessibilityLabel("Agent confirmed")
+                if d.unreadable {
+                    Text(asked.agent.app).lineLimit(1).font(.subheadline).foregroundStyle(.secondary)
+                } else {
+                    HStack(spacing: 6) {
+                        if state == .confirmed {
+                            Image(systemName: "checkmark").font(.footnote.weight(.bold)).foregroundStyle(.green).accessibilityLabel("Agent confirmed")
+                        }
+                        Text(asked.agent.app + " · " + (model.choice(d).map { d.choiceText($0) } ?? "")).lineLimit(1)
                     }
-                    Text(asked.agent.app + " · " + (model.choice(d).map { d.choiceText($0) } ?? "")).lineLimit(1)
+                    .font(.subheadline).foregroundStyle(.secondary)
+                    if state != .confirmed { SendStatusLine(decision: d, agent: asked.agent).font(.subheadline).foregroundStyle(.secondary) }
                 }
-                .font(.subheadline).foregroundStyle(.secondary)
-                if state != .confirmed { SendStatusLine(decision: d, agent: asked.agent).font(.subheadline).foregroundStyle(.secondary) }
             }
         }
         .padding(.vertical, 2)
@@ -132,7 +136,9 @@ struct ChoiceBadge: View {
     var size: CGFloat
     var body: some View {
         Group {
-            if case .option(let n)? = choice, let o = decision.option(n) {
+            if decision.unreadable {
+                Image(systemName: "lock").font(size > 30 ? .body : .footnote).foregroundStyle(.white)
+            } else if case .option(let n)? = choice, let o = decision.option(n) {
                 Text(o.letter).font(size > 30 ? .title3.weight(.semibold) : .subheadline.weight(.semibold)).foregroundStyle(.white)
             } else {
                 Image(systemName: "text.bubble").font(size > 30 ? .body : .footnote).foregroundStyle(.white)

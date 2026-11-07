@@ -172,12 +172,12 @@
       "ephemeralPrivateKey": "JNE-K21zKHulxRbKd2VS8eCFni6u2zrH31w7OltcbOw",
       "ephemeralPublicKey": "6alCaP13EHLi9n49c4B45I1d0ilnyjFl1bOW5VfRiQg",
       "nonce": "_Gi_Wytpa8b8dY_o",
-      "plaintext": "eyJhcHAiOiJDbGF1ZGUgQ29kZSIsInByb2plY3QiOiJhZ2VudHBhZ2VyIiwibWFjaGluZSI6InBybyJ9",
+      "plaintext": "eyJhcHAiOiJDbGF1ZGUgQ29kZSIsInByb2plY3QiOiJhZ2VudHBhZ2VyIiwibWFjaGluZSI6InBybyIsImFuc3dlcktleSI6Ilo4aFZ0MVRieVFxU2dscmFzM0wyR2tmTzdOOUk2LXRLUXctdDMzckFkVlUifQ",
       "sharedSecret": "a2eccbeb01dc2a0b063b1e4bb4d57c50deb0701533fe6e2f8f7d57bbc5437309",
       "info": "6167656e7470616765722f76312f7061727403e9a94268fd771072e2f67e3d738078e48d5dd22967ca3165d5b396e557d18908de9edb7d7b7dc1b4d35b61c2ece435373f8343c85b78674dadfc7e146f882b4f",
       "key": "289d7a76836e575b37d3f5b01d5aaf10abae26ab5f0ec47e1c3513044948aef7",
       "aad": "01035254d8586ca9073ac4d4854e48971373",
-      "envelope": "AempQmj9dxBy4vZ-PXOAeOSNXdIpZ8oxZdWzluVX0YkI_Gi_Wytpa8b8dY_o6_kc3PYhtvl2uHIR_rpCrzkhb5dMFkr6h6XgyKpPUZwdCrz8f6DJBTxORBgDx9JVr6jMcWGWoCpIgwJijs1QHD1BIaibEE-rVThN_A"
+      "envelope": "AempQmj9dxBy4vZ-PXOAeOSNXdIpZ8oxZdWzluVX0YkI_Gi_Wytpa8b8dY_o6_kc3PYhtvl2uHIR_rpCrzkhb5dMFkr6h6XgyKpPUZwdCrz8f6DJBTxORBgDx9JVr6jMcWGWoCpIgwIzQTVDCsm6Uvz1usEr6LW3Ib4JEhbYBcH2HOG7ZbETjBMtJnbmZlJ31bNKySUcTf984h6z2nCsXznqDeeq4e4F4h5gehFFB7eaiTQ"
     },
     {
       "name": "identity, non-ASCII project, no machine",
@@ -191,12 +191,12 @@
       "ephemeralPrivateKey": "E_qXCTP9iokWy7seRNfCSaqWqJeGt_TU-sDUDYWEUa4",
       "ephemeralPublicKey": "qk-9T0AOS5HkYTQKhgLAU4IYo_nv_aR-pOVstONXh1I",
       "nonce": "2Q6SJjAmibJ_i4nJ",
-      "plaintext": "eyJhcHAiOiJDb2RleCIsInByb2plY3QiOiLml6XmnKzoqp7jg5fjg63jgrjjgqfjgq_jg4gifQ",
+      "plaintext": "eyJhcHAiOiJDb2RleCIsInByb2plY3QiOiLml6XmnKzoqp7jg5fjg63jgrjjgqfjgq_jg4giLCJhbnN3ZXJLZXkiOiJaOGhWdDFUYnlRcVNnbHJhczNMMkdrZk83TjlJNi10S1F3LXQzM3JBZFZVIn0",
       "sharedSecret": "1eb30bba5bfe30e7698735f2158403fe154eb688eeda4fdd525abeb9f7a8a453",
       "info": "6167656e7470616765722f76312f7061727403aa4fbd4f400e4b91e461340a8602c0538218a3f9effda47ea4e56cb4e3578752de9edb7d7b7dc1b4d35b61c2ece435373f8343c85b78674dadfc7e146f882b4f",
       "key": "16eb2f5d54ddaad74c3661f9541f1391aedcb4f18bb4ddc07f8745687d0f12b7",
       "aad": "01035254d8586ca9073ac4d4854e48971373",
-      "envelope": "AapPvU9ADkuR5GE0CoYCwFOCGKP57_2kfqTlbLTjV4dS2Q6SJjAmibJ_i4nJc7PkBEZbPf3DgXXtIQ1XKlt2av1FLndOEykfOWgthUvveQnreCbij9K28oQrojU301SberPpjRXvQ2Dn0cvK-Bxsr8duayo"
+      "envelope": "AapPvU9ADkuR5GE0CoYCwFOCGKP57_2kfqTlbLTjV4dS2Q6SJjAmibJ_i4nJc7PkBEZbPf3DgXXtIQ1XKlt2av1FLndOEykfOWgthUvveQnreCbij9K28oQrojU301SberPp3IIRYsJpPlTalnUpbX2zv-dSAhczsEv7dEhtyypdhEQp_Hj7vL7cLzDUWutqojLn0XcuXBtjoDO0FPUqr8xXgREFaSJwelLNclB8"
     },
     {
       "name": "acknowledgement",
@@ -705,7 +705,7 @@
         "decisionId": "a8Z6yhijm1nporqyjY8k3gzUwvvci4bl"
       },
       "recipientPrivateKey": "XasIfmJKikt54X-Lg4AO5m87sSkmGLb9HC-LJ_-I4Os",
-      "envelope": "AempQmj9dxBy4vZ-PXOAeOSNXdIpZ8oxZdWzluVX0YkI_Gi_Wytpa8b8dY_o6_kc3PYhtvl2uHIR_rpCrzkhb5dMFkr6h6XgyKpPUZwdCrz8f6DJBTxORBgDx9JVr6jMcWGWoCpIgwJijs1QHD1BIaibEE-rVThN_A",
+      "envelope": "AempQmj9dxBy4vZ-PXOAeOSNXdIpZ8oxZdWzluVX0YkI_Gi_Wytpa8b8dY_o6_kc3PYhtvl2uHIR_rpCrzkhb5dMFkr6h6XgyKpPUZwdCrz8f6DJBTxORBgDx9JVr6jMcWGWoCpIgwIzQTVDCsm6Uvz1usEr6LW3Ib4JEhbYBcH2HOG7ZbETjBMtJnbmZlJ31bNKySUcTf984h6z2nCsXznqDeeq4e4F4h5gehFFB7eaiTQ",
       "refusal": "EnvelopeError",
       "name": "identity opened as a card",
       "why": "kind"
@@ -740,7 +740,7 @@
         "pagerId": "e37ea7aa311b88559309873762913567"
       },
       "recipientPrivateKey": "XasIfmJKikt54X-Lg4AO5m87sSkmGLb9HC-LJ_-I4Os",
-      "envelope": "AempQmj9dxBy4vZ-PXOAeOSNXdIpZ8oxZdWzluVX0YkI_Gi_Wytpa8b8dY_o6_kc3PYhtvl2uHIR_rpCrzkhb5dMFkr6h6XgyKpPUZwdCrz8f6DJBTxORBgDx9JVr6jMcWGWoCpIgwJijs1QHD1BIaibEE-rVThN_A",
+      "envelope": "AempQmj9dxBy4vZ-PXOAeOSNXdIpZ8oxZdWzluVX0YkI_Gi_Wytpa8b8dY_o6_kc3PYhtvl2uHIR_rpCrzkhb5dMFkr6h6XgyKpPUZwdCrz8f6DJBTxORBgDx9JVr6jMcWGWoCpIgwIzQTVDCsm6Uvz1usEr6LW3Ib4JEhbYBcH2HOG7ZbETjBMtJnbmZlJ31bNKySUcTf984h6z2nCsXznqDeeq4e4F4h5gehFFB7eaiTQ",
       "refusal": "EnvelopeError",
       "name": "identity opened for another pager",
       "why": "pager"
@@ -1163,7 +1163,7 @@
         "decisionId": "a8Z6yhijm1nporqyjY8k3gzUwvvci4bl"
       },
       "recipientPrivateKey": "XasIfmJKikt54X-Lg4AO5m87sSkmGLb9HC-LJ_-I4Os",
-      "envelope": "AempQmj9dxBy4vZ-PXOAeOSNXdIpZ8oxZdWzluVX0YkI_Gi_Wytpa8b8dY_o6_kc3PYhtvl2uHIR_rpCrzkhb5dMFkr6h6XgyKpPUZwdCrz8f6DJBTxORBgDx9JVr6jMcWGWoCpIgwJijs1QHD1BIaibEE-rVThN_A",
+      "envelope": "AempQmj9dxBy4vZ-PXOAeOSNXdIpZ8oxZdWzluVX0YkI_Gi_Wytpa8b8dY_o6_kc3PYhtvl2uHIR_rpCrzkhb5dMFkr6h6XgyKpPUZwdCrz8f6DJBTxORBgDx9JVr6jMcWGWoCpIgwIzQTVDCsm6Uvz1usEr6LW3Ib4JEhbYBcH2HOG7ZbETjBMtJnbmZlJ31bNKySUcTf984h6z2nCsXznqDeeq4e4F4h5gehFFB7eaiTQ",
       "refusal": "EnvelopeError",
       "name": "identity opened with a decision",
       "why": "context"
@@ -1220,12 +1220,12 @@
       {
         "name": "identity, with machine",
         "kind": "identity",
-        "plaintext": "eyJhcHAiOiJDbGF1ZGUgQ29kZSIsInByb2plY3QiOiJhZ2VudHBhZ2VyIiwibWFjaGluZSI6InBybyJ9"
+        "plaintext": "eyJhcHAiOiJDbGF1ZGUgQ29kZSIsInByb2plY3QiOiJhZ2VudHBhZ2VyIiwibWFjaGluZSI6InBybyIsImFuc3dlcktleSI6Ilo4aFZ0MVRieVFxU2dscmFzM0wyR2tmTzdOOUk2LXRLUXctdDMzckFkVlUifQ"
       },
       {
         "name": "identity, non-ASCII project, no machine",
         "kind": "identity",
-        "plaintext": "eyJhcHAiOiJDb2RleCIsInByb2plY3QiOiLml6XmnKzoqp7jg5fjg63jgrjjgqfjgq_jg4gifQ"
+        "plaintext": "eyJhcHAiOiJDb2RleCIsInByb2plY3QiOiLml6XmnKzoqp7jg5fjg63jgrjjgqfjgq_jg4giLCJhbnN3ZXJLZXkiOiJaOGhWdDFUYnlRcVNnbHJhczNMMkdrZk83TjlJNi10S1F3LXQzM3JBZFZVIn0"
       },
       {
         "name": "acknowledgement",
@@ -1275,7 +1275,7 @@
       {
         "name": "identity with spaces between its fields",
         "kind": "identity",
-        "plaintext": "ewogICJhcHAiOiAiQ2xhdWRlIENvZGUiLAogICJwcm9qZWN0IjogImFnZW50cGFnZXIiLAogICJtYWNoaW5lIjogInBybyIKfQo"
+        "plaintext": "ewogICJhcHAiOiAiQ2xhdWRlIENvZGUiLAogICJwcm9qZWN0IjogImFnZW50cGFnZXIiLAogICJtYWNoaW5lIjogInBybyIsCiAgImFuc3dlcktleSI6ICJaOGhWdDFUYnlRcVNnbHJhczNMMkdrZk83TjlJNi10S1F3LXQzM3JBZFZVIgp9Cg"
       },
       {
         "name": "decision preview shortened to fit, four-byte characters",
@@ -2060,37 +2060,37 @@
       {
         "name": "JSON: a field name escaped to ASCII",
         "kind": "identity",
-        "plaintext": "eyJcdTAwNjFwcCI6IkNvZGV4IiwicHJvamVjdCI6InNpdGUifQ"
+        "plaintext": "eyJcdTAwNjFwcCI6IkNvZGV4IiwicHJvamVjdCI6InNpdGUiLCJhbnN3ZXJLZXkiOiJaOGhWdDFUYnlRcVNnbHJhczNMMkdrZk83TjlJNi10S1F3LXQzM3JBZFZVIn0"
       },
       {
         "name": "JSON: tabs, CRs and newlines between tokens",
         "kind": "identity",
-        "plaintext": "CXsNCiJhcHAiCToKIkNvZGV4IiAsICJwcm9qZWN0Ijoic2l0ZSINCn0K"
+        "plaintext": "CXsNCiJhcHAiCToKIkNvZGV4IiAsICJwcm9qZWN0Ijoic2l0ZSIsImFuc3dlcktleSI6Ilo4aFZ0MVRieVFxU2dscmFzM0wyR2tmTzdOOUk2LXRLUXctdDMzckFkVlUiDQp9Cg"
       },
       {
         "name": "JSON: an escaped NUL in a string",
         "kind": "identity",
-        "plaintext": "eyJhcHAiOiJDb1x1MDAwMGRleCIsInByb2plY3QiOiJzaXRlIn0"
+        "plaintext": "eyJhcHAiOiJDb1x1MDAwMGRleCIsInByb2plY3QiOiJzaXRlIiwiYW5zd2VyS2V5IjoiWjhoVnQxVGJ5UXFTZ2xyYXMzTDJHa2ZPN045STYtdEtRdy10MzNyQWRWVSJ9"
       },
       {
         "name": "JSON: an escaped slash",
         "kind": "identity",
-        "plaintext": "eyJhcHAiOiJDb1wvZGV4IiwicHJvamVjdCI6InNpdGUifQ"
+        "plaintext": "eyJhcHAiOiJDb1wvZGV4IiwicHJvamVjdCI6InNpdGUiLCJhbnN3ZXJLZXkiOiJaOGhWdDFUYnlRcVNnbHJhczNMMkdrZk83TjlJNi10S1F3LXQzM3JBZFZVIn0"
       },
       {
         "name": "JSON: a unicode escape then a letter",
         "kind": "identity",
-        "plaintext": "eyJhcHAiOiJDb1x1MTJkZXgiLCJwcm9qZWN0Ijoic2l0ZSJ9"
+        "plaintext": "eyJhcHAiOiJDb1x1MTJkZXgiLCJwcm9qZWN0Ijoic2l0ZSIsImFuc3dlcktleSI6Ilo4aFZ0MVRieVFxU2dscmFzM0wyR2tmTzdOOUk2LXRLUXctdDMzckFkVlUifQ"
       },
       {
         "name": "JSON: an escaped surrogate pair",
         "kind": "identity",
-        "plaintext": "eyJhcHAiOiJDb2RleCBcdWQ4M2RcdWRlODAiLCJwcm9qZWN0Ijoic2l0ZSJ9"
+        "plaintext": "eyJhcHAiOiJDb2RleCBcdWQ4M2RcdWRlODAiLCJwcm9qZWN0Ijoic2l0ZSIsImFuc3dlcktleSI6Ilo4aFZ0MVRieVFxU2dscmFzM0wyR2tmTzdOOUk2LXRLUXctdDMzckFkVlUifQ"
       },
       {
         "name": "JSON: an escaped surrogate pair in upper case",
         "kind": "identity",
-        "plaintext": "eyJhcHAiOiJDb2RleCBcdUQ4M0RcdURFODAiLCJwcm9qZWN0Ijoic2l0ZSJ9"
+        "plaintext": "eyJhcHAiOiJDb2RleCBcdUQ4M0RcdURFODAiLCJwcm9qZWN0Ijoic2l0ZSIsImFuc3dlcktleSI6Ilo4aFZ0MVRieVFxU2dscmFzM0wyR2tmTzdOOUk2LXRLUXctdDMzckFkVlUifQ"
       },
       {
         "name": "JSON: option 1.0000000000000001, a whole number once read",
@@ -2267,22 +2267,22 @@
       {
         "name": "identity without a project",
         "kind": "identity",
-        "plaintext": "eyJhcHAiOiJDb2RleCJ9"
+        "plaintext": "eyJhcHAiOiJDb2RleCIsImFuc3dlcktleSI6Ilo4aFZ0MVRieVFxU2dscmFzM0wyR2tmTzdOOUk2LXRLUXctdDMzckFkVlUifQ"
       },
       {
         "name": "identity app of 61 characters",
         "kind": "identity",
-        "plaintext": "eyJhcHAiOiJ4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4IiwicHJvamVjdCI6InNpdGUifQ"
+        "plaintext": "eyJhcHAiOiJ4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4IiwicHJvamVjdCI6InNpdGUiLCJhbnN3ZXJLZXkiOiJaOGhWdDFUYnlRcVNnbHJhczNMMkdrZk83TjlJNi10S1F3LXQzM3JBZFZVIn0"
       },
       {
         "name": "identity machine blank",
         "kind": "identity",
-        "plaintext": "eyJhcHAiOiJDb2RleCIsInByb2plY3QiOiJzaXRlIiwibWFjaGluZSI6IiAgIn0"
+        "plaintext": "eyJhcHAiOiJDb2RleCIsInByb2plY3QiOiJzaXRlIiwibWFjaGluZSI6IiAgIiwiYW5zd2VyS2V5IjoiWjhoVnQxVGJ5UXFTZ2xyYXMzTDJHa2ZPN045STYtdEtRdy10MzNyQWRWVSJ9"
       },
       {
         "name": "identity app a byte-order mark only",
         "kind": "identity",
-        "plaintext": "eyJhcHAiOiLvu78iLCJwcm9qZWN0Ijoic2l0ZSJ9"
+        "plaintext": "eyJhcHAiOiLvu78iLCJwcm9qZWN0Ijoic2l0ZSIsImFuc3dlcktleSI6Ilo4aFZ0MVRieVFxU2dscmFzM0wyR2tmTzdOOUk2LXRLUXctdDMzckFkVlUifQ"
       },
       {
         "name": "answer of an unknown kind",
@@ -2352,22 +2352,32 @@
       {
         "name": "identity after a UTF-8 byte-order mark",
         "kind": "identity",
-        "plaintext": "77u_eyJhcHAiOiJDbGF1ZGUgQ29kZSIsInByb2plY3QiOiJhZ2VudHBhZ2VyIiwibWFjaGluZSI6InBybyJ9"
+        "plaintext": "77u_eyJhcHAiOiJDbGF1ZGUgQ29kZSIsInByb2plY3QiOiJhZ2VudHBhZ2VyIiwibWFjaGluZSI6InBybyIsImFuc3dlcktleSI6Ilo4aFZ0MVRieVFxU2dscmFzM0wyR2tmTzdOOUk2LXRLUXctdDMzckFkVlUifQ"
       },
       {
         "name": "identity as UTF-16 with a byte-order mark",
         "kind": "identity",
-        "plaintext": "__57ACIAYQBwAHAAIgA6ACIAQwBsAGEAdQBkAGUAIABDAG8AZABlACIALAAiAHAAcgBvAGoAZQBjAHQAIgA6ACIAYQBnAGUAbgB0AHAAYQBnAGUAcgAiACwAIgBtAGEAYwBoAGkAbgBlACIAOgAiAHAAcgBvACIAfQA"
+        "plaintext": "__57ACIAYQBwAHAAIgA6ACIAQwBsAGEAdQBkAGUAIABDAG8AZABlACIALAAiAHAAcgBvAGoAZQBjAHQAIgA6ACIAYQBnAGUAbgB0AHAAYQBnAGUAcgAiACwAIgBtAGEAYwBoAGkAbgBlACIAOgAiAHAAcgBvACIALAAiAGEAbgBzAHcAZQByAEsAZQB5ACIAOgAiAFoAOABoAFYAdAAxAFQAYgB5AFEAcQBTAGcAbAByAGEAcwAzAEwAMgBHAGsAZgBPADcATgA5AEkANgAtAHQASwBRAHcALQB0ADMAMwByAEEAZABWAFUAIgB9AA"
       },
       {
         "name": "identity as UTF-16 without one",
         "kind": "identity",
-        "plaintext": "ewAiAGEAcABwACIAOgAiAEMAbABhAHUAZABlACAAQwBvAGQAZQAiACwAIgBwAHIAbwBqAGUAYwB0ACIAOgAiAGEAZwBlAG4AdABwAGEAZwBlAHIAIgAsACIAbQBhAGMAaABpAG4AZQAiADoAIgBwAHIAbwAiAH0A"
+        "plaintext": "ewAiAGEAcABwACIAOgAiAEMAbABhAHUAZABlACAAQwBvAGQAZQAiACwAIgBwAHIAbwBqAGUAYwB0ACIAOgAiAGEAZwBlAG4AdABwAGEAZwBlAHIAIgAsACIAbQBhAGMAaABpAG4AZQAiADoAIgBwAHIAbwAiACwAIgBhAG4AcwB3AGUAcgBLAGUAeQAiADoAIgBaADgAaABWAHQAMQBUAGIAeQBRAHEAUwBnAGwAcgBhAHMAMwBMADIARwBrAGYATwA3AE4AOQBJADYALQB0AEsAUQB3AC0AdAAzADMAcgBBAGQAVgBVACIAfQA"
       },
       {
         "name": "identity with a raw NUL byte in a field",
         "kind": "identity",
-        "plaintext": "eyJhcHAiOiJDbwBkZXgiLCJwcm9qZWN0Ijoic2l0ZSJ9"
+        "plaintext": "eyJhcHAiOiJDbwBkZXgiLCJwcm9qZWN0Ijoic2l0ZSIsImFuc3dlcktleSI6Ilo4aFZ0MVRieVFxU2dscmFzM0wyR2tmTzdOOUk2LXRLUXctdDMzckFkVlUifQ"
+      },
+      {
+        "name": "identity without its answer key",
+        "kind": "identity",
+        "plaintext": "eyJhcHAiOiJDb2RleCIsInByb2plY3QiOiJzaXRlIn0"
+      },
+      {
+        "name": "identity answer key not canonical",
+        "kind": "identity",
+        "plaintext": "eyJhcHAiOiJDb2RleCIsInByb2plY3QiOiJzaXRlIiwiYW5zd2VyS2V5IjoiWjhoVnQxVGJ5UXFTZ2xyYXMzTDJHa2ZPN045STYtdEtRdy10MzNyQWRWViJ9"
       },
       {
         "name": "decision preview recommending E",
@@ -2392,17 +2402,17 @@
       {
         "name": "identity naming app twice, null last",
         "kind": "identity",
-        "plaintext": "eyJhcHAiOiJDb2RleCIsImFwcCI6bnVsbCwicHJvamVjdCI6InNpdGUifQ"
+        "plaintext": "eyJhcHAiOiJDb2RleCIsImFwcCI6bnVsbCwicHJvamVjdCI6InNpdGUiLCJhbnN3ZXJLZXkiOiJaOGhWdDFUYnlRcVNnbHJhczNMMkdrZk83TjlJNi10S1F3LXQzM3JBZFZVIn0"
       },
       {
         "name": "identity naming app twice, null first",
         "kind": "identity",
-        "plaintext": "eyJhcHAiOm51bGwsImFwcCI6IkNvZGV4IiwicHJvamVjdCI6InNpdGUifQ"
+        "plaintext": "eyJhcHAiOm51bGwsImFwcCI6IkNvZGV4IiwicHJvamVjdCI6InNpdGUiLCJhbnN3ZXJLZXkiOiJaOGhWdDFUYnlRcVNnbHJhczNMMkdrZk83TjlJNi10S1F3LXQzM3JBZFZVIn0"
       },
       {
         "name": "identity naming app twice, once escaped",
         "kind": "identity",
-        "plaintext": "eyJhcHAiOiJDb2RleCIsIlx1MDA2MXBwIjoiT3RoZXIiLCJwcm9qZWN0Ijoic2l0ZSJ9"
+        "plaintext": "eyJhcHAiOiJDb2RleCIsIlx1MDA2MXBwIjoiT3RoZXIiLCJwcm9qZWN0Ijoic2l0ZSIsImFuc3dlcktleSI6Ilo4aFZ0MVRieVFxU2dscmFzM0wyR2tmTzdOOUk2LXRLUXctdDMzckFkVlUifQ"
       },
       {
         "name": "answer naming its kind twice",
@@ -2862,7 +2872,7 @@
       {
         "name": "JSON: a trailing comma in an object",
         "kind": "identity",
-        "plaintext": "eyJhcHAiOiJDb2RleCIsInByb2plY3QiOiJzaXRlIix9"
+        "plaintext": "eyJhcHAiOiJDb2RleCIsInByb2plY3QiOiJzaXRlIiwiYW5zd2VyS2V5IjoiWjhoVnQxVGJ5UXFTZ2xyYXMzTDJHa2ZPN045STYtdEtRdy10MzNyQWRWVSIsfQ"
       },
       {
         "name": "JSON: a trailing comma in a list",
@@ -2887,62 +2897,62 @@
       {
         "name": "JSON: an empty field name",
         "kind": "identity",
-        "plaintext": "eyJhcHAiOiJDb2RleCIsInByb2plY3QiOiJzaXRlIiwiIjoieCJ9"
+        "plaintext": "eyJhcHAiOiJDb2RleCIsInByb2plY3QiOiJzaXRlIiwiYW5zd2VyS2V5IjoiWjhoVnQxVGJ5UXFTZ2xyYXMzTDJHa2ZPN045STYtdEtRdy10MzNyQWRWVSIsIiI6IngifQ"
       },
       {
         "name": "JSON: single quotes",
         "kind": "identity",
-        "plaintext": "eydhcHAnOidDb2RleCcsInByb2plY3QiOiJzaXRlIn0"
+        "plaintext": "eydhcHAnOidDb2RleCcsInByb2plY3QiOiJzaXRlIiwiYW5zd2VyS2V5IjoiWjhoVnQxVGJ5UXFTZ2xyYXMzTDJHa2ZPN045STYtdEtRdy10MzNyQWRWVSJ9"
       },
       {
         "name": "JSON: a field name unquoted",
         "kind": "identity",
-        "plaintext": "e2FwcDoiQ29kZXgiLCJwcm9qZWN0Ijoic2l0ZSJ9"
+        "plaintext": "e2FwcDoiQ29kZXgiLCJwcm9qZWN0Ijoic2l0ZSIsImFuc3dlcktleSI6Ilo4aFZ0MVRieVFxU2dscmFzM0wyR2tmTzdOOUk2LXRLUXctdDMzckFkVlUifQ"
       },
       {
         "name": "JSON: a comment",
         "kind": "identity",
-        "plaintext": "eyJhcHAiOiJDb2RleCIsLyogYyAqLyJwcm9qZWN0Ijoic2l0ZSJ9"
+        "plaintext": "eyJhcHAiOiJDb2RleCIsLyogYyAqLyJwcm9qZWN0Ijoic2l0ZSIsImFuc3dlcktleSI6Ilo4aFZ0MVRieVFxU2dscmFzM0wyR2tmTzdOOUk2LXRLUXctdDMzckFkVlUifQ"
       },
       {
         "name": "JSON: a no-break space between tokens",
         "kind": "identity",
-        "plaintext": "eyJhcHAiOiJDb2RleCIswqAicHJvamVjdCI6InNpdGUifQ"
+        "plaintext": "eyJhcHAiOiJDb2RleCIswqAicHJvamVjdCI6InNpdGUiLCJhbnN3ZXJLZXkiOiJaOGhWdDFUYnlRcVNnbHJhczNMMkdrZk83TjlJNi10S1F3LXQzM3JBZFZVIn0"
       },
       {
         "name": "JSON: a raw tab in a string",
         "kind": "identity",
-        "plaintext": "eyJhcHAiOiJDbwlkZXgiLCJwcm9qZWN0Ijoic2l0ZSJ9"
+        "plaintext": "eyJhcHAiOiJDbwlkZXgiLCJwcm9qZWN0Ijoic2l0ZSIsImFuc3dlcktleSI6Ilo4aFZ0MVRieVFxU2dscmFzM0wyR2tmTzdOOUk2LXRLUXctdDMzckFkVlUifQ"
       },
       {
         "name": "JSON: an unknown escape",
         "kind": "identity",
-        "plaintext": "eyJhcHAiOiJDb1x4ZGV4IiwicHJvamVjdCI6InNpdGUifQ"
+        "plaintext": "eyJhcHAiOiJDb1x4ZGV4IiwicHJvamVjdCI6InNpdGUiLCJhbnN3ZXJLZXkiOiJaOGhWdDFUYnlRcVNnbHJhczNMMkdrZk83TjlJNi10S1F3LXQzM3JBZFZVIn0"
       },
       {
         "name": "JSON: a unicode escape with a letter that isn't hex",
         "kind": "identity",
-        "plaintext": "eyJhcHAiOiJDb1x1MTJnNGRleCIsInByb2plY3QiOiJzaXRlIn0"
+        "plaintext": "eyJhcHAiOiJDb1x1MTJnNGRleCIsInByb2plY3QiOiJzaXRlIiwiYW5zd2VyS2V5IjoiWjhoVnQxVGJ5UXFTZ2xyYXMzTDJHa2ZPN045STYtdEtRdy10MzNyQWRWVSJ9"
       },
       {
         "name": "JSON: a low surrogate alone",
         "kind": "identity",
-        "plaintext": "eyJhcHAiOiJDb2RleCBcdWRlODAiLCJwcm9qZWN0Ijoic2l0ZSJ9"
+        "plaintext": "eyJhcHAiOiJDb2RleCBcdWRlODAiLCJwcm9qZWN0Ijoic2l0ZSIsImFuc3dlcktleSI6Ilo4aFZ0MVRieVFxU2dscmFzM0wyR2tmTzdOOUk2LXRLUXctdDMzckFkVlUifQ"
       },
       {
         "name": "JSON: a value nested too deep in an extra field",
         "kind": "identity",
-        "plaintext": "eyJhcHAiOiJDb2RleCIsInByb2plY3QiOiJzaXRlIiwieCI6W1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW11dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV19"
+        "plaintext": "eyJhcHAiOiJDb2RleCIsInByb2plY3QiOiJzaXRlIiwiYW5zd2VyS2V5IjoiWjhoVnQxVGJ5UXFTZ2xyYXMzTDJHa2ZPN045STYtdEtRdy10MzNyQWRWVSIsIngiOltbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tdXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dfQ"
       },
       {
         "name": "JSON: the literal true for a field",
         "kind": "identity",
-        "plaintext": "eyJhcHAiOnRydWUsInByb2plY3QiOiJzaXRlIn0"
+        "plaintext": "eyJhcHAiOnRydWUsInByb2plY3QiOiJzaXRlIiwiYW5zd2VyS2V5IjoiWjhoVnQxVGJ5UXFTZ2xyYXMzTDJHa2ZPN045STYtdEtRdy10MzNyQWRWVSJ9"
       },
       {
         "name": "JSON: a value after the object",
         "kind": "identity",
-        "plaintext": "eyJhcHAiOiJDb2RleCIsInByb2plY3QiOiJzaXRlIn0ge30"
+        "plaintext": "eyJhcHAiOiJDb2RleCIsInByb2plY3QiOiJzaXRlIiwiYW5zd2VyS2V5IjoiWjhoVnQxVGJ5UXFTZ2xyYXMzTDJHa2ZPN045STYtdEtRdy10MzNyQWRWVSJ9IHt9"
       },
       {
         "name": "JSON: option 2.5",

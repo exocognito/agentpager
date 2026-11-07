@@ -13,11 +13,11 @@ export const AGENT_IDLE_MS = 30 * 24 * 3_600_000;
 export const PICKUP_MS = PICKUP_MINUTES * 60_000;
 // How long each auto-off choice keeps a pager on.
 export const AUTO_OFF = { '24h': 24 * 3_600_000, '7d': 7 * 24 * 3_600_000, '30d': 30 * 24 * 3_600_000 } as const;
-// The oldest protocol (CLIENT_HEADER) the service accepts from each side. An agent's call without the header, such as
-// one from an m4 command, is refused. The phone's isn't yet: until its shapes change at the encryption switch, an app
-// from before the header still works, and one that sends it must send a protocol accepted here.
-export const OLDEST_PROTOCOL = { agent: 1, phone: 1 } as const;
-export const PHONE_NEEDS_CLIENT_HEADER = false;
+// The oldest protocol (CLIENT_HEADER) the service accepts from each side. Since the encryption switch (protocol 2) every
+// call must say it speaks it: a command or an app from before the switch, which sent readable decisions or sent no
+// header at all, is refused and told to update. An app is never told its pager is unknown instead, which would make
+// it drop the pager and its keys.
+export const OLDEST_PROTOCOL = { agent: 2, phone: 2 } as const;
 
 export class Refusal extends Error {
   readonly tag: RefusalTag;
@@ -30,7 +30,7 @@ export const refuse = {
   unknownAgent: () => new Refusal('UnknownAgent', "This agent does not exist or has been forgotten. Connect again with your owner's pager number."),
   unknownPager: () => new Refusal('UnknownPager', 'This pager does not exist or has been deleted.'),
   unknownDecision: () => new Refusal('UnknownDecision', 'This agent has no decision with that id.'),
-  unknownFile: () => new Refusal('UnknownFile', 'This decision has no attachment with that name.'),
+  unknownFile: () => new Refusal('UnknownFile', 'This decision has no attachment in that slot.'),
   pagerOff: () => new Refusal('PagerOff', 'This pager is turned off. Your message was not delivered. Nothing is queued: ask again once your owner turns it on, or ask them for another pager number.'),
   pagerExists: () => new Refusal('PagerExists', 'A pager with this number already exists.'),
   pagerDeleted: () => new Refusal('PagerDeleted', 'Your owner deleted this pager. Stop paging; ask your owner for a pager number only if they want more decisions.'),

@@ -46,7 +46,7 @@ const card = (title: string, detail: string, recommended: string): CardPart => (
   title, detail, answerKey: "A".repeat(43),
   card: { type: "brief", recommended: 2, options: [{ number: 1, title: "One", prioritizes: "speed" }, { number: 2, title: recommended, prioritizes: "care" }], markdown: "## Options\n\n## Recommendation: B\n" },
 });
-const worst: [string, CardPart, IdentityPart][] = [
+const worst: [string, CardPart, Omit<IdentityPart, "answerKey">][] = [
   ["every field at its limit in four-byte characters", card(four(100), four(280), four(280)), { app: four(60), project: four(60), machine: four(60) }],
   ["every field at its limit in characters JSON escapes", card(escaped(100), escaped(280), escaped(280)), { app: escaped(60), project: escaped(60), machine: escaped(60) }],
   ["a single character of 6001 bytes in every field", card(heavy, heavy, heavy), { app: heavy, project: heavy, machine: heavy }],

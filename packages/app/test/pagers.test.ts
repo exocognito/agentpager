@@ -34,13 +34,15 @@ test('pagers and agents: the phone makes a pager, every connect is a new agent, 
     const b = await f.connect(keys.number, 'Codex', 'atomic-pages');
     assert.notEqual(a.agent.agentId, b.agent.agentId);
     const c = await f.connect(keys.number, 'Claude Code', 'agentpager');
-    const raw = await f.request('/api/agents', { data: { number: keys.number, app: 'Pi', project: 'raw' } });
+    const raw = await f.request('/api/agents', { data: f.connectBody(keys.number, 'Pi', 'raw') });
     assert.deepEqual(Object.keys(raw.value ?? {}).sort(), ['agent', 'agentKey', 'message'], 'nothing to show the owner');
     for (const bad of [pagerKeys().number, keys.number.slice(0, -1) + (keys.number.endsWith('A') ? 'B' : 'A'), 'not-a-number', 'ap1_' + 'x'.repeat(31)]) {
-      await f.refused(410, 'NumberInvalid', '/api/agents', { data: { number: bad, app: 'Codex', project: 'nope' } });
+      await f.refused(410, 'NumberInvalid', '/api/agents', { data: f.connectBody(bad, 'Codex', 'nope') });
     }
-    await f.refused(400, 'InvalidInput', '/api/agents', { data: { number: keys.number, app: 'Codex' } });
-    await f.refused(400, 'InvalidInput', '/api/agents', { data: { number: keys.number, app: 'Codex', project: 'x'.repeat(61) } });
+    // Who asked and the project travel only sealed; the service can't check them, so the command does (I4.9).
+    await f.refused(400, 'InvalidInput', '/api/agents', { data: { number: keys.number } });
+    await f.refused(400, 'InvalidInput', '/api/agents', { data: { number: keys.number, identity: 'Codex' } });
+    await f.refused(400, 'InvalidInput', '/api/agents', { data: { ...f.connectBody(keys.number), app: 'Codex', project: 'readable' } });
 
     // The usual exchange; the phone reads every agent's decisions with one call.
     const asked = await f.ask(a, 'Ship it?');
@@ -68,7 +70,7 @@ test('pagers and agents: the phone makes a pager, every connect is a new agent, 
     const busy = await f.connect(keys.number, 'Codex', 'busy');
     const open = [];
     for (let n = 1; n <= C.MAX_OPEN_DECISIONS; n++) open.push(await f.ask(busy, `Question ${n}`));
-    const full = await f.refused(409, 'TooManyOpenDecisions', `/api/agents/${busy.agent.agentId}/cards`, { agent: busy.agentKey, data: question('Eleventh') });
+    const full = await f.refused(409, 'TooManyOpenDecisions', `/api/agents/${busy.agent.agentId}/cards`, { agent: busy.agentKey, data: await f.sealed(busy, question('Eleventh')) });
     assert.equal(full.limit, 10); assert.match(full.message, /10 unanswered decisions from you/);
     await f.answer(busy.agent.agentId, phone, open[0].decisionId);
     await f.ask(busy, 'Eleventh, after an answer');
@@ -77,7 +79,7 @@ test('pagers and agents: the phone makes a pager, every connect is a new agent, 
     const late = await f.ask(c, 'Before finishing?');
     const finished = await f.ok(C.Finished, `/api/agents/${c.agent.agentId}/finish`, { method: 'POST', agent: c.agentKey });
     assert.deepEqual(await f.ok(C.Finished, `/api/agents/${c.agent.agentId}/finish`, { method: 'POST', agent: c.agentKey }), finished, 'finishing twice is harmless');
-    assert.match((await f.refused(409, 'AgentFinished', `/api/agents/${c.agent.agentId}/cards`, { agent: c.agentKey, data: question() })).message, /connect again/);
+    assert.match((await f.refused(409, 'AgentFinished', `/api/agents/${c.agent.agentId}/cards`, { agent: c.agentKey, data: await f.sealed(c, question()) })).message, /connect again/);
     const lateReceipt = await f.answer(c.agent.agentId, phone, late.decisionId, { kind: 'feedback', text: 'Not now.' });
     await f.ack(c, late.decisionId, lateReceipt.answerId, 'Leaving it.');
     assert.equal((await f.pager(keys.pagerId, phone)).agents[2].agent.finishedAt, finished.finishedAt);
@@ -94,11 +96,11 @@ test('off: nothing gets through and nothing is queued; the phone keeps everythin
     assert.equal(off.pager.on, false); assert.equal(off.pager.offAt, null); assert.ok(off.pager.offSince);
     const agentId = a.agent.agentId, cards = `/api/agents/${agentId}/cards`;
     const refusals = [
-      await f.refused(409, 'PagerOff', '/api/agents', { data: { number: p.number, app: 'Codex', project: 'off' } }),
-      await f.refused(409, 'PagerOff', cards, { agent: a.agentKey, data: question('While off?') }),
+      await f.refused(409, 'PagerOff', '/api/agents', { data: f.connectBody(p.number, 'Codex', 'off') }),
+      await f.refused(409, 'PagerOff', cards, { agent: a.agentKey, data: await f.sealed(a, question('While off?')) }),
       await f.refused(409, 'PagerOff', `${cards}/${asked.decisionId}/answer?wait=1`, { agent: a.agentKey }),
       await f.refused(409, 'PagerOff', `/api/agents/${agentId}/finish`, { method: 'POST', agent: a.agentKey }),
-      await f.refused(409, 'PagerOff', `${cards}/${asked.decisionId}/answer`, { phone: p.phone, data: { requestId: token(), choice: { kind: 'option', number: 1 } } }),
+      await f.refused(409, 'PagerOff', `${cards}/${asked.decisionId}/answer`, { phone: p.phone, data: await f.sealedAnswer(agentId, p.phone, asked.decisionId, { kind: 'option', number: 1 }) }),
     ];
     for (const r of refusals) assert.match(r.message, /^This pager is turned off\. Your message was not delivered\./);
     // A wrong key is still refused as unauthorized first.
@@ -131,7 +133,7 @@ test('auto-off lands in the same off state; turning on starts its clock again', 
     await pause(Date.parse(p.pager.offAt ?? '') - Date.now() + 500);
     const seen = await f.pager(p.pagerId, p.phone);
     assert.deepEqual([seen.pager.on, seen.pager.offSince, seen.pager.offAt], [false, p.pager.offAt, null], 'off since it was due');
-    await f.refused(409, 'PagerOff', `/api/agents/${a.agent.agentId}/cards`, { agent: a.agentKey, data: question() });
+    await f.refused(409, 'PagerOff', `/api/agents/${a.agent.agentId}/cards`, { agent: a.agentKey, data: await f.sealed(a, question()) });
 
     const on = await f.settings(p.pagerId, p.phone, { on: true });
     assert.ok(Date.parse(on.pager.offAt ?? '') > Date.now() + 2_000, 'counted from now');
@@ -157,7 +159,7 @@ test('delete takes the agents and their decisions; housekeeping forgets an idle 
     await f.request(`/api/pagers/${p.pagerId}/delete`, { method: 'POST', phone: p.phone });
     await f.refused(404, 'UnknownPager', `/api/pagers/${p.pagerId}`, { phone: p.phone });
     await f.refused(404, 'UnknownAgent', `/api/agents/${a.agent.agentId}/cards/${asked.decisionId}/answer`, { agent: a.agentKey });
-    await f.refused(410, 'NumberInvalid', '/api/agents', { data: { number: p.number, app: 'Codex', project: 'delete' } });
+    await f.refused(410, 'NumberInvalid', '/api/agents', { data: f.connectBody(p.number, 'Codex', 'delete') });
 
     // Idle for longer than housekeeping allows: forgotten, and its pager no longer lists it.
     const { p: q, a: idle } = await f.connected('Codex', 'idle');

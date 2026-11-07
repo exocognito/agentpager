@@ -32,12 +32,17 @@ agentpager ack --agent ap-7f3k d_2x8w "Building the smaller fix today."
 2 refused, 4 pager off, 5 no usable reply from the server (unreachable, no reply, or a reply not understood),
 6 unknown agent id.
 
-Files: `~/.agentpager/agents/<id>.json` (mode 600: the agent's server key, its reminder clock, and the request id of
-each ask no reply has settled yet, so asking the same card again after a lost reply reaches the owner once; the agent
-only ever passes the id) and `~/.agentpager/history/<pager>.jsonl` (capped at 1,000 lines). `AGENTPAGER_HOME` moves the folder;
+Files: `~/.agentpager/agents/<id>.json` (mode 600: the agent's server key, its own private key, made at connect, the
+pager's public key as checked against the number at connect, its reminder clock, and the request id of each ask no
+reply has settled yet, so asking the same card again after a lost reply reaches the owner once; the agent only ever
+passes the id, and neither key is printed) and `~/.agentpager/history/<pager>.jsonl` (capped at 1,000 lines). `AGENTPAGER_HOME` moves the folder;
 `AGENTPAGER_SERVER` or `config.json` `{"server": …}` picks the server (default `https://agentpager.me`).
 
-Not yet (Stage 3): end-to-end encryption. The binary sends cards in the clear over HTTPS, as the hosted MCP did.
+End to end (B30, I19.6): connect reads the pager's public key, checks it against the number's fingerprint and pins it,
+or sends nothing. Who asked, every card and attachment, and every acknowledgement are sealed to that key
+(`src/seal.ts`, the format in `packages/contract/envelope.ts`); the card carries this agent's own public key, the only
+key the phone seals its answer to, and wait opens each answer and checks it fits the card asked. An agent file from
+before the encryption switch has no keys: that agent is told to connect again.
 
 ## Tests
 

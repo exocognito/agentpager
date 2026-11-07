@@ -58,10 +58,13 @@ public struct CardPart: Part, Hashable {
     public var attachments: [AttachmentEntryPart]?
     public var answerKey: String
 }
+// Who asked, the project and the computer, with the agent's own key: the phone takes a card as this agent's only when
+// the card names the same key.
 public struct IdentityPart: Part, Hashable {
     public var app: String
     public var project: String
     public var machine: String?
+    public var answerKey: String
 }
 public enum ChoicePart: Sendable, Hashable {
     case option(Int)
@@ -156,6 +159,30 @@ func prose(_ text: String, max: Int, _ field: String) throws(PartError) -> Strin
     return text
 }
 
+// A public key as the contract's AnswerKey takes it: 32 bytes as canonical base64url.
+func publicKey(_ v: Value, _ field: String) throws(PartError) -> String {
+    let key = try string(v, field)
+    guard key.utf8.count == 43, Envelope.fromBase64url(key)?.count == 32 else { throw PartError("\(field): a public key is 32 bytes as canonical base64url") }
+    return key
+}
+
+extension Parts {
+    // An attachment that is a Markdown page, as the command holds one before it seals it (brief.ts PageInput and
+    // Attachments): UTF-8, at most a million bytes, not blank, at most 20,000 characters, no HTML outside code, and every
+    // image or page it names one of its card's attachments. The service can't read a page, so the phone holds it to this
+    // before showing any of it.
+    public static let pageMaxBytes = 1_000_000
+    public static func page(_ data: Data, attachments: [(name: String, type: String)]) throws(PartError) -> String {
+        guard data.count <= pageMaxBytes else { throw PartError("a page may not exceed \(pageMaxBytes) bytes") }
+        guard let text = String(validating: data, as: UTF8.self) else { throw PartError("a page is UTF-8 text") }
+        if text.unicodeScalars.allSatisfy({ jsWhitespace.contains($0.value) }) { throw PartError("a page may not be blank") }
+        if text.count > Limits.brief { throw PartError("a page may not exceed \(Limits.brief) characters") }
+        if BriefRules.htmlOutsideCode(text) { throw PartError("HTML is not allowed outside fenced code blocks") }
+        if let problem = BriefRules.missingAttachment(text, attachments.map { AttachmentEntryPart(name: $0.name, type: $0.type) }) { throw PartError(problem) }
+        return text
+    }
+}
+
 extension BriefOptionPart {
     init(_ v: Value) throws(PartError) {
         let f = try Fields(v, ["number", "title", "label", "prioritizes"])
@@ -210,16 +237,16 @@ extension CardPart {
             attachments = a
         } else { attachments = nil }
         if let problem = BriefRules.missingAttachment(card.markdown, attachments ?? []) { throw PartError(problem) }
-        answerKey = try string(f.required("answerKey"), "answerKey")
-        guard answerKey.utf8.count == 43, Envelope.fromBase64url(answerKey)?.count == 32 else { throw PartError("answerKey: a public key is 32 bytes as canonical base64url") }
+        answerKey = try publicKey(f.required("answerKey"), "answerKey")
     }
 }
 extension IdentityPart {
     public init(json: PartJSON) throws(PartError) {
-        let f = try Fields(json.value, ["app", "project", "machine"])
+        let f = try Fields(json.value, ["app", "project", "machine", "answerKey"])
         app = try prose(f.required("app"), max: Limits.label, "app")
         project = try prose(f.required("project"), max: Limits.label, "project")
         machine = try f.optional("machine").map { v throws(PartError) in try prose(v, max: Limits.label, "machine") }
+        answerKey = try publicKey(f.required("answerKey"), "answerKey")
     }
 }
 extension ChoicePart {

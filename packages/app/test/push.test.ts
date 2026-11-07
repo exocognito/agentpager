@@ -1,50 +1,7 @@
 import { test } from 'node:test';
-import { createServer } from 'node:http';
-import { generateKeyPairSync, verify } from 'node:crypto';
-import { Schema } from 'effect';
-import { fixture, assert, token, until, decode, question, C } from './support.ts';
+import { fixture, assert, token, until, question, C, apple, device, registered, openPreview } from './support.ts';
 
-// A stand-in for Apple's push service: it records each alert, checks the provider token, and answers each device
-// token as `replies` says (200 unless set).
-const Payload = Schema.Struct({
-  aps: Schema.Struct({
-    alert: Schema.Struct({ title: Schema.String, body: Schema.String }), sound: Schema.Literal('default'), 'thread-id': Schema.String,
-    'content-available': Schema.Literal(1), 'interruption-level': Schema.Literal('time-sensitive', 'active'),
-  }),
-  kind: Schema.Literal('decision', 'acknowledgement', 'warning'), pagerId: Schema.String, agentId: Schema.String, decisionId: Schema.String,
-});
-type Delivery = { device: string; headers: Record<string, string>; payload: typeof Payload.Type };
-const Ok = Schema.Struct({ ok: Schema.Literal(true) });
-
-async function apple() {
-  const { privateKey, publicKey } = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
-  const deliveries: Delivery[] = [], replies = new Map<string, { status: number; reason: string }>();
-  const server = createServer((req, res) => {
-    let raw = '';
-    req.on('data', chunk => { raw += chunk; });
-    req.on('end', () => {
-      const [head, claims, signature] = (req.headers.authorization ?? '').replace(/^bearer /, '').split('.');
-      const genuine = !!signature && verify('sha256', Buffer.from(`${head}.${claims}`), { key: publicKey, dsaEncoding: 'ieee-p1363' }, Buffer.from(signature, 'base64url'));
-      const header = JSON.parse(Buffer.from(head ?? '', 'base64url').toString() || '{}'), claim = JSON.parse(Buffer.from(claims ?? '', 'base64url').toString() || '{}');
-      if (!genuine || header.alg !== 'ES256' || header.kid !== 'KEY1234567' || claim.iss !== 'TEAM123456') { res.writeHead(403); res.end(JSON.stringify({ reason: 'InvalidProviderToken' })); return; }
-      const device = (req.url ?? '').replace('/3/device/', '');
-      deliveries.push({ device, headers: Object.fromEntries(Object.entries(req.headers).map(([k, v]) => [k, String(v)])), payload: decode(Payload, JSON.parse(raw)) });
-      const reply = replies.get(device) ?? { status: 200, reason: '' };
-      res.writeHead(reply.status); res.end(reply.status === 200 ? '' : JSON.stringify({ reason: reply.reason }));
-    });
-  });
-  await new Promise<void>(r => server.listen(0, '127.0.0.1', r));
-  const address = server.address(); if (!address || typeof address === 'string') throw new Error('port');
-  // The key as it sits in the vault: one line, its breaks turned to spaces.
-  process.env.APNS_KEY_P8 = privateKey.export({ type: 'pkcs8', format: 'pem' }).toString().replace(/\n/g, ' ');
-  process.env.APNS_KEY_ID = 'KEY1234567'; process.env.APNS_TEAM_ID = 'TEAM123456'; process.env.APNS_TOPIC = 'me.agentpager.app.dev';
-  process.env.APNS_ORIGIN = `http://127.0.0.1:${address.port}`;
-  return { replies, sent: (to: string) => deliveries.filter(d => d.device === to), close: () => server.close() };
-}
-const device = () => Array.from({ length: 64 }, () => '0123456789abcdef'[Math.floor(Math.random() * 16)]).join('');
-const registered = (f: Awaited<ReturnType<typeof fixture>>) => (pagerId: string, phone: string, deviceToken: string) => f.ok(Ok, `/api/pagers/${pagerId}/push`, { phone, data: { token: deviceToken, environment: 'sandbox' } });
-
-test('alerts: a pager whose phone gave its token alerts when an agent asks and acknowledges', { timeout: 180_000 }, async () => {
+test('B17.11 alerts: a pager whose phone gave its token alerts when an agent asks and acknowledges, with only plain words and the preview the phone opens', { timeout: 180_000 }, async () => {
   const { replies, sent, close } = await apple();
   const f = await fixture('push'), register = registered(f);
   try {
@@ -56,11 +13,15 @@ test('alerts: a pager whose phone gave its token alerts when an agent asks and a
     await register(p.pagerId, p.phone, mine);
     const a = await f.connect(p.number, 'Claude Code', 'alerts');
 
-    // A decision: time sensitive, titled with who asked and the project, the question first, collapsing on the decision.
+    // A decision: time sensitive, collapsing on the decision. Its words are the preview the agent sealed, which the
+    // phone opens to show who asked, the project, the question and the recommended option; Apple gets only the plain
+    // fallback (B17.11).
     const asked = await f.ask(a, 'Ship it?');
     const [decisionAlert] = await until(async () => sent(mine), d => d.length === 1);
     const aps = decisionAlert.payload.aps;
-    assert.deepEqual(aps.alert, { title: 'Claude Code · alerts', body: 'Ship it?\nRecommended: B. Second plan' });
+    assert.deepEqual(aps.alert, { title: 'AgentPager', body: 'New decision' });
+    assert.equal(aps['mutable-content'], 1, 'the phone may change it before it shows');
+    assert.deepEqual(openPreview(decisionAlert.payload), { title: 'Ship it?', recommended: { letter: 'B', title: 'Second plan' }, app: 'Claude Code', project: 'alerts' });
     assert.equal(aps['interruption-level'], 'time-sensitive');
     assert.equal(aps['thread-id'], p.pagerId);
     assert.deepEqual([decisionAlert.payload.kind, decisionAlert.payload.pagerId, decisionAlert.payload.agentId, decisionAlert.payload.decisionId], ['decision', p.pagerId, a.agent.agentId, asked.decisionId]);
@@ -74,7 +35,8 @@ test('alerts: a pager whose phone gave its token alerts when an agent asks and a
     const receipt = await f.answer(a.agent.agentId, p.phone, asked.decisionId);
     await f.ack(a, asked.decisionId, receipt.answerId, 'Shipping now.');
     const ackAlert = (await until(async () => sent(mine), d => d.length === 2))[1];
-    assert.deepEqual(ackAlert.payload.aps.alert, { title: 'Claude Code · alerts', body: 'Shipping now.' });
+    assert.deepEqual(ackAlert.payload.aps.alert, { title: 'AgentPager', body: 'New acknowledgement' });
+    assert.deepEqual(openPreview(ackAlert.payload), { nextSteps: 'Shipping now.', app: 'Claude Code', project: 'alerts', title: 'Ship it?' });
     assert.equal(ackAlert.payload.aps['interruption-level'], 'active');
     assert.equal(ackAlert.payload.kind, 'acknowledgement');
 
@@ -94,11 +56,11 @@ test('alerts: a pager whose phone gave its token alerts when an agent asks and a
     const b = await f.connect(p.number, 'Codex', 'second agent');
     await f.ask(b, 'Back?');
     const back = await until(async () => sent(fresh), d => d.length === 1);
-    assert.equal(back[0].payload.aps.alert.title, 'Codex · second agent');
+    assert.equal(openPreview(back[0].payload).project, 'second agent');
 
     // Off: nothing is sent, so nothing alerts.
     await f.settings(p.pagerId, p.phone, { on: false });
-    await f.refused(409, 'PagerOff', `/api/agents/${b.agent.agentId}/cards`, { agent: b.agentKey, data: question('While off?') });
+    await f.refused(409, 'PagerOff', `/api/agents/${b.agent.agentId}/cards`, { agent: b.agentKey, data: await f.sealed(b, question('While off?')) });
     assert.equal(sent(fresh).length, 1);
   } finally {
     await f.stop();
@@ -126,7 +88,11 @@ test('not picked up: one alert and a warning when no agent collects an answer in
     const slow = await f.ask(a, 'Ship it?');
     const receipt = await f.answer(a.agent.agentId, p.phone, slow.decisionId);
     const warning = (await until(async () => sent(mine).filter(d => d.payload.kind === 'warning'), w => w.length === 1, 30_000))[0];
-    assert.deepEqual(warning.payload.aps.alert, { title: 'Claude Desktop · wake-lab', body: 'Claude Desktop on air (wake-lab) hasn’t picked up your answer to “Ship it?” after 3 min. AgentPager can’t reach it: it may be asleep, closed or disconnected. Check in with it directly.' });
+    // It resends the decision's preview, which names who asked, the computer, the project and the question; the phone
+    // words it as the warning. Apple gets only the plain fallback.
+    assert.deepEqual(warning.payload.aps.alert, { title: 'AgentPager', body: 'Answer not picked up' });
+    assert.equal(warning.payload.preview, sent(mine).find(d => d.payload.kind === 'decision' && d.payload.decisionId === slow.decisionId)?.payload.preview, 'the decision\'s own preview');
+    assert.deepEqual(openPreview(warning.payload), { title: 'Ship it?', recommended: { letter: 'B', title: 'Second plan' }, app: 'Claude Desktop', project: 'wake-lab', machine: 'air' });
     assert.equal(warning.payload.decisionId, slow.decisionId);
     assert.equal(warning.payload.aps['interruption-level'], 'active');
     assert.equal(warning.headers['apns-collapse-id'], slow.decisionId);
@@ -170,26 +136,29 @@ test('B27.9 The same ask again with its request id is one decision and one alert
     const a = await f.connect(p.number, 'Codex', 'again');
     const cards = `/api/agents/${a.agent.agentId}/cards`, alerted = () => sent(mine).map(d => d.payload.decisionId);
     const open = async () => (await f.pager(p.pagerId, p.phone)).agents[0].open.map(d => d.decisionId);
-    const ship = question('Ship it?'), id = await C.decisionIdOf(a.agent.agentId, ship.requestId);
+    const plain = question('Ship it?'), ship = await f.sealed(a, plain), id = await C.decisionIdOf(a.agent.agentId, ship.requestId);
     assert.equal((await f.ok(C.Asked, cards, { agent: a.agentKey, data: ship })).decisionId, id, 'named by the agent and its request id');
     assert.deepEqual(alerted(), [id]);
-    // Again, and again with its fields in another order: the same decision, no alert.
+    // Again, as sent; and sealed again, as a later run of the command sends it, with new encrypted parts and the same
+    // digest: the same decision, no alert, and the parts first stored stay.
+    const resealed = await f.sealed(a, plain);
+    assert.notEqual(resealed.card, ship.card);
+    assert.equal(resealed.digest, ship.digest);
     assert.equal((await f.ok(C.Asked, cards, { agent: a.agentKey, data: ship })).decisionId, id);
-    assert.equal((await f.ok(C.Asked, cards, { agent: a.agentKey, data: { card: ship.card, title: ship.title, requestId: ship.requestId } })).decisionId, id);
+    assert.equal((await f.ok(C.Asked, cards, { agent: a.agentKey, data: resealed })).decisionId, id);
     assert.deepEqual(alerted(), [id], 'one alert');
     assert.deepEqual(await open(), [id], 'one decision');
+    const stored = await f.ok(C.PagerInbox, `/api/pagers/${p.pagerId}`, { phone: p.phone });
+    assert.equal(stored.agents[0].open[0].card, ship.card, 'the card as first stored');
     // Another question, or the same one changed, with that request id is refused, and stores and alerts nothing.
-    for (const data of [{ ...question('Something else?'), requestId: ship.requestId }, { ...ship, detail: 'Now with a detail.' }]) {
+    for (const data of [await f.sealed(a, { ...question('Something else?'), requestId: ship.requestId }), await f.sealed(a, { ...plain, detail: 'Now with a detail.' })]) {
       assert.match((await f.refused(409, 'RequestIdTaken', cards, { agent: a.agentKey, data })).message, /different question/);
     }
-    assert.deepEqual(alerted(), [id]);
-    assert.deepEqual((await f.pager(p.pagerId, p.phone)).agents[0].open.map(d => [d.title, d.detail]), [['Ship it?', undefined]], 'the decision as first asked');
-
     // At the limit of open decisions it still finds its decision, while a new question is refused.
     const others = [];
     for (let n = 2; n <= C.MAX_OPEN_DECISIONS; n++) others.push((await f.ask(a, `Question ${n}`)).decisionId);
     assert.equal((await f.ok(C.Asked, cards, { agent: a.agentKey, data: ship })).decisionId, id);
-    await f.refused(409, 'TooManyOpenDecisions', cards, { agent: a.agentKey, data: question('Eleventh?') });
+    await f.refused(409, 'TooManyOpenDecisions', cards, { agent: a.agentKey, data: await f.sealed(a, question('Eleventh?')) });
     assert.deepEqual(alerted(), [id, ...others], 'one alert per decision');
     // Answered, it is still the same decision, and stays answered.
     const receipt = await f.answer(a.agent.agentId, p.phone, id);
@@ -206,8 +175,8 @@ test('B27.9 The same ask again with its request id is one decision and one alert
     // Another agent, here or on another pager, asking with the same request id gets a decision of its own, under an id
     // of its own: no two agents' decisions share an id, which is how the phone tells them apart.
     const b = await f.connect(p.number, 'Claude Code', 'again'), q = await f.makePager('never', p.phone), c = await f.connect(q.number, 'Codex', 'elsewhere');
-    const theirs = (await f.ok(C.Asked, `/api/agents/${b.agent.agentId}/cards`, { agent: b.agentKey, data: ship })).decisionId;
-    const elsewhere = (await f.ok(C.Asked, `/api/agents/${c.agent.agentId}/cards`, { agent: c.agentKey, data: ship })).decisionId;
+    const theirs = (await f.ok(C.Asked, `/api/agents/${b.agent.agentId}/cards`, { agent: b.agentKey, data: await f.sealed(b, plain) })).decisionId;
+    const elsewhere = (await f.ok(C.Asked, `/api/agents/${c.agent.agentId}/cards`, { agent: c.agentKey, data: await f.sealed(c, plain) })).decisionId;
     assert.equal(new Set([id, theirs, elsewhere]).size, 3);
     assert.equal((await f.read(b, theirs)).status, 'pending', 'its own decision, unanswered');
     await f.refused(404, 'UnknownDecision', `/api/agents/${b.agent.agentId}/cards/${id}/answer`, { agent: b.agentKey });

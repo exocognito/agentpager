@@ -1,4 +1,6 @@
 import XCTest
+import CryptoKit
+import AgentPagerCrypto
 
 // End-to-end flows: the app in the Simulator, the real local server, and this test playing the agent.
 // Run with: TEST_RUNNER_AGENTPAGER_SERVER_URL=http://<mac-ip>:8787 TEST_RUNNER_SCREENSHOT_DIR=<dir> xcodebuild test ...
@@ -159,6 +161,60 @@ final class FlowTests: XCTestCase {
         try agent.finish()
         waitUntil(8, "finished") { app.staticTexts["who-asked"].label == "Codex · finished" }
         XCTAssertThrowsError(try agent.ask("Again?", options: ["One", "Two"])) { e in XCTAssertEqual((e as? ToolError)?.tag, "AgentFinished") }
+    }
+
+    // I4.9 and B30.2: a card moved to another decision, as a service could hand one back, and a card that opens but isn't
+    // one the contract takes, as an agent calling the service directly could send. Each shows as a decision the phone
+    // can't read, with nothing of it and nothing to answer, and the app carries on: the readable one still answers.
+    func test_I4_9_B30_2_aDecisionThePhoneCantReadShowsAsOneItCantReadNeverInPart() throws {
+        launch()
+        let number = makePager("Unreadable")
+        try agent.connect(number: number, app: "Codex", project: "unreadable")
+        _ = try agent.ask("Moved to another decision?", options: ["Keep", "Drop"], sealCard: { card, at in
+            try self.agent.seal(.card, card, PartContext(pagerId: at.pagerId, decisionId: AgentHarness.token()))
+        })
+        _ = try agent.ask("Broken around the command?", options: ["Keep", "Drop"], sealCard: { card, at in
+            var c = card, brief = card["card"] as! [String: Any]
+            brief["markdown"] = "## Options\n<img src=x onerror=alert(1)>\n"
+            c["card"] = brief
+            return try self.agent.seal(.card, c, at)
+        })
+        let readable = try agent.ask("Still readable?", options: ["Keep", "Drop"])
+        let unreadable = app.buttons.matching(identifier: "open-A decision this phone can’t read")
+        waitUntil(15, "two unreadable rows") { unreadable.count == 2 }
+        wait(app.buttons["open-Still readable?"])
+        XCTAssertFalse(app.staticTexts["Moved to another decision?"].exists || app.staticTexts["Broken around the command?"].exists, "nothing of them shows")
+        shot("unreadable-rows", after: "An agent sends a card moved to another decision and one the contract refuses")
+        unreadable.element(boundBy: 0).tap()
+        wait(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "didn’t open with this pager’s key")).firstMatch)
+        XCTAssertFalse(app.buttons["tile-A"].exists || app.buttons["ask-for-changes"].exists || app.buttons["send-option"].exists, "nothing to answer")
+        shot("unreadable-decision", after: "Open one")
+        back()
+        open("Still readable?")
+        app.buttons["tile-A"].tap()
+        app.buttons["send-option"].tap()
+        XCTAssertEqual(((try XCTUnwrap(try agent.waitForAnswer(readable, seconds: 20)))["choice"] as! [String: Any])["number"] as? Int, 1)
+    }
+
+    // B30.1: an answer reaches only the agent that asked. The phone seals it to the key inside the card, and takes a
+    // card as its agent's only when the card names the key the agent's identity names: a card naming another key, as
+    // one the service sealed to the pager's key would, shows as one the phone can't read, with nothing to answer, while
+    // the agent's own card answers and opens with its key.
+    func test_B30_1_aCardNamingAnotherKeyThanItsAgentsShowsAsOneThePhoneCantRead() throws {
+        launch()
+        let number = makePager("Answer key")
+        try agent.connect(number: number, app: "Codex", project: "answer key")
+        let other = Curve25519.KeyAgreement.PrivateKey()
+        _ = try agent.ask("Sealed for someone else?", options: ["This one", "That one"], answerKey: Envelope.base64url(other.publicKey.rawRepresentation))
+        let own = try agent.ask("Sealed for its own agent?", options: ["This one", "That one"])
+        let unreadable = app.buttons.matching(identifier: "open-A decision this phone can’t read")
+        waitUntil(15, "one unreadable row") { unreadable.count == 1 }
+        XCTAssertFalse(app.staticTexts["Sealed for someone else?"].exists, "nothing of it shows")
+        open("Sealed for its own agent?")
+        app.buttons["tile-B"].tap()
+        app.buttons["send-option"].tap()
+        XCTAssertEqual(((try XCTUnwrap(try agent.waitForAnswer(own, seconds: 20)))["choice"] as! [String: Any])["number"] as? Int, 2)
+        XCTAssertThrowsError(try agent.waitForAnswer(own, seconds: 1, key: other), "another key can't open it")
     }
 
     // I6: two answers that both fail are both reported, by name, and Retry sends both; neither is lost.

@@ -27,8 +27,22 @@ export class Registry {
     ctx.storage.sql.exec(`DROP TABLE IF EXISTS links_v2; DROP TABLE IF EXISTS numbers_v1; DROP TABLE IF EXISTS number_pagers_v1; DROP TABLE IF EXISTS number_push_v1;
       CREATE TABLE IF NOT EXISTS pagers_v2 (pager_id TEXT PRIMARY KEY, fingerprint TEXT NOT NULL, public_key TEXT NOT NULL, phone_hash TEXT NOT NULL,
         enabled INTEGER NOT NULL, auto_off TEXT NOT NULL, off_at INTEGER, off_since INTEGER, push TEXT, created_at INTEGER NOT NULL);
-      CREATE TABLE IF NOT EXISTS pager_agents_v2 (pager_id TEXT NOT NULL, agent_id TEXT NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY (pager_id, agent_id));
+      CREATE TABLE IF NOT EXISTS pager_agents_v3 (pager_id TEXT NOT NULL, agent_id TEXT NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY (pager_id, agent_id));
       CREATE TABLE IF NOT EXISTS erase_v2 (agent_id TEXT PRIMARY KEY);`);
+    // The encryption switch (M5, the release's exception in blueprint/milestones/M5-encrypt.md): every agent connected
+    // before it is forgotten, with all its decisions, and no pager lists it again. pager_agents_v2 lists exactly those
+    // agents; v3 lists only agents connected since. In one transaction, each is queued to forget everything, as a
+    // deleted pager's agents are, and the old list goes, so this runs once. Every pager keeps its row: its key, number,
+    // switch, auto-off and push target. An agent of the old list that the queue hasn't reached yet forgets itself at
+    // its first start on this code (agent.ts).
+    ctx.storage.transactionSync(() => {
+      if (!ctx.storage.sql.exec("SELECT 1 FROM sqlite_master WHERE type='table' AND name='pager_agents_v2'").toArray().length) return;
+      ctx.storage.sql.exec('INSERT OR IGNORE INTO erase_v2 SELECT agent_id FROM pager_agents_v2; DROP TABLE pager_agents_v2;');
+    });
+    // Whatever is queued to forget is tried at once, from this start: the switch's queue, or a delete's left over.
+    void ctx.blockConcurrencyWhile(async () => {
+      if (ctx.storage.sql.exec('SELECT 1 FROM erase_v2 LIMIT 1').toArray().length && await ctx.storage.getAlarm() === null) await ctx.storage.setAlarm(Date.now());
+    });
   }
   // A deleted pager's agents still to forget everything. Each is tried now; any left are tried again every minute
   // until done. Until then the agent finds its pager gone on any call, and forgets itself.
@@ -54,7 +68,7 @@ export class Registry {
     return decode(C.Pager, { pagerId: row.pager_id, on: row.enabled === 1, autoOff: row.auto_off, offAt: row.off_at === null ? null : iso(row.off_at), offSince: row.off_since === null ? null : iso(row.off_since), createdAt: iso(row.created_at) });
   }
   private agents(pagerId: string) {
-    return this.ctx.storage.sql.exec<{ agent_id: string }>('SELECT agent_id FROM pager_agents_v2 WHERE pager_id=? ORDER BY created_at, rowid', pagerId).toArray().map(r => r.agent_id);
+    return this.ctx.storage.sql.exec<{ agent_id: string }>('SELECT agent_id FROM pager_agents_v3 WHERE pager_id=? ORDER BY created_at, rowid', pagerId).toArray().map(r => r.agent_id);
   }
   // Turned on now: it turns off by itself after its auto-off time, if it has one.
   private offAt(autoOff: C.AutoOff, now: number) { return autoOff === 'never' ? null : now + clocks.autoOffMs(autoOff); }
@@ -112,7 +126,7 @@ export class Registry {
         const row = this.mine(decode(Phone, data));
         this.ctx.storage.transactionSync(() => {
           for (const id of this.agents(row.pager_id)) this.ctx.storage.sql.exec('INSERT OR IGNORE INTO erase_v2 VALUES (?)', id);
-          this.ctx.storage.sql.exec('DELETE FROM pager_agents_v2 WHERE pager_id=?', row.pager_id);
+          this.ctx.storage.sql.exec('DELETE FROM pager_agents_v3 WHERE pager_id=?', row.pager_id);
           this.ctx.storage.sql.exec('DELETE FROM pagers_v2 WHERE pager_id=?', row.pager_id);
         });
         await this.erase();
@@ -123,8 +137,14 @@ export class Registry {
         const p = decode(Connect, data), row = this.row(p.pagerId);
         if (!row || row.fingerprint !== p.fingerprint) throw C.refuse.numberInvalid();
         if (row.enabled !== 1) throw C.refuse.pagerOff();
-        this.ctx.storage.sql.exec('INSERT INTO pager_agents_v2 VALUES (?, ?, ?)', p.pagerId, p.agentId, now);
+        this.ctx.storage.sql.exec('INSERT INTO pager_agents_v3 VALUES (?, ?, ?)', p.pagerId, p.agentId, now);
         return json({ phoneHash: row.phone_hash });
+      }
+      // A pager's public key, for anyone with its id: the command checks it against the number (I19).
+      if (action === 'key') {
+        const row = this.row(decode(Id, data).pagerId);
+        if (!row) throw C.refuse.numberInvalid();
+        return json({ pagerId: row.pager_id, publicKey: row.public_key });
       }
       // What an agent checks before each call: is its pager on, and where do alerts go.
       if (action === 'state') {
@@ -135,7 +155,7 @@ export class Registry {
       // Housekeeping forgot an agent.
       if (action === 'forget') {
         const p = decode(Forget, data);
-        this.ctx.storage.sql.exec('DELETE FROM pager_agents_v2 WHERE pager_id=? AND agent_id=?', p.pagerId, p.agentId);
+        this.ctx.storage.sql.exec('DELETE FROM pager_agents_v3 WHERE pager_id=? AND agent_id=?', p.pagerId, p.agentId);
         return json({ ok: true });
       }
       return json({ error: 'NotFound' }, 404);

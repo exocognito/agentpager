@@ -3,15 +3,15 @@ import path from 'node:path';
 import { parse } from 'yaml';
 import { Either, ParseResult, Schema } from 'effect';
 import { QuestionInput, TEXT_MAX_CHARACTERS, TITLE_MAX_CHARACTERS } from '../../contract/exchange.ts';
-import { briefProblem, missingAttachment, attachmentTypes, IMAGE_MAX_BYTES, ATTACHMENTS_MAX, ATTACHMENTS_MAX_BYTES, BRIEF_LABEL_MAX_CHARACTERS, BRIEF_MAX_CHARACTERS } from '../../contract/brief.ts';
+import { briefProblem, missingAttachment, attachmentTypes, IMAGE_MAX_BYTES, ATTACHMENTS_MAX, ATTACHMENTS_MAX_BYTES, BRIEF_LABEL_MAX_CHARACTERS, BRIEF_MAX_CHARACTERS, PAGE_MAX_BYTES } from '../../contract/brief.ts';
 
 // card.yaml (TEMPLATE in rules.ts; B27 and I22, blueprint/areas/3-cards.md): the whole card as structure, each key landing in one place on the
 // phone. `ask` refuses only what is mechanically certain (R1–R4 here; R5 and R6 come from the server), one line per
 // problem, and compiles the rest to the brief the server and phone read today. The brief is then held to the server's
-// own QuestionInput, so nothing the server would refuse leaves this machine: once cards are end-to-end encrypted the
-// server can't read them to refuse them.
+// own QuestionInput, so nothing the server would refuse leaves this machine: cards are end-to-end encrypted, so the
+// server can't read them to refuse them, and only the phone checks them again (I4.9).
 
-export const LIMITS = { title: TITLE_MAX_CHARACTERS, detail: TEXT_MAX_CHARACTERS, prioritizes: TEXT_MAX_CHARACTERS, label: BRIEF_LABEL_MAX_CHARACTERS, markdown: BRIEF_MAX_CHARACTERS, page: BRIEF_MAX_CHARACTERS, image: IMAGE_MAX_BYTES, attachments: ATTACHMENTS_MAX, attachmentBytes: ATTACHMENTS_MAX_BYTES };
+export const LIMITS = { title: TITLE_MAX_CHARACTERS, detail: TEXT_MAX_CHARACTERS, prioritizes: TEXT_MAX_CHARACTERS, label: BRIEF_LABEL_MAX_CHARACTERS, markdown: BRIEF_MAX_CHARACTERS, page: BRIEF_MAX_CHARACTERS, pageBytes: PAGE_MAX_BYTES, image: IMAGE_MAX_BYTES, attachments: ATTACHMENTS_MAX, attachmentBytes: ATTACHMENTS_MAX_BYTES };
 const RATINGS = ['green', 'yellow', 'orange', 'red'] as const;
 const STORY_KEYS = ['changes', 'why', 'why_not', 'assumes'] as const;
 const STORY: { readonly [k in typeof STORY_KEYS[number]]: string } = { changes: 'What {L} changes', why: 'Why choose {L}', why_not: 'Why pass on {L}', assumes: 'Assumptions {L} makes' };
@@ -254,6 +254,7 @@ export function compile(source: Source): Compiled {
     const bytes = 'text' in a ? Buffer.byteLength(a.text) : Buffer.from(a.base64, 'base64').length;
     total += bytes;
     if ('text' in a && count(a.text) > LIMITS.page) problems.push(`Attachment ${a.name} is ${number(count(a.text))} characters; the limit is ${number(LIMITS.page)}. Split it, or cut it.`);
+    else if ('text' in a && bytes > LIMITS.pageBytes) problems.push(`Attachment ${a.name} is ${number(bytes)} bytes; a page may be at most ${number(LIMITS.pageBytes)}. Split it, or cut it.`);
     if (!('text' in a) && bytes > LIMITS.image) problems.push(`Attachment ${a.name} is ${number(bytes)} bytes; an image may be at most ${number(LIMITS.image)}.`);
   }
   const pages = attached.length + (more ? 1 : 0);

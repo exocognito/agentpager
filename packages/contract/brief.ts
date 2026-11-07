@@ -215,7 +215,13 @@ function wholeJpeg(b: Uint8Array) {
 const shaped: Record<"image/png" | "image/jpeg", (b: Uint8Array) => boolean> = { "image/png": wholePng, "image/jpeg": wholeJpeg };
 export const utf8Bytes = (text: string) => new TextEncoder().encode(text).length;
 
-export const PageInput = Schema.Struct({ name: AttachmentName, type: Schema.Literal("text/markdown"), text: BriefMarkdown }).pipe(Schema.filter(named));
+// A page is held to a size in bytes too, as an image is: its characters alone don't bound it, since one visible
+// character can be many bytes, and each attachment travels as one encrypted part that must fit one stored row.
+export const PAGE_MAX_BYTES = 1_000_000;
+export const PageInput = Schema.Struct({ name: AttachmentName, type: Schema.Literal("text/markdown"), text: BriefMarkdown }).pipe(
+  Schema.filter(named),
+  Schema.filter(a => utf8Bytes(a.text) <= PAGE_MAX_BYTES || `"${a.name}" is ${utf8Bytes(a.text)} bytes; a page may not exceed ${PAGE_MAX_BYTES}`),
+);
 export const ImageInput = Schema.Struct({ name: AttachmentName, type: Schema.Literal("image/png", "image/jpeg"), base64: Schema.String }).pipe(
   Schema.filter(named),
   Schema.filter(a => {

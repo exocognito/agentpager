@@ -48,6 +48,8 @@ function sideOf(parts: string[], method: string): Side | null {
   if (top === 'pagers') {
     if (n === 1) return method === 'POST' ? 'phone' : null;
     if (n === 2) return method === 'GET' ? 'phone' : null;
+    // The pager's public key, which the command reads before it connects.
+    if (n === 3 && sub === 'key') return method === 'GET' ? 'agent' : null;
     return n === 3 && method === 'POST' && ['settings', 'push', 'delete'].includes(sub) ? 'phone' : null;
   }
   if (top !== 'agents') return null;
@@ -60,11 +62,11 @@ function sideOf(parts: string[], method: string): Side | null {
   return null;
 }
 // Each call's client (CLIENT_HEADER), checked first, before its key and its input: a client older than the service
-// accepts is told to update, and nothing it sent is read or stored. An app without the header is still served
-// (OLDEST_PROTOCOL), and is never told its pager is unknown, which would make it drop the pager and its keys.
+// accepts (OLDEST_PROTOCOL), or one that doesn't say, as the m4 command and app didn't, is told to update, and nothing
+// it sent is read or stored. So an older app is never told its pager is unknown, which would make it drop the pager
+// and its keys.
 function admit(request: Request, side: Side, origin: string) {
   const header = request.headers.get(C.CLIENT_HEADER), client = C.readClientVersion(header);
-  if (side === 'phone' && header === null && !C.PHONE_NEEDS_CLIENT_HEADER) return;
   if (client && client.protocol >= C.OLDEST_PROTOCOL[side]) return;
   console.warn(`UpdateRequired: ${side === 'agent' ? 'an agent' : 'a phone'} call ${client ? `from ${client.client}/${client.protocol} ${client.build}` : header === null ? 'with no client header' : 'with a client header that does not read'}`);
   throw side === 'agent' ? C.refuse.commandTooOld(origin) : C.refuse.appTooOld();
@@ -89,6 +91,8 @@ async function api(request: Request, env: Env): Promise<Response> {
   }
   if (parts[0] === 'pagers' && parts.length >= 2) {
     const pagerId = decode(C.PagerId, parts[1]), rest = parts.slice(2).join('/');
+    // Anyone may read a pager's public key: it opens nothing, and the command checks it against the number (I19).
+    if (rest === 'key' && method === 'GET') return registry(env, '/key', { pagerId });
     // Everything on the pager, read while it is on or off: its state and each agent's decisions.
     if (rest === '' && method === 'GET') {
       const { hit } = await ownPager(env, request, pagerId);
@@ -114,18 +118,19 @@ async function api(request: Request, env: Env): Promise<Response> {
       return registry(env, '/delete', { pagerId, phoneHash: hash });
     }
   }
-  // An agent connects with the owner's pager number: a new agent on that pager, every time.
+  // An agent connects with the owner's pager number and its identity, sealed to the pager's key: a new agent on that
+  // pager, every time.
   if (parts.length === 1 && parts[0] === 'agents' && method === 'POST') {
     const input = decode(C.ConnectInput, await body(request));
     const { pagerId, fingerprint: named } = parseNumber(input.number), agentId = token();
     const linked = decode(Linked, await relay(await registry(env, '/connect', { pagerId, fingerprint: named, agentId })).json());
-    return forward(env.AGENT, agentId, '/open', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ agentId, pagerId, phoneHash: linked.phoneHash, app: input.app, project: input.project, machine: input.machine }) });
+    return forward(env.AGENT, agentId, '/open', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ agentId, pagerId, phoneHash: linked.phoneHash, identity: input.identity }) });
   }
   if (parts[0] === 'agents' && parts.length >= 2) {
     const agentId = decode(C.Token, parts[1]), rest = parts.slice(2).join('/');
     if (rest === '' && method === 'GET') return pass(agentId, '/status');
     if (rest === 'cards' && method === 'POST') return pass(agentId, '/ask');
-    // The decision id and file name go on as sent: the agent decodes them after the key (I4).
+    // The decision id and attachment slot go on as sent: the agent decodes them after the key (I4).
     if (parts.length === 5 && parts[2] === 'cards') {
       const decisionId = parts[3];
       if (parts[4] === 'answer') return pass(agentId, `/${method === 'GET' ? 'read' : 'answer'}/${decisionId}`);

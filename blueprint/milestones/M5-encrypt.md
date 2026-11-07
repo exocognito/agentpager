@@ -73,6 +73,7 @@ The pull requests, in order, are in [.agents/plans/2026-11-06-m5-encrypt.md](../
   - An ask request id. The phone's answer already has one, so sending it twice stores it once. An ask has none: if its reply is lost and the agent asks again, the owner gets a second decision.
   - A client-version header. The command doesn't say which version it is, so the service can't tell an old one to update, as METHOD's release rule needs. Replies already name the service's build.
 - **What encryption doesn't hide,** for the site's note on what the service stores (SITE): who pages whom, when, how much and how often; and, to Apple, that an alert happened and its size. A compromised agent machine exposes that agent's cards, the answers to it and its history. A compromised phone exposes everything on it.
+  - The service can show decisions of its own, as a new agent or in place of an existing agent's who-asked, and read the answers to those; it can't read real agents' decisions, attachments or acknowledgements, or the answers to them.
 - **Apple signing.** The alert extension is a new target with its own bundle id, so the development profile changes. Only Sam can do that step: one build in Xcode on pro, with automatic signing. The service and command don't wait for it; the dev phone's build does.
 - INSTALL comes after ENCRYPT, so at the switch the command is still built from the repository, and only Sam's machines run it.
 
@@ -120,7 +121,7 @@ Why: [Only agents I give a number reach my phone](../PRODUCT.md#only-agents-i-gi
 
 - **Adds:** B30 and I20, whole; I19.6 and I19.7; B17.11; B25.14; B27.9; I4.9; each as Sam approved it (question 6). L25, a leaked number can connect any number of agents (1 Pagers), as Sam chose (question 9). The alert extension on the phone. The upgrade baseline from `m4` and the upgrade check on dev.
 - **Changes:** I4.1, I4.7 and I22's notes, since the service can't read a card; I19's Why and notes, since the command's check is built; TERMS › Keys; METHOD.md › Writing lines, which takes Sam's line test and look rule, and › Stages and releases, which allows an exception the owner approves; L10, whose fix and revisit move to TIDY.
-- **Retires:** L19 and L17, named above, once built. M4's ledger leaves the tree, at tag `m4-house-ledger`.
+- **Retires:** L19, the service can read every decision (6 Privacy), which B30 and I20 fix, and L17, alerts pass through Apple as plain text (4 Getting paged), which B17.11 fixes. Their ids are never reused. M4's ledger leaves the tree, at tag `m4-house-ledger`.
 
 ## Log
 

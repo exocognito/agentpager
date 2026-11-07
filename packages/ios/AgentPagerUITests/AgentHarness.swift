@@ -1,7 +1,11 @@
 import XCTest
+import CryptoKit
+import AgentPagerCrypto
 
 // Plays the coding agent against the real local server over its HTTP API, as the agentpager command does (the
-// hosted MCP server is retired). Nothing is mocked.
+// hosted MCP server is retired). Nothing is mocked. Like the command, it reads the pager's key, checks it against the
+// number, makes a key pair of its own, seals who asked, each card and each acknowledgement to the pager's key, and
+// opens each answer with its own key (packages/cli/src/seal.ts).
 struct ToolError: Error, @unchecked Sendable, CustomStringConvertible {
     var body: [String: Any]
     var tag: String { body["error"] as? String ?? "?" }
@@ -12,11 +16,17 @@ final class AgentHarness {
     // The agentpager command's client header, as this harness plays it. It mirrors CLIENT_HEADER and PROTOCOL in
     // packages/contract/exchange.ts, which packages/contract/mirror.test.ts checks.
     static let clientHeader = "x-agentpager-client"
-    static let clientVersion = "uitests/1 harness"
+    static let clientVersion = "uitests/2 harness"
 
     let base: URL
     var agentId = ""
     var agentKey = ""
+    var pagerId = ""
+    var pagerKey: Curve25519.KeyAgreement.PublicKey?
+    // The agent's own key: its public key goes in each card as the key the phone seals the answer to.
+    var ownKey = Curve25519.KeyAgreement.PrivateKey()
+    var identity: [String: Any] = [:]
+    private var titles: [String: String] = [:]
 
     init(base: URL) { self.base = base }
 
@@ -57,25 +67,53 @@ final class AgentHarness {
     // Connects with the owner's pager number: a new agent on that pager, on the computer named, if any.
     func connect(number: String, app: String = "Codex", project: String = "flow", machine: String? = nil) throws {
         agentKey = ""
-        var input = ["number": number, "app": app, "project": project]
-        if let machine { input["machine"] = machine }
-        let r = try call("POST", "api/agents", input)
+        let bytes = Envelope.fromBase64url(String(number.dropFirst(4))) ?? Data()
+        pagerId = bytes.prefix(16).map { String(format: "%02x", $0) }.joined()
+        let key = try call("GET", "api/pagers/\(pagerId)/key")
+        guard let raw = Envelope.fromBase64url(key["publicKey"] as? String ?? ""), Data(SHA256.hash(data: raw).prefix(8)) == bytes.dropFirst(16) else { throw ToolError(body: ["error": "KeyMismatch"]) }
+        pagerKey = try Curve25519.KeyAgreement.PublicKey(rawRepresentation: raw)
+        ownKey = Curve25519.KeyAgreement.PrivateKey()
+        // Its identity names its own key, as each of its cards does.
+        identity = ["app": app, "project": project, "answerKey": Envelope.base64url(ownKey.publicKey.rawRepresentation)]
+        if let machine { identity["machine"] = machine }
+        let r = try call("POST", "api/agents", ["number": number, "identity": try seal(.identity, identity, PartContext(pagerId: pagerId))])
         agentId = (r["agent"] as! [String: Any])["agentId"] as! String
         agentKey = r["agentKey"] as! String
     }
 
-    // Every card is a brief: here its short form, each option's title on its answer button.
-    func ask(_ title: String, detail: String? = nil, options: [String], recommended: Int? = nil) throws -> String {
+    // A part's JSON, sealed to the pager's key under its binding.
+    func seal(_ kind: PartKind, _ value: [String: Any], _ at: PartContext) throws -> String {
+        guard let pagerKey else { throw ToolError(body: ["error": "NotConnected"]) }
+        return try Envelope.seal(to: pagerKey, kind: kind, context: at, plaintext: try JSONSerialization.data(withJSONObject: value, options: [.sortedKeys, .withoutEscapingSlashes]))
+    }
+    // A decision's id, as the service makes it from the agent and the request id (decisionIdOf in exchange.ts).
+    func decisionId(_ requestId: String) -> String {
+        Envelope.base64url(Data(SHA256.hash(data: Data("agentpager decision\n\(agentId)\n\(requestId)".utf8)).prefix(24)))
+    }
+
+    // Every card is a brief: here its short form, each option's title on its answer button. `sealCard` lets a test seal
+    // the card itself, as an agent calling the service directly could: to another binding, or what isn't a card.
+    func ask(_ title: String, detail: String? = nil, options: [String], recommended: Int? = nil, answerKey: String? = nil,
+             sealCard: ((_ card: [String: Any], _ at: PartContext) throws -> String)? = nil) throws -> String {
         var markdown = "## Options\n"
         if let recommended { markdown += "\n## Recommendation: \(String(UnicodeScalar(UInt8(64 + recommended))))\n" }
-        var card: [String: Any] = ["type": "brief", "markdown": markdown, "options": options.enumerated().map { i, o -> [String: Any] in
+        var brief: [String: Any] = ["type": "brief", "markdown": markdown, "options": options.enumerated().map { i, o -> [String: Any] in
             ["number": i + 1, "title": o, "prioritizes": o]
         }]
-        if let recommended { card["recommended"] = recommended }
-        // The command chooses each ask's request id.
-        var question: [String: Any] = ["requestId": Self.token(), "title": title, "card": card]
-        if let detail { question["detail"] = detail }
-        return try call("POST", "api/agents/\(agentId)/cards", question)["decisionId"] as! String
+        if let recommended { brief["recommended"] = recommended }
+        // The command chooses each ask's request id, and seals each part to the decision it names.
+        let requestId = Self.token(), at = PartContext(pagerId: pagerId, decisionId: decisionId(requestId))
+        var card: [String: Any] = ["title": title, "card": brief, "answerKey": answerKey ?? Envelope.base64url(ownKey.publicKey.rawRepresentation)]
+        if let detail { card["detail"] = detail }
+        var preview: [String: Any] = ["title": title, "app": identity["app"] ?? "", "project": identity["project"] ?? ""]
+        if let detail { preview["detail"] = detail }
+        if let recommended { preview["recommended"] = ["letter": String(UnicodeScalar(UInt8(64 + recommended))), "title": options[recommended - 1]] }
+        if let machine = identity["machine"] { preview["machine"] = machine }
+        let digest = Envelope.base64url(Data(SHA256.hash(data: Data("\(requestId) \(title)".utf8))))
+        let sealed = try sealCard?(card, at) ?? seal(.card, card, at)
+        let id = try call("POST", "api/agents/\(agentId)/cards", ["requestId": requestId, "digest": digest, "card": sealed, "preview": try seal(.decisionPreview, preview, at)])["decisionId"] as! String
+        titles[id] = title
+        return id
     }
 
     // 32 URL-safe characters, as the command's ids are.
@@ -84,14 +122,19 @@ final class AgentHarness {
         return String((0..<32).map { _ in alphabet.randomElement()! })
     }
 
-    // Returns the answer object, or nil while pending.
-    func waitForAnswer(_ decisionId: String, seconds: Int = 20) throws -> [String: Any]? {
+    // Returns the answer object, with its choice opened with this agent's key (or `key`), or nil while pending.
+    func waitForAnswer(_ decisionId: String, seconds: Int = 20, key: Curve25519.KeyAgreement.PrivateKey? = nil) throws -> [String: Any]? {
         let r = try call("GET", "api/agents/\(agentId)/cards/\(decisionId)/answer?wait=\(seconds)")
-        return r["status"] as? String == "answered" ? r["answer"] as? [String: Any] : nil
+        guard r["status"] as? String == "answered", var answer = r["answer"] as? [String: Any] else { return nil }
+        let plain = try Envelope.open(answer["answer"] as? String ?? "", with: key ?? ownKey, kind: .answer, context: PartContext(pagerId: pagerId, decisionId: decisionId))
+        answer["choice"] = (try JSONSerialization.jsonObject(with: plain) as? [String: Any])?["choice"]
+        return answer
     }
 
     func acknowledge(_ decisionId: String, answerId: String, nextSteps: String) throws {
-        try call("POST", "api/agents/\(agentId)/cards/\(decisionId)/acknowledge", ["answerId": answerId, "nextSteps": nextSteps])
+        let at = PartContext(pagerId: pagerId, decisionId: decisionId)
+        let preview: [String: Any] = ["nextSteps": nextSteps, "app": identity["app"] ?? "", "project": identity["project"] ?? "", "title": titles[decisionId] ?? "this decision"]
+        try call("POST", "api/agents/\(agentId)/cards/\(decisionId)/acknowledge", ["answerId": answerId, "acknowledgement": try seal(.acknowledgement, ["nextSteps": nextSteps], at), "preview": try seal(.acknowledgementPreview, preview, at)])
     }
 
     func finish() throws { try call("POST", "api/agents/\(agentId)/finish") }

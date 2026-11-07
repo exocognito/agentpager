@@ -107,8 +107,9 @@ const longCard: CardPart = {
   },
   answerKey: "",
 };
-const identity: IdentityPart = { app: "Claude Code", project: "agentpager", machine: "pro" };
-const identityNoMachine: IdentityPart = { app: "Codex", project: "日本語プロジェクト" };
+// Each identity names the agent's own key (answerKey, filled in below), as every card of that agent does.
+const who = { app: "Claude Code", project: "agentpager", machine: "pro" };
+const whoNoMachine = { app: "Codex", project: "日本語プロジェクト" };
 const ack = { nextSteps: "Merging now; I'll report back with the pull request." };
 
 type Valid = { name: string; kind: Kind; context: Context; recipient: Bytes; ephemeral: Bytes; nonce: Bytes; plaintext: Bytes; part: boolean };
@@ -116,6 +117,7 @@ type Valid = { name: string; kind: Kind; context: Context; recipient: Bytes; eph
 export async function vectors(): Promise<string> {
   const answerKey = b64(await publicOf(agentKey));
   const cards = { card: { ...card, answerKey }, longCard: { ...longCard, answerKey } };
+  const identity: IdentityPart = { ...who, answerKey }, identityNoMachine: IdentityPart = { ...whoNoMachine, answerKey };
   const part = <K extends ShapedKind>(kind: K, value: Parameters<typeof encodePart<K>>[1]): Bytes => new Uint8Array(encodePart(kind, value));
   const ofDecision = { pagerId, decisionId };
   const slot = (index: number) => ({ pagerId, decisionId, index });
@@ -284,10 +286,10 @@ export async function vectors(): Promise<string> {
     { name: "card naming one attachment twice", kind: "card", plaintext: json({ ...c, attachments: [c.attachments?.[0], c.attachments?.[0], c.attachments?.[1]] }) },
     { name: "card option number as a string", kind: "card", plaintext: json({ ...c, card: { ...c.card, options: [{ ...c.card.options[0], number: "1" }, c.card.options[1]] } }) },
     { name: "card blank markdown", kind: "card", plaintext: json({ ...c, card: { ...c.card, markdown: " \n " } }) },
-    { name: "identity without a project", kind: "identity", plaintext: json({ app: "Codex" }) },
-    { name: "identity app of 61 characters", kind: "identity", plaintext: json({ app: "x".repeat(61), project: "site" }) },
-    { name: "identity machine blank", kind: "identity", plaintext: json({ app: "Codex", project: "site", machine: "  " }) },
-    { name: "identity app a byte-order mark only", kind: "identity", plaintext: json({ app: "﻿", project: "site" }) },
+    { name: "identity without a project", kind: "identity", plaintext: json({ app: "Codex", answerKey }) },
+    { name: "identity app of 61 characters", kind: "identity", plaintext: json({ app: "x".repeat(61), project: "site", answerKey }) },
+    { name: "identity machine blank", kind: "identity", plaintext: json({ app: "Codex", project: "site", machine: "  ", answerKey }) },
+    { name: "identity app a byte-order mark only", kind: "identity", plaintext: json({ app: "﻿", project: "site", answerKey }) },
     { name: "answer of an unknown kind", kind: "answer", plaintext: json({ choice: { kind: "maybe" } }) },
     { name: "answer option 0", kind: "answer", plaintext: json({ choice: { kind: "option", number: 0 } }) },
     { name: "answer option 5", kind: "answer", plaintext: json({ choice: { kind: "option", number: 5 } }) },
@@ -304,7 +306,9 @@ export async function vectors(): Promise<string> {
     { name: "identity after a UTF-8 byte-order mark", kind: "identity", plaintext: b64(join(Uint8Array.of(0xef, 0xbb, 0xbf), utf8(JSON.stringify(identity)))) },
     { name: "identity as UTF-16 with a byte-order mark", kind: "identity", plaintext: b64(join(Uint8Array.of(0xff, 0xfe), new Uint8Array(Buffer.from(JSON.stringify(identity), "utf16le")))) },
     { name: "identity as UTF-16 without one", kind: "identity", plaintext: b64(new Uint8Array(Buffer.from(JSON.stringify(identity), "utf16le"))) },
-    { name: "identity with a raw NUL byte in a field", kind: "identity", plaintext: b64(join(utf8('{"app":"Co'), Uint8Array.of(0), utf8('dex","project":"site"}'))) },
+    { name: "identity with a raw NUL byte in a field", kind: "identity", plaintext: b64(join(utf8('{"app":"Co'), Uint8Array.of(0), utf8(`dex","project":"site","answerKey":"${answerKey}"}`))) },
+    { name: "identity without its answer key", kind: "identity", plaintext: json({ app: "Codex", project: "site" }) },
+    { name: "identity answer key not canonical", kind: "identity", plaintext: json({ app: "Codex", project: "site", answerKey: answerKey.slice(0, 42) + ALPHABET[ALPHABET.indexOf(answerKey[42]) | 1] }) },
     { name: "decision preview recommending E", kind: "decisionPreview", plaintext: json({ title: "Pick", recommended: { letter: "E", title: "x" }, app: "Codex", project: "site" }) },
     { name: "decision preview over the byte limit, every field within its own", kind: "decisionPreview", plaintext: json({ title: four(100), detail: four(280), recommended: { letter: "B", title: four(280) }, app: four(60), project: four(60), machine: four(60) }) },
     { name: "acknowledgement preview without its title", kind: "acknowledgementPreview", plaintext: json({ nextSteps: "Done.", app: "Codex", project: "site" }) },
@@ -316,9 +320,9 @@ export async function vectors(): Promise<string> {
   };
   // A field named twice: JavaScript would keep the last and Foundation the first, so both refuse it.
   partsInvalid.push(
-    { name: "identity naming app twice, null last", kind: "identity", plaintext: b64(utf8('{"app":"Codex","app":null,"project":"site"}')) },
-    { name: "identity naming app twice, null first", kind: "identity", plaintext: b64(utf8('{"app":null,"app":"Codex","project":"site"}')) },
-    { name: "identity naming app twice, once escaped", kind: "identity", plaintext: b64(utf8('{"app":"Codex","\\u0061pp":"Other","project":"site"}')) },
+    { name: "identity naming app twice, null last", kind: "identity", plaintext: b64(utf8(`{"app":"Codex","app":null,"project":"site","answerKey":"${answerKey}"}`)) },
+    { name: "identity naming app twice, null first", kind: "identity", plaintext: b64(utf8(`{"app":null,"app":"Codex","project":"site","answerKey":"${answerKey}"}`)) },
+    { name: "identity naming app twice, once escaped", kind: "identity", plaintext: b64(utf8(`{"app":"Codex","\\u0061pp":"Other","project":"site","answerKey":"${answerKey}"}`)) },
     { name: "answer naming its kind twice", kind: "answer", plaintext: b64(utf8('{"choice":{"kind":"option","number":1,"kind":"option"}}')) },
     { name: "card naming an option's title twice", kind: "card", plaintext: b64(utf8(JSON.stringify(c).replace('"title":"Ship today"', '"title":"Ship today","title":"Ship now"'))) },
   );
@@ -437,7 +441,7 @@ export async function vectors(): Promise<string> {
 
   // JSON as JavaScript reads it, and nothing more: what Foundation also takes (trailing commas, field names equal
   // only by Unicode canonical equivalence) and the edges of the grammar. Filed by what decodePart says.
-  const id = '"project":"site"';
+  const id = `"project":"site","answerKey":"${answerKey}"`;
   const kelvin = "answer\u212aey";
   const syntax: [string, string, string][] = [
     ["identity", "a trailing comma in an object", `{"app":"Codex",${id},}`],

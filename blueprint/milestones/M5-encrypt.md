@@ -117,6 +117,18 @@ Why: [Only agents I give a number reach my phone](../PRODUCT.md#only-agents-i-gi
 - J5's step that the alert travels encrypted and an extension decrypts it: J5.3 already walks what the owner sees, and I20 holds the guarantee.
 - A number of an unknown version refused with a reply that says so: no other version exists yet, so there is nothing to choose.
 
+## Walk on dev
+
+On HomePhoneLite, which runs `main`'s app with dev as its server, and with the walk command on pro, `~/.agentpager-dev/agentpager`: the command built from `main`, with its own `AGENTPAGER_HOME`. It always talks to dev and never touches `~/.agentpager`, which Sam's real agents use on prod.
+
+1. Open AgentPager on the dev phone. The dev pagers are there with their names and numbers, and their decisions from before the switch are gone (the release's exception, above).
+2. Give an agent the walk command, used in place of `agentpager`, and a dev pager's number from its Pager detail. It connects.
+3. Close the app, and have the agent ask a card with an attached page. The alert names who asked and the project, with the question; expanded, it shows the detail and the recommended option. With a Focus on that allows AgentPager's time-sensitive alerts, it still comes through (B17.3).
+4. Open the alert, read the brief and its page, and answer. The agent's wait gets the answer, and its acknowledgement arrives as an alert with its next steps.
+5. Leave an answer uncollected for 3 minutes: one alert names who asked, its computer, its project and the question.
+6. Run the `m4` command installed on Sam's machines with a throwaway `AGENTPAGER_HOME` and `--server https://dev.agentpager.me`. It is refused and told how to update.
+7. Read this doc, [6 Privacy](../areas/6-privacy.md) (B30, I20, I19.6–7), [4 Getting paged](../areas/4-getting-paged.md) (B17.11) and [generated/untested.md](../generated/untested.md).
+
 ## Sam decides at the walk
 
 Found while building. What is built follows ★ on 1 to 3; 4 and 5 change only words, once Sam answers.
@@ -145,3 +157,4 @@ Found while building. What is built follows ★ on 1 to 3; 4 and 5 change only w
 - 6 Nov · building: PR #62, the alert extension. Each pager's keys stay where they were, and the extension can read them there, so no pager moved. It opens an alert's encrypted preview with its pager's key and shows its words, and shows the alert as sent when it can't. Sam's Xcode session on pro registered it, after its time-sensitive entitlement came off, since Apple allows that only on apps. A Simulator push never starts the extension, so its code is tested inside the app. `pnpm check` green, `pnpm test:all` 620 passed (555, 3, 8, Swift 15, 28 and 11), AgentPagerTests 11 of 11 in the Simulator. Grok and Codex MERGEABLE in round 2.
 - 6 Nov · building: PR #63, the switch. The service holds only encrypted parts and what it needs to route them. The command checks the pager's key against its number before it encrypts anything, and makes the agent's key pair at connect. The phone opens what it reads, encrypts each answer to its agent, and shows a decision it can't read as one, with nothing to answer. Alerts carry plain words and the encrypted preview. At its first start the service deletes the agents and decisions stored before the switch, and keeps every pager. The approved lines are in their areas, and L17 and L19 are retired. The upgrade check joins `pnpm smoke:dev`; it passed locally against an `m4` baseline. `pnpm check` green (152 clauses, 23 tested), `pnpm test:all` 629 passed (556, 3, 8, Swift 17, 32 and 13), FlowTests 9 of 9 and AgentPagerTests 14 of 14 in the Simulator. Grok and Codex MERGEABLE in round 4.
 - 6 Nov · built and on dev, awaiting Sam's walk: after each code merge the root deployed `main` to dev and ran `pnpm smoke:dev`, which passed 8 of 8 at 4e8dbf5, 5061308 and 1ee603d, and 14 of 14 at 6df2016, the switch. Its upgrade check against the `m4` baseline found the pager kept with its key and number, everything stored before the switch gone, the `m4` command refused and told how to update, an `m4` agent's file told to connect again, and the new command connecting to the baseline's number. Dev runs 6df2016, and prod still runs `m4`. HomePhoneLite's app from `main` (`pnpm phone:dev`) is pending. PR #64 marks M5 built, asks Sam's five questions for the walk, and points SITE's note at What encryption doesn't hide.
+- 6 Nov · ready for Sam's walk: HomePhoneLite runs `main`'s app at 6e9717a, with dev as its server and the alert extension; dev runs 6e9717a, and `pnpm smoke:dev` passed 14 of 14 there. This pull request adds Walk on dev, above.

@@ -30,5 +30,6 @@ The words that mean something specific in this product. They name things; the pr
 | Not picked up | An answer no agent has read 3 minutes after Send. The owner is told once. |
 | Acknowledgement | The agent saying it read an answer, with its next steps. |
 | Keys | Each pager has a key pair made on the phone, whose public key the number's fingerprint names, and a phone key the phone acts with. Each agent has an agent key, kept in a private file on its machine, so the agent passes only its id. Each agent also has a key pair, made at connect, whose private key stays in the agent's file. The service stores phone and agent keys only as digests. |
+| Encrypted part | A card, one of its attachments, who asked, an answer, an acknowledgement or an alert's preview, encrypted on one end for the other to read. |
 | History | The command's record, on the agent's machine, of every decision asked from it on a pager, with its answer and acknowledgement. |
 | Pagers, Pager, Pager detail, New pager | The app's screens: the list of this phone's pagers; one pager's decisions, grouped by project; one pager's switch, name, auto-off, the text to give agents, and Delete; and the sheet that names a new pager, shows its text and creates it. |

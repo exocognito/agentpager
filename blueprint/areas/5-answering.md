@@ -60,7 +60,6 @@ Why: [Sent decisions cannot be changed](../PRODUCT.md#sent-decisions-cannot-be-c
 3. An acknowledgement can't be replaced.
 4. An answered decision offers no control that could change it.
 
-- One change was made on purpose: each decision stored before 31 Oct 2026 is rewritten once, to drop two fields that decisions no longer carry. Nothing else in it changes.
 - Nothing is proved about tampering with storage below the service.
 
 ### I6 · @M1 · Only Send sends, and only the agent acknowledges

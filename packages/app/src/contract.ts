@@ -13,6 +13,11 @@ export const AGENT_IDLE_MS = 30 * 24 * 3_600_000;
 export const PICKUP_MS = PICKUP_MINUTES * 60_000;
 // How long each auto-off choice keeps a pager on.
 export const AUTO_OFF = { '24h': 24 * 3_600_000, '7d': 7 * 24 * 3_600_000, '30d': 30 * 24 * 3_600_000 } as const;
+// The oldest protocol (CLIENT_HEADER) the service accepts from each side. An agent's call without the header, such as
+// one from an m4 command, is refused. The phone's isn't yet: until its shapes change at the encryption switch, an app
+// from before the header still works, and one that sends it must send a protocol accepted here.
+export const OLDEST_PROTOCOL = { agent: 1, phone: 1 } as const;
+export const PHONE_NEEDS_CLIENT_HEADER = false;
 
 export class Refusal extends Error {
   readonly tag: RefusalTag;
@@ -37,4 +42,8 @@ export const refuse = {
   alreadyAnswered: (receipt: Receipt) => new Refusal('AlreadyAnswered', 'This decision already has a different answer.', { receipt }),
   numberInvalid: () => new Refusal('NumberInvalid', 'This pager number is not in use. Ask your owner for their current one.'),
   notFound: () => new Refusal('NotFound', 'No such route. Read /start.'),
+  // Refused before the key or the input is read, so nothing an old client sends is stored.
+  commandTooOld: (origin: string) => new Refusal('UpdateRequired', `This agentpager command is too old for this server, so nothing reached your owner. Update it: build it again as ${origin}/start describes (in an existing clone, git pull first), or if you can't, tell your owner it needs updating. Then connect again with your owner's pager number.`),
+  appTooOld: () => new Refusal('UpdateRequired', 'This AgentPager app is too old for this server. Update the app; your pagers stay on this phone.'),
+  requestIdTaken: () => new Refusal('RequestIdTaken', 'This agent already asked a different question with this requestId. Nothing was sent; ask with a new requestId.'),
 };

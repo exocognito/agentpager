@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import { createServer } from 'node:http';
 import { generateKeyPairSync, verify } from 'node:crypto';
 import { Schema } from 'effect';
-import { fixture, assert, token, until, decode, question } from './support.ts';
+import { fixture, assert, token, until, decode, question, C } from './support.ts';
 
 // A stand-in for Apple's push service: it records each alert, checks the provider token, and answers each device
 // token as `replies` says (200 unless set).
@@ -152,6 +152,69 @@ test('not picked up: one alert and a warning when no agent collects an answer in
     await new Promise(r => setTimeout(r, 6_000));
     assert.equal((await decision(p.pagerId, p.phone, off.decisionId))?.warnedAt, undefined, 'no warning while off');
     assert.equal(sent(mine).filter(d => d.payload.kind === 'warning').length, 1, 'no alert while off');
+  } finally {
+    await f.stop();
+    close();
+  }
+});
+
+// A lost ask reply: the command asks again with the request id it chose. The owner gets one decision and one alert;
+// another question with that request id is refused. Each alert goes out before its ask replies, so an ask that
+// replies without adding to the alerts below sent none.
+test('B27.9 The same ask again with its request id is one decision and one alert; another question with it is refused', { timeout: 180_000 }, async () => {
+  const { sent, close } = await apple();
+  const f = await fixture('push-again'), register = registered(f);
+  try {
+    const p = await f.makePager(), mine = device();
+    await register(p.pagerId, p.phone, mine);
+    const a = await f.connect(p.number, 'Codex', 'again');
+    const cards = `/api/agents/${a.agent.agentId}/cards`, alerted = () => sent(mine).map(d => d.payload.decisionId);
+    const open = async () => (await f.pager(p.pagerId, p.phone)).agents[0].open.map(d => d.decisionId);
+    const ship = question('Ship it?'), id = await C.decisionIdOf(a.agent.agentId, ship.requestId);
+    assert.equal((await f.ok(C.Asked, cards, { agent: a.agentKey, data: ship })).decisionId, id, 'named by the agent and its request id');
+    assert.deepEqual(alerted(), [id]);
+    // Again, and again with its fields in another order: the same decision, no alert.
+    assert.equal((await f.ok(C.Asked, cards, { agent: a.agentKey, data: ship })).decisionId, id);
+    assert.equal((await f.ok(C.Asked, cards, { agent: a.agentKey, data: { card: ship.card, title: ship.title, requestId: ship.requestId } })).decisionId, id);
+    assert.deepEqual(alerted(), [id], 'one alert');
+    assert.deepEqual(await open(), [id], 'one decision');
+    // Another question, or the same one changed, with that request id is refused, and stores and alerts nothing.
+    for (const data of [{ ...question('Something else?'), requestId: ship.requestId }, { ...ship, detail: 'Now with a detail.' }]) {
+      assert.match((await f.refused(409, 'RequestIdTaken', cards, { agent: a.agentKey, data })).message, /different question/);
+    }
+    assert.deepEqual(alerted(), [id]);
+    assert.deepEqual((await f.pager(p.pagerId, p.phone)).agents[0].open.map(d => [d.title, d.detail]), [['Ship it?', undefined]], 'the decision as first asked');
+
+    // At the limit of open decisions it still finds its decision, while a new question is refused.
+    const others = [];
+    for (let n = 2; n <= C.MAX_OPEN_DECISIONS; n++) others.push((await f.ask(a, `Question ${n}`)).decisionId);
+    assert.equal((await f.ok(C.Asked, cards, { agent: a.agentKey, data: ship })).decisionId, id);
+    await f.refused(409, 'TooManyOpenDecisions', cards, { agent: a.agentKey, data: question('Eleventh?') });
+    assert.deepEqual(alerted(), [id, ...others], 'one alert per decision');
+    // Answered, it is still the same decision, and stays answered.
+    const receipt = await f.answer(a.agent.agentId, p.phone, id);
+    assert.equal((await f.ok(C.Asked, cards, { agent: a.agentKey, data: ship })).decisionId, id);
+    const read = await f.read(a, id);
+    assert.equal(read.status === 'answered' && read.answer.answerId, receipt.answerId);
+    // While the pager is off it is refused like every ask (I17); on again, it finds its decision.
+    await f.settings(p.pagerId, p.phone, { on: false });
+    await f.refused(409, 'PagerOff', cards, { agent: a.agentKey, data: ship });
+    await f.settings(p.pagerId, p.phone, { on: true });
+    assert.equal((await f.ok(C.Asked, cards, { agent: a.agentKey, data: ship })).decisionId, id);
+    assert.deepEqual(alerted(), [id, ...others]);
+
+    // Another agent, here or on another pager, asking with the same request id gets a decision of its own, under an id
+    // of its own: no two agents' decisions share an id, which is how the phone tells them apart.
+    const b = await f.connect(p.number, 'Claude Code', 'again'), q = await f.makePager('never', p.phone), c = await f.connect(q.number, 'Codex', 'elsewhere');
+    const theirs = (await f.ok(C.Asked, `/api/agents/${b.agent.agentId}/cards`, { agent: b.agentKey, data: ship })).decisionId;
+    const elsewhere = (await f.ok(C.Asked, `/api/agents/${c.agent.agentId}/cards`, { agent: c.agentKey, data: ship })).decisionId;
+    assert.equal(new Set([id, theirs, elsewhere]).size, 3);
+    assert.equal((await f.read(b, theirs)).status, 'pending', 'its own decision, unanswered');
+    await f.refused(404, 'UnknownDecision', `/api/agents/${b.agent.agentId}/cards/${id}/answer`, { agent: b.agentKey });
+    const seen = (await f.pager(p.pagerId, p.phone)).agents;
+    assert.deepEqual(seen.map(x => [x.agent.agentId, [...x.open, ...x.answered].filter(d => d.title === 'Ship it?').map(d => [d.decisionId, d.status])]), [[a.agent.agentId, [[id, 'answered']]], [b.agent.agentId, [[theirs, 'open']]]]);
+    await until(async () => sent(mine), d => d.length === others.length + 2);
+    assert.deepEqual(alerted(), [id, ...others, theirs]);
   } finally {
     await f.stop();
     close();

@@ -70,13 +70,13 @@ test('a 200 that isn\'t AgentPager\'s reply: exit 5, nothing saved, and never "N
     assert.deepEqual(store.agentIds(), agents, 'no agent saved with an "undefined" key');
 
     const asked = await op.ask(agent('ap-wifi', portal.origin), { yaml: small(), dir: work });
-    assert.deepEqual([asked.code, asked.text], [5, `${unclear(portal.origin, 'text/html')} Check with \`agentpager status --agent ap-wifi\` before trying again.`]);
+    assert.deepEqual([asked.code, asked.text], [5, `${unclear(portal.origin, 'text/html')} Check with \`agentpager status --agent ap-wifi\` before trying again.\nAsking again with the same card is safe: your owner gets it once.`]);
     assert.deepEqual(store.loadAgent('ap-wifi')?.decisions, {}, 'no decision recorded as "undefined"');
     assert.equal(existsSync(path.join(home, 'history')), false, 'nothing in history');
 
     // Waiting forever ends on it instead of spinning as pending.
     const before = requests, waited = await op.wait('ap-wifi', decisionId, { forever: true });
-    assert.deepEqual([waited.code, waited.text, requests - before], [5, asked.text, 1]);
+    assert.deepEqual([waited.code, waited.text, requests - before], [5, `${unclear(portal.origin, 'text/html')} Check with \`agentpager status --agent ap-wifi\` before trying again.`, 1]);
     // JSON of the wrong shape is no better.
     const status = await op.status(agent('ap-odds', odd.origin));
     assert.deepEqual([status.code, status.text], [5, `${unclear(odd.origin, 'application/json')} Check with \`agentpager status --agent ap-odds\` before trying again.`]);
@@ -100,7 +100,7 @@ test('sent, no reply: it may have reached the owner, and waiting forever still t
   try {
     assert.deepEqual(await call(Asked, silent.origin, 'POST', '/api/agents/x/cards', { data: {}, timeoutMs: 300 }), { ok: false, status: 0, error: 'NoReply', message: 'timed out' });
     const asked = await op.ask(agent('ap-drop', dropping.origin), { yaml: small(), dir: work });
-    assert.deepEqual([asked.code, asked.text], [5, `No reply from ${dropping.origin} (the connection closed).\nThis may or may not have reached your owner. Check with \`agentpager status --agent ap-drop\` before trying again.`]);
+    assert.deepEqual([asked.code, asked.text], [5, `No reply from ${dropping.origin} (the connection closed).\nThis may or may not have reached your owner. Check with \`agentpager status --agent ap-drop\` before trying again.\nAsking again with the same card is safe: your owner gets it once.`]);
     const connected = await op.connect({ number, app: 'Codex', project: 'decode', server: dropping.origin });
     assert.deepEqual([connected.code, connected.text], [5, `No reply from ${dropping.origin} (the connection closed).\nThis may or may not have reached your owner. Connect again; their phone may show an extra agent from this try.`]);
     // Couldn't connect at all: nothing was sent, in today's words.

@@ -160,6 +160,19 @@ nonisolated enum APIError: Error, Sendable {
     }
 }
 
+// Which client this is, on every request: `ios/<protocol> <build>`. The header and the protocol mirror CLIENT_HEADER
+// and PROTOCOL in packages/contract/exchange.ts, which packages/contract/mirror.test.ts checks.
+nonisolated enum ClientVersion {
+    static let header = "x-agentpager-client"
+    static let protocolNumber = 1
+    static let value: String = {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? "0"
+        let build = info?["CFBundleVersion"] as? String ?? "0"
+        return "ios/\(protocolNumber) \(version)+\(build)"
+    }()
+}
+
 nonisolated struct APIClient: Sendable {
     let base: URL
 
@@ -191,6 +204,7 @@ nonisolated struct APIClient: Sendable {
         r.timeoutInterval = timeout
         r.cachePolicy = .reloadIgnoringLocalCacheData
         r.setValue("application/json", forHTTPHeaderField: "content-type")
+        r.setValue(ClientVersion.value, forHTTPHeaderField: ClientVersion.header)
         if let phoneKey { r.setValue(phoneKey, forHTTPHeaderField: "x-phone-key") }
         if let body {
             do { r.httpBody = try JSONEncoder().encode(body) } catch { throw .transport("encode: \(error)") }

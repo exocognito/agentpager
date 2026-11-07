@@ -19,6 +19,7 @@
 6. A card that passes is compiled to the brief and sent. The reply says it was sent, shows the question and detail as the owner sees them first, and says how to wait for the answer (B32).
 7. The service refuses a new card from an agent that already has too many unanswered decisions, and the agent is told to wait for answers before asking more.
 8. When the agent last saw the card contract more than 2 hours ago, or this is its fifth card since, the ask reply ends with the contract's short version. The command keeps that count on the agent's machine, not in the agent's memory.
+9. @M5: When an ask's reply is lost and the agent asks again, the owner gets one decision, not two.
 
 - Over MCP, a card is the same structure as `card.yaml`, as an object, with its attachments inline.
 - While the pager is off, every card is refused and nothing is queued (I17).

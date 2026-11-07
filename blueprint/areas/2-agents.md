@@ -3,7 +3,7 @@
 > **Definition:** The agent's side of an exchange, through the agentpager command: connecting with a pager number as a new agent, waiting for the answer in its own app, acknowledging it, and the history kept on its machine. Writing and checking a card belongs to 3 Cards, and installing and setting up the command to 7 Getting started.
 > **Serves:** [Unblock my agent from my phone](../PRODUCT.md#unblock-my-agent-from-my-phone) · [Reach the agents owners actually use](../PRODUCT.md#reach-the-agents-owners-actually-use) · [An acknowledgement always comes from the agent](../PRODUCT.md#an-acknowledgement-always-comes-from-the-agent) · [Pinned design decisions](../PRODUCT.md#pinned-design-decisions)
 > **Relies on:** the agent apps owners already use, such as Claude Code, Claude Desktop, Codex, Cursor and pi, which the owner installs and signs in to. Each runs the command from its shell, or starts it as a local MCP server that setup adds without an agent's key or a pager number (B29.6), and says who it is. How an answer reaches a waiting agent depends on the app (B33).
-> **Code:** `packages/cli/src/commands.ts`, `detect.ts`, `mcp.ts`, `store.ts`, `client.ts`, `main.ts`; `packages/app/src/agent.ts`, `registry.ts` (connect)
+> **Code:** `packages/cli/src/commands.ts`, `detect.ts`, `mcp.ts`, `store.ts`, `client.ts`, `main.ts`; `packages/app/src/agent.ts`, `registry.ts` (connect), `worker.ts` (which client each call names)
 > **Screens:** [journeys/pager](../generated/screens/journeys/pager/README.md) · [phone/answered.png](../generated/screens/phone/answered.png) · [phone/notpickedup.png](../generated/screens/phone/notpickedup.png)
 > **Walked by:** J3, J4, J5
 
@@ -21,6 +21,7 @@
 11. An agent can connect to a server other than agentpager.me. Every later call for that agent, from the command line or MCP, goes to the same server.
 <!-- B25.12 dropped in Sam's review, 6 Nov 2026; ids are never reused -->
 13. An agent that finishes shows as finished on the phone and can ask nothing more. It can still wait for and acknowledge the answers to what it already asked, and finishing again changes nothing.
+14. @M5: A command too old for the service is refused on every call, stores nothing, and is told plainly how to update.
 
 - The text usually goes in the project's AGENTS.md.
 - A number carries the pager's 128-bit random id. That it can't be guessed holds by construction, not by an attack.

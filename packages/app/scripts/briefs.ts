@@ -1,7 +1,9 @@
 // Plays the agent for the decision-brief dogfood: connects to the owner's pager with its number, asks the
 // canvas's four example briefs (D1–D4), then waits for each answer and acknowledges it.
 // Usage: node --experimental-strip-types scripts/briefs.ts <server> <pager number> [D1 D2 …] [--no-wait]
+import { randomBytes } from 'node:crypto';
 import { briefNames, loadBrief } from '../fixtures/briefs/load.ts';
+import { CLIENT_HEADER, clientVersion } from '../../contract/exchange.ts';
 
 const args = process.argv.slice(2), wait = !args.includes('--no-wait');
 const [server, number, ...only] = args.filter(a => a !== '--no-wait');
@@ -11,7 +13,7 @@ const names = briefNames().filter(name => !only.length || only.some(prefix => na
 // Over the HTTP API, as the agentpager command does (the hosted MCP server is retired).
 let key = '';
 async function call(method: string, route: string, data?: unknown): Promise<Record<string, unknown>> {
-  const r = await fetch(server + route, { method, headers: { 'content-type': 'application/json', ...(key ? { authorization: `Bearer ${key}` } : {}) }, body: data === undefined ? undefined : JSON.stringify(data) });
+  const r = await fetch(server + route, { method, headers: { 'content-type': 'application/json', [CLIENT_HEADER]: clientVersion('briefs', 'designs'), ...(key ? { authorization: `Bearer ${key}` } : {}) }, body: data === undefined ? undefined : JSON.stringify(data) });
   const value = await r.json();
   if (!r.ok) throw new Error(`${route} refused: ${JSON.stringify(value)}`);
   return value;
@@ -23,7 +25,7 @@ const agent = String(field(field(connected, 'agent'), 'agentId'));
 key = String(field(connected, 'agentKey'));
 const asked: { name: string; decisionId: string }[] = [];
 for (const name of names) {
-  const reply = await call('POST', `/api/agents/${agent}/cards`, loadBrief(name));
+  const reply = await call('POST', `/api/agents/${agent}/cards`, { requestId: randomBytes(24).toString('base64url'), ...loadBrief(name) });
   asked.push({ name, decisionId: String(field(reply, 'decisionId')) });
   console.log(`asked ${name}: ${field(reply, 'decisionId')}`);
 }

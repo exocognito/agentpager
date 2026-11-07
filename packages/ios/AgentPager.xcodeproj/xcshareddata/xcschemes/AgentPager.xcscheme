@@ -29,6 +29,20 @@
             buildForAnalyzing = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
+               BlueprintIdentifier = "FBA480C7A1FC875AC17EB7E8"
+               BuildableName = "AgentPagerTests.xctest"
+               BlueprintName = "AgentPagerTests"
+               ReferencedContainer = "container:AgentPager.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "NO"
+            buildForProfiling = "NO"
+            buildForArchiving = "NO"
+            buildForAnalyzing = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
                BlueprintIdentifier = "F3051C40EF05BCC6CF6A7B05"
                BuildableName = "AgentPagerUITests.xctest"
                BlueprintName = "AgentPagerUITests"
@@ -53,6 +67,17 @@
          </BuildableReference>
       </MacroExpansion>
       <Testables>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "FBA480C7A1FC875AC17EB7E8"
+               BuildableName = "AgentPagerTests.xctest"
+               BlueprintName = "AgentPagerTests"
+               ReferencedContainer = "container:AgentPager.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
          <TestableReference
             skipped = "NO"
             parallelizable = "NO">

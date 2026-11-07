@@ -56,9 +56,13 @@ xcrun simctl push booted me.agentpager.app.dev alert.apns
 ### The alert extension
 
 `AgentPagerNotifications` (bundle id `me.agentpager.app.dev.notifications`) is a notification service extension
-embedded in the app. iOS runs it for an alert sent with `mutable-content: 1`, before the alert shows. For now it shows
-every alert exactly as sent; it looks up the key of the alert's pager, which ENCRYPT's encrypted previews will need. It
-has no network code.
+embedded in the app. iOS runs it for an alert sent with `mutable-content: 1`, before the alert shows. The service's
+alert says only what kind it is (`New decision`) and carries an encrypted `preview`; the extension opens it with the
+key of the pager the alert names, bound to the alert's kind, pager and decision, and shows the real words: who asked and
+the project, then the question, its detail and the recommended option, or the agent's next steps, or the warning that
+no agent picked up an answer. Anything it can't read, and any alert with no preview, shows as sent. The payload and the
+words are `packages/contract/alerts.ts`; the phone's mirror is `AgentPagerCrypto` (`Alerts.swift`), and both pass
+`packages/contract/vectors/alerts.json`. It has no network code.
 
 It reads pagers' keys from the Keychain group the app already keeps them in, its own App ID
 (`X3M532E87A.me.agentpager.app.dev`): both targets' entitlements name that group (`keychain-access-groups`), so
@@ -76,8 +80,9 @@ signing: Xcode registers `me.agentpager.app.dev.notifications` and makes its dev
 ## Tests
 
 `AgentPagerTests` are unit tests that run inside the app in the Simulator, so they use the app's own Keychain: the
-alert extension's code against pagers saved as the app saves them, and the extension's built entitlements. They skip on
-a phone, where the app's Keychain holds real pagers.
+alert extension's code against pagers saved as the app saves them, the alert vectors' payloads, and the extension's
+built entitlements. They skip on a phone, where the app's Keychain holds real pagers. `AgentPagerCrypto` has its own
+`swift test`, in `pnpm test`.
 
 ```sh
 xcodebuild test -project AgentPager.xcodeproj -scheme AgentPager \

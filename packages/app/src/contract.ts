@@ -1,4 +1,5 @@
 import { MAX_OPEN_DECISIONS, type Receipt, type RefusalTag } from '../../contract/exchange.ts';
+import { PICKUP_MINUTES } from '../../contract/alerts.ts';
 
 // The server's side of the contract. The wire contract itself, every shape a client sends or receives, is
 // packages/contract/exchange.ts; it is re-exported so the server reads one namespace.
@@ -7,8 +8,9 @@ export * from '../../contract/exchange.ts';
 
 // Housekeeping: an agent is forgotten this long after its last activity.
 export const AGENT_IDLE_MS = 30 * 24 * 3_600_000;
-// An answer no agent has collected this long after Send gets one alert, and the phone says so (I6).
-export const PICKUP_MS = 3 * 60_000;
+// An answer no agent has collected this long after Send gets one alert, and the phone says so (I6). The alert's
+// words name the same minutes (packages/contract/alerts.ts).
+export const PICKUP_MS = PICKUP_MINUTES * 60_000;
 // How long each auto-off choice keeps a pager on.
 export const AUTO_OFF = { '24h': 24 * 3_600_000, '7d': 7 * 24 * 3_600_000, '30d': 30 * 24 * 3_600_000 } as const;
 

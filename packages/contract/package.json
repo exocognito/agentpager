@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "test": "vitest run",
-    "vectors": "node --experimental-strip-types vectors/generate.ts"
+    "vectors": "node --experimental-strip-types vectors/generate.ts",
+    "vectors:alerts": "node --experimental-strip-types vectors/alerts.ts"
   },
   "dependencies": {
     "effect": "3.22.1"

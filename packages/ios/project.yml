@@ -8,6 +8,11 @@ options:
     iOS: "26.0"
   createIntermediateGroups: true
   generateEmptyDirectories: true
+# The phone's side of the encrypted-part format and of alerts (packages/contract), as a local Swift package that
+# `swift test` also runs on its own (pnpm test).
+packages:
+  AgentPagerCrypto:
+    path: AgentPagerCrypto
 settings:
   base:
     MARKETING_VERSION: "0.1"
@@ -80,6 +85,8 @@ targets:
     sources:
       - path: AgentPagerNotifications
       - path: AgentPager/Model/Keychain.swift
+    dependencies:
+      - package: AgentPagerCrypto
     entitlements:
       path: AgentPagerNotifications/AgentPagerNotifications.entitlements
       properties:
@@ -112,6 +119,7 @@ targets:
       - path: AgentPagerNotifications/NotificationService.swift
     dependencies:
       - target: AgentPager
+      - package: AgentPagerCrypto
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: me.agentpager.app.dev.tests

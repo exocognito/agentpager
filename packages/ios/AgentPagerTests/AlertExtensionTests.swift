@@ -132,18 +132,27 @@ final class AlertExtensionTests: XCTestCase {
         return [UInt8](Data(base64Encoded: text) ?? Data())
     }
 
-    // MARK: Alerts show as sent
+    // MARK: Alerts as the owner sees them
 
-    // An alert as packages/app/src/push.ts sends one: its words, thread, level and AgentPager's keys.
-    private func sent(kind: String, title: String, body: String, pagerId: String = "0f1e2d3c4b5a69788796a5b4c3d2e1f0") -> UNNotificationContent {
+    // An alert as the service sent it, as iOS hands it to the extension: Apple's alert, and the whole payload as its
+    // userInfo.
+    private func delivered(_ payload: [String: Any]) -> UNNotificationContent {
+        let aps = payload["aps"] as? [String: Any] ?? [:]
+        let alert = aps["alert"] as? [String: String] ?? [:]
         let content = UNMutableNotificationContent()
-        content.title = title
-        content.body = body
+        content.title = alert["title"] ?? ""
+        content.body = alert["body"] ?? ""
         content.sound = .default
-        content.threadIdentifier = pagerId
-        content.interruptionLevel = kind == "decision" ? .timeSensitive : .active
-        content.userInfo = ["kind": kind, "pagerId": pagerId, "agentId": "agent-1", "decisionId": "decision-1"]
+        content.threadIdentifier = aps["thread-id"] as? String ?? ""
+        content.interruptionLevel = aps["interruption-level"] as? String == "time-sensitive" ? .timeSensitive : .active
+        content.userInfo = payload
         return content
+    }
+
+    // An alert as the service sends it today, with no preview.
+    private func today(kind: String, title: String, body: String) -> UNNotificationContent {
+        delivered(["aps": ["alert": ["title": title, "body": body], "thread-id": "0f1e2d3c4b5a69788796a5b4c3d2e1f0", "interruption-level": kind == "decision" ? "time-sensitive" : "active"],
+                   "kind": kind, "pagerId": "0f1e2d3c4b5a69788796a5b4c3d2e1f0", "agentId": "agent-1", "decisionId": "decision-1"])
     }
 
     // Runs the extension on one alert, then iOS's expiry, and returns the one content it handed back.
@@ -156,39 +165,99 @@ final class AlertExtensionTests: XCTestCase {
         return handed.first ?? UNNotificationContent()
     }
 
-    private func assertShownAsSent(_ alert: UNNotificationContent, file: StaticString = #filePath, line: UInt = #line) {
-        let shown = shown(alert)
-        XCTAssertEqual(shown.title, alert.title, file: file, line: line)
-        XCTAssertEqual(shown.subtitle, alert.subtitle, file: file, line: line)
-        XCTAssertEqual(shown.body, alert.body, file: file, line: line)
-        XCTAssertEqual(shown.threadIdentifier, alert.threadIdentifier, file: file, line: line)
-        XCTAssertEqual(shown.interruptionLevel, alert.interruptionLevel, file: file, line: line)
-        XCTAssertNotNil(shown.sound, file: file, line: line)
-        XCTAssertEqual(shown.userInfo as NSDictionary, alert.userInfo as NSDictionary, file: file, line: line)
+    // Everything but the words is the alert as sent: its thread, level, sound and payload.
+    private func assertSame(_ shown: UNNotificationContent, _ alert: UNNotificationContent, words: (title: String, body: String)? = nil, _ name: String = "", file: StaticString = #filePath, line: UInt = #line) {
+        XCTAssertEqual(shown.title, words?.title ?? alert.title, name, file: file, line: line)
+        XCTAssertEqual(shown.body, words?.body ?? alert.body, name, file: file, line: line)
+        XCTAssertEqual(shown.subtitle, alert.subtitle, name, file: file, line: line)
+        XCTAssertEqual(shown.threadIdentifier, alert.threadIdentifier, name, file: file, line: line)
+        XCTAssertEqual(shown.interruptionLevel, alert.interruptionLevel, name, file: file, line: line)
+        XCTAssertNotNil(shown.sound, name, file: file, line: line)
+        XCTAssertEqual(shown.userInfo as NSDictionary, alert.userInfo as NSDictionary, name, file: file, line: line)
     }
 
-    func test_B17_2_aDecisionAlertShowsAsSent() {
-        assertShownAsSent(sent(kind: "decision", title: "Codex · shop", body: "Ship the new checkout today?\nIt passed review.\nRecommended: A. Ship"))
+    // packages/contract/vectors/alerts.json: payloads as the service sends them, with the key of the pager each names,
+    // and what the owner sees. Read where it is, from the Mac, as the Simulator allows.
+    private struct Case { var name: String; var payload: [String: Any]; var key: Data; var shows: (title: String, body: String)? }
+    private func cases() throws -> [Case] {
+        let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("contract/vectors/alerts.json")
+        let v = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
+        return try XCTUnwrap(v["payloads"] as? [[String: Any]]).map { c in
+            let shows = (c["shows"] as? [String: String]).map { (title: $0["title"] ?? "", body: $0["body"] ?? "") }
+            var key = try XCTUnwrap(c["recipientPrivateKey"] as? String).replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
+            while key.count % 4 != 0 { key += "=" }
+            return Case(name: c["name"] as? String ?? "?", payload: try XCTUnwrap(c["payload"] as? [String: Any]), key: try XCTUnwrap(Data(base64Encoded: key)), shows: shows)
+        }
+    }
+    private func vector(_ name: String) throws -> Case { try XCTUnwrap(try cases().first { $0.name == name }, name) }
+
+    // Saves the pager a vector names, with its key, as the app saves a pager.
+    private func hold(_ c: Case) throws {
+        let pagerId = try XCTUnwrap(c.payload["pagerId"] as? String)
+        let key = try Curve25519.KeyAgreement.PrivateKey(rawRepresentation: c.key)
+        let id = stride(from: 0, to: 32, by: 2).map { UInt8(pagerId.dropFirst($0).prefix(2), radix: 16) ?? 0 }
+        let number = "ap1_" + base64url(Data(id + Array(SHA256.hash(data: key.publicKey.rawRepresentation)).prefix(8)))
+        made.append(pagerId)
+        Keychain.save(LocalPager(pagerId: pagerId, number: number, phoneKey: randomToken(), privateKey: c.key, name: "Alerts vector", server: server, createdAt: Date()))
     }
 
-    // For a pager this phone holds, too: finding its key changes nothing yet.
-    func test_B17_2_aDecisionAlertForAPagerHeldHereShowsAsSent() {
-        let pager = save("Alerts held")
-        assertShownAsSent(sent(kind: "decision", title: "Codex · shop", body: "Ship the new checkout today?", pagerId: pager.pagerId))
+    private func assertShowsItsPreviewsWords(_ name: String, file: StaticString = #filePath, line: UInt = #line) throws {
+        let c = try vector(name)
+        try hold(c)
+        let alert = delivered(c.payload)
+        let words = try XCTUnwrap(c.shows, file: file, line: line)
+        XCTAssertNotEqual(alert.body, words.body, "the payload carries only the plain words", file: file, line: line)
+        assertSame(shown(alert), alert, words: words, name, file: file, line: line)
     }
 
-    func test_B17_5_anAcknowledgementAlertShowsAsSent() {
-        assertShownAsSent(sent(kind: "acknowledgement", title: "Codex · shop", body: "Shipping now; I'll post the release notes."))
+    func test_B17_2_aDecisionAlertShowsWhoAskedTheProjectAndTheQuestion() throws {
+        try assertShowsItsPreviewsWords("a decision")
     }
 
-    func test_B17_8_aNotPickedUpAlertShowsAsSent() {
-        assertShownAsSent(sent(kind: "warning", title: "Answer not picked up", body: "Codex on mini (shop) hasn’t picked up your answer to “Ship the new checkout today?” after 3 min."))
+    func test_B17_5_anAcknowledgementAlertShowsTheAgentsNextSteps() throws {
+        try assertShowsItsPreviewsWords("an acknowledgement")
+    }
+
+    func test_B17_8_aNotPickedUpAlertNamesWhoAskedTheComputerTheProjectAndTheQuestion() throws {
+        try assertShowsItsPreviewsWords("a warning, carrying its decision's preview")
+    }
+
+    // A preview for another pager or decision, of another kind, changed, cut short or sealed to another key: the alert
+    // shows as sent, with none of the preview.
+    func testAnAlertWhosePreviewCantBeReadShowsAsSent() throws {
+        let unreadable = try cases().filter { $0.shows == nil }
+        XCTAssertEqual(unreadable.count, 9)
+        for c in unreadable {
+            for pagerId in made { Keychain.delete(pagerId) }
+            made = []
+            try hold(c)
+            let alert = delivered(c.payload)
+            assertSame(shown(alert), alert, c.name)
+        }
+    }
+
+    func testAnAlertForAPagerThisPhoneDoesntHoldShowsAsSent() throws {
+        let alert = delivered(try vector("a decision").payload)
+        assertSame(shown(alert), alert)
+    }
+
+    // The service's alerts from before encryption carry their own words and no preview: they show as sent.
+    func testAnAlertWithNoPreviewShowsAsSent() throws {
+        try hold(try vector("a decision"))
+        for alert in [today(kind: "decision", title: "Codex · shop", body: "Ship the new checkout today?\nIt passed review.\nRecommended: A. Ship"),
+                      today(kind: "acknowledgement", title: "Codex · shop", body: "Shipping now; I'll post the release notes."),
+                      today(kind: "warning", title: "Codex · shop", body: "Codex on mini (shop) hasn’t picked up your answer to “Ship the new checkout today?” after 3 min.")] {
+            assertSame(shown(alert), alert)
+        }
+        let held = try vector("an alert with no preview")
+        assertSame(shown(delivered(held.payload)), delivered(held.payload))
     }
 
     // iOS's time can run out while the extension works: the alert then shows as sent, once, and the extension's own
     // result after that is dropped.
-    func test_B17_2_anAlertShowsAsSentWhenTheExtensionRunsOutOfTime() {
-        let alert = sent(kind: "decision", title: "Codex · shop", body: "Ship the new checkout today?")
+    func testAnAlertShowsAsSentWhenTheExtensionRunsOutOfTime() {
+        let alert = today(kind: "decision", title: "Codex · shop", body: "Ship the new checkout today?")
         let late = UNMutableNotificationContent()
         late.body = "late"
         let delivery = AlertDelivery()

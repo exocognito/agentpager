@@ -40,7 +40,7 @@ Read `AGENTS.md`, then `blueprint/README.md`. This file covers only what those t
 
 ## For Sam to approve trashing
 
-Nothing is trashed until Sam approves the exact command. Every worktree below is clean, and its branch or head is on `main`. [V]
+Nothing is trashed until Sam approves the exact command. Every worktree below is clean, and its branch or head is on `main`, except `m5-walk`'s until its pull request merges. [V]
 
 - **Worktrees** in `~/Projects/agentpager-worktrees/`:
   - Merged pull requests, with their local branches: `m5-plan` (#57), `m5-baseline` (#58), `m5-answers` (#60), `m5-hardening` (#59), `m5-envelope` (#61), `m5-extension` (#62) and `m5-switch` (#63). Their branches are still on GitHub too.

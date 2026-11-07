@@ -225,7 +225,7 @@ final class AlertExtensionTests: XCTestCase {
 
     // A preview for another pager or decision, of another kind, changed, cut short or sealed to another key: the alert
     // shows as sent, with none of the preview.
-    func testAnAlertWhosePreviewCantBeReadShowsAsSent() throws {
+    func test_B17_11_anAlertWhosePreviewCantBeReadShowsAsSent() throws {
         let unreadable = try cases().filter { $0.shows == nil }
         XCTAssertEqual(unreadable.count, 9)
         for c in unreadable {
@@ -237,13 +237,13 @@ final class AlertExtensionTests: XCTestCase {
         }
     }
 
-    func testAnAlertForAPagerThisPhoneDoesntHoldShowsAsSent() throws {
+    func test_B17_11_anAlertForAPagerThisPhoneDoesntHoldShowsAsSent() throws {
         let alert = delivered(try vector("a decision").payload)
         assertSame(shown(alert), alert)
     }
 
     // The service's alerts from before encryption carry their own words and no preview: they show as sent.
-    func testAnAlertWithNoPreviewShowsAsSent() throws {
+    func test_B17_11_anAlertWithNoPreviewShowsAsSent() throws {
         try hold(try vector("a decision"))
         for alert in [today(kind: "decision", title: "Codex · shop", body: "Ship the new checkout today?\nIt passed review.\nRecommended: A. Ship"),
                       today(kind: "acknowledgement", title: "Codex · shop", body: "Shipping now; I'll post the release notes."),
@@ -256,7 +256,7 @@ final class AlertExtensionTests: XCTestCase {
 
     // iOS's time can run out while the extension works: the alert then shows as sent, once, and the extension's own
     // result after that is dropped.
-    func testAnAlertShowsAsSentWhenTheExtensionRunsOutOfTime() {
+    func test_B17_11_anAlertShowsAsSentWhenTheExtensionRunsOutOfTime() {
         let alert = today(kind: "decision", title: "Codex · shop", body: "Ship the new checkout today?")
         let late = UNMutableNotificationContent()
         late.body = "late"

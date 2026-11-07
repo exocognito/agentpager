@@ -15,14 +15,16 @@ enum ActiveSheet: Identifiable, Hashable {
     var id: String { "new-pager" }
 }
 
-// An answer the owner pressed Send on. It waits out the Undo window, then is sent with the same requestId
-// on every retry so the server can recognise a replay.
+// An answer the owner pressed Send on. It waits out the Undo window, then is sent with the same requestId and the
+// same sealed part on every retry, so the server can recognise a replay (I5). sealed: the answer, sealed at Send to
+// the key inside its card (Sealed.swift).
 struct PreparedAnswer: Identifiable, Hashable, Codable {
     var pagerId: String
     var agentId: String
     var decisionId: String
     var requestId: String
     var choice: Choice
+    var sealed: String
     var deadline: Date
     var id: String { requestId }
 }
@@ -53,8 +55,13 @@ final class AppModel {
 
     var server: URL
     var pagers: [LocalPager] = []
-    // Saved on every change, so the last read of each pager shows while the server can't be reached.
-    var inboxes: [String: PagerInbox] = [:] { didSet { if live { InboxCache.save(inboxes) } } }
+    // Each pager as the phone opened it (Sealed.swift), from its last read, which is saved sealed on every change, so it
+    // shows while the server can't be reached.
+    var inboxes: [String: PagerInbox] = [:]
+    private var sealedInboxes: [String: SealedPagerInbox] = [:] { didSet { if live { InboxCache.save(sealedInboxes) } } }
+    // Every answer this phone sent, by its request id: only the agent can open the answer itself, so this is how the
+    // phone shows its own answers. Kept until the pager goes.
+    private var sentAnswers: [String: SentAnswer] = [:] { didSet { if live { AnswerCache.save(sentAnswers) } } }
     var now = Date()
     var lastSuccess: Date?
     var lastFailure: String?
@@ -105,10 +112,12 @@ final class AppModel {
         self.server = Self.configuredServer()
         if live {
             // Here, not in the App's init: its @State model is built before that init's body runs.
-            if ProcessInfo.processInfo.arguments.contains("-resetKeys") { Keychain.deleteAll(); InboxCache.deleteAll(); SendCache.deleteAll() }
+            if ProcessInfo.processInfo.arguments.contains("-resetKeys") { Keychain.deleteAll(); InboxCache.deleteAll(); SendCache.deleteAll(); AnswerCache.deleteAll() }
             Keychain.deleteRetired()
             pagers = Keychain.all()
-            inboxes = InboxCache.load()
+            sentAnswers = AnswerCache.load()
+            sealedInboxes = InboxCache.load()
+            for (id, sealed) in sealedInboxes { if let p = pagers.first(where: { $0.pagerId == id }) { inboxes[id] = Sealed.inbox(sealed, pager: p, answers: sentAnswers) } }
             inFlight = SendCache.load()
         }
     }
@@ -177,13 +186,13 @@ final class AppModel {
         if stored != pagers { pagers = stored }
         let client = self.client
         let mine = myPagers
-        let results = await withTaskGroup(of: (LocalPager, Result<PagerInbox, APIError>).self) { group in
+        let results = await withTaskGroup(of: (LocalPager, Result<SealedPagerInbox, APIError>).self) { group in
             for p in mine {
                 group.addTask {
                     do throws(APIError) { return (p, .success(try await client.pager(p))) } catch { return (p, .failure(error)) }
                 }
             }
-            var all: [(LocalPager, Result<PagerInbox, APIError>)] = []
+            var all: [(LocalPager, Result<SealedPagerInbox, APIError>)] = []
             for await r in group { all.append(r) }
             return all
         }
@@ -203,10 +212,12 @@ final class AppModel {
     }
 
     // Returns a failure description for transport problems; drops pagers the server no longer knows.
-    private func apply(_ p: LocalPager, _ result: Result<PagerInbox, APIError>) -> String? {
+    private func apply(_ p: LocalPager, _ result: Result<SealedPagerInbox, APIError>) -> String? {
         switch result {
-        case .success(let inbox):
+        case .success(let sealed):
             // Assign only on change: every assignment re-renders, which would disturb an open menu.
+            if sealedInboxes[p.pagerId] != sealed { sealedInboxes[p.pagerId] = sealed }
+            let inbox = Sealed.inbox(sealed, pager: p, answers: sentAnswers)
             if inboxes[p.pagerId] != inbox { inboxes[p.pagerId] = inbox }
             let answered = Set(inbox.agents.flatMap { $0.answered.map(\.decisionId) })
             for (decisionId, a) in inFlight where a.pagerId == p.pagerId && answered.contains(decisionId) { inFlight[decisionId] = nil }
@@ -231,6 +242,8 @@ final class AppModel {
         notConfirmed.removeAll { $0.pagerId == pagerId }
         let agents = Set(inboxes[pagerId]?.agents.map(\.agent.agentId) ?? [])
         inboxes[pagerId] = nil
+        sealedInboxes[pagerId] = nil
+        sentAnswers = sentAnswers.filter { $0.value.pagerId != pagerId }
         files = files.filter { !agents.contains(String($0.key.split(separator: "/").first ?? "")) }
         path.removeAll { route in
             switch route {
@@ -298,6 +311,7 @@ final class AppModel {
             if live { Keychain.save(p) }
             pagers.append(p)
             inboxes[p.pagerId] = PagerInbox(pager: made.pager, agents: [])
+            if live { sealedInboxes[p.pagerId] = SealedPagerInbox(pager: made.pager, agents: []) }
             draft = nil
             sheet = nil
             path = [.pager(p.pagerId)]
@@ -400,14 +414,17 @@ final class AppModel {
         return d.warnedAt != nil && d.collectedAt == nil ? .notPickedUp : .waiting
     }
 
-    // A brief's attachments, kept in memory once read: a decision never changes (SI8). They go with the pager
-    // when the phone drops it.
+    // A brief's attachments, kept in memory once read and opened: a decision never changes (I5). They go with the
+    // pager when the phone drops it. Each is fetched by its slot in the card's list and opened bound to that slot; one
+    // that won't open is refused, and the brief shows it as one it couldn't load.
     @ObservationIgnored var files: [String: Data] = [:]
     func attachment(_ agentId: String, _ decisionId: String, _ name: String) async throws(APIError) -> Data {
         let id = agentId + "/" + decisionId + "/" + name
         if let data = files[id] { return data }
         guard live, let p = pagerOf(agentId) else { throw .transport("This phone holds no key for the pager.") }
-        let data = try await client.file(p, agentId: agentId, decisionId: decisionId, name: name)
+        guard let slot = asked(p.pagerId, agentId, decisionId)?.decision.attachments?.firstIndex(where: { $0.name == name }) else { throw .transport("This decision has no attachment \(name).") }
+        let part = try await client.file(p, agentId: agentId, decisionId: decisionId, slot: slot)
+        guard let data = Sealed.attachment(part, pager: p, decisionId: decisionId, slot: slot) else { throw .transport("This attachment can’t be read.") }
         files[id] = data
         return data
     }
@@ -415,8 +432,13 @@ final class AppModel {
     // MARK: Answering
 
     func send(pagerId: String, agentId: String, decisionId: String, choice: Choice) {
+        // Sealed now, to the key inside the card being answered, and sent as sealed on every try (I5). A card the phone
+        // couldn't read offers nothing to send.
+        guard let d = asked(pagerId, agentId, decisionId)?.decision, !d.unreadable else { return }
+        let sealed: String
+        if live { guard let s = Sealed.answer(choice, to: d.answerKey, pagerId: pagerId, decisionId: decisionId) else { return }; sealed = s } else { sealed = "" }
         if let pending = undo { undo = nil; commit(pending) }
-        let p = PreparedAnswer(pagerId: pagerId, agentId: agentId, decisionId: decisionId, requestId: randomToken(), choice: choice, deadline: Date().addingTimeInterval(Self.undoSeconds))
+        let p = PreparedAnswer(pagerId: pagerId, agentId: agentId, decisionId: decisionId, requestId: randomToken(), choice: choice, sealed: sealed, deadline: Date().addingTimeInterval(Self.undoSeconds))
         drafts[decisionId] = choice
         undo = p
         if case .decision(_, _, decisionId)? = path.last { path.removeLast() }
@@ -449,6 +471,8 @@ final class AppModel {
         }
         inFlight[p.decisionId] = p
         drafts[p.decisionId] = nil
+        // Kept before it is sent, so whichever send the server stores, the phone can show it.
+        if live, sentAnswers[p.requestId] == nil { sentAnswers[p.requestId] = SentAnswer(pagerId: p.pagerId, decisionId: p.decisionId, choice: p.choice) }
         // An answer goes only to the server its pager was made on; it waits while the phone points elsewhere.
         guard live, let pager = pager(p.pagerId), !sendingNow.contains(p.requestId) else { return }
         sendingNow.insert(p.requestId)
@@ -460,14 +484,16 @@ final class AppModel {
                 if delay > 0 { try? await Task.sleep(for: .seconds(delay)) }
                 do throws(APIError) {
                     if failSends > 0 { failSends -= 1; throw APIError.transport("simulated failure") }
-                    _ = try await client.answer(pager, agentId: p.agentId, decisionId: p.decisionId, requestId: p.requestId, choice: p.choice)
+                    _ = try await client.answer(pager, agentId: p.agentId, decisionId: p.decisionId, requestId: p.requestId, sealed: p.sealed)
                     notConfirmed.removeAll { $0.requestId == p.requestId }
                     await refresh(p.pagerId)
                     return
                 } catch {
                     if !error.isTransport {
-                        // AlreadyAnswered, a pager turned off and the like: the server's state wins.
+                        // AlreadyAnswered, a pager turned off and the like: the server's state wins, and it didn't store
+                        // this send, so this send is never shown as the answer.
                         inFlight[p.decisionId] = nil
+                        sentAnswers[p.requestId] = nil
                         notConfirmed.removeAll { $0.requestId == p.requestId }
                         await refresh(p.pagerId)
                         return

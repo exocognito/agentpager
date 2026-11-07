@@ -1,6 +1,6 @@
 import { Either, ParseResult, Schema } from "effect";
 import { characters, OPTIONS_MAX, Text, Title, Token } from "./values.ts";
-import { Choice, Label, PagerId, PublicKey } from "./exchange.ts";
+import { Choice, ENVELOPE_OVERHEAD_BYTES, Label, PagerId, PREVIEW_MAX_BYTES, PublicKey } from "./exchange.ts";
 import { ATTACHMENTS_MAX, AttachmentName, AttachmentType, attachmentTypes, letter, missingAttachment, named, Payload as BriefCard } from "./brief.ts";
 
 // What travels encrypted between an agent's machine and the phone: each encrypted part's kind, what it is bound to,
@@ -28,8 +28,9 @@ export const PartContexts = {
 export type PartContext<K extends PartKind> = (typeof PartContexts)[K]["Type"];
 
 // Sizes, for a check that needs no key: an encrypted part is a version byte, the sender's one-time public key (32
-// bytes), a nonce (12) and the ciphertext with its tag (16), as base64url without padding.
-export const ENVELOPE_OVERHEAD_BYTES = 61;
+// bytes), a nonce (12) and the ciphertext with its tag (16), as base64url without padding (exchange.ts, where the
+// service's check of a part's shape and size is).
+export { ENVELOPE_OVERHEAD_BYTES, PREVIEW_MAX_BYTES };
 export const envelopeCharacters = (plaintextBytes: number) => Math.ceil(((plaintextBytes + ENVELOPE_OVERHEAD_BYTES) * 4) / 3);
 
 const utf8 = new TextEncoder();
@@ -73,7 +74,6 @@ export type AcknowledgementPart = typeof AcknowledgementPart.Type;
 // An alert's preview, which the phone's alert extension opens to show the real question. Apple takes at most 4096
 // bytes of payload: a preview of PREVIEW_MAX_BYTES seals to envelopeCharacters(PREVIEW_MAX_BYTES) = 2812 characters,
 // leaving the rest for the alert's plain words and ids. decisionPreview() and acknowledgementPreview() shorten to fit.
-export const PREVIEW_MAX_BYTES = 2048;
 const fits = (preview: object) => utf8Length(JSON.stringify(preview)) <= PREVIEW_MAX_BYTES || `a preview may not exceed ${PREVIEW_MAX_BYTES} bytes as JSON`;
 export const OptionLetter = Schema.Literal(...Array.from({ length: OPTIONS_MAX }, (_, i) => letter(i + 1)));
 // A decision's: the question, its detail, the recommended option and who asked, from where. The service sends it

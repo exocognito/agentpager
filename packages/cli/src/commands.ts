@@ -1,11 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { createHash, randomBytes } from 'node:crypto';
-import { Acknowledgement, AgentStatus, AnswerStatus, Asked, Connected, Finished, decisionIdOf } from '../../contract/exchange.ts';
+import { Acknowledgement, AgentStatus, AnswerStatus, Asked, Connected, Finished, PagerKey, acceptsChoice, decisionIdOf } from '../../contract/exchange.ts';
 import { call, type Failure } from './client.ts';
 import { compile, type Source } from './card.ts';
 import { HARNESS_APP, detectApp, detectMachine, detectProject, harness, self, type Harness } from './detect.ts';
 import { REVIEW, SHORT, EXAMPLE, rulesText } from './rules.ts';
-import { UnreadableAgent, agentIds, appendHistory, home, loadAgent, pagerOf, readHistory, saveAgent, server, shortId, updateAgent, writable, type AgentFile } from './store.ts';
+import { UnreadableAgent, agentIds, appendHistory, fingerprintOf, home, loadAgent, pagerOf, readHistory, saveAgent, server, shortId, updateAgent, writable, type AgentFile } from './store.ts';
+import { Unsendable, askDigest, fingerprint, newKeys, openAnswer, sealAcknowledgement, sealAsk, sealIdentity } from './seal.ts';
 
 // The operations, shared by the CLI and the MCP server, with their replies word for word
 // (B25, B32 and B33, blueprint/areas/2-agents.md), so a model reads the same words whichever way it arrived.
@@ -78,29 +79,52 @@ function decisionOf(a: AgentFile, ref: string) {
   return /^[A-Za-z0-9_-]{32}$/.test(ref) ? { short: ref, id: ref, title: 'this decision', options: [] } : null;
 }
 
+// What this agent seals with: its pager, the pager's key pinned at connect, and its own private key.
+const keysOf = (a: AgentFile) => ({ pager: a.pager, pagerKey: a.pagerKey, privateKey: a.privateKey });
+const identityOf = (a: AgentFile) => ({ app: a.app, project: a.project, ...(a.machine ? { machine: a.machine } : {}) });
+const unreadableAnswer = (short: string) => `An answer to ${short} arrived, but it can't be read as your owner's answer to that card, so it may not be theirs. Don't act on it: tell your owner.`;
+
 // --server names a server other than agentpager.me; the agent file keeps it for every later call, CLI or MCP.
+// Before anything of the agent's is sent, the pager's public key is read from the server and checked against the
+// fingerprint in the number (I19.6, blueprint/areas/6-privacy.md); it is pinned in the agent file, and every part this
+// agent sends is sealed to it. Who asked, the project and the computer travel sealed to it too.
+export const keyMismatch = (base: string) => `Not connected, and nothing was sent: the key this pager number names doesn't match the key ${host(base)} gave for it. Check the number with the one your owner gave you. If it is right, stop and tell your owner.`;
 export async function connect(input: { number?: string; app?: string; project?: string; server?: string; mcpClient?: string }): Promise<Result> {
   const number = input.number || process.env.AGENTPAGER_PAGER;
   if (!number) return refused('No pager number. Pass the one your owner gave you, or set AGENTPAGER_PAGER.');
   if (input.server !== undefined && !/^https?:\/\/[^\s/]+/.test(input.server)) return refused('--server takes the server\'s address, such as https://agentpager.me.');
-  const pager = pagerOf(number), base = input.server ? input.server.replace(/\/+$/, '') : server();
+  const pager = pagerOf(number), named = fingerprintOf(number), base = input.server ? input.server.replace(/\/+$/, '') : server();
   // A harness the binary identifies names itself: a Claude Desktop chat passes app "Claude" (lab, 30 Oct 2026), and the
   // phone has to say where the agent is.
   const known = harness(input.mcpClient);
   const app = known ? HARNESS_APP[known] : input.app || detectApp(input.mcpClient), project = input.project || detectProject();
-  if (!pager) return refused('Not connected. This pager number is not in use. Ask your owner for their current one.');
+  const notInUse = refused('Not connected. This pager number is not in use. Ask your owner for their current one.');
+  if (!pager || !named) return notInUse;
   const cannot = writable();
   if (cannot) return unwritable(cannot);
   const machine = detectMachine();
-  const r = await call(Connected, base, 'POST', '/api/agents', { data: { number, app, project, ...(machine ? { machine } : {}) } });
+  const offWords = 'Not connected. This pager is turned off and your message was not delivered.\nAsk your owner to turn it on, or for another pager number.';
+  const key = await call(PagerKey, base, 'GET', `/api/pagers/${pager}/key`);
+  // Only the pager's id went out, so whatever went wrong reached no one.
+  if (!key.ok && (key.error === 'NoReply' || key.error === 'NotUnderstood')) return { code: 5, text: [
+    key.error === 'NoReply' ? `No reply from ${base} (${key.message}).` : `The reply from ${base} wasn't understood (${key.message}). A proxy or Wi-Fi sign-in page may have answered for it.`,
+    'Not connected, and nothing reached your owner: try again.',
+  ].join('\n') };
+  if (!key.ok) return key.error === 'NumberInvalid' ? notInUse : refusal(key, { server: base }, offWords);
+  if (key.value.pagerId !== pager || fingerprint(key.value.publicKey) !== named) return refused(keyMismatch(base));
+  const keys = newKeys(), sealing = { pager, pagerKey: key.value.publicKey, privateKey: keys.privateKey };
+  let identity: string;
+  try { identity = sealIdentity(sealing, { app, project, ...(machine ? { machine } : {}) }); }
+  catch (e) { if (e instanceof Unsendable) return refused(`Refused: ${e.message}`); throw e; }
+  const r = await call(Connected, base, 'POST', '/api/agents', { data: { number, identity } });
   if (!r.ok) {
-    if (r.error === 'NumberInvalid') return refused('Not connected. This pager number is not in use. Ask your owner for their current one.');
-    return refusal(r, { server: base }, 'Not connected. This pager is turned off and your message was not delivered.\nAsk your owner to turn it on, or for another pager number.');
+    if (r.error === 'NumberInvalid') return notInUse;
+    return refusal(r, { server: base }, offWords);
   }
   const agentId = r.value.agent.agentId, agentKey = r.value.agentKey;
   const id = shortId('ap-', taken => agentIds().includes(taken));
   const now = new Date().toISOString();
-  try { saveAgent({ id, server: base, pager, agentId, agentKey, app, project, createdAt: now, rulesShownAt: now, cardsSinceRules: 0, decisions: {} }); }
+  try { saveAgent({ id, server: base, pager, agentId, agentKey, privateKey: keys.privateKey, pagerKey: key.value.publicKey, app, project, ...(machine ? { machine } : {}), createdAt: now, rulesShownAt: now, cardsSinceRules: 0, decisions: {} }); }
   catch (e) { return refused(`Connected, but this machine couldn't save the agent (${e instanceof Error && 'code' in e ? String(e.code) : 'write failed'}). Your owner's phone shows an agent you can't use; set AGENTPAGER_HOME to a folder you can write, and connect again.`); }
   return done([
     `Connected as agent ${id} on your owner's pager (project ${project}, as ${app}).`,
@@ -173,7 +197,14 @@ export async function ask(agent: string, card: Source, client?: string, holdMs =
     } catch { /* left as it was: its hold runs out */ }
     return kept;
   };
-  const send = () => call(Asked, a.server, 'POST', `/api/agents/${a.agentId}/cards`, { key: a.agentKey, data: { requestId, ...brief } });
+  // Sealed once for this run, so a resend is the same request; a later run seals again, under the same request id and
+  // digest, and finds the same decision.
+  const decisionId = await decisionIdOf(a.agentId, requestId);
+  let sealed: ReturnType<typeof sealAsk>;
+  try { sealed = sealAsk(keysOf(a), identityOf(a), brief, decisionId); }
+  catch (e) { leave(false); if (e instanceof Unsendable) return refused(`${e.message}.`); throw e; }
+  const data = { requestId, digest: askDigest(keysOf(a), brief), ...sealed };
+  const send = () => call(Asked, a.server, 'POST', `/api/agents/${a.agentId}/cards`, { key: a.agentKey, data });
   // It may have reached the owner (B32.10): the id is kept, and the agent is told asking again is safe when it is.
   const unsure = (f: Failure) => leave(false) ? uncertain(f, a, askAgain) : uncertain(f, a);
   let r = await send();
@@ -195,7 +226,7 @@ export async function ask(agent: string, card: Source, client?: string, holdMs =
     return refusal(r, a);
   }
   // The service names the decision by this agent and the request id; any other name isn't its reply.
-  if (r.value.decisionId !== await decisionIdOf(a.agentId, requestId)) return unsure({ ok: false, status: 200, error: 'NotUnderstood', message: 'it named another decision' });
+  if (r.value.decisionId !== decisionId) return unsure({ ok: false, status: 200, error: 'NotUnderstood', message: 'it named another decision' });
   leave(true);
   const id = r.value.decisionId;
   const now = new Date();
@@ -238,7 +269,10 @@ export async function wait(agent: string, ref: string, opts: { seconds?: number;
       if (opts.forever) continue;
       return pending(a, d, opts.seconds !== undefined && seconds < WAIT_SECONDS, harness(opts.client));
     }
-    const { choice, sentAt } = r.value.answer;
+    const { sentAt } = r.value.answer, choice = openAnswer(keysOf(a), d.id, r.value.answer.answer);
+    // Only the phone, which read the card, holds the key the answer is sealed to; an answer that doesn't open, or names
+    // an option the card didn't offer, isn't the owner's answer to this card.
+    if (!choice || (d.options.length > 0 && !acceptsChoice({ options: d.options.map((_, i) => ({ number: i + 1 })) }, choice))) return refused(unreadableAnswer(d.short));
     if (!d.answered) {
       try {
         updateAgent(a.id, x => { if (x.decisions[d.short]) x.decisions[d.short].answered = true; });
@@ -285,7 +319,10 @@ export async function ack(agent: string, ref: string, nextSteps: string): Promis
   const read = await call(AnswerStatus, a.server, 'GET', `/api/agents/${a.agentId}/cards/${d.id}/answer`, { key: a.agentKey });
   if (!read.ok) return refusal(read, a);
   if (read.value.status !== 'answered') return refused(`Your owner hasn't answered "${d.title}" yet. Wait first: agentpager wait --agent ${a.id} ${d.short}`);
-  const r = await call(Acknowledgement, a.server, 'POST', `/api/agents/${a.agentId}/cards/${d.id}/acknowledge`, { key: a.agentKey, data: { answerId: read.value.answer.answerId, nextSteps } });
+  let sealed: ReturnType<typeof sealAcknowledgement>;
+  try { sealed = sealAcknowledgement(keysOf(a), identityOf(a), d.id, nextSteps, d.title); }
+  catch (e) { if (e instanceof Unsendable) return refused(`Refused: ${e.message}`); throw e; }
+  const r = await call(Acknowledgement, a.server, 'POST', `/api/agents/${a.agentId}/cards/${d.id}/acknowledge`, { key: a.agentKey, data: { answerId: read.value.answer.answerId, ...sealed } });
   if (!r.ok) return refusal(r, a);
   try {
     updateAgent(a.id, x => { if (x.decisions[d.short]) Object.assign(x.decisions[d.short], { answered: true, acknowledged: true }); });
@@ -338,7 +375,8 @@ export function agents(): Result {
   const all = agentIds().map(agentOf).filter((a): a is AgentFile => !('code' in a));
   if (!all.length) return done('No agents on this machine. Connect with: agentpager connect <number>', []);
   const rows = all.map(a => `${a.id}  pager ${a.pager.slice(0, 8)}  ${a.project} · ${a.app}  ${a.createdAt.slice(0, 16).replace('T', ' ')}  ${Object.values(a.decisions).filter(d => !d.answered).length} open`);
-  return done(rows.join('\n'), all.map(({ agentKey, ...rest }) => { void agentKey; return rest; }));
+  // Neither key is ever printed.
+  return done(rows.join('\n'), all.map(({ agentKey, privateKey, ...rest }) => { void agentKey; void privateKey; return rest; }));
 }
 
 export function share(agent: string): Result {

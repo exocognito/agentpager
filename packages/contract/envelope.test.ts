@@ -5,7 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { EnvelopeError, fromBase64url, keyPair, open, publicKeyOf, seal, sealForTestVectors, toBase64url } from "./envelope.ts";
 import { envelopeCharacters, ENVELOPE_OVERHEAD_BYTES, PART_KINDS, type PartContext, type PartKind } from "./parts.ts";
-import { ATTACHMENTS_MAX, ATTACHMENTS_MAX_BYTES, IMAGE_MAX_BYTES } from "./brief.ts";
+import { ATTACHMENTS_MAX, ATTACHMENTS_MAX_BYTES, IMAGE_MAX_BYTES, PAGE_MAX_BYTES } from "./brief.ts";
 import { verify, type Vectors } from "./vectors/verify.ts";
 import { vectors as generate, VECTORS_PATH } from "./vectors/generate.ts";
 
@@ -100,8 +100,10 @@ describe("sizes", () => {
     expect(envelope.length).toBe(1_333_415);
     expect(envelope.length).toBeLessThan(ROW_MAX_BYTES);
   });
-  // A Markdown page is held to 20,000 characters, not to a byte size: only the 3 MB total bounds one page's bytes,
-  // and a page over 2 MB doesn't fit one row as plaintext either. That gap is today's, not the envelope's.
+  // A Markdown page is held to PAGE_MAX_BYTES as well as its characters, so it seals to no more than an image does.
+  it("seals the largest page to one stored row", () => {
+    expect(envelopeCharacters(PAGE_MAX_BYTES)).toBeLessThan(ROW_MAX_BYTES);
+  });
   it("fits every attachment of the largest ask in one request", () => {
     const sealedAttachments = envelopeCharacters(ATTACHMENTS_MAX_BYTES) + ATTACHMENTS_MAX * envelopeCharacters(0);
     expect(sealedAttachments).toBe(4_000_738);
@@ -110,7 +112,8 @@ describe("sizes", () => {
 });
 
 // Sealing with a chosen one-time key and nonce makes the same envelope twice, so it is for the vectors alone. The
-// service never seals or opens a part, so it never imports the format.
+// service never seals or opens a part, so its code never imports the format; its tests and scripts, which play the
+// agent and the phone, do.
 describe("reach", () => {
   const repo = path.resolve(here, "../..");
   const files = execFileSync("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard"], { cwd: repo, encoding: "utf8" }).split("\0").filter(f => /\.(ts|tsx|mjs|js|swift)$/.test(f));
@@ -121,6 +124,6 @@ describe("reach", () => {
     expect(naming(/@testable\s+import\s+AgentPagerCrypto/)).toEqual(["packages/ios/AgentPagerCrypto/Tests/AgentPagerCryptoTests/EnvelopeTests.swift"]);
   });
   it("keeps the service from importing the format", () => {
-    expect(naming(/envelope\.ts['"]/).filter(f => f.startsWith("packages/app/"))).toEqual([]);
+    expect(naming(/envelope\.ts['"]/).filter(f => f.startsWith("packages/app/src/"))).toEqual([]);
   });
 });

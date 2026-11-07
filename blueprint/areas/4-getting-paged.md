@@ -3,7 +3,7 @@
 > **Definition:** How a decision gets the owner's attention: alerts while AgentPager is closed, opening an alert to its decision, the app icon's badge, the one alert when no agent picks up an answer, and how the app shows a new decision while it is open. Reading and answering the decision belongs to 5 Answering.
 > **Serves:** [What it's for](../PRODUCT.md#what-its-for) · [Get paged when my agent needs me](../PRODUCT.md#get-paged-when-my-agent-needs-me) · [Return to completed work, not an unseen question](../PRODUCT.md#return-to-completed-work-not-an-unseen-question)
 > **Relies on:** Apple's push service (APNs), through Sam's paid Apple Developer Program team and its push key · the iPhone's own notification settings, where the owner allows AgentPager's alerts and its time-sensitive alerts
-> **Code:** `packages/app/src/push.ts`, `agent.ts`, `registry.ts`; `packages/ios/AgentPager/Model/Alerts.swift`, `AppModel.swift`
+> **Code:** `packages/contract/alerts.ts` (what an alert carries and the words it shows); `packages/app/src/push.ts`, `agent.ts`, `registry.ts`; `packages/ios/AgentPagerNotifications/NotificationService.swift` (the alert extension), `packages/ios/AgentPagerCrypto` (`Alerts.swift`); `packages/ios/AgentPager/Model/Alerts.swift`, `AppModel.swift`
 > **Screens:** none
 > **Walked by:** J5
 
@@ -19,15 +19,7 @@
 <!-- B17.6 dropped in Sam's review, 6 Nov 2026; ids are never reused -->
 7. The app icon's badge shows how many decisions are waiting.
 8. @M3: If no agent has picked up an answer 3 minutes after Send, one more alert says so. It names who asked, its computer, its project and the question, and opening it opens that decision, which says so too (B5). There is one such alert per answer, and none if the pager is off at that moment. With the app open, it shows as a banner unless its pager is on screen.
+11. @M5: No alert's words reach Apple's push service as text. When the phone can't read an alert, it still arrives, saying only that there is a new decision, an acknowledgement or an answer not picked up.
 
 - Apple delivers each alert. How long that takes is Apple's, and nothing here measures it.
 - How soon a new decision shows while the app is open is K1, which FRIENDS measures.
-
-## Limits
-
-### L17 · @M1 · Alerts pass through Apple as plain text
-
-- What people meet: Apple's push service carries every alert's words as text. That is who asked and the project in the title, and in the body the question, its detail and the recommended option, the agent's acknowledgement, or the not-picked-up alert with the computer's name.
-- Why it waits: encryption is its own milestone, ENCRYPT, which comes before the friends rollout ([PRODUCT.md › Pinned design decisions](../PRODUCT.md#pinned-design-decisions)).
-- What would fix it: alerts that travel encrypted, which the phone decrypts to show the real question.
-- When to revisit: ENCRYPT, which runs right after M4.

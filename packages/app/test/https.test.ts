@@ -32,7 +32,7 @@ test('I23.4 Plain HTTP to a deployed host: GET and HEAD move to HTTPS, anything 
     for (const [method, path] of [['PUT', '/'], ['DELETE', '/api/pagers/x'], ['POST', '/api/agents'], ['PATCH', '/start']]) {
       assert.equal((await raw(f.origin + path, { method, host: 'agentpager.me', body: '{}' })).status, 403, `${method} ${path}`);
     }
-    await f.refused(410, 'NumberInvalid', '/api/agents', { data: { number: keys.number, app: 'Codex', project: 'https' } });
+    await f.refused(410, 'NumberInvalid', '/api/agents', { data: f.connectBody(keys.number, 'Codex', 'https') });
     // The same calls on the local server's own addresses, and on a LAN or .local name, are served as before.
     const port = new URL(f.origin).port;
     for (const host of LOCAL(port)) {

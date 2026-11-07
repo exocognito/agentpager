@@ -121,8 +121,11 @@ their frames against a local server the command starts and stops. `pnpm check` f
 A brief card (`card.type: "brief"`) draws as the canvas's headed template: "Decision: " and the question, then each
 section's heading above its own card. Context; Options (the Tradeoffs table, with the picked option's column outlined,
 and a row to the Options sheet); Recommendation; Next steps and Small print, folded at first. The Options sheet shows
-one option at a time, switched by swiping or the segmented control at its top; it never chooses one. Attachments
-load from `/api/agents/<id>/cards/<decisionId>/files/<name>` with the pager's phone key; Markdown pages open in a sheet
+one option at a time, switched by swiping or the segmented control at its top; it never chooses one. Every part of a
+decision comes encrypted, and the app opens it with the pager's private key (`AgentPager/Model/Sealed.swift`); one that
+doesn't open or isn't what the contract takes shows as a decision this phone can't read, and answers are sealed to the
+key inside the card. Attachments load by their slot from `/api/agents/<id>/cards/<decisionId>/files/<slot>` with the
+pager's phone key, and open bound to that slot; Markdown pages open in a sheet
 titled by their first heading, images one after another show as a strip of thumbnails that opens full screen and
 swipes, Mermaid flowcharts are drawn on the phone (anything else shows its source).
 

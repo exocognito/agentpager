@@ -7,6 +7,8 @@ import { fileURLToPath } from 'node:url';
 import { Schema } from 'effect';
 import pngjs from 'pngjs';
 import { AGENT_IDLE_MS, CLIENT_HEADER, PagerInbox, clientVersion } from '../src/contract.ts';
+import { fromBase64url, open, seal } from '../../contract/envelope.ts';
+import { decodePart, encodePart } from '../../contract/parts.ts';
 import { RELEASE_TAG, stageOf } from './stages.ts';
 
 // The upgrade baseline (METHOD.md › The milestone loop, step 7): what a release stored on a stage, kept so the next
@@ -19,7 +21,7 @@ import { RELEASE_TAG, stageOf } from './stages.ts';
 // It makes a pager as the phone does, with no alert target and auto-off never, so it pages no one. The agentpager
 // binary (--binary, else one built from this checkout) connects to it under its own AGENTPAGER_HOME and asks two
 // cards; the phone answers the first and the binary collects and acknowledges it; the second stays open. It then reads
-// the pager back over the phone's API. It never reads or writes ~/.agentpager, prints no number or key, and never
+// the pager back over the phone's API, opening every part with the pager's private key as the phone does. It never reads or writes ~/.agentpager, prints no number or key, and never
 // overwrites a record. On dev and prod the tag must be a release tag (m4, m4.1) and the binary that tag's build. If a
 // step fails, it deletes the pager it made and leaves the folder, marked failed, for the owner to move to the Trash.
 //
@@ -30,7 +32,7 @@ import { RELEASE_TAG, stageOf } from './stages.ts';
 //   home/         that binary's AGENTPAGER_HOME: agents/<id>.json holds its agent's key, history/ its decisions
 //   cards/        the two card.yaml files and the attachment, as sent
 // record.json, with paths relative to its folder:
-//   { format: 1, state: 'recording' | 'recorded' | 'failed' (only 'recorded' is a baseline; 'failed' had its pager deleted),
+//   { format: 2, state: 'recording' | 'recorded' | 'failed' (only 'recorded' is a baseline; 'failed' had its pager deleted),
 //     stage: 'dev', server: 'https://dev.agentpager.me', tag: 'm4',
 //     binaryVersion: '9849671' (what `agentpager version` reports), serverBuild: the X-AgentPager-Build that made the pager,
 //     recordedWith: this checkout's commit, recordedAt: ISO time,
@@ -41,6 +43,8 @@ import { RELEASE_TAG, stageOf } from './stages.ts';
 //       acknowledged: { id: 'd_xxxx', decisionId, title, answerId, option: 1, nextSteps,
 //         attachments: [{ name, type, bytes, sha256 }] (a PNG, and the Markdown page context.more makes) },
 //       open: { id: 'd_xxxx', decisionId, title, attachments: [] } } }
+//   Format 1 is the same, from before the encryption switch (M5), when the service stored decisions readable: the m4
+//   baseline. Only the smoke run's upgrade check reads one; --verify reads format 2.
 // The service forgets an agent idle for 30 days (blueprint/areas/1-pagers.md), and with it these decisions: a check
 // must run within 30 days of recordedAt. --verify is no activity, so it doesn't extend that.
 const argv = process.argv, flag = name => { const at = argv.indexOf(name); return at === -1 ? undefined : argv[at + 1]; };
@@ -115,32 +119,39 @@ function save(record) {
 }
 const agentFile = record => JSON.parse(readFileSync(path.join(dir, record.home, 'agents', `${record.agent.id}.json`), 'utf8'));
 
-// What the record says is on the stage, read as the phone reads it and by the binary that made it. Reads only.
+// What the record says is on the stage, read as the phone reads it, opening each part with the pager's private key,
+// and by the binary that made it. Reads only.
+const key = record => fromBase64url(record.pager.privateKey);
+const opened = (record, kind, at, part) => decodePart(kind, open(key(record), kind, { pagerId: record.pager.pagerId, ...at }, part));
 async function readBack(record) {
   const lines = [];
   const inbox = Schema.decodeUnknownSync(PagerInbox)(await (await ok(await phone(record, `/api/pagers/${record.pager.pagerId}`), 'reading the pager')).json());
   check(inbox.pager.pagerId === record.pager.pagerId && inbox.pager.on && inbox.pager.autoOff === 'never', `the pager reads back ${inbox.pager.on ? 'on' : 'off'}, auto-off ${inbox.pager.autoOff}`);
   lines.push('the pager is on, auto-off never');
   check(inbox.agents.length === 1 && inbox.agents[0].agent.agentId === record.agent.agentId && !inbox.agents[0].agent.finishedAt, `the pager lists ${inbox.agents.length} agents, not its one agent`);
-  const { agent, open, answered } = inbox.agents[0], { acknowledged, open: waiting } = record.decisions;
-  lines.push(`one agent (${record.agent.id}), last active ${agent.lastActivityAt}`);
-  check(open.length === 1 && open[0].decisionId === waiting.decisionId && open[0].status === 'open', `${open.length} open decisions, not ${waiting.id}`);
-  lines.push(`one open decision (${waiting.id})`);
+  const { agent, open: waiting, answered } = inbox.agents[0], { acknowledged, open: left } = record.decisions;
+  check(opened(record, 'identity', {}, agent.identity).project === `${record.tag} baseline`, 'its identity doesn\'t open to its project');
+  lines.push(`one agent (${record.agent.id}), its identity opened, last active ${agent.lastActivityAt}`);
+  check(waiting.length === 1 && waiting[0].decisionId === left.decisionId && waiting[0].status === 'open' && opened(record, 'card', { decisionId: left.decisionId }, waiting[0].card).title === left.title, `${waiting.length} open decisions, not ${left.id}`);
+  lines.push(`one open decision (${left.id}), its card opened`);
   const d = answered[0];
-  check(answered.length === 1 && d && d.decisionId === acknowledged.decisionId && d.status === 'acknowledged' && d.answer?.answerId === acknowledged.answerId
-    && d.answer.choice.kind === 'option' && d.answer.choice.number === acknowledged.option && d.collectedAt && d.acknowledgement?.nextSteps === acknowledged.nextSteps,
+  check(answered.length === 1 && d && d.decisionId === acknowledged.decisionId && d.status === 'acknowledged' && d.answer?.answerId === acknowledged.answerId && d.collectedAt
+    && opened(record, 'acknowledgement', { decisionId: d.decisionId }, d.acknowledgement.acknowledgement).nextSteps === acknowledged.nextSteps,
   `${answered.length} answered decisions, not ${acknowledged.id} answered, collected and acknowledged`);
-  lines.push(`one acknowledged decision (${acknowledged.id}), its answer collected`);
-  const listed = (d.attachments ?? []).map(a => `${a.name} ${a.type} ${a.bytes}`).sort().join(', ');
+  const card = opened(record, 'card', { decisionId: d.decisionId }, d.card);
+  check(card.title === acknowledged.title, 'its card doesn\'t open to its question');
+  lines.push(`one acknowledged decision (${acknowledged.id}), its answer collected, its card and acknowledgement opened`);
+  const listed = (card.attachments ?? []).map((a, i) => `${a.name} ${a.type} ${d.attachments[i]?.bytes}`).sort().join(', ');
   check(listed === acknowledged.attachments.map(a => `${a.name} ${a.type} ${a.bytes}`).sort().join(', '), `its attachments read back as ${listed || 'none'}`);
-  for (const a of acknowledged.attachments) {
-    const file = await ok(await phone(record, `/api/agents/${record.agent.agentId}/cards/${acknowledged.decisionId}/files/${encodeURIComponent(a.name)}`), `fetching ${a.name}`);
-    check(digest(Buffer.from(await file.arrayBuffer())) === a.sha256, `${a.name} came back changed`);
+  for (const [slot, a] of (card.attachments ?? []).entries()) {
+    const file = await ok(await phone(record, `/api/agents/${record.agent.agentId}/cards/${acknowledged.decisionId}/files/${slot}`), `fetching ${a.name}`);
+    const bytes = open(key(record), 'attachment', { pagerId: record.pager.pagerId, decisionId: acknowledged.decisionId, index: slot }, await file.text());
+    check(digest(bytes) === acknowledged.attachments.find(x => x.name === a.name)?.sha256, `${a.name} came back changed`);
   }
-  lines.push(`its attachments fetch unchanged (${acknowledged.attachments.map(a => a.name).join(', ')})`);
+  lines.push(`its attachments fetch and open unchanged (${acknowledged.attachments.map(a => a.name).join(', ')})`);
   const status = command(path.join(dir, record.binary), path.join(dir, record.home), ['status', '--agent', record.agent.id]).result;
-  check(status.pagerOn && status.open === 1 && status.waiting.join() === waiting.id && status.unacknowledged.length === 0, `agentpager status: pager ${status.pagerOn ? 'on' : 'off'}, ${status.open} open`);
-  lines.push(`the agentpager ${record.binaryVersion} copy reads its agent's status: pager on, ${waiting.id} open`);
+  check(status.pagerOn && status.open === 1 && status.waiting.join() === left.id && status.unacknowledged.length === 0, `agentpager status: pager ${status.pagerOn ? 'on' : 'off'}, ${status.open} open`);
+  lines.push(`the agentpager ${record.binaryVersion} copy reads its agent's status: pager on, ${left.id} open`);
   lines.push(`the agent is forgotten if idle until ${new Date(Date.parse(agent.lastActivityAt) + AGENT_IDLE_MS).toISOString()}`);
   return lines;
 }
@@ -216,7 +227,7 @@ async function record() {
   const id = randomBytes(16), fingerprint = createHash('sha256').update(Buffer.from(jwk.x, 'base64url')).digest().subarray(0, 8);
   const pager = { pagerId: id.toString('hex'), number: 'ap1_' + Buffer.concat([id, fingerprint]).toString('base64url'), publicKey: jwk.x, privateKey: jwk.d, phoneKey: randomBytes(24).toString('base64url'), autoOff: 'never' };
   for (const s of [pager.number, pager.publicKey, pager.privateKey, pager.phoneKey]) secrets.add(s);
-  const r = { format: 1, state: 'recording', stage: stage.name, server: origin, tag, binaryVersion, serverBuild: null, recordedWith: sha, recordedAt: null, pager, agent: null, home: 'home', binary: 'agentpager', decisions: null };
+  const r = { format: 2, state: 'recording', stage: stage.name, server: origin, tag, binaryVersion, serverBuild: null, recordedWith: sha, recordedAt: null, pager, agent: null, home: 'home', binary: 'agentpager', decisions: null };
   // Saved before the pager exists, so a run that dies still leaves the keys that delete it.
   save(r);
   say(`Baseline ${stage.name} ${tag} at ${origin}: agentpager ${binaryVersion}, into ${dir}`);
@@ -241,11 +252,13 @@ async function record() {
     check(asked[first] && asked[second], 'the binary did not record both decisions');
     say(`ok it asked ${first}, with a PNG and a page, and ${second}`);
 
-    // The phone answers the first with option A, as it would after reading it.
+    // The phone answers the first with option A, as it would after reading it: sealed to the key inside its card.
     const inbox = Schema.decodeUnknownSync(PagerInbox)(await (await ok(await phone(r, `/api/pagers/${pager.pagerId}`), 'reading the pager')).json());
     const shown = inbox.agents.find(a => a.agent.agentId === r.agent.agentId)?.open.find(d => d.decisionId === asked[first].id);
     check(shown, `the phone doesn't see ${first}`);
-    const receipt = await (await ok(await phone(r, `/api/agents/${r.agent.agentId}/cards/${shown.decisionId}/answer`, { requestId: randomBytes(24).toString('base64url'), choice: { kind: 'option', number: 1 } }), 'answering')).json();
+    const card = opened(r, 'card', { decisionId: shown.decisionId }, shown.card);
+    const answer = seal(fromBase64url(card.answerKey), 'answer', { pagerId: pager.pagerId, decisionId: shown.decisionId }, encodePart('answer', { choice: { kind: 'option', number: 1 } }));
+    const receipt = await (await ok(await phone(r, `/api/agents/${r.agent.agentId}/cards/${shown.decisionId}/answer`, { requestId: randomBytes(24).toString('base64url'), answer }), 'answering')).json();
     say(`ok the phone answered ${first} with option A`);
     const waited = command(binary, home, ['wait', '--agent', r.agent.id, first]).result;
     check(waited.status === 'answered' && waited.option === 'A', `agentpager wait: ${waited.status} ${waited.option ?? ''}`);
@@ -253,11 +266,11 @@ async function record() {
     command(binary, home, ['ack', '--agent', r.agent.id, first, nextSteps]);
     say(`ok the binary collected the answer and acknowledged ${first}; ${second} stays open`);
 
-    const attachments = (shown.attachments ?? []).map(a => ({ ...a, sha256: null }));
+    const attachments = (card.attachments ?? []).map((a, i) => ({ ...a, bytes: shown.attachments[i]?.bytes, sha256: null }));
     const page = attachments.find(a => a.type === 'text/markdown');
     check(attachments.some(a => a.name === 'baseline.png' && a.type === 'image/png') && page, `${first} carries ${attachments.map(a => a.name).join(', ') || 'nothing'}, not a PNG and a page`);
-    for (const a of attachments) {
-      a.sha256 = a.name === 'baseline.png' ? digest(png) : digest(Buffer.from(await (await ok(await phone(r, `/api/agents/${r.agent.agentId}/cards/${shown.decisionId}/files/${encodeURIComponent(a.name)}`), `fetching ${a.name}`)).arrayBuffer()));
+    for (const [slot, a] of attachments.entries()) {
+      a.sha256 = a.name === 'baseline.png' ? digest(png) : digest(open(key(r), 'attachment', { pagerId: pager.pagerId, decisionId: shown.decisionId, index: slot }, await (await ok(await phone(r, `/api/agents/${r.agent.agentId}/cards/${shown.decisionId}/files/${slot}`), `fetching ${a.name}`)).text()));
     }
     r.decisions = {
       acknowledged: { id: first, decisionId: asked[first].id, title: asked[first].title, answerId: receipt.answerId, option: 1, nextSteps, attachments },
@@ -282,7 +295,8 @@ async function verify() {
   check(existsSync(recordFile), `No baseline at ${dir}.`);
   const r = JSON.parse(readFileSync(recordFile, 'utf8'));
   for (const s of [r.pager.number, r.pager.publicKey, r.pager.privateKey, r.pager.phoneKey]) secrets.add(s);
-  check(r.format === 1 && r.state === 'recorded' && r.stage === stage.name && r.server === origin && r.tag === tag, `${recordFile} is ${r.state}, for ${r.stage} ${r.tag}, not a recorded baseline for ${stage.name} ${tag}.`);
+  check(r.format !== 1, `${recordFile} is from before the encryption switch (format 1): the smoke run's upgrade check reads it, not --verify.`);
+  check(r.format === 2 && r.state === 'recorded' && r.stage === stage.name && r.server === origin && r.tag === tag, `${recordFile} is ${r.state}, for ${r.stage} ${r.tag}, not a recorded baseline for ${stage.name} ${tag}.`);
   secrets.add(agentFile(r).agentKey);
   say(`Baseline ${stage.name} ${tag}, recorded ${r.recordedAt} with agentpager ${r.binaryVersion}, read back at ${new Date().toISOString()}`);
   for (const line of await readBack(r)) say(`ok ${line}`);

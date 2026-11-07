@@ -1,12 +1,13 @@
 import { Schema } from 'effect';
 import type { Env } from './env.ts';
-import { decisionBody } from '../../contract/alerts.ts';
-import { letter, type Payload as BriefCard } from '../../contract/brief.ts';
+import { alertPayload, type AlertKind } from '../../contract/alerts.ts';
 
-// Alerts through Apple's push service (C17::get-paged). The phone gives each pager it holds its device token, and
-// the pager alerts that phone when its agent asks or acknowledges. The token goes when the pager ends.
-// Apple's service speaks HTTP/2 only: a deployed Worker reaches it, local workerd does not, so a local server keeps
-// tokens but its alerts fail. An alert that fails is logged and never refuses the agent's call.
+// Alerts through Apple's push service (B17, blueprint/areas/4-getting-paged.md). The phone gives each pager it holds
+// its device token, and the pager alerts that phone when its agent asks or acknowledges, and when no agent picks up an
+// answer. An alert carries no words of the decision: only its kind's plain fallback and the preview the agent sealed
+// to the pager's key, which the phone's alert extension opens (packages/contract/alerts.ts). The token goes when the
+// pager ends. Apple's service speaks HTTP/2 only: a deployed Worker reaches it, local workerd does not, so a local
+// server keeps tokens but its alerts fail. An alert that fails is logged and never refuses the agent's call.
 export const PushTarget = Schema.Struct({
   token: Schema.String.pipe(Schema.pattern(/^[0-9a-f]{64,200}$/)),
   environment: Schema.Literal('sandbox', 'production'),
@@ -14,8 +15,8 @@ export const PushTarget = Schema.Struct({
 export type PushTarget = typeof PushTarget.Type;
 
 export type Alert = {
-  title: string; body: string; timeSensitive: boolean; expiresAt: string; collapseId: string; thread: string;
-  data: Record<string, string>;
+  kind: AlertKind; preview: string; expiresAt: string; collapseId: string;
+  pagerId: string; agentId: string; decisionId: string;
 };
 export type Outcome = 'sent' | 'gone' | 'failed' | 'off';
 
@@ -44,13 +45,6 @@ export async function alert(env: Env, to: PushTarget, a: Alert): Promise<Outcome
   if (!env.APNS_KEY_P8 || !env.APNS_KEY_ID || !env.APNS_TEAM_ID || !env.APNS_TOPIC) return 'off';
   try {
     const jwt = await providerToken(env.APNS_KEY_P8, env.APNS_KEY_ID, env.APNS_TEAM_ID);
-    const payload = {
-      aps: {
-        alert: { title: a.title, body: a.body }, sound: 'default', 'thread-id': a.thread, 'content-available': 1,
-        'interruption-level': a.timeSensitive ? 'time-sensitive' : 'active',
-      },
-      ...a.data,
-    };
     const response = await fetch(`${env.APNS_ORIGIN ?? HOSTS[to.environment]}/3/device/${to.token}`, {
       method: 'POST',
       headers: {
@@ -58,7 +52,7 @@ export async function alert(env: Env, to: PushTarget, a: Alert): Promise<Outcome
         // Never delivered after the pager would have ended.
         'apns-expiration': String(Math.floor(Date.parse(a.expiresAt) / 1000)), 'apns-collapse-id': a.collapseId,
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(alertPayload(a.kind, a, a.preview)),
       signal: AbortSignal.timeout(5_000),
     });
     if (response.ok) return 'sent';
@@ -70,14 +64,4 @@ export async function alert(env: Env, to: PushTarget, a: Alert): Promise<Outcome
     console.error('APNs alert failed', error instanceof Error ? error.name : 'unknown');
     return 'failed';
   }
-}
-
-// The words come from the contract (packages/contract/alerts.ts), which the phone's alert extension mirrors.
-// The warning when no agent has collected an answer: who, where and what, so the owner knows which agent to go to.
-export { pickupBody } from '../../contract/alerts.ts';
-
-// The alert body: the question, then its detail and the recommended option, which show when the alert is expanded.
-export function questionBody(q: { title: string; detail?: string; card: BriefCard }) {
-  const recommended = q.card.options.find(o => o.number === q.card.recommended);
-  return decisionBody({ title: q.title, detail: q.detail, recommended: recommended && { letter: letter(recommended.number), title: recommended.title } });
 }

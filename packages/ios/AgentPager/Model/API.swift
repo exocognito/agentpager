@@ -1,6 +1,9 @@
 import Foundation
 
 // Wire types for the AgentPager server (v2: pagers and agents). The server owns every clock; the phone only shows its times.
+// Since the encryption switch (M5) the server holds every decision, attachment, who asked, answer and acknowledgement
+// as an encrypted part it can't read (packages/contract/exchange.ts): the Sealed… types below are what it sends, and
+// Sealed.swift opens them with the pager's key into the readable types the screens draw.
 
 // When a pager turns off by itself: never, or this long after it was turned on.
 nonisolated enum AutoOff: String, Codable, CaseIterable, Identifiable, Sendable {
@@ -27,7 +30,8 @@ nonisolated struct PagerState: Codable, Hashable, Sendable {
 }
 
 // Something that connected to a pager: who asked, the project its decisions are grouped under, and the computer it
-// runs on when it said.
+// runs on when it said, as the phone opened them. unreadable: its identity didn't open or decode, so none of its
+// decisions is shown either (I4.9).
 nonisolated struct AgentInfo: Codable, Hashable, Sendable {
     var agentId: String
     var app: String
@@ -37,6 +41,7 @@ nonisolated struct AgentInfo: Codable, Hashable, Sendable {
     var finishedAt: Date?
     var lastActivityAt: Date
     var openCount: Int
+    var unreadable: Bool = false
 }
 
 nonisolated struct AgentInbox: Codable, Hashable, Sendable {
@@ -112,6 +117,9 @@ nonisolated struct Acknowledgement: Codable, Hashable, Sendable {
 
 nonisolated enum DecisionStatus: String, Codable, Sendable { case open, answered, feedback, acknowledged }
 
+// A decision as the phone opened it. answerKey: the agent's key, from inside the card, the only key an answer is
+// sealed to. unreadable: a part of it didn't open or decode, or the phone doesn't hold the answer it sent, so it shows
+// as one the phone can't read, with nothing of it and nothing to answer (I4.9).
 nonisolated struct Decision: Codable, Hashable, Identifiable, Sendable {
     var decisionId: String
     var status: DecisionStatus
@@ -125,6 +133,8 @@ nonisolated struct Decision: Codable, Hashable, Identifiable, Sendable {
     var collectedAt: Date?
     var warnedAt: Date?
     var acknowledgement: Acknowledgement?
+    var answerKey: String = ""
+    var unreadable: Bool = false
     var id: String { decisionId }
 
     func option(_ number: Int) -> Option? { card.options.first { $0.number == number } }
@@ -135,6 +145,53 @@ nonisolated struct Decision: Codable, Hashable, Identifiable, Sendable {
         case .feedback(let text): text
         }
     }
+}
+
+// What the server sends: each part sealed, and what it knows of it (exchange.ts). The phone opens them (Sealed.swift).
+nonisolated struct SealedAgent: Codable, Hashable, Sendable {
+    var agentId: String
+    var identity: String
+    var createdAt: Date
+    var finishedAt: Date?
+    var lastActivityAt: Date
+    var openCount: Int
+}
+nonisolated struct SealedAnswer: Codable, Hashable, Sendable {
+    var answerId: String
+    var decisionId: String
+    // The request id the phone sent it with: which of its sends the server stored.
+    var requestId: String
+    var answer: String
+    var sentAt: Date
+}
+nonisolated struct SealedAcknowledgement: Codable, Hashable, Sendable {
+    var decisionId: String
+    var answerId: String
+    var acknowledgement: String
+    var acknowledgedAt: Date
+}
+// Each attachment's size, in its slot's order.
+nonisolated struct AttachmentSize: Codable, Hashable, Sendable { var bytes: Int }
+nonisolated enum SealedStatus: String, Codable, Sendable { case open, answered, acknowledged }
+nonisolated struct SealedDecision: Codable, Hashable, Sendable {
+    var decisionId: String
+    var status: SealedStatus
+    var card: String
+    var attachments: [AttachmentSize]
+    var askedAt: Date
+    var answer: SealedAnswer?
+    var collectedAt: Date?
+    var warnedAt: Date?
+    var acknowledgement: SealedAcknowledgement?
+}
+nonisolated struct SealedAgentInbox: Codable, Hashable, Sendable {
+    var agent: SealedAgent
+    var open: [SealedDecision]
+    var answered: [SealedDecision]
+}
+nonisolated struct SealedPagerInbox: Codable, Hashable, Sendable {
+    var pager: PagerState
+    var agents: [SealedAgentInbox]
 }
 
 nonisolated struct Receipt: Codable, Sendable { var decisionId: String; var answerId: String; var sentAt: Date }
@@ -164,7 +221,7 @@ nonisolated enum APIError: Error, Sendable {
 // and PROTOCOL in packages/contract/exchange.ts, which packages/contract/mirror.test.ts checks.
 nonisolated enum ClientVersion {
     static let header = "x-agentpager-client"
-    static let protocolNumber = 1
+    static let protocolNumber = 2
     static let value: String = {
         let info = Bundle.main.infoDictionary
         let version = info?["CFBundleShortVersionString"] as? String ?? "0"
@@ -223,7 +280,7 @@ nonisolated struct APIClient: Sendable {
     func createPager(_ p: LocalPager, autoOff: AutoOff) async throws(APIError) -> PagerReply {
         try await request("POST", "api/pagers", phoneKey: p.phoneKey, body: ["number": p.number, "publicKey": p.publicKey, "autoOff": autoOff.rawValue])
     }
-    func pager(_ p: LocalPager) async throws(APIError) -> PagerInbox {
+    func pager(_ p: LocalPager) async throws(APIError) -> SealedPagerInbox {
         try await request("GET", "api/pagers/\(p.pagerId)", phoneKey: p.phoneKey)
     }
     func setOn(_ p: LocalPager, _ on: Bool) async throws(APIError) -> PagerReply {
@@ -240,12 +297,13 @@ nonisolated struct APIClient: Sendable {
     func push(_ p: LocalPager, token: String, environment: String) async throws(APIError) {
         let _: Done = try await request("POST", "api/pagers/\(p.pagerId)/push", phoneKey: p.phoneKey, body: ["token": token, "environment": environment])
     }
-    func answer(_ p: LocalPager, agentId: String, decisionId: String, requestId: String, choice: Choice) async throws(APIError) -> Receipt {
-        struct Body: Encodable, Sendable { var requestId: String; var choice: Choice }
-        return try await request("POST", "api/agents/\(agentId)/cards/\(decisionId)/answer", phoneKey: p.phoneKey, body: Body(requestId: requestId, choice: choice))
+    // The answer, sealed to the key inside its card; resent with the same request id and the same part.
+    func answer(_ p: LocalPager, agentId: String, decisionId: String, requestId: String, sealed: String) async throws(APIError) -> Receipt {
+        struct Body: Encodable, Sendable { var requestId: String; var answer: String }
+        return try await request("POST", "api/agents/\(agentId)/cards/\(decisionId)/answer", phoneKey: p.phoneKey, body: Body(requestId: requestId, answer: sealed))
     }
-    // One attachment of a brief, as the agent sent it.
-    func file(_ p: LocalPager, agentId: String, decisionId: String, name: String) async throws(APIError) -> Data {
-        try await raw("GET", "api/agents/\(agentId)/cards/\(decisionId)/files/\(name)", phoneKey: p.phoneKey, timeout: 30)
+    // One attachment of a brief, by its slot in the card's list: its encrypted part, as text.
+    func file(_ p: LocalPager, agentId: String, decisionId: String, slot: Int) async throws(APIError) -> Data {
+        try await raw("GET", "api/agents/\(agentId)/cards/\(decisionId)/files/\(slot)", phoneKey: p.phoneKey, timeout: 30)
     }
 }

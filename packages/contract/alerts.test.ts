@@ -67,7 +67,7 @@ describe("alert words", () => {
 describe("the payload", () => {
   const pager = keyPair();
   const preview = (bytes: number) => seal(pager.publicKey, "decisionPreview", { pagerId: ids.pagerId, decisionId: ids.decisionId }, new Uint8Array(bytes).fill(0x61));
-  it("says only what kind of alert it is, as text", () => {
+  it("B17.11 says only what kind of alert it is, as text", () => {
     for (const kind of ["decision", "acknowledgement", "warning"] as const) {
       const p = alertPayload(kind, ids, preview(10));
       expect(p.aps.alert).toEqual({ title: PLAIN_TITLE, body: PLAIN_BODIES[kind] });

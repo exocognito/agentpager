@@ -120,7 +120,7 @@ Why: [Only agents I give a number reach my phone](../PRODUCT.md#only-agents-i-gi
 
 - **Adds:** B30 and I20, whole; I19.6 and I19.7; B17.11; B25.14; B27.9; I4.9; each as Sam approved it (question 6). L25, a leaked number can connect any number of agents (1 Pagers), as Sam chose (question 9). The alert extension on the phone. The upgrade baseline from `m4` and the upgrade check on dev.
 - **Changes:** I4.1, I4.7 and I22's notes, since the service can't read a card; I19's Why and notes, since the command's check is built; TERMS › Keys; METHOD.md › Writing lines, which takes Sam's line test and look rule, and › Stages and releases, which allows an exception the owner approves; L10, whose fix and revisit move to TIDY.
-- **Retires:** L19 and L17, named above, once built. M4's ledger leaves the tree, at tag `m4-house-ledger`.
+- **Retires:** L19, the service can read every decision (6 Privacy), which B30 and I20 fix, and L17, alerts pass through Apple as plain text (4 Getting paged), which B17.11 fixes. Their ids are never reused. M4's ledger leaves the tree, at tag `m4-house-ledger`.
 
 ## Log
 

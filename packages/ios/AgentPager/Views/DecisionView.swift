@@ -26,7 +26,11 @@ struct DecisionView: View {
 
     var body: some View {
         Group {
-            if let a = model.asked(pagerId, agentId, decisionId) {
+            if let a = model.asked(pagerId, agentId, decisionId), a.decision.unreadable {
+                // Nothing of it is shown, and nothing can answer it (I4.9).
+                ContentUnavailableView(Wording.unreadableDecision, systemImage: "lock.trianglebadge.exclamationmark", description: Text(Wording.unreadableDetail))
+                    .accessibilityIdentifier("unreadable-decision")
+            } else if let a = model.asked(pagerId, agentId, decisionId) {
                 let d = a.decision, open = model.choice(d) == nil
                 BriefView(agentId: agentId, decision: d, picked: open ? $selection : nil, subtitle: subtitle(d),
                           openPage: { sheet = .page($0) }, openOptions: { sheet = .options }, bottom: AnyView(bar(a, open: open)))
@@ -291,7 +295,8 @@ struct AskChangesView: View {
 
     private var trimmed: String { text.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var hasHTML: Bool { text.range(of: "<[A-Za-z/!?]", options: .regularExpression) != nil }
-    private var valid: Bool { !trimmed.isEmpty && text.count <= 1000 && !hasHTML }
+    // A note's bytes are held too, so its sealed answer fits what the service takes (PART_MAX_BYTES in exchange.ts).
+    private var valid: Bool { !trimmed.isEmpty && text.count <= 1000 && text.utf8.count <= 60_000 && !hasHTML }
 
     var body: some View {
         List {

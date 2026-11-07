@@ -24,6 +24,7 @@ const SOURCES = [
   'packages/ios/AgentPagerUITests', // the screens and journeys, and what their agents ask
   'packages/app/fixtures/briefs', // the briefs journey's four briefs
   'packages/app/scripts/briefs.ts', // its agent, and the words it acknowledges with
+  'packages/cli/src/seal.ts', // how that agent seals what it asks and opens what it is answered
   'packages/contract', // the wire contract, and the brief's wire format
   'packages/app/src/contract.ts', // the server's side of it: its clocks and refusals
   'packages/app/src/browser.tsx', // the front page

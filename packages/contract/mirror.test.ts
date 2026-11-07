@@ -39,14 +39,12 @@ it("reads a client's header as its name, protocol and build, and nothing else", 
   }
 });
 
-it("asks with a request id the agent chose; the question itself is unchanged", () => {
+it("asks with a request id the agent chose, and never with the question readable", () => {
   const card = { type: "brief", recommended: 1, options: [{ number: 1, title: "First", prioritizes: "speed" }, { number: 2, title: "Second", prioritizes: "safety" }], markdown: "## Options\n\n## Recommendation: A\n**Why:** It is quick.\n" };
   const question = { title: "Which?", card };
   expect(Schema.is(QuestionInput)(question)).toBe(true);
   expect(Schema.is(AskInput)(question)).toBe(false);
-  expect(Schema.is(AskInput)({ requestId: "r".repeat(32), ...question })).toBe(true);
-  expect(Schema.is(AskInput)({ requestId: "short", ...question })).toBe(false);
-  expect(Schema.is(AskInput)({ decisionId: "d".repeat(32), ...question })).toBe(false);
+  expect(Schema.is(AskInput)({ requestId: "r".repeat(32), ...question })).toBe(false);
   expect(() => Schema.decodeUnknownSync(QuestionInput, { onExcessProperty: "error" })({ requestId: "r".repeat(32), ...question })).toThrow();
 });
 

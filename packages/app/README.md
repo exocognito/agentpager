@@ -20,31 +20,45 @@ on or off (`POST /api/pagers/<id>/settings {on?, autoOff?}`); auto-off (`never`,
 off state. `GET /api/pagers/<id>` returns the pager and every agent on it with its open and answered decisions.
 `POST /api/pagers/<id>/delete` deletes it and its agents.
 
-An **agent** is whatever connected with the number: `POST /api/agents {number, app, project}` (`agentpager connect`) makes a
-new one every time, with its own key. It has no lifetime; housekeeping forgets it 30 days after its last activity.
+Anyone may read a pager's public key, `GET /api/pagers/<id>/key`: the command checks it against the number's fingerprint
+before it seals anything to it, and pins it. An **agent** is whatever connected with the number:
+`POST /api/agents {number, identity}` (`agentpager connect`) makes a new one every time, with its own key; `identity` is
+who asked, the project and the computer, sealed to the pager's key. It has no lifetime; housekeeping forgets it 30 days
+after its last activity.
 While its pager is off, every call but status is refused `PagerOff` and nothing is queued; the phone's answers too.
 An agent asks with a request id its command chose (`requestId`, a token), and the decision is stored under the id
 `decisionIdOf(agentId, requestId)` makes (`packages/contract/exchange.ts`), so no two agents' decisions share an id. The
-same ask again with that request id, as after a lost reply, returns the same decision without storing or alerting
-again; another question with it is refused `RequestIdTaken`.
+same ask again with that request id and the same `digest` (a keyed digest of the card only its agent can make), as after
+a lost reply, returns the same decision without storing or alerting again; another card with it is refused
+`RequestIdTaken`.
+
+**End to end.** The service holds every card, attachment, identity, answer and acknowledgement as an encrypted part
+(`packages/contract/envelope.ts`) it can't read, and checks only each part's shape and size (`Sealed` in
+`exchange.ts`). An ask sends `{requestId, digest, card, attachments?, preview}`, each part sealed to the pager's key and
+bound to the decision; the card names the key the phone seals its answer to, which the service never sees otherwise.
+The phone answers with `{requestId, answer}`; an acknowledgement is `{answerId, acknowledgement, preview}`. Alerts carry
+only a plain fallback and the preview (`packages/contract/alerts.ts`). Agents stored before the switch are forgotten at
+its first start, with all they stored; every pager stays (`registry.ts`, `agent.ts`).
 
 Every request names its client in `X-AgentPager-Client`, as `<client>/<protocol> <build>` (`CLIENT_HEADER` and
 `PROTOCOL` in `packages/contract/exchange.ts`). An agent's call without it, or from a protocol older than the service
 accepts (`OLDEST_PROTOCOL` in `src/contract.ts`), is refused `UpdateRequired`, before its key or input is read, with how
-to update. The phone's calls don't need it yet; an app that sends an older protocol is refused the same way, never
-`UnknownPager`.
+to update. Since the encryption switch (protocol 2) the phone's calls need it too: an older app is refused the same way,
+never `UnknownPager`.
 
 ## Decision briefs (dogfood)
 
 `card.type: "brief"` carries Markdown sections (the canvas Kit) and 2 to 4 lettered options; `attachments` carry
 Markdown pages and PNG or JPEG images. The contract's brief schema (`packages/contract/brief.ts`) refuses a
 brief whole with the reason: HTML outside code, a recommendation or option block or Tradeoffs column for a letter
-that is no option, a link to a missing attachment, or a size over its limit. The decision keeps each attachment's
-name, type and size; the bytes live in their own table, immutable, and go when the pager ends. The phone reads one
-with `GET /api/agents/<id>/cards/<decisionId>/files/<name>` and its phone key.
+that is no option, a link to a missing attachment, or a size over its limit. The command holds every card to it before
+it seals it, and the phone again when it opens one; the service can't read it. The card part names each attachment;
+the service keeps each attachment's part and its size by slot, immutable, and they go when the pager ends. The phone
+reads one with `GET /api/agents/<id>/cards/<decisionId>/files/<slot>` and its phone key, and opens it bound to that slot.
 
 `fixtures/briefs/` holds the canvas's four examples (D1–D4) word for word. `scripts/briefs.ts <server> <pager number>`
-plays the agent over the HTTP API: it connects with the number, asks all four, then acknowledges each answer.
+plays the agent over the HTTP API, sealing as the command does: it connects with the number, asks all four, then
+acknowledges each answer.
 
 ## Local configuration
 
@@ -74,7 +88,7 @@ Commit and clean the checkout, then `pnpm deploy:dev`, and `pnpm smoke:dev` afte
 
 ### Upgrade baseline
 
-Each release records an upgrade baseline on dev before the next milestone's code reaches dev (METHOD.md › The milestone loop). `pnpm baseline:dev --binary <the release's agentpager> --tag m<n>` makes a pager there as the phone does, with no alert target, so it pages no one. That binary connects to it under its own `AGENTPAGER_HOME` and asks two cards: one with a PNG and a page, which the phone answers and the binary collects and acknowledges, and one left open. The script reads it all back over the phone's API. Without `--binary`, it builds one from a checkout at the tag. The record goes to `~/.agentpager-baselines/dev/<tag>/`, outside every worktree: the pager's keys, number and phone key, the agent and decision ids, the binary's home, and a copy of the binary, so the next milestone's upgrade check can run the old command without rebuilding it. Its format is at the top of `scripts/baseline.mjs`. The script prints no key or number, never overwrites a record, and never touches `~/.agentpager`; `--verify` reads a record back and changes nothing. The service forgets an agent idle for 30 days, so the upgrade check has to run within 30 days of the baseline.
+Each release records an upgrade baseline on dev before the next milestone's code reaches dev (METHOD.md › The milestone loop). `pnpm baseline:dev --binary <the release's agentpager> --tag m<n>` makes a pager there as the phone does, with no alert target, so it pages no one. That binary connects to it under its own `AGENTPAGER_HOME` and asks two cards: one with a PNG and a page, which the phone answers and the binary collects and acknowledges, and one left open. The script reads it all back over the phone's API. Without `--binary`, it builds one from a checkout at the tag. The record goes to `~/.agentpager-baselines/dev/<tag>/`, outside every worktree: the pager's keys, number and phone key, the agent and decision ids, the binary's home, and a copy of the binary, so the next milestone's upgrade check can run the old command without rebuilding it. Its format is at the top of `scripts/baseline.mjs`. The script prints no key or number, never overwrites a record, and never touches `~/.agentpager`; `--verify` reads a record back and changes nothing. The service forgets an agent idle for 30 days, so the upgrade check has to run within 30 days of the baseline. The smoke run's upgrade check reads the last release's record (`--baseline-tag`, `m4` for M5): `node --experimental-strip-types scripts/smoke.mjs --stage local --server <url>` runs it, with the rest of the smoke run that a local server can, against a local baseline under `AGENTPAGER_BASELINES`. A record from before the encryption switch is format 1; `--verify` reads format 2.
 
 ### Alerts
 
@@ -83,10 +97,10 @@ Alerts go through Apple's push service with the owner's APNs key (B17, in `bluep
 ## Enforcement
 
 - Strict imported schemas decode UTF-8 requests before writes; a wrong key wins over invalid input (I4). Inputs are not trimmed or truncated.
-- Agent and phone keys are stored only as SHA-256 digests and compared in constant time. SQL keys and update-denying triggers keep proposals, answers, acknowledgements and attachments immutable.
+- Agent and phone keys are stored only as SHA-256 digests and compared in constant time. SQL keys and update-denying triggers keep decisions, answers, acknowledgements and attachments immutable. Every one of them is an encrypted part the service can't read (I20).
 - Every agent call that sends something asks the Registry for its pager's state first; a deleted pager's agent forgets itself on its next call.
 - The app lint disallows `any`, type assertions and suppressions in derived TypeScript; the entire pinned design remains under the existing strict typecheck.
 
 ## Limits
 
-Off is not atomic with a write (accepted 30 Oct for dogfooding, to fix later): an agent call checks its pager in the Registry and then writes in its own object, so a request already past that check when the owner turns the pager off still lands, a window of one Registry round trip; everything sent after the switch is refused. Closing it needs one writer per pager. The local auto-off and housekeeping proofs run on seconds, not the production days. Nothing is encrypted end to end yet (Stage 3): the server reads cards, attachments and answers. Platform backups, agent action execution and cross-device recovery are not claimed.
+Off is not atomic with a write (accepted 30 Oct for dogfooding, to fix later): an agent call checks its pager in the Registry and then writes in its own object, so a request already past that check when the owner turns the pager off still lands, a window of one Registry round trip; everything sent after the switch is refused. Closing it needs one writer per pager. The local auto-off and housekeeping proofs run on seconds, not the production days. Encryption hides what is said, not who pages whom, when, how much or how often. Platform backups, agent action execution and cross-device recovery are not claimed.

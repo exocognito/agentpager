@@ -47,4 +47,10 @@ enum Wording {
     }
 
     static func capitalized(_ text: String) -> String { text.prefix(1).uppercased() + text.dropFirst() }
+
+    // A decision, or an agent, whose encrypted parts this phone can't read (I4.9): none of it is shown.
+    nonisolated static let unreadableDecision = "A decision this phone can’t read"
+    nonisolated static let unreadableAgent = "An agent this phone can’t read"
+    nonisolated static let unreadableProject = "Can’t read"
+    static let unreadableDetail = "It didn’t open with this pager’s key, or what it holds isn’t a decision AgentPager can show, so nothing of it is shown and it can’t be answered here."
 }

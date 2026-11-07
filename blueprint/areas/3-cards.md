@@ -31,14 +31,15 @@
 
 Why: [UTF-8 with Markdown is allowed; invalid or over-limit text is refused, never truncated](../PRODUCT.md#utf-8-with-markdown-is-allowed-invalid-or-over-limit-text-is-refused-never-truncated)
 
-1. The service checks every request, from an agent or the phone, and refuses whole what doesn't fit: an unknown field, text that isn't valid UTF-8, HTML, blank text, text over its limit, or an answer that doesn't fit its decision. A refused request stores nothing.
+1. The service checks what it can still read of every request, from an agent or the phone: ids, sizes, counts and its own fields. It refuses whole what doesn't fit, and a refused request stores nothing.
 2. A refusal says what to fix: what is wrong, and the field when there is one.
 3. Limits count visible characters, spaces and Markdown punctuation included, so a combined emoji counts as one.
 4. Every text an agent or the phone sends has a limit. A question's title holds at most 100 visible characters, its detail and an acknowledgement at most 280, and a note at most 1,000. Each option's label, title and what it prioritizes, the brief and each page have their own. A decision's attachments are PNG or JPEG images and Markdown pages, with limits on how many and how big.
 5. Text may use `<` and `>` as plain characters: what is refused is HTML. In a brief or its pages, HTML inside code is allowed, and it shows as text and is never rendered.
 6. A request with a wrong key is refused as unauthorized, even when its input is also invalid.
-7. The service stores exactly the text it accepts, and opening a decision on the phone shows it whole.
+7. The service stores exactly what it accepts.
 8. @M3: Compiling `card.yaml`, the command trims the spaces around each value and joins a prose paragraph's wrapped lines so the phone can reflow them. It changes nothing else, and holds the result to these same checks before it leaves the machine (I22).
+9. @M5: Text the service can't read is checked by the command before it leaves the agent's machine (I22), and by the phone when it reads it. A decision that fails the phone's check shows as one it can't read, never in part.
 
 - A list row or an alert may shorten a long question to fit. Opening the decision shows all of it.
 - The size of every other limit is in the schemas, `packages/contract/`, which the service and the command share.
@@ -56,7 +57,7 @@ Why: [A decision is reviewed before it's sent](../PRODUCT.md#a-decision-is-revie
 7. A card is never refused or held for how it is written, and never cut or changed to fit a limit.
 
 - The service refuses whole whatever breaks its own checks (I4), but it doesn't check that one-line fields are on one line.
-- An agent that calls the service directly skips the command's checks. The service then refuses only what breaks its own (I4).
+- An agent that calls the service directly skips the command's checks, and then only the phone's check stands between it and the owner (I4.9).
 
 ## Limits
 

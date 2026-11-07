@@ -2,7 +2,7 @@
 
 > **Definition:** What the service is and what it can see: where it runs, the keys and the number's fingerprint that tie a pager to its phone, and how keys and the service's own secrets are kept. Making a pager is 1 Pagers (B26), connecting with a number is 2 Agents (B25), and what an alert carries is 4 Getting paged (B17).
 > **Serves:** [Stack](../PRODUCT.md#stack) · [Only agents I give a number reach my phone](../PRODUCT.md#only-agents-i-give-a-number-reach-my-phone)
-> **Relies on:** Cloudflare, where the whole service runs: one Worker per stage, prod's at agentpager.me and dev's at dev.agentpager.me, each with its own data (AGENTS.md › Stages), behind Cloudflare's HTTPS, with its storage in Durable Objects, one for the pagers and one per agent · the iPhone's Keychain, which keeps each pager's private key and phone key on that phone · the cryptography built into iOS, into Node and Bun on the agent's machine, and into the Worker, which makes the key pairs, the fingerprint, the digests and the encrypted parts
+> **Relies on:** Cloudflare, where the whole service runs: one Worker per stage, prod's at agentpager.me and dev's at dev.agentpager.me, each with its own data (AGENTS.md › Stages), behind Cloudflare's HTTPS, with its storage in Durable Objects, one for the pagers and one per agent · the iPhone's Keychain, which keeps each pager's private key and phone key on that phone, with the key each agent first names · the cryptography built into iOS, into Node and Bun on the agent's machine, and into the Worker, which makes the key pairs, the fingerprint, the digests and the encrypted parts
 > **Code:** `packages/contract/envelope.ts` and `parts.ts` (the encrypted parts), `exchange.ts` (what the service checks of them); `packages/cli/src/seal.ts`, `commands.ts` (the key check), `store.ts`; `packages/app/src/worker.ts` (the number and its fingerprint), `https.ts` (HTTPS only), `registry.ts`, `agent.ts`, `shared.ts` (digests); `packages/app/scripts/build.mjs`, `deploy.mjs`; `packages/ios/AgentPagerCrypto`; `packages/ios/AgentPager/Model/Keychain.swift`, `Sealed.swift`
 > **Screens:** none
 > **Walked by:** no journey.
@@ -13,6 +13,7 @@
 
 1. Each decision, its attachments, who asked with the project and the computer, the owner's answer and the agent's acknowledgement are encrypted on the agent's machine or the phone, and only the other end can read them.
 2. The service can't move an encrypted part to another pager or decision, or pass it off as another kind: the end that reads it refuses it.
+3. @M5: The phone keeps the key each agent first names. When that agent's who-asked later names another key, the phone shows the agent and its decisions as ones it can't read, with nothing to answer.
 
 ## Invariants
 

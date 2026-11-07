@@ -49,23 +49,59 @@ nonisolated enum SendCache {
 }
 
 // Every answer this phone sent, by request id (Sealed.swift SentAnswer), so it shows its own answers: only the agent
-// can open the answer itself. Removed with the pager.
-nonisolated enum AnswerCache {
-    private static var url: URL {
-        let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir.appending(path: "answers.json")
+// can open the answer itself. Kept in the Keychain with its pager (Keychain.swift › Kept), so it outlives the app
+// being deleted and installed again, and goes with the pager (B7.4, blueprint/areas/5-answering.md). Each pager's are
+// read from the Keychain the first time they are asked for and kept in memory from then on; a read the Keychain
+// refuses is tried again the next time.
+nonisolated final class KeptAnswers: @unchecked Sendable {
+    private let lock = NSLock()
+    // Each pager's answers known this run, by request id, and the pagers whose Keychain records are among them.
+    private var known: [String: [String: SentAnswer]] = [:]
+    private var read: Set<String> = []
+
+    func of(_ pagerId: String) -> [String: SentAnswer] {
+        lock.withLock {
+            if !read.contains(pagerId), let records = Keychain.records(.answers, pagerId: pagerId) {
+                for (requestId, data) in records {
+                    // The service names the pager, so a record names its own; one that doesn't is no answer of this pager's.
+                    guard let a = try? JSONDecoder().decode(SentAnswer.self, from: data), a.pagerId == pagerId else { continue }
+                    if known[pagerId]?[requestId] == nil { known[pagerId, default: [:]][requestId] = a }
+                }
+                read.insert(pagerId)
+            }
+            return known[pagerId] ?? [:]
+        }
     }
 
-    static func load() -> [String: SentAnswer] {
-        guard let data = try? Data(contentsOf: url) else { return [:] }
-        return (try? JSONDecoder().decode([String: SentAnswer].self, from: data)) ?? [:]
+    // Kept before the answer is first sent (AppModel.commit), and never replaced: the first record of a request id is
+    // the one the phone sealed. Still shown this run if the Keychain refuses it.
+    func keep(_ a: SentAnswer, requestId: String) {
+        lock.withLock {
+            guard known[a.pagerId]?[requestId] == nil else { return }
+            known[a.pagerId, default: [:]][requestId] = a
+            if let data = try? JSONEncoder().encode(a) { _ = Keychain.add(.answers, pagerId: a.pagerId, account: requestId, data: data) }
+        }
     }
 
-    static func save(_ answers: [String: SentAnswer]) {
-        guard let data = try? JSONEncoder().encode(answers) else { return }
-        try? data.write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+    // The pager is gone: Keychain.delete took its records.
+    func forget(_ pagerId: String) {
+        lock.withLock { known[pagerId] = nil; read.remove(pagerId) }
     }
 
-    static func deleteAll() { try? FileManager.default.removeItem(at: url) }
+    // Before the Keychain kept them, this build's predecessors kept these records in answers.json in Application
+    // Support, which goes when the app is deleted. Its answers move into the Keychain once, at launch, so none is lost;
+    // they show this run from memory, and the file goes only once every one of them reads back from the Keychain as it
+    // was. A file that doesn't decode stays as it is, and nothing of it shows.
+    static var file: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appending(path: "answers.json")
+    }
+
+    func move(from file: URL) {
+        guard let data = try? Data(contentsOf: file), let old = try? JSONDecoder().decode([String: SentAnswer].self, from: data) else { return }
+        for (requestId, a) in old { keep(a, requestId: requestId) }
+        let moved = old.allSatisfy { requestId, a in
+            Keychain.record(.answers, pagerId: a.pagerId, account: requestId).flatMap { try? JSONDecoder().decode(SentAnswer.self, from: $0) } == a
+        }
+        if moved { try? FileManager.default.removeItem(at: file) }
+    }
 }

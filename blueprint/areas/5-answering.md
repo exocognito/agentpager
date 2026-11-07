@@ -2,8 +2,8 @@
 
 > **Definition:** Reading and answering a decision on the phone: the brief and its sheets, picking an option or asking for changes, Send and Undo, what the phone says while the answer waits for the agent, and the closed record that never changes. How the agent waits for the answer and acknowledges it is in 2 Agents (B32), and the alerts are in 4 Getting paged (B17).
 > **Serves:** [Unblock my agent from my phone](../PRODUCT.md#unblock-my-agent-from-my-phone) · [Sending a decision requires confirmation](../PRODUCT.md#sending-a-decision-requires-confirmation) · [Sent decisions cannot be changed](../PRODUCT.md#sent-decisions-cannot-be-changed) · [An acknowledgement always comes from the agent](../PRODUCT.md#an-acknowledgement-always-comes-from-the-agent) · [Cards are independent](../PRODUCT.md#cards-are-independent) · [Make the usual answer easy and clear](../PRODUCT.md#make-the-usual-answer-easy-and-clear) · [Lead with the decision; keep the rest one tap away](../PRODUCT.md#lead-with-the-decision-keep-the-rest-one-tap-away) · [Pinned design decisions](../PRODUCT.md#pinned-design-decisions)
-> **Relies on:** the owner's iPhone and iOS, which draw the screens, the sheets and the keyboard · the AgentPager service on Cloudflare, which stores each answer and acknowledgement (6 Privacy)
-> **Code:** `packages/ios/AgentPager/Views/DecisionView.swift`, `BriefView.swift`, `PagerView.swift`; `packages/ios/AgentPager/Model/AppModel.swift`, `InboxCache.swift`; `packages/app/src/agent.ts`; `packages/contract/`
+> **Relies on:** the owner's iPhone and iOS, which draw the screens, the sheets and the keyboard · the iPhone's Keychain, which keeps the phone's record of each answer it sent with its pager · the AgentPager service on Cloudflare, which stores each answer and acknowledgement (6 Privacy)
+> **Code:** `packages/ios/AgentPager/Views/DecisionView.swift`, `BriefView.swift`, `PagerView.swift`; `packages/ios/AgentPager/Model/AppModel.swift`, `InboxCache.swift`, `Keychain.swift`; `packages/app/src/agent.ts`; `packages/contract/`
 > **Screens:** [decision](../generated/screens/phone/decision.png) · [selected](../generated/screens/phone/selected.png) · [options](../generated/screens/phone/options.png) · [page](../generated/screens/phone/page.png) · [changes](../generated/screens/phone/changes.png) · [off](../generated/screens/phone/off.png) · [undo](../generated/screens/phone/undo.png) · [notconfirmed](../generated/screens/phone/notconfirmed.png) · [notpickedup](../generated/screens/phone/notpickedup.png) · [answered](../generated/screens/phone/answered.png) · journeys [briefs](../generated/screens/journeys/briefs/README.md) and [undo-and-changes](../generated/screens/journeys/undo-and-changes/README.md)
 > **Walked by:** J4, J5
 
@@ -46,6 +46,7 @@
 
 2. @M2: Each answered decision in its project's list (B23.5) shows the chosen option's letter or a note's mark, the question, who asked and the answer. It shows a green tick once the agent has acknowledged. Until then it says where the answer is (B5).
 3. @M2: Reopening an answered decision shows the brief as it was asked, with when it was asked and answered, and the chosen option's whole column outlined in the tradeoffs table.
+4. @M5: An answered decision still shows the owner's answer after the app is deleted and installed again, as long as its pager is still on the phone.
 
 - The proof reads answered decisions only on the phone that made the pager. Nothing proves it on another device.
 

@@ -61,8 +61,10 @@ final class AppModel {
     var inboxes: [String: PagerInbox] = [:]
     private var sealedInboxes: [String: SealedPagerInbox] = [:] { didSet { if live { InboxCache.save(sealedInboxes) } } }
     // Every answer this phone sent, by its request id, with the part it sealed: only the agent can open the answer
-    // itself, so this is how the phone shows its own answers. Kept until the pager goes.
-    private var sentAnswers: [String: SentAnswer] = [:] { didSet { if live { AnswerCache.save(sentAnswers) } } }
+    // itself, so this is how the phone shows its own answers. Kept in the Keychain until the pager goes (B7.4).
+    private let answers = KeptAnswers()
+    // The key each agent first named, kept in the Keychain until the pager goes (B30.3).
+    private let pins = Pins()
     var now = Date()
     var lastSuccess: Date?
     var lastFailure: String?
@@ -113,12 +115,12 @@ final class AppModel {
         self.server = Self.configuredServer()
         if live {
             // Here, not in the App's init: its @State model is built before that init's body runs.
-            if ProcessInfo.processInfo.arguments.contains("-resetKeys") { Keychain.deleteAll(); InboxCache.deleteAll(); SendCache.deleteAll(); AnswerCache.deleteAll() }
+            if ProcessInfo.processInfo.arguments.contains("-resetKeys") { Keychain.deleteAll(); InboxCache.deleteAll(); SendCache.deleteAll(); try? FileManager.default.removeItem(at: KeptAnswers.file) }
             Keychain.deleteRetired()
             pagers = Keychain.all()
-            sentAnswers = AnswerCache.load()
+            answers.move(from: KeptAnswers.file)
             sealedInboxes = InboxCache.load()
-            for (id, sealed) in sealedInboxes { if let p = pagers.first(where: { $0.pagerId == id }), let inbox = Sealed.inbox(sealed, pager: p, answers: sentAnswers) { inboxes[id] = inbox } }
+            for (id, sealed) in sealedInboxes { if let p = pagers.first(where: { $0.pagerId == id }), let inbox = Sealed.inbox(sealed, pager: p, answers: answers.of(id), pins: pins) { inboxes[id] = inbox } }
             inFlight = SendCache.load()
         }
     }
@@ -217,7 +219,7 @@ final class AppModel {
         switch result {
         case .success(let sealed):
             // A reply that names another pager isn't this pager's read: shown as a failure, and nothing of it kept.
-            guard let inbox = Sealed.inbox(sealed, pager: p, answers: sentAnswers) else { return "the server answered for another pager" }
+            guard let inbox = Sealed.inbox(sealed, pager: p, answers: answers.of(p.pagerId), pins: pins) else { return "the server answered for another pager" }
             // Assign only on change: every assignment re-renders, which would disturb an open menu.
             if sealedInboxes[p.pagerId] != sealed { sealedInboxes[p.pagerId] = sealed }
             if inboxes[p.pagerId] != inbox { inboxes[p.pagerId] = inbox }
@@ -237,14 +239,16 @@ final class AppModel {
         }
     }
 
+    // The pager goes from this phone with everything kept with it: Keychain.delete takes its pins and answers too.
     func drop(_ pagerId: String) {
         Keychain.delete(pagerId)
+        answers.forget(pagerId)
+        pins.forget(pagerId)
         pagers.removeAll { $0.pagerId == pagerId }
         inFlight = inFlight.filter { $0.value.pagerId != pagerId }
         notConfirmed.removeAll { $0.pagerId == pagerId }
         inboxes[pagerId] = nil
         sealedInboxes[pagerId] = nil
-        sentAnswers = sentAnswers.filter { $0.value.pagerId != pagerId }
         files = files.filter { !$0.key.hasPrefix(pagerId + "/") }
         path.removeAll { route in
             switch route {
@@ -483,7 +487,7 @@ final class AppModel {
         inFlight[p.decisionId] = p
         drafts[p.decisionId] = nil
         // Kept before it is sent, so whichever send the server stores, the phone can show it.
-        if live, sentAnswers[p.requestId] == nil { sentAnswers[p.requestId] = SentAnswer(pagerId: p.pagerId, decisionId: p.decisionId, choice: p.choice, sealed: p.sealed) }
+        if live { answers.keep(SentAnswer(pagerId: p.pagerId, decisionId: p.decisionId, choice: p.choice, sealed: p.sealed), requestId: p.requestId) }
         // An answer goes only to the server its pager was made on; it waits while the phone points elsewhere.
         guard live, let pager = pager(p.pagerId), !sendingNow.contains(p.requestId) else { return }
         sendingNow.insert(p.requestId)

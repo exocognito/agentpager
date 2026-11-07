@@ -118,7 +118,7 @@ final class AppModel {
             pagers = Keychain.all()
             sentAnswers = AnswerCache.load()
             sealedInboxes = InboxCache.load()
-            for (id, sealed) in sealedInboxes { if let p = pagers.first(where: { $0.pagerId == id }) { inboxes[id] = Sealed.inbox(sealed, pager: p, answers: sentAnswers) } }
+            for (id, sealed) in sealedInboxes { if let p = pagers.first(where: { $0.pagerId == id }), let inbox = Sealed.inbox(sealed, pager: p, answers: sentAnswers) { inboxes[id] = inbox } }
             inFlight = SendCache.load()
         }
     }
@@ -216,9 +216,10 @@ final class AppModel {
     private func apply(_ p: LocalPager, _ result: Result<SealedPagerInbox, APIError>) -> String? {
         switch result {
         case .success(let sealed):
+            // A reply that names another pager isn't this pager's read: shown as a failure, and nothing of it kept.
+            guard let inbox = Sealed.inbox(sealed, pager: p, answers: sentAnswers) else { return "the server answered for another pager" }
             // Assign only on change: every assignment re-renders, which would disturb an open menu.
             if sealedInboxes[p.pagerId] != sealed { sealedInboxes[p.pagerId] = sealed }
-            let inbox = Sealed.inbox(sealed, pager: p, answers: sentAnswers)
             if inboxes[p.pagerId] != inbox { inboxes[p.pagerId] = inbox }
             let answered = Set(inbox.agents.flatMap { $0.answered.map(\.decisionId) })
             for (decisionId, a) in inFlight where a.pagerId == p.pagerId && answered.contains(decisionId) { inFlight[decisionId] = nil }

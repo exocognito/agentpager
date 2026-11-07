@@ -24,14 +24,17 @@ nonisolated struct SentAnswer: Codable, Hashable, Sendable {
 }
 
 nonisolated enum Sealed {
-    // Opened parts, by kind, binding and part: each part never changes, so it is opened once.
+    // Opened parts, by the key that opened them, kind, binding and part: each part never changes, so it is opened once.
     private static let cache = OpenedParts()
 
-    static func inbox(_ sealed: SealedPagerInbox, pager: LocalPager, answers: [String: SentAnswer]) -> PagerInbox {
+    // A pager's read, opened with this phone's key for that pager and bound to its id as the phone holds it, never the
+    // id the server's reply names. A reply that names another pager isn't this pager's read: nil.
+    static func inbox(_ sealed: SealedPagerInbox, pager: LocalPager, answers: [String: SentAnswer]) -> PagerInbox? {
+        guard sealed.pager.pagerId == pager.pagerId else { return nil }
         guard let key = try? Curve25519.KeyAgreement.PrivateKey(rawRepresentation: pager.privateKey) else {
             return PagerInbox(pager: sealed.pager, agents: sealed.agents.map { unreadableAgent($0) })
         }
-        let pagerId = sealed.pager.pagerId
+        let pagerId = pager.pagerId
         return PagerInbox(pager: sealed.pager, agents: sealed.agents.map { a in
             guard let identity: IdentityPart = open(a.agent.identity, key, .identity, PartContext(pagerId: pagerId)) else { return unreadableAgent(a) }
             let agent = AgentInfo(agentId: a.agent.agentId, app: identity.app, project: identity.project, machine: identity.machine,
@@ -83,7 +86,8 @@ nonisolated enum Sealed {
     }
 
     private static func open<P: Part>(_ part: String, _ key: Curve25519.KeyAgreement.PrivateKey, _ kind: PartKind, _ at: PartContext) -> P? {
-        let id = "\(kind.rawValue) \(at.pagerId) \(at.decisionId ?? "") " + SHA256.hash(data: Data(part.utf8)).map { String(format: "%02x", $0) }.joined()
+        let hex = { (data: Data) in data.map { String(format: "%02x", $0) }.joined() }
+        let id = "\(hex(key.publicKey.rawRepresentation)) \(kind.rawValue) \(at.pagerId) \(at.decisionId ?? "") " + hex(Data(SHA256.hash(data: Data(part.utf8))))
         if let hit = cache.get(id) { return hit as? P }
         let opened: P?
         do { opened = try Parts.decode(P.self, from: try Envelope.open(part, with: key, kind: kind, context: at)) } catch { opened = nil }

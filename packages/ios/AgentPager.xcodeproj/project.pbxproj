@@ -39,6 +39,7 @@
 		DD3DFD921630978FF1CEB7C8 /* AgentHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD4C535AB23CF5192F290774 /* AgentHarness.swift */; };
 		DF3350557E5F9D7E2A01B318 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A27A68C79B4A7080DFE2CB13 /* AppModel.swift */; };
 		ED43F6BB3082EA03DD2438B2 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 83DEE6CF5EAF6D4642D1EAB5 /* Assets.xcassets */; };
+		F6860D8B183BB6780CA5C397 /* SealedTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF01597E2C118E56B11C7BE3 /* SealedTests.swift */; };
 		F9A5352D4CF1434626249917 /* API.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61CEF972485C3A4967C99E99 /* API.swift */; };
 /* End PBXBuildFile section */
 
@@ -114,6 +115,7 @@
 		F2672FD861C315A4EAEFB3DA /* Flowchart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Flowchart.swift; sourceTree = "<group>"; };
 		FCA60458492252A60DB7858D /* AlertExtensionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertExtensionTests.swift; sourceTree = "<group>"; };
 		FE1EF4216A2BDFB97FAAD13C /* PagerDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PagerDetailView.swift; sourceTree = "<group>"; };
+		FF01597E2C118E56B11C7BE3 /* SealedTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SealedTests.swift; sourceTree = "<group>"; };
 		FF476350295D66EA56CCB835 /* DecisionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -157,6 +159,7 @@
 			isa = PBXGroup;
 			children = (
 				FCA60458492252A60DB7858D /* AlertExtensionTests.swift */,
+				FF01597E2C118E56B11C7BE3 /* SealedTests.swift */,
 			);
 			path = AgentPagerTests;
 			sourceTree = "<group>";
@@ -422,6 +425,7 @@
 				521E0DBC4606B0E0987A2DF7 /* AlertExtensionTests.swift in Sources */,
 				C01C4BD97EF2120B97949177 /* Keychain.swift in Sources */,
 				0AE10F87ED71A7A8D285283E /* NotificationService.swift in Sources */,
+				F6860D8B183BB6780CA5C397 /* SealedTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

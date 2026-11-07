@@ -106,8 +106,9 @@ export function openDecision(pagerId: string, d: C.Decision, agentKey?: string):
     ...(d.acknowledgement ? { acknowledgement: { decisionId: d.decisionId, answerId: d.acknowledgement.answerId, nextSteps: decodePart('acknowledgement', open(key, 'acknowledgement', at, d.acknowledgement.acknowledgement)).nextSteps, acknowledgedAt: d.acknowledgement.acknowledgedAt } } : {}),
   };
 }
-export function readable(inbox: C.PagerInbox): Readable {
-  const pagerId = inbox.pager.pagerId;
+// A pager's read as the phone opens it: bound to the pager it asked for, never the id the reply names.
+export function readable(inbox: C.PagerInbox, pagerId: string): Readable {
+  assert.equal(inbox.pager.pagerId, pagerId, 'the reply is the read of the pager asked for');
   return {
     pager: inbox.pager,
     agents: inbox.agents.map(x => {
@@ -211,7 +212,7 @@ export async function fixture(name: string, clocks: { autoOffMs: number; idleMs:
     const p = await makePager();
     return { p, a: await connect(p.number, app, project) };
   }
-  const pager = async (pagerId: string, phone: string) => readable(await ok(C.PagerInbox, `/api/pagers/${pagerId}`, { phone }));
+  const pager = async (pagerId: string, phone: string) => readable(await ok(C.PagerInbox, `/api/pagers/${pagerId}`, { phone }), pagerId);
   const settings = (pagerId: string, phone: string, data: { on?: boolean; autoOff?: C.AutoOff }) => ok(C.PagerReply, `/api/pagers/${pagerId}/settings`, { phone, data });
   const sealed = sealQuestion;
   const ask = async (a: AgentCreds, title = 'Which plan?') => ok(C.Asked, `/api/agents/${a.agent.agentId}/cards`, { agent: a.agentKey, data: await sealQuestion(a, question(title)) });

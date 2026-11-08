@@ -20,7 +20,7 @@ An agent that is blocked or unsure about a risky step asks me for a quick go/no-
 
 I make pagers on my phone, as many as I like: one for my AGENTS.md, one for a throwaway VM, one per shared project. Each has a number. An agent I give the number to connects with the agentpager command, and appears on that pager with nothing for me to tap. Every connect is a new agent, shown by who asked (Claude Code, Codex) and grouped by project.
 
-When it needs me, my agent sends a decision: the question first, two to four options, its recommendation, and the detail one tap away. I answer, see that my answer was sent, then get the agent's acknowledgement and next steps. I can look back at an agent's decisions until its pager is deleted, or until it has been idle 30 days.
+When it needs me, my agent sends a decision: the question first, two to four options, its recommendation, and the detail one tap away. I answer, see that my answer was sent, then get the agent's acknowledgement and next steps. I can look back at an agent's decisions until its pager is deleted, or until it has been idle 30 days while its pager is on.
 
 An option can show exactly what it would send or change, such as a draft email or a diff, so I approve that exact version. The agent carries out the option I chose; AgentPager only carries my answer.
 
@@ -46,7 +46,7 @@ An acknowledgement is a real message from the agent, never an automatic message 
 
 ### A pager is on until I turn it off
 
-A pager turns off when I turn it off, or by itself at the time I chose (never, or after 24 hours, 7 days or 30 days). While it's off, nothing gets through and nothing is queued: an agent is told plainly that its message wasn't delivered. My phone keeps every decision while a pager is off, and turning it on makes open decisions answerable again. An agent lasts until it finishes or my pager is deleted; one idle for 30 days is forgotten. Deleting a pager deletes its agents and decisions from the service. None of this stops the agent itself.
+A pager turns off when I turn it off, or by itself at the time I chose (never, or after 24 hours, 7 days or 30 days). While it's off, nothing gets through and nothing is queued: an agent is told plainly that its message wasn't delivered. My phone keeps every decision while a pager is off, and turning it on makes open decisions answerable again. An agent lasts until it finishes or my pager is deleted; one idle for 30 days while its pager is on is forgotten. Deleting a pager deletes its agents and decisions from the service. None of this stops the agent itself.
 
 ### UTF-8 with Markdown is allowed; invalid or over-limit text is refused, never truncated
 

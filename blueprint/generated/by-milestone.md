@@ -108,3 +108,7 @@ Added to earlier entries:
 - **B30.3**, in [B30 · Decisions are encrypted end to end](../areas/6-privacy.md#b30--m5--decisions-are-encrypted-end-to-end): The phone keeps the key each agent first names. When that agent's who-asked later names another key, the phone shows the agent and its decisions as ones it can't read, with nothing to answer.
 - **I19.6**, in [I19 · The number names the pager's key](../areas/6-privacy.md#i19--m2--the-number-names-the-pagers-key): Before it encrypts anything to a pager, the command checks the pager's key against the number's fingerprint, so a service that swaps the key is caught on the agent's machine.
 - **I19.7**, in [I19 · The number names the pager's key](../areas/6-privacy.md#i19--m2--the-number-names-the-pagers-key): When that check fails, nothing is sent, and the agent is told that the number's key doesn't match the service's, to check the number, and, if it is right, to stop and tell its owner.
+
+## [M6 · TIDY](../milestones/M6-tidy.md)
+
+0 entries with 0 clauses, and 0 clauses added to earlier entries.

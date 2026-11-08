@@ -3,6 +3,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { DURABLE_OBJECTS } from './stages.ts';
 const root = fileURLToPath(new URL('..', import.meta.url));
 const out = process.env.AGENTPAGER_BUILD_DIR || path.join(root, 'dist');
 const local = process.argv.includes('--local');
@@ -14,9 +15,11 @@ await build({ entryPoints: [path.join(root, 'src/worker.ts')], outfile: path.joi
 const config = {
   name: 'ownerpager', main: './worker.js', compatibility_date: '2026-09-24',
   assets: { directory: './public', binding: 'ASSETS', run_worker_first: true },
-  durable_objects: { bindings: [{ name: 'AGENT', class_name: 'Agent' }, { name: 'REGISTRY', class_name: 'Registry' }] },
+  durable_objects: { bindings: DURABLE_OBJECTS.map(([name, class_name]) => ({ name, class_name })) },
   // v3: v2's agents are v1's sessions renamed. Their old rows are not read; each forgets itself at its next alarm.
-  migrations: [{ tag: 'v1', new_sqlite_classes: ['Session'] }, { tag: 'v2', new_sqlite_classes: ['Registry'] }, { tag: 'v3', renamed_classes: [{ from: 'Session', to: 'Agent' }] }],
+  // v4: each pager's own store (pager.ts), which takes over its pager's row from the Registry and its agents' rows from
+  // their stores (M6).
+  migrations: [{ tag: 'v1', new_sqlite_classes: ['Session'] }, { tag: 'v2', new_sqlite_classes: ['Registry'] }, { tag: 'v3', renamed_classes: [{ from: 'Session', to: 'Agent' }] }, { tag: 'v4', new_sqlite_classes: ['Pager'] }],
   // Local builds keep the caller's origin (a LAN dogfood server hands out LAN links); only deploy binds the domain.
   ...(local ? {} : { routes: [{ pattern: 'agentpager.me', custom_domain: true }] }),
   // Workers Logs keep each failure's message, which the platform's analytics do not.

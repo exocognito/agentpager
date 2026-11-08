@@ -1,5 +1,5 @@
 // The deployed stages (AGENTS.md › Stages). Each is its own Worker on its own hostname of the agentpager.me zone, so
-// each has its own Agent and Registry namespaces: its own data. Both deploy the same build; only these two names differ.
+// each has its own Durable Object namespaces: its own data. Both deploy the same build; only these two names differ.
 export const ZONE = 'agentpager.me';
 export const STAGES = {
   dev: { name: 'dev', worker: 'ownerpager-dev', host: 'dev.agentpager.me' },
@@ -49,4 +49,33 @@ export function stageConfig(config: Record<string, unknown>, stage: Stage): Reco
     throw new Error('The build no longer names prod\'s Worker and domain as stages.ts expects; update stages.ts with it.');
   }
   return stage.name === 'prod' ? config : { ...config, name: stage.worker, routes: [{ pattern: stage.host, custom_domain: true }] };
+}
+
+// The Worker's Durable Objects, each a SQLite class under its binding: build.mjs writes them, and the deploy checks that
+// the stage has each one, bound by that name.
+export const DURABLE_OBJECTS = [['AGENT', 'Agent'], ['REGISTRY', 'Registry'], ['PAGER', 'Pager']] as const;
+export type Namespace = { id: string; class: string; script: string; use_sqlite?: boolean };
+export type Binding = { type: string; name: string; class_name?: string; namespace_id?: string };
+// What is wrong with the stage's storage as Cloudflare reports it, or null: every class a SQLite namespace of the
+// Worker, every binding naming its class's namespace, and the push key's secret set.
+export function storageRefusal(worker: string, namespaces: readonly Namespace[], bindings: readonly Binding[]): string | null {
+  const placement = namespaces.filter(n => n.script === worker);
+  for (const [, className] of DURABLE_OBJECTS) if (!placement.some(n => n.class === className && n.use_sqlite === true)) return `${className} is not a SQLite namespace on ${worker}.`;
+  for (const [name, className] of DURABLE_OBJECTS) {
+    if (!bindings.some(b => b.type === 'durable_object_namespace' && b.name === name && b.class_name === className && placement.some(n => n.id === b.namespace_id && n.class === className))) return `Incorrect ${name} binding.`;
+  }
+  if (!bindings.some(b => b.type === 'secret_text' && b.name === 'APNS_KEY_P8')) return 'The Worker secret APNS_KEY_P8 is missing, so no alerts go out.';
+  return null;
+}
+// Cloudflare's reads of a Worker's settings can lag a deploy that has just finished, while the Worker already serves
+// the new build: on 7 Nov 2026 the check after a deploy failed once with "Incorrect AGENT binding.". So the check is
+// asked again, a few times over about 30 s, and fails with what it last saw only after that.
+export async function checkSettled(check: () => Promise<string | null>, say: (line: string) => void, wait = (ms: number) => new Promise<void>(r => setTimeout(r, ms)), tries = 6, pauseMs = 6_000): Promise<void> {
+  for (let n = 1; ; n++) {
+    const wrong = await check();
+    if (wrong === null) return;
+    if (n === tries) throw new Error(`${wrong} (still so after ${tries} checks over ${Math.round(((tries - 1) * pauseMs) / 1000)} s)`);
+    say(`${wrong} Cloudflare may not report the deploy yet: checking again in ${pauseMs / 1000} s (${n} of ${tries}).`);
+    await wait(pauseMs);
+  }
 }

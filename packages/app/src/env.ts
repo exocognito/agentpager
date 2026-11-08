@@ -2,7 +2,7 @@ import type { DurableObjectNamespace, Fetcher } from '@cloudflare/workers-types'
 import { AGENT_IDLE_MS, AUTO_OFF, PICKUP_MS } from './contract.ts';
 // The APNS_ values are set only where alerts go out (see push.ts); APNS_ORIGIN points tests at a stand-in for Apple.
 export interface Env {
-  AGENT: DurableObjectNamespace; REGISTRY: DurableObjectNamespace; ASSETS: Fetcher;
+  AGENT: DurableObjectNamespace; REGISTRY: DurableObjectNamespace; PAGER: DurableObjectNamespace; ASSETS: Fetcher;
   APNS_KEY_P8?: string; APNS_KEY_ID?: string; APNS_TEAM_ID?: string; APNS_TOPIC?: string; APNS_ORIGIN?: string;
 }
 declare const __LOCAL_AUTO_OFF_MS__: number;

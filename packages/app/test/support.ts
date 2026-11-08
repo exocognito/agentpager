@@ -1,6 +1,6 @@
 import { spawn, execFileSync, type ChildProcess } from 'node:child_process';
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
-import { createWriteStream } from 'node:fs';
+import { createWriteStream, existsSync, writeFileSync } from 'node:fs';
 import { createHash, generateKeyPairSync, randomBytes, verify } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -137,20 +137,38 @@ export function openAnswer(a: AgentCreds, decisionId: string, part: string): C.C
   return decodePart('answer', open(raw32(a.keys.privateKey), 'answer', { pagerId: a.keys.pager, decisionId }, part)).choice;
 }
 
+// A release's service and command, from its tag: a clone sharing this repository's objects, so no worktree is added,
+// with its packages installed offline and its binary built. Kept in the system's temp folder by the tag's commit, and
+// made again only if it isn't ready.
+export function release(tag: string) {
+  const commit = execFileSync('git', ['rev-parse', '--verify', `${tag}^{commit}`], { encoding: 'utf8' }).trim();
+  const dir = path.join(tmpdir(), `agentpager-release-${commit}`), ready = path.join(dir, '.agentpager-ready');
+  if (!existsSync(ready)) {
+    if (existsSync(dir)) throw new Error(`${dir} is a release left half made; move it to the Trash and run again.`);
+    execFileSync('git', ['clone', '-q', '--shared', '--no-checkout', path.join(app, '../..'), dir]);
+    execFileSync('git', ['-C', dir, 'checkout', '-q', '--detach', commit]);
+    execFileSync('pnpm', ['install', '--offline', '--frozen-lockfile'], { cwd: dir, stdio: 'ignore', timeout: 120_000 });
+    execFileSync('sh', ['scripts/build.sh'], { cwd: path.join(dir, 'packages/cli'), stdio: 'ignore', timeout: 120_000 });
+    writeFileSync(ready, commit);
+  }
+  return { tag, commit, app: path.join(dir, 'packages/app'), binary: path.join(dir, 'packages/cli/dist/agentpager') };
+}
+
 // Each test file starts its own workerd. Zero is the production clock; a test that crosses auto-off or housekeeping
 // in real time sets a short one.
-// `https` serves it over HTTPS, with a self-signed certificate.
-export async function fixture(name: string, clocks: { autoOffMs: number; idleMs: number; pickupMs?: number } = { autoOffMs: 0, idleMs: 0 }, serving: { https?: boolean } = {}) {
+// `https` serves it over HTTPS, with a self-signed certificate. `app` runs another release's service (release()), whose
+// replies name its own build; `persist` and `port` start it on the storage and the address another fixture used.
+export async function fixture(name: string, clocks: { autoOffMs: number; idleMs: number; pickupMs?: number } = { autoOffMs: 0, idleMs: 0 }, serving: { https?: boolean; app?: { app: string; commit: string }; persist?: string; port?: number } = {}) {
   const evidence = path.join(process.env.BLUEPRINT_EVIDENCE_DIR || path.join(tmpdir(), 'agentpager-evidence'), name);
   await mkdir(evidence, { recursive: true });
   const directory = await mkdtemp(path.join(tmpdir(), `agentpager-${name}-`));
-  const serverPort = await port(), inspector = await port();
+  const serverPort = serving.port ?? await port(), inspector = await port();
   const origin = `${serving.https ? 'https' : 'http'}://127.0.0.1:${serverPort}`;
-  const persist = path.join(directory, 'persist');
+  const persist = serving.persist ?? path.join(directory, 'persist'), served = serving.app ?? { app, commit: sha };
   let child: ChildProcess | undefined;
   const log = createWriteStream(path.join(evidence, 'server.log'));
   async function launch() {
-    child = spawn(process.execPath, ['scripts/start.mjs'], { cwd: app, detached: true, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, PORT: String(serverPort), AGENTPAGER_INSPECTOR_PORT: String(inspector), AGENTPAGER_PERSIST: persist, AGENTPAGER_BUILD_DIR: path.join(directory, 'build'), AGENTPAGER_AUTO_OFF_MS: String(clocks.autoOffMs), AGENTPAGER_IDLE_MS: String(clocks.idleMs), AGENTPAGER_PICKUP_MS: String(clocks.pickupMs ?? 0), ...(serving.https ? { AGENTPAGER_LOCAL_PROTOCOL: 'https' } : {}) } });
+    child = spawn(process.execPath, ['scripts/start.mjs'], { cwd: served.app, detached: true, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, PORT: String(serverPort), AGENTPAGER_INSPECTOR_PORT: String(inspector), AGENTPAGER_PERSIST: persist, AGENTPAGER_BUILD_DIR: path.join(directory, 'build'), AGENTPAGER_AUTO_OFF_MS: String(clocks.autoOffMs), AGENTPAGER_IDLE_MS: String(clocks.idleMs), AGENTPAGER_PICKUP_MS: String(clocks.pickupMs ?? 0), ...(serving.https ? { AGENTPAGER_LOCAL_PROTOCOL: 'https' } : {}) } });
     child.stdout?.pipe(log, { end: false }); child.stderr?.pipe(log, { end: false });
     try { await until(async () => (await raw(origin + '/start')).status, s => s === 200, 90_000); } catch (e) { await stop(); throw e; }
   }
@@ -171,7 +189,7 @@ export async function fixture(name: string, clocks: { autoOffMs: number; idleMs:
   async function request(route: string, opts: { method?: string; data?: unknown; agent?: string; phone?: string; raw?: string; client?: string | null } = {}) {
     const client = opts.client === undefined ? CLIENT : opts.client;
     const r = await fetch(origin + route, { method: opts.method || (opts.data !== undefined || opts.raw !== undefined ? 'POST' : 'GET'), headers: { ...(opts.agent ? { authorization: `Bearer ${opts.agent}` } : {}), ...(opts.phone ? { 'x-phone-key': opts.phone } : {}), ...(client === null ? {} : { [C.CLIENT_HEADER]: client }), 'content-type': 'application/json' }, body: opts.raw ?? (opts.data === undefined ? undefined : JSON.stringify(opts.data)) });
-    assert.equal(r.headers.get('x-agentpager-build'), sha, `candidate build on ${route}`);
+    assert.equal(r.headers.get('x-agentpager-build'), served.commit, `candidate build on ${route}`);
     const value: unknown = await r.json();
     return { status: r.status, value };
   }
@@ -242,7 +260,7 @@ export async function fixture(name: string, clocks: { autoOffMs: number; idleMs:
     return { ...r, nextSteps };
   }
   async function artifact(file: string, value: unknown) { await writeFile(path.join(evidence, file), typeof value === 'string' ? value : JSON.stringify(value, null, 2)); }
-  return { origin, evidence, persist, stop, restart, request, ok, refused, makePager, connectBody, connect, connected, pager, settings, sealed, ask, answer, sealedAnswer, read, ack, sealedAck, artifact, clocks };
+  return { origin, port: serverPort, evidence, persist, start: launch, stop, restart, request, ok, refused, makePager, connectBody, connect, connected, pager, settings, sealed, ask, answer, sealedAnswer, read, ack, sealedAck, artifact, clocks };
 }
 
 // A stand-in for Apple's push service: it records each alert, checks the provider token and that the payload is the

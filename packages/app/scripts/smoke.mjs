@@ -10,7 +10,7 @@ import { fromBase64url, keyPair, open, seal, toBase64url } from '../../contract/
 import { decodePart, encodePart } from '../../contract/parts.ts';
 
 // The smoke run (METHOD.md › Tests and checks): node scripts/smoke.mjs --stage dev|prod checks that the stage serves
-// this checkout's commit and that its Worker and Registry answer, from outside, paging no one and needing no phone. It
+// this checkout's commit and that its Worker and its stores answer, from outside, paging no one and needing no phone. It
 // leaves nothing behind: its one throwaway pager is deleted with its agent, and the upgrade check only reads. The full
 // suites stay local. A failed step is tried once more; a second failure fails the run.
 //   --stage local --server <url>   the same against a local server, without the checks only a deployed stage has
@@ -28,7 +28,7 @@ const app = fileURLToPath(new URL('..', import.meta.url)), cli = path.join(app, 
 const sha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
 // Every line out passes through this: no pager number and no key-length string is ever printed.
 const redact = text => String(text).replace(/ap1_[A-Za-z0-9_-]*/g, 'ap1_[redacted]').replace(/(?<![A-Za-z0-9_-])[A-Za-z0-9_-]{32,}(?![A-Za-z0-9_-])/g, '[redacted]');
-// A well-formed number no pager has: the binary sends it, and only the Registry can say it isn't in use.
+// A well-formed number no pager has: the binary sends it, and only the service can say it isn't in use.
 const bogus = 'ap1_' + randomBytes(24).toString('base64url');
 // A pager only this stage has, as the phone makes one (test/support.ts pagerKeys), with its private key and a phone key
 // of its own. It has no alert target, so connecting to it pages no one, and it turns itself off after 24 hours if its
@@ -38,7 +38,7 @@ function throwawayPager() {
   const id = randomBytes(16), fingerprint = createHash('sha256').update(k.publicKey).digest().subarray(0, 8);
   return { pagerId: id.toString('hex'), publicKey, privateKey: k.privateKey, number: 'ap1_' + Buffer.concat([id, fingerprint]).toString('base64url'), phone: randomBytes(24).toString('base64url') };
 }
-// A connect's body, its identity sealed to a stranger's key: only the Registry's answer about the number matters.
+// A connect's body, its identity sealed to a stranger's key: only the service's answer about the number matters.
 const strangerConnect = number => ({ number, identity: seal(keyPair().publicKey, 'identity', { pagerId: '0'.repeat(32) }, encodePart('identity', { app: 'smoke', project: 'smoke', answerKey: toBase64url(keyPair().publicKey) })) });
 // The smoke run's own calls name it as their client, as every client of the API does.
 const asClient = { 'content-type': 'application/json', [CLIENT_HEADER]: clientVersion('smoke', sha.slice(0, 7)) };
@@ -92,7 +92,7 @@ if (!local) await step('Plain HTTP moves to HTTPS or is refused, and HTTPS repli
   const secure = await fetch(origin + '/start');
   check(secure.headers.get('strict-transport-security') === 'max-age=31536000', `HSTS: ${secure.headers.get('strict-transport-security')}`); await secure.arrayBuffer();
 });
-await step('The Registry refuses a pager number it has never seen', async () => {
+await step('The service refuses a pager number it has never seen', async () => {
   const response = await fetch(origin + '/api/agents', { method: 'POST', headers: asClient, body: JSON.stringify(strangerConnect(bogus)) });
   const value = await response.json();
   check(response.status === 410 && value.error === 'NumberInvalid', `${response.status} ${value.error}`); candidate(response);
@@ -119,7 +119,7 @@ await step('The binary built from this commit checks a pager\'s key, asks it a c
   check(made.status === 200, `making a throwaway pager: ${made.status} ${await made.text()}`);
   let failure;
   try {
-    // Only this stage's Registry has the pager, so connecting proves the binary reached this stage.
+    // Only this stage has the pager, so connecting proves the binary reached this stage.
     const connected = run('connect', pager.number, '--server', origin, '--app', 'smoke', '--project', 'smoke', '--json');
     check(connected.status === 0 && said(connected).includes('Connected as agent'), `connect: exit ${connected.status}: ${said(connected)}`);
     const id = JSON.parse(connected.stdout).result.agent;

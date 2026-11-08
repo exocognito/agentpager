@@ -1,19 +1,17 @@
 import { Schema } from 'effect';
 import * as C from './contract.ts';
 import { BUILD, forward, type Env } from './env.ts';
-import { body, decode, emptyBody, json, read, refusal, sha256, token } from './shared.ts';
+import { body, decode, json, read, refusal, sha256, token } from './shared.ts';
 import { frontDocument, startDocument } from './start.ts';
 import { keepsToHttps, plainHttp, HSTS } from './https.ts';
-import { PushTarget } from './push.ts';
 export { Agent } from './agent.ts';
 export { Registry } from './registry.ts';
+export { Pager } from './pager.ts';
 
-// A refusal from a Durable Object, passed on to the caller as it is.
-class Relay extends Error { constructor(readonly response: Response) { super('relayed refusal'); } }
-const relay = (response: Response) => { if (!response.ok) throw new Relay(response); return response; };
-const failure = async (error: unknown) => error instanceof Relay ? error.response : refusal(error);
 
-const registry = (env: Env, path: string, data: unknown) => forward(env.REGISTRY, 'registry', path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(data) });
+// The pager's own store (pager.ts), which handles every call on the pager.
+const pager = (env: Env, pagerId: string, path: string, init: { method: string; headers: Headers | Record<string, string>; body?: ArrayBuffer | string }) =>
+  forward(env.PAGER, pagerId, `/${pagerId}${path}`, init);
 async function phoneHash(request: Request) {
   const key = request.headers.get(C.PHONE_AUTH_HEADER);
   if (!key || !Schema.is(C.Token)(key)) throw C.refuse.unauthorized();
@@ -29,15 +27,6 @@ function parseNumber(number: string) {
 }
 async function fingerprint(publicKey: string) {
   return hex(new Uint8Array(await crypto.subtle.digest('SHA-256', base64url(publicKey))).slice(0, 8));
-}
-
-const PagerHit = Schema.Struct({ pager: C.Pager, agentIds: Schema.Array(C.Token) });
-const Linked = Schema.Struct({ phoneHash: Schema.String });
-// The phone's own pager, checked before its input is read: a wrong key wins over invalid input (I4).
-async function ownPager(env: Env, request: Request, pagerId: string) {
-  const hash = await phoneHash(request);
-  const reply = await read('/get', p => registry(env, p, { pagerId, phoneHash: hash }));
-  return { hash, hit: decode(PagerHit, await relay(reply).json()) };
 }
 
 // Which side calls each route: the phone, with its pager's key, or an agent. Anything else is no route, refused before
@@ -72,7 +61,7 @@ function admit(request: Request, side: Side, origin: string) {
   throw side === 'agent' ? C.refuse.commandTooOld(origin) : C.refuse.appTooOld();
 }
 
-// Public HTTPS routes -> the Registry (pagers) or one agent's object.
+// Public HTTPS routes -> the pager's own store, or one agent's store, which passes the call on to its pager's.
 async function api(request: Request, env: Env): Promise<Response> {
   const u = new URL(request.url), method = request.method, parts = u.pathname.split('/').filter(Boolean).slice(1);
   const side = sideOf(parts, method);
@@ -87,35 +76,18 @@ async function api(request: Request, env: Env): Promise<Response> {
     const hash = await phoneHash(request), input = decode(C.CreatePagerInput, await body(request));
     const { pagerId, fingerprint: named } = parseNumber(input.number);
     if (named !== await fingerprint(input.publicKey)) throw C.refuse.invalid('number: its fingerprint does not match publicKey');
-    return registry(env, '/create', { pagerId, fingerprint: named, publicKey: input.publicKey, phoneHash: hash, autoOff: input.autoOff });
+    return pager(env, pagerId, '/create', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ fingerprint: named, publicKey: input.publicKey, phoneHash: hash, autoOff: input.autoOff }) });
   }
   if (parts[0] === 'pagers' && parts.length >= 2) {
     const pagerId = decode(C.PagerId, parts[1]), rest = parts.slice(2).join('/');
+    // The pager's store checks the phone's key before it reads any input: a wrong key wins over invalid input (I4).
+    const phone = { [C.PHONE_AUTH_HEADER]: request.headers.get(C.PHONE_AUTH_HEADER) ?? '', 'content-type': 'application/json' };
     // Anyone may read a pager's public key: it opens nothing, and the command checks it against the number (I19).
-    if (rest === 'key' && method === 'GET') return registry(env, '/key', { pagerId });
-    // Everything on the pager, read while it is on or off: its state and each agent's decisions.
-    if (rest === '' && method === 'GET') {
-      const { hit } = await ownPager(env, request, pagerId);
-      const headers = { [C.PHONE_AUTH_HEADER]: request.headers.get(C.PHONE_AUTH_HEADER) ?? '' };
-      const replies = await Promise.all(hit.agentIds.map(id => read('/inbox', p => forward(env.AGENT, id, p, { method: 'GET', headers }))));
-      const agents: C.AgentInbox[] = [];
-      // An agent housekeeping has just forgotten is skipped; its pager stops listing it.
-      for (const reply of replies) if (reply.status !== 404) agents.push(decode(C.AgentInbox, await relay(reply).json()));
-      return json(decode(C.PagerInbox, { pager: hit.pager, agents }));
-    }
-    if (rest === 'settings' && method === 'POST') {
-      const { hash } = await ownPager(env, request, pagerId), input = decode(C.PagerSettingsInput, await body(request));
-      return registry(env, '/settings', { pagerId, phoneHash: hash, ...input });
-    }
-    if (rest === 'push' && method === 'POST') {
-      const { hash } = await ownPager(env, request, pagerId), push = decode(PushTarget, await body(request));
-      return registry(env, '/push', { pagerId, phoneHash: hash, push });
-    }
-    // Deleting a pager deletes its agents and their decisions from the service (the Registry sees it through).
-    if (rest === 'delete' && method === 'POST') {
-      const { hash } = await ownPager(env, request, pagerId);
-      await emptyBody(request);
-      return registry(env, '/delete', { pagerId, phoneHash: hash });
+    if (rest === 'key' && method === 'GET') return read('/key', p => pager(env, pagerId, p, { method: 'GET', headers: {} }));
+    // Everything on the pager, read while it is on or off: its state and each agent's decisions, from its one store.
+    if (rest === '' && method === 'GET') return read('/inbox', p => pager(env, pagerId, p, { method: 'GET', headers: phone }));
+    if (method === 'POST' && ['settings', 'push', 'delete'].includes(rest)) {
+      return pager(env, pagerId, `/${rest}`, { method: 'POST', headers: phone, body: await request.arrayBuffer() });
     }
   }
   // An agent connects with the owner's pager number and its identity, sealed to the pager's key: a new agent on that
@@ -123,8 +95,7 @@ async function api(request: Request, env: Env): Promise<Response> {
   if (parts.length === 1 && parts[0] === 'agents' && method === 'POST') {
     const input = decode(C.ConnectInput, await body(request));
     const { pagerId, fingerprint: named } = parseNumber(input.number), agentId = token();
-    const linked = decode(Linked, await relay(await registry(env, '/connect', { pagerId, fingerprint: named, agentId })).json());
-    return forward(env.AGENT, agentId, '/open', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ agentId, pagerId, phoneHash: linked.phoneHash, identity: input.identity }) });
+    return forward(env.AGENT, agentId, '/open', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ agentId, pagerId, fingerprint: named, identity: input.identity }) });
   }
   if (parts[0] === 'agents' && parts.length >= 2) {
     const agentId = decode(C.Token, parts[1]), rest = parts.slice(2).join('/');
@@ -167,7 +138,7 @@ async function serve(request: Request, env: Env) {
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     let response: Response;
-    try { response = await serve(request, env); } catch (error) { response = await failure(error); }
+    try { response = await serve(request, env); } catch (error) { response = refusal(error); }
     const headers = new Headers(response.headers);
     headers.set('X-AgentPager-Build', BUILD);
     headers.set('Cache-Control', 'no-store');

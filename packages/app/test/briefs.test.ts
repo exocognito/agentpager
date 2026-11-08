@@ -3,7 +3,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import path from 'node:path';
 import { Either, ParseResult, Schema } from 'effect';
-import { fixture, assert, token, until, C, emojiCard, asClient, openDecision, asQuestion } from './support.ts';
+import { fixture, assert, token, C, emojiCard, asClient, openDecision, asQuestion } from './support.ts';
 import { briefNames, briefsDir, loadBrief } from '../fixtures/briefs/load.ts';
 import { decodePart, encodePart } from '../../contract/parts.ts';
 import { fromBase64url, open, seal } from '../../contract/envelope.ts';
@@ -12,18 +12,18 @@ import { publicOf } from '../../cli/src/seal.ts';
 // Decision briefs: an agent sends Markdown with lettered options and attachments, each sealed to the pager's key; the
 // phone opens the decision and fetches and opens each attachment by its slot.
 
-// The agent objects' stored databases, read after the server stops.
-export function agentDatabases(persist: string) {
+// The pager stores' databases, read after the server stops.
+function pagerDatabases(persist: string) {
   const files: string[] = [];
   const walk = (dir: string) => { for (const name of readdirSync(dir)) { const p = path.join(dir, name); if (statSync(p).isDirectory()) walk(p); else if (p.endsWith('.sqlite')) files.push(p); } };
   walk(path.join(persist, 'v3', 'do'));
-  return opened(files, "SELECT 1 FROM sqlite_master WHERE name='attachments_v3'");
+  return opened(files, "SELECT 1 FROM sqlite_master WHERE name='attachments_v4'");
 }
 // The databases a query finds a row in, opened; every other is closed again, so none is held while the server runs.
 function opened(files: string[], query: string) {
   return files.flatMap(file => { const db = new DatabaseSync(file); if (db.prepare(query).get()) return [db]; db.close(); return []; });
 }
-const count = (db: DatabaseSync) => Number(db.prepare('SELECT count(*) AS n FROM attachments_v3').get()?.n);
+const count = (db: DatabaseSync) => Number(db.prepare('SELECT count(*) AS n FROM attachments_v4').get()?.n);
 const fileBytes = (name: string, file: string) => readFileSync(path.join(briefsDir, name, file));
 test('briefs: the four canvas examples ask, read back as sent, answer, and go with the pager when it is deleted', { timeout: 180_000 }, async () => {
   const f = await fixture('briefs');
@@ -79,8 +79,8 @@ test('briefs: the four canvas examples ask, read back as sent, answer, and go wi
     await f.request(`/api/pagers/${p.pagerId}/delete`, { method: 'POST', phone });
     assert.equal((await file(d2, '0')).status, 404);
     await f.stop();
-    const stores = agentDatabases(f.persist);
-    assert.ok(stores.length > 0, 'the agent object has an attachments table');
+    const stores = pagerDatabases(f.persist);
+    assert.ok(stores.length > 0, 'the pager\'s store has an attachments table');
     for (const db of stores) { assert.equal(count(db), 0, 'no attachment parts after the delete'); db.close(); }
   } finally { await f.stop(); }
 });
@@ -149,105 +149,5 @@ test('I4.9 A broken card is refused by the command before it is sent, and by the
     }
     // What the command takes, the phone reads.
     assert.equal(problems(base), '');
-  } finally { await f.stop(); }
-});
-
-// Every file of the local store, and its SQLite databases.
-const storeFiles = (persist: string) => {
-  const files: string[] = [];
-  const walk = (dir: string) => { for (const name of readdirSync(dir)) { const q = path.join(dir, name); if (statSync(q).isDirectory()) walk(q); else files.push(q); } };
-  walk(persist);
-  return files;
-};
-const registryOf = (persist: string) => opened(storeFiles(path.join(persist, 'v3', 'do')).filter(q => q.endsWith('.sqlite')), "SELECT 1 FROM sqlite_master WHERE name='pagers_v2'")[0];
-const holds = (file: string, marker: string) => [file, file + '-wal', file + '-shm'].some(q => { try { return readFileSync(q).includes(Buffer.from(marker)); } catch { return false; } });
-
-// The release's exception (blueprint/milestones/M5-encrypt.md, Sam's answer 3): at the first start of this code, every
-// agent stored before the switch is forgotten, with its decisions, attachments, answers, acknowledgements and digests,
-// and no pager lists it; every pager keeps its key, number, switch, auto-off and push target, and what was stored
-// since is untouched. Before the switch an agent's object had readable tables (agent, proposals, …) and the Registry
-// listed it in pager_agents_v2: this puts two such agents back as the m4 code stored them, then starts this code on
-// them, twice. One is called again; the other never is, so only the Registry's start reaches it.
-test('the switch forgets every agent stored before it, keeps every pager, and leaves what came after alone', { timeout: 180_000 }, async () => {
-  const f = await fixture('switch');
-  try {
-    const { p, a: before } = await f.connected('Codex', 'before the switch');
-    const quiet = await f.connect(p.number, 'pi', 'before the switch, quiet');
-    const old = await f.ask(before, 'Asked before the switch?');
-    await f.answer(before.agent.agentId, p.phone, old.decisionId);
-    const pushed = await f.request(`/api/pagers/${p.pagerId}/push`, { phone: p.phone, data: { token: 'ab'.repeat(32), environment: 'sandbox' } });
-    assert.equal(pushed.status, 200);
-    await f.settings(p.pagerId, p.phone, { autoOff: '30d' });
-    const after = await f.connect(p.number, 'Claude Code', 'after the switch');
-    const kept = await f.ask(after, 'Asked after the switch?');
-    const keptReceipt = await f.answer(after.agent.agentId, p.phone, kept.decisionId);
-    await f.ack(after, kept.decisionId, keptReceipt.answerId, 'Kept.');
-    const seenBefore = await f.pager(p.pagerId, p.phone);
-    const afterBefore = seenBefore.agents.find(x => x.agent.agentId === after.agent.agentId);
-    await f.stop();
-
-    // Both agents' objects back as the m4 code stored them: readable who asked, question, answer and attachment.
-    const objects = new Map<string, string>();
-    for (const [a, marker] of [[before, 'before'], [quiet, 'quiet']] as const) {
-      const file = storeFiles(path.join(f.persist, 'v3', 'do')).filter(q => q.endsWith('.sqlite')).find(q => {
-        const db = new DatabaseSync(q);
-        try { return String(db.prepare("SELECT json FROM sqlite_master m, agent_v3 WHERE m.name='agent_v3'").get()?.json ?? '').includes(a.agent.agentId); } catch { return false; } finally { db.close(); }
-      });
-      assert.ok(file, `the ${marker} agent's object`);
-      objects.set(marker, file);
-      const db = new DatabaseSync(file);
-      db.exec(`PRAGMA foreign_keys = OFF; DROP TABLE agent_v3; DROP TABLE warnings_v3; DROP TABLE collections_v3; DROP TABLE pickups_v3;
-        DROP TABLE acknowledgements_v3; DROP TABLE answers_v3; DROP TABLE attachments_v3; DROP TABLE decisions_v3;
-        CREATE TABLE agent (id INTEGER PRIMARY KEY CHECK(id=1), json TEXT NOT NULL);
-        CREATE TABLE proposals (id TEXT PRIMARY KEY, json TEXT NOT NULL);
-        CREATE TABLE answers (decision_id TEXT PRIMARY KEY, request_id TEXT NOT NULL UNIQUE, input TEXT NOT NULL, json TEXT NOT NULL);
-        CREATE TABLE attachments (decision_id TEXT NOT NULL, name TEXT NOT NULL, type TEXT NOT NULL, data BLOB NOT NULL, PRIMARY KEY (decision_id, name));
-        CREATE TABLE asks (decision_id TEXT PRIMARY KEY, question TEXT NOT NULL);`);
-      db.prepare('INSERT INTO agent VALUES (1, ?)').run(JSON.stringify({ agentId: a.agent.agentId, pagerId: p.pagerId, app: `Codex-${marker}-the-switch`, project: 'before the switch' }));
-      db.prepare('INSERT INTO proposals VALUES (?, ?)').run(old.decisionId, JSON.stringify({ decisionId: old.decisionId, title: `Asked ${marker} the switch, readable` }));
-      db.prepare('INSERT INTO answers VALUES (?, ?, ?, ?)').run(old.decisionId, token(), `A note ${marker} the switch`, JSON.stringify({ choice: { kind: 'feedback', text: `A note ${marker} the switch` } }));
-      db.prepare('INSERT INTO attachments VALUES (?, ?, ?, ?)').run(old.decisionId, 'notes.md', 'text/markdown', Buffer.from(`A page ${marker} the switch`));
-      db.close();
-    }
-    const markers = (marker: string) => [`Codex-${marker}-the-switch`, `Asked ${marker} the switch, readable`, `A note ${marker} the switch`, `A page ${marker} the switch`];
-    // The Registry back as it listed agents before the switch.
-    const registry = registryOf(f.persist);
-    assert.ok(registry);
-    registry.exec('CREATE TABLE pager_agents_v2 (pager_id TEXT NOT NULL, agent_id TEXT NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY (pager_id, agent_id));');
-    for (const a of [before, quiet]) {
-      registry.prepare('INSERT INTO pager_agents_v2 VALUES (?, ?, ?)').run(p.pagerId, a.agent.agentId, Date.now());
-      registry.prepare('DELETE FROM pager_agents_v3 WHERE agent_id=?').run(a.agent.agentId);
-    }
-    const pagerRow = registry.prepare('SELECT * FROM pagers_v2 WHERE pager_id=?').get(p.pagerId);
-    registry.close();
-    for (const marker of ['before', 'quiet']) assert.ok(markers(marker).every(m => holds(objects.get(marker) ?? '', m)), 'readable before the switch');
-
-    for (const round of [1, 2]) {
-      await f.restart();
-      const seen = await f.pager(p.pagerId, p.phone);
-      // The pager is as it was: on, its auto-off, its key, and its number still connects.
-      assert.deepEqual(seen.pager, seenBefore.pager, `round ${round}: the pager as it was`);
-      assert.equal((await f.ok(C.PagerKey, `/api/pagers/${p.pagerId}/key`)).publicKey, p.publicKey);
-      // The agents from before the switch are gone with everything they had; the one since is as it was.
-      assert.deepEqual(seen.agents.map(x => x.agent.agentId), [after.agent.agentId], `round ${round}: only the agent since the switch`);
-      assert.deepEqual(seen.agents[0], afterBefore, `round ${round}: untouched`);
-      await f.refused(404, 'UnknownAgent', `/api/agents/${before.agent.agentId}`, { agent: before.agentKey });
-      await f.refused(404, 'UnknownAgent', `/api/agents/${before.agent.agentId}/cards/${old.decisionId}/files/0`, { phone: p.phone });
-      // The quiet one is reached by the Registry's start alone: its object holds nothing readable soon after.
-      await until(async () => markers('quiet').some(m => holds(objects.get('quiet') ?? '', m)), held => !held, 20_000);
-      await f.stop();
-      for (const file of storeFiles(f.persist)) for (const m of [...markers('before'), ...markers('quiet')]) assert.ok(!readFileSync(file).includes(Buffer.from(m)), `${m} in ${path.relative(f.persist, file)}`);
-      const reg = registryOf(f.persist);
-      assert.ok(reg);
-      assert.equal(reg.prepare("SELECT 1 FROM sqlite_master WHERE name='pager_agents_v2'").get(), undefined, 'the old list is gone');
-      assert.deepEqual(reg.prepare('SELECT * FROM pagers_v2 WHERE pager_id=?').get(p.pagerId), pagerRow, 'the pager row is unchanged');
-      assert.equal(Number(reg.prepare('SELECT count(*) AS n FROM erase_v2').get()?.n), 0, 'nothing left to forget');
-      reg.close();
-    }
-    await f.restart();
-    // A new agent connects with the number as before.
-    const again = await f.connect(p.number, 'Codex', 'after the switch, again');
-    assert.equal((await f.pager(p.pagerId, p.phone)).agents.length, 2);
-    await f.ask(again, 'Still answerable?');
   } finally { await f.stop(); }
 });

@@ -169,3 +169,84 @@ test('delete takes the agents and their decisions; housekeeping forgets an idle 
     assert.deepEqual((await f.pager(q.pagerId, q.phone)).agents.map(x => x.agent.agentId), [active.agent.agentId]);
   } finally { await f.stop(); }
 });
+
+// One store per pager handles turning it off and every call on it one after the other, so a call either landed before
+// the off, and shows with a time no later than the off's, or comes after it and is refused as off with nothing stored.
+// Each round fires every kind of call that sends or collects something (asking, waiting for an answer, acknowledging,
+// finishing, connecting, the phone's answer) in one burst, with the off sent in the middle of it, then reads what the
+// pager holds as the phone does.
+test('I17.2 A call that lands as the pager turns off is refused as off with nothing stored, or was stored before the off; none lands after it', { timeout: 300_000 }, async () => {
+  const f = await fixture('off-race');
+  try {
+    const p = await f.makePager();
+    const outcomes = { landed: 0, refused: 0 };
+    for (let round = 1; round <= 6; round++) {
+      // Fresh agents each round, each with a decision answered and collected (to acknowledge), one answered and not
+      // collected (to collect), and one open (for the phone to answer).
+      const agents = await Promise.all([1, 2, 3, 4].map(n => f.connect(p.number, 'Codex', `race ${round}.${n}`)));
+      const prepared = await Promise.all(agents.map(async a => {
+        const [toAck, toCollect, toAnswer] = [await f.ask(a, 'To acknowledge?'), await f.ask(a, 'To collect?'), await f.ask(a, 'To answer?')];
+        const receipt = await f.answer(a.agent.agentId, p.phone, toAck.decisionId);
+        await f.answer(a.agent.agentId, p.phone, toCollect.decisionId);
+        assert.equal((await f.read(a, toAck.decisionId)).status, 'answered');
+        const q = question(`Asked in round ${round}?`), asked = await C.decisionIdOf(a.agent.agentId, q.requestId);
+        return { a, toAck, receipt, toCollect, toAnswer, ask: await f.sealed(a, q), asked, answer: await f.sealedAnswer(a.agent.agentId, p.phone, toAnswer.decisionId), ack: f.sealedAck(a, toAck.decisionId, receipt.answerId) };
+      }));
+      const cards = (x: typeof prepared[number]) => `/api/agents/${x.a.agent.agentId}/cards`;
+      type Call = { kind: string; send: () => ReturnType<typeof f.request> };
+      const calls: Call[] = prepared.flatMap(x => [
+        { kind: 'ask', send: () => f.request(cards(x), { agent: x.a.agentKey, data: x.ask }) },
+        { kind: 'collect', send: () => f.request(`${cards(x)}/${x.toCollect.decisionId}/answer`, { agent: x.a.agentKey }) },
+        { kind: 'acknowledge', send: () => f.request(`${cards(x)}/${x.toAck.decisionId}/acknowledge`, { agent: x.a.agentKey, data: x.ack }) },
+        { kind: 'answer', send: () => f.request(`${cards(x)}/${x.toAnswer.decisionId}/answer`, { phone: p.phone, data: x.answer }) },
+      ]);
+      // An agent of its own finishes, so its finish races only the off.
+      const last = await f.connect(p.number, 'Codex', `race ${round} finishing`);
+      calls.push({ kind: 'finish', send: () => f.request(`/api/agents/${last.agent.agentId}/finish`, { method: 'POST', agent: last.agentKey }) });
+      for (let n = 0; n < 3; n++) calls.push({ kind: 'connect', send: () => f.request('/api/agents', { data: f.connectBody(p.number, 'Codex', `race ${round} connect ${n}`) }) });
+      // Interleaved so each kind sits on both sides of the off.
+      const order = calls.map((c, i) => ({ c, key: (i * 7919) % calls.length })).sort((x, y) => x.key - y.key).map(x => x.c);
+      const half = Math.floor(order.length / 2);
+      const before = order.slice(0, half).map(c => c.send());
+      const off = f.settings(p.pagerId, p.phone, { on: false });
+      const after = order.slice(half).map(c => c.send());
+      const replies = await Promise.all([...before, ...after]);
+      const offSince = Date.parse((await off).pager.offSince ?? '');
+      const seen = await f.pager(p.pagerId, p.phone);
+      const byId = new Map(seen.agents.map(x => [x.agent.agentId, x]));
+      const kinds = [...order.slice(0, half), ...order.slice(half)];
+      // Each reply is either the call done or refused as off.
+      for (const [i, r] of replies.entries()) {
+        const tag = typeof r.value === 'object' && r.value !== null && 'error' in r.value ? r.value.error : undefined;
+        assert.ok(r.status === 200 || (r.status === 409 && tag === 'PagerOff'), `${kinds[i].kind}: ${r.status} ${JSON.stringify(r.value).slice(0, 200)}`);
+        if (r.status === 200) outcomes.landed++; else outcomes.refused++;
+      }
+      const result = (send: () => unknown) => { const i = kinds.findIndex(c => c.send === send); return replies[i].status === 200; };
+      const before_ = (at: string | undefined, what: string) => assert.ok(at && Date.parse(at) <= offSince, `${what} at ${at}, after the off at ${new Date(offSince).toISOString()}`);
+      for (const [n, x] of prepared.entries()) {
+        const mine = byId.get(x.a.agent.agentId), all = [...(mine?.open ?? []), ...(mine?.answered ?? [])], d = (id: string) => all.find(y => y.decisionId === id);
+        const call = (kind: string) => calls.filter(c => c.kind === kind)[n].send;
+        const asked = d(x.asked);
+        if (result(call('ask'))) before_(asked?.askedAt, 'an ask that landed'); else assert.equal(asked, undefined, 'a refused ask stored nothing');
+        const collected = d(x.toCollect.decisionId)?.collectedAt;
+        if (result(call('collect'))) before_(collected, 'a collection that landed'); else assert.equal(collected, undefined, 'a refused read collected nothing');
+        const acked = d(x.toAck.decisionId)?.acknowledgement;
+        if (result(call('acknowledge'))) before_(acked?.acknowledgedAt, 'an acknowledgement that landed'); else assert.equal(acked, undefined, 'a refused acknowledgement stored nothing');
+        const answered = d(x.toAnswer.decisionId)?.answer;
+        if (result(call('answer'))) before_(answered?.sentAt, 'an answer that landed'); else assert.equal(answered, undefined, 'a refused answer stored nothing');
+      }
+      const finished = byId.get(last.agent.agentId)?.agent.finishedAt ?? undefined;
+      const finish = calls.find(c => c.kind === 'finish');
+      assert.ok(finish);
+      if (result(finish.send)) before_(finished, 'a finish that landed'); else assert.equal(finished, undefined, 'a refused finish stored nothing');
+      const connects = calls.filter(c => c.kind === 'connect').map(c => replies[kinds.indexOf(c)]);
+      const joined = seen.agents.filter(x => x.agent.project.startsWith(`race ${round} connect`));
+      assert.equal(joined.length, connects.filter(r => r.status === 200).length, 'one agent for each connect that landed, and none for a refused one');
+      for (const x of joined) before_(x.agent.createdAt, 'a connect that landed');
+      await f.settings(p.pagerId, p.phone, { on: true });
+    }
+    // The bursts straddled the off: calls landed as it turned off, and calls were refused.
+    assert.ok(outcomes.landed > 0 && outcomes.refused > 0, `landed ${outcomes.landed}, refused ${outcomes.refused}`);
+    await f.artifact('outcomes.json', outcomes);
+  } finally { await f.stop(); }
+});

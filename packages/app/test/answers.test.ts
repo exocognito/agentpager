@@ -44,8 +44,8 @@ test('I5.1 I5.2 I5.3 The phone\'s resend of an answer, the same request and the 
     let checked = 0;
     for (const file of files) {
       const db = new DatabaseSync(file);
-      if (db.prepare("SELECT 1 FROM sqlite_master WHERE name='answers_v3'").get()) {
-        for (const [table, column] of [['decisions_v3', 'card'], ['answers_v3', 'part'], ['acknowledgements_v3', 'part']]) {
+      if (db.prepare("SELECT 1 FROM sqlite_master WHERE name='answers_v4'").get()) {
+        for (const [table, column] of [['decisions_v4', 'card'], ['answers_v4', 'part'], ['acknowledgements_v4', 'part']]) {
           assert.throws(() => db.prepare(`UPDATE ${table} SET ${column}='x'`).run(), /immutable/, table);
         }
         checked++;

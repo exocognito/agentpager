@@ -1,51 +1,36 @@
 import type { DurableObjectState } from '@cloudflare/workers-types';
 import { Schema } from 'effect';
 import * as C from './contract.ts';
-import { body, decode, iso, json, refusal, sameDigest } from './shared.ts';
-import { PushTarget } from './push.ts';
-import { clocks, forward, type Env } from './env.ts';
+import { body, decode, json, refusal } from './shared.ts';
+import { forward, type Env } from './env.ts';
+import type { RegistryExport } from './move.ts';
 
-const Digest = Schema.String.pipe(Schema.pattern(/^[a-f0-9]{64}$/));
-const Fingerprint = Schema.String.pipe(Schema.pattern(/^[a-f0-9]{16}$/));
-const Create = Schema.Struct({ pagerId: C.PagerId, fingerprint: Fingerprint, publicKey: C.PublicKey, phoneHash: Digest, autoOff: C.AutoOff });
-const Phone = Schema.Struct({ pagerId: C.PagerId, phoneHash: Digest });
-const Settings = Schema.Struct({ ...Phone.fields, on: Schema.optional(Schema.Boolean), autoOff: Schema.optional(C.AutoOff) });
-const Push = Schema.Struct({ ...Phone.fields, push: PushTarget });
-const Connect = Schema.Struct({ pagerId: C.PagerId, fingerprint: Fingerprint, agentId: C.Token });
 const Id = Schema.Struct({ pagerId: C.PagerId });
-const PushGone = Schema.Struct({ pagerId: C.PagerId, token: Schema.String });
 const Forget = Schema.Struct({ pagerId: C.PagerId, agentId: C.Token });
 
 type Row = { pager_id: string; fingerprint: string; public_key: string; phone_hash: string; enabled: number; auto_off: string; off_at: number | null; off_since: number | null; push: string | null; created_at: number };
 
-// The pagers: each phone-made pager's public key, its phone key as a digest, whether it is on, when it turns off by
-// itself, and where its phone gets alerts. Also which agents connected to each, so the phone can read them and a
-// deleted pager can take them with it. No names: those live only on the phone.
+// What M5 stored of every pager, in one object: each pager's row (its public key, its phone key as a digest, its
+// switch, auto-off, off-since and alert target) and which agents connected to it. Since M6 each pager has its own
+// store (pager.ts), which takes its row and its agents from here at its first call (/export) and keeps them from then
+// on. What is here stays, unused and never written again, until a later release removes it, except that a pager's
+// store erases what is here of a pager it deleted (/drop) or an agent it forgot (/forget).
+//   pagers_v2        each pager's row, as M5 last wrote it
+//   pager_agents_v3  the agents connected to each pager, in connect order
+//   erase_v2         agents of pagers deleted before M6, still to forget everything
 export class Registry {
   constructor(private ctx: DurableObjectState, private env: Env) {
-    // v1 links and numbers fail by design: v2 is a fresh install.
-    ctx.storage.sql.exec(`DROP TABLE IF EXISTS links_v2; DROP TABLE IF EXISTS numbers_v1; DROP TABLE IF EXISTS number_pagers_v1; DROP TABLE IF EXISTS number_push_v1;
-      CREATE TABLE IF NOT EXISTS pagers_v2 (pager_id TEXT PRIMARY KEY, fingerprint TEXT NOT NULL, public_key TEXT NOT NULL, phone_hash TEXT NOT NULL,
+    ctx.storage.sql.exec(`CREATE TABLE IF NOT EXISTS pagers_v2 (pager_id TEXT PRIMARY KEY, fingerprint TEXT NOT NULL, public_key TEXT NOT NULL, phone_hash TEXT NOT NULL,
         enabled INTEGER NOT NULL, auto_off TEXT NOT NULL, off_at INTEGER, off_since INTEGER, push TEXT, created_at INTEGER NOT NULL);
       CREATE TABLE IF NOT EXISTS pager_agents_v3 (pager_id TEXT NOT NULL, agent_id TEXT NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY (pager_id, agent_id));
       CREATE TABLE IF NOT EXISTS erase_v2 (agent_id TEXT PRIMARY KEY);`);
-    // The encryption switch (M5, the release's exception in blueprint/milestones/M5-encrypt.md): every agent connected
-    // before it is forgotten, with all its decisions, and no pager lists it again. pager_agents_v2 lists exactly those
-    // agents; v3 lists only agents connected since. In one transaction, each is queued to forget everything, as a
-    // deleted pager's agents are, and the old list goes, so this runs once. Every pager keeps its row: its key, number,
-    // switch, auto-off and push target. An agent of the old list that the queue hasn't reached yet forgets itself at
-    // its first start on this code (agent.ts).
-    ctx.storage.transactionSync(() => {
-      if (!ctx.storage.sql.exec("SELECT 1 FROM sqlite_master WHERE type='table' AND name='pager_agents_v2'").toArray().length) return;
-      ctx.storage.sql.exec('INSERT OR IGNORE INTO erase_v2 SELECT agent_id FROM pager_agents_v2; DROP TABLE pager_agents_v2;');
-    });
-    // Whatever is queued to forget is tried at once, from this start: the switch's queue, or a delete's left over.
+    // Whatever a delete before M6 left queued to forget is tried at once, from this start.
     void ctx.blockConcurrencyWhile(async () => {
       if (ctx.storage.sql.exec('SELECT 1 FROM erase_v2 LIMIT 1').toArray().length && await ctx.storage.getAlarm() === null) await ctx.storage.setAlarm(Date.now());
     });
   }
-  // A deleted pager's agents still to forget everything. Each is tried now; any left are tried again every minute
-  // until done. Until then the agent finds its pager gone on any call, and forgets itself.
+  // A pager deleted before M6 took its agents with it: each is still asked to forget everything, now and then every
+  // minute until done. Until then its agent finds its pager gone on any call.
   private async erase() {
     const ids = this.ctx.storage.sql.exec<{ agent_id: string }>('SELECT agent_id FROM erase_v2').toArray().map(r => r.agent_id);
     await Promise.all(ids.map(async id => {
@@ -56,109 +41,42 @@ export class Registry {
     else await this.ctx.storage.deleteAlarm();
   }
   async alarm() { await this.erase(); }
-  private row(pagerId: string) { return this.ctx.storage.sql.exec<Row>('SELECT * FROM pagers_v2 WHERE pager_id=?', pagerId).toArray()[0]; }
-  // Only the pager's own phone key reads or changes it.
-  private mine(p: { pagerId: string; phoneHash: string }) {
-    const row = this.row(p.pagerId);
-    if (!row) throw C.refuse.unknownPager();
-    if (!sameDigest(p.phoneHash, row.phone_hash)) throw C.refuse.unauthorized();
-    return row;
-  }
-  private pager(row: Row): C.Pager {
-    return decode(C.Pager, { pagerId: row.pager_id, on: row.enabled === 1, autoOff: row.auto_off, offAt: row.off_at === null ? null : iso(row.off_at), offSince: row.off_since === null ? null : iso(row.off_since), createdAt: iso(row.created_at) });
-  }
-  private agents(pagerId: string) {
-    return this.ctx.storage.sql.exec<{ agent_id: string }>('SELECT agent_id FROM pager_agents_v3 WHERE pager_id=? ORDER BY created_at, rowid', pagerId).toArray().map(r => r.agent_id);
-  }
-  // Turned on now: it turns off by itself after its auto-off time, if it has one.
-  private offAt(autoOff: C.AutoOff, now: number) { return autoOff === 'never' ? null : now + clocks.autoOffMs(autoOff); }
 
   async fetch(request: Request): Promise<Response> {
     try {
-      const now = Date.now();
-      // Auto-off lands in the same state as the switch: off since the time it was due.
-      this.ctx.storage.sql.exec('UPDATE pagers_v2 SET enabled=0, off_since=off_at, off_at=NULL WHERE enabled=1 AND off_at IS NOT NULL AND off_at <= ?', now);
       const action = new URL(request.url).pathname.slice(1), data = await body(request);
-      if (action === 'create') {
-        const p = decode(Create, data);
-        // The same phone making the same pager again (its reply was lost) gets the pager back, with the turn-off choice
-        // it asks for now; anyone else is refused.
-        const existing = this.row(p.pagerId);
-        if (existing) {
-          if (!sameDigest(p.phoneHash, existing.phone_hash) || existing.public_key !== p.publicKey || existing.fingerprint !== p.fingerprint) throw C.refuse.pagerExists();
-          if (existing.auto_off !== p.autoOff) this.ctx.storage.sql.exec('UPDATE pagers_v2 SET auto_off=?, off_at=? WHERE pager_id=?', p.autoOff, existing.enabled === 1 ? this.offAt(p.autoOff, now) : null, p.pagerId);
-          return json({ pager: this.pager(this.row(p.pagerId)) });
-        }
-        this.ctx.storage.sql.exec('INSERT INTO pagers_v2 VALUES (?, ?, ?, ?, 1, ?, ?, NULL, NULL, ?)', p.pagerId, p.fingerprint, p.publicKey, p.phoneHash, p.autoOff, this.offAt(p.autoOff, now), now);
-        return json({ pager: this.pager(this.row(p.pagerId)) });
+      // One pager's row and its agents, for its store's move. It only reads: auto-off that has come due is the pager's
+      // store's to apply, from the same row. An agent still queued to forget is never handed over, nor is any agent of
+      // a pager that isn't here.
+      if (action === 'export') {
+        const { pagerId } = decode(Id, data);
+        const row = this.ctx.storage.sql.exec<Row>('SELECT * FROM pagers_v2 WHERE pager_id=?', pagerId).toArray()[0];
+        const agents = row ? this.ctx.storage.sql.exec<{ agent_id: string }>('SELECT agent_id FROM pager_agents_v3 WHERE pager_id=? AND agent_id NOT IN (SELECT agent_id FROM erase_v2) ORDER BY created_at, rowid', pagerId).toArray().map(r => r.agent_id) : [];
+        if (row && row.enabled !== 0 && row.enabled !== 1) throw new Error('A pager row whose switch is neither on nor off.');
+        const reply: RegistryExport = {
+          pager: row ? { fingerprint: row.fingerprint, publicKey: row.public_key, phoneHash: row.phone_hash, enabled: row.enabled === 1 ? 1 : 0, autoOff: decode(C.AutoOff, row.auto_off), offAt: row.off_at, offSince: row.off_since, push: row.push, createdAt: row.created_at } : null,
+          agents,
+        };
+        return json(reply);
       }
-      if (action === 'get') {
-        const row = this.mine(decode(Phone, data));
-        return json({ pager: this.pager(row), agentIds: this.agents(row.pager_id) });
-      }
-      if (action === 'settings') {
-        const p = decode(Settings, data);
-        let row = this.mine(p);
-        if (p.autoOff !== undefined) {
-          // Counted from now while on; an off pager keeps the choice for when it is turned on.
-          this.ctx.storage.sql.exec('UPDATE pagers_v2 SET auto_off=?, off_at=? WHERE pager_id=?', p.autoOff, row.enabled === 1 ? this.offAt(p.autoOff, now) : null, p.pagerId);
-          row = this.mine(p);
-        }
-        if (p.on === true && row.enabled === 0) this.ctx.storage.sql.exec('UPDATE pagers_v2 SET enabled=1, off_since=NULL, off_at=? WHERE pager_id=?', this.offAt(decode(C.AutoOff, row.auto_off), now), p.pagerId);
-        if (p.on === false && row.enabled === 1) this.ctx.storage.sql.exec('UPDATE pagers_v2 SET enabled=0, off_since=?, off_at=NULL WHERE pager_id=?', now, p.pagerId);
-        return json({ pager: this.pager(this.mine(p)) });
-      }
-      if (action === 'push') {
-        const p = decode(Push, data);
-        this.mine(p);
-        this.ctx.storage.sql.exec('UPDATE pagers_v2 SET push=? WHERE pager_id=?', JSON.stringify(p.push), p.pagerId);
-        return json({ ok: true });
-      }
-      // Apple says a token is gone: drop it, unless the phone has given a new one since.
-      if (action === 'push-gone') {
-        const p = decode(PushGone, data), row = this.row(p.pagerId);
-        if (row?.push && decode(PushTarget, JSON.parse(row.push)).token === p.token) this.ctx.storage.sql.exec('UPDATE pagers_v2 SET push=NULL WHERE pager_id=?', p.pagerId);
-        return json({ ok: true });
-      }
-      // Deleting a pager deletes its agents and their decisions from the service: they are queued to forget
-      // everything in the same transaction that deletes the pager.
-      if (action === 'delete') {
-        const row = this.mine(decode(Phone, data));
-        this.ctx.storage.transactionSync(() => {
-          for (const id of this.agents(row.pager_id)) this.ctx.storage.sql.exec('INSERT OR IGNORE INTO erase_v2 VALUES (?)', id);
-          this.ctx.storage.sql.exec('DELETE FROM pager_agents_v3 WHERE pager_id=?', row.pager_id);
-          this.ctx.storage.sql.exec('DELETE FROM pagers_v2 WHERE pager_id=?', row.pager_id);
-        });
-        await this.erase();
-        return json({ ok: true });
-      }
-      // An agent connects with the number: the fingerprint must match, and the pager must be on.
-      if (action === 'connect') {
-        const p = decode(Connect, data), row = this.row(p.pagerId);
-        if (!row || row.fingerprint !== p.fingerprint) throw C.refuse.numberInvalid();
-        if (row.enabled !== 1) throw C.refuse.pagerOff();
-        this.ctx.storage.sql.exec('INSERT INTO pager_agents_v3 VALUES (?, ?, ?)', p.pagerId, p.agentId, now);
-        return json({ phoneHash: row.phone_hash });
-      }
-      // A pager's public key, for anyone with its id: the command checks it against the number (I19).
-      if (action === 'key') {
-        const row = this.row(decode(Id, data).pagerId);
-        if (!row) throw C.refuse.numberInvalid();
-        return json({ pagerId: row.pager_id, publicKey: row.public_key });
-      }
-      // What an agent checks before each call: is its pager on, and where do alerts go.
-      if (action === 'state') {
-        const row = this.row(decode(Id, data).pagerId);
-        if (!row) return json({ state: 'gone' });
-        return json({ state: row.enabled === 1 ? 'on' : 'off', push: row.push ? decode(PushTarget, JSON.parse(row.push)) : null });
-      }
-      // Housekeeping forgot an agent.
+      // A pager's store forgot one of the agents it took from here.
       if (action === 'forget') {
         const p = decode(Forget, data);
         this.ctx.storage.sql.exec('DELETE FROM pager_agents_v3 WHERE pager_id=? AND agent_id=?', p.pagerId, p.agentId);
         return json({ ok: true });
       }
-      return json({ error: 'NotFound' }, 404);
+      // A pager's store deleted the pager it took from here.
+      if (action === 'drop') {
+        const { pagerId } = decode(Id, data);
+        this.ctx.storage.transactionSync(() => {
+          this.ctx.storage.sql.exec('DELETE FROM pager_agents_v3 WHERE pager_id=?', pagerId);
+          this.ctx.storage.sql.exec('DELETE FROM pagers_v2 WHERE pager_id=?', pagerId);
+        });
+        return json({ ok: true });
+      }
+      // M5's other routes are each pager's store's now. A call from M5's code during the deploy fails as the server's
+      // own failure, which every client tries again, and never as the pager being gone.
+      throw new Error(`The Registry no longer serves /${action}; each pager's store does.`);
     } catch (error) { return refusal(error); }
   }
 }

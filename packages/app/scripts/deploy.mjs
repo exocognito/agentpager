@@ -2,7 +2,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdtempSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
-import { ZONE, stageOf, deployRefusal, hostRefusal, stageConfig } from './stages.ts';
+import { ZONE, stageOf, deployRefusal, hostRefusal, stageConfig, storageRefusal, checkSettled } from './stages.ts';
 
 // node scripts/deploy.mjs --stage dev|prod deploys this checkout's commit to that stage (AGENTS.md › Stages).
 // With --verify it deploys nothing and only checks what that stage runs, for the smoke run.
@@ -59,15 +59,17 @@ try {
   const dns = await cf(`/zones/${zones[0].id}/dns_records?name=${stage.host}`);
   if (!dns.some(d => d.name === stage.host && d.proxied)) throw new Error(`Proxied DNS record for ${stage.host} missing.`);
   console.log('Verified custom domain, DNS:', JSON.stringify(dns.map(d => ({ type: d.type, name: d.name, proxied: d.proxied }))));
-  const namespaces = await cf(`/accounts/${account}/workers/durable_objects/namespaces`);
-  const placement = namespaces.filter(n => n.script === stage.worker);
-  for (const name of ['Agent', 'Registry']) if (!placement.some(n => n.class === name && n.use_sqlite === true)) throw new Error(`${name} is not a SQLite namespace on ${stage.worker}.`);
-  console.log('Durable Object placement:', JSON.stringify(placement));
-  const settings = await cf(`/accounts/${account}/workers/scripts/${stage.worker}/settings`);
-  const bindings = settings.bindings.filter(b => b.type === 'durable_object_namespace');
-  for (const [name, className] of [['AGENT', 'Agent'], ['REGISTRY', 'Registry']]) if (!bindings.some(b => b.name === name && b.class_name === className && placement.some(n => n.id === b.namespace_id && n.class === className))) throw new Error(`Incorrect ${name} binding.`);
-  console.log('Bindings:', JSON.stringify(bindings));
-  if (!settings.bindings.some(b => b.type === 'secret_text' && b.name === 'APNS_KEY_P8')) throw new Error('The Worker secret APNS_KEY_P8 is missing, so no alerts go out.');
+  // Every class a SQLite namespace of this Worker, every binding naming it, and the push key's secret set; asked again
+  // while Cloudflare's reads lag the deploy.
+  let seenStorage;
+  await checkSettled(async () => {
+    const namespaces = await cf(`/accounts/${account}/workers/durable_objects/namespaces`);
+    const settings = await cf(`/accounts/${account}/workers/scripts/${stage.worker}/settings`);
+    seenStorage = { placement: namespaces.filter(n => n.script === stage.worker), bindings: settings.bindings.filter(b => b.type === 'durable_object_namespace') };
+    return storageRefusal(stage.worker, namespaces, settings.bindings);
+  }, line => console.log(line));
+  console.log('Durable Object placement:', JSON.stringify(seenStorage.placement));
+  console.log('Bindings:', JSON.stringify(seenStorage.bindings));
   // A new hostname's record takes Cloudflare a moment to serve, and a resolver that asks before then keeps the
   // negative answer for up to the zone's 30 minutes. So this machine asks only once public DNS answers.
   let resolved = false;

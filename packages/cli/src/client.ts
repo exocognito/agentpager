@@ -1,5 +1,5 @@
 import { Either, Schema } from 'effect';
-import { CLIENT_HEADER, clientVersion } from '../../contract/exchange.ts';
+import { CLIENT_HEADER, PICKUP_PROTOCOL, clientVersion } from '../../contract/exchange.ts';
 import { VERSION } from './version.ts';
 
 // The HTTP API is the binary's transport (the server's /start documents it). A reply is decoded with its route's
@@ -21,8 +21,9 @@ export function transportFailure(e: unknown): Failure {
 }
 
 // Every call says it is this command, at this build, and the protocol it speaks; a server that no longer accepts it
-// refuses it with how to update.
-const CLIENT = clientVersion('cli', VERSION);
+// refuses it with how to update. This command says when it has received an answer (commands.ts › wait), so it speaks
+// PICKUP_PROTOCOL.
+const CLIENT = clientVersion('cli', VERSION, PICKUP_PROTOCOL);
 export async function call<A, I>(schema: Schema.Schema<A, I>, server: string, method: string, route: string, opts: { key?: string; data?: unknown; timeoutMs?: number } = {}): Promise<Reply<A>> {
   let response: Response, text: string;
   try {

@@ -27,7 +27,7 @@ The words that mean something specific in this product. They name things; the pr
 | Undo window | The five seconds after Send in which the owner can take an answer back. |
 | Answer | What the owner sent for one decision: an option or feedback. |
 | Receipt | The service saying it stored an answer. Not an acknowledgement. |
-| Not picked up | An answer no agent has read 3 minutes after Send. The owner is told once. |
+| Not picked up | An answer no agent has received 3 minutes after Send. The owner is told once. |
 | Acknowledgement | The agent saying it read an answer, with its next steps. |
 | Keys | Each pager has a key pair made on the phone, whose public key the number's fingerprint names, and a phone key the phone acts with. Each agent has an agent key, kept in a private file on its machine, so the agent passes only its id. Each agent also has a key pair, made at connect, whose private key stays in the agent's file. The service stores phone and agent keys only as digests. |
 | Encrypted part | A card, one of its attachments, who asked, an answer, an acknowledgement or an alert's preview, encrypted on one end for the other to read. |

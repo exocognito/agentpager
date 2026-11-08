@@ -32,7 +32,8 @@ import { Waits, type Reach } from './wake.ts';
 //   attachments_v4      each attachment's part, by its slot in the card's list
 //   answers_v4          the answer part, with the phone's request id, so its resend is the same request (I5)
 //   acknowledgements_v4 the acknowledgement part
-//   pickups_v4, collections_v4, warnings_v4   when an answer is due its not-picked-up warning, was collected, was warned
+//   pickups_v4, collections_v4, warnings_v4   when an answer is due its not-picked-up warning, was picked up (pickUp),
+//                       was warned
 //   erase_v4            what an old store still holds of a pager or agent this store has deleted, still to erase there
 // Decisions, attachments, answers, acknowledgements, collections and warnings are written once and never changed.
 //
@@ -65,6 +66,14 @@ type Erase = { store: 'agent' | 'listing' | 'pager'; id: string };
 
 async function keyDigest(value: string | null | undefined) { return value && Schema.is(C.Token)(value) ? sha256(value) : null; }
 const agentDigest = (request: Request) => keyDigest(request.headers.get(C.AGENT_AUTH_HEADER)?.replace(/^Bearer /, ''));
+// Whether an agent's call comes from a command that says when it has received an answer (C.PICKUP_PROTOCOL): then only
+// that, or the agent's acknowledgement, picks the answer up (B32.12, blueprint/areas/2-agents.md). The protocol in the
+// call's client header tells, since saying what a client speaks is that header's job and every command sends it; the
+// Worker has already refused one too old. The build it names is a commit, which has no order. The m6.1 command and
+// every one before it say 2, so they keep the rule they were built for: their read picks the answer up. No read at 3
+// does, so a read that never says it has the answer, such as a watcher's waiting to wake its agent, can't silence the
+// owner's warning (B5.13).
+const confirmsPickup = (request: Request) => (C.readClientVersion(request.headers.get(C.CLIENT_HEADER))?.protocol ?? 0) >= C.PICKUP_PROTOCOL;
 const phoneDigest = (request: Request) => keyDigest(request.headers.get(C.PHONE_AUTH_HEADER));
 const registry = (env: Env, path: string, data: unknown) => forward(env.REGISTRY, 'registry', path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(data) });
 // What an old store hands over is decoded before use. A failure names only the paths that failed, never a value, since
@@ -370,7 +379,7 @@ export class Pager {
     try { await this.erase(); } catch (error) { console.error('Erasing an old store failed', error instanceof Error ? error.message : 'unknown'); }
     await this.afterwards();
   }
-  // An answer no agent has collected clocks.pickupMs after Send: the owner hears once, by an alert while the pager is on
+  // An answer no agent has picked up clocks.pickupMs after Send: the owner hears once, by an alert while the pager is on
   // and on the decision row, that AgentPager can't reach the agent. The alert resends the decision's preview, which
   // names who asked, its computer, its project and the question; the phone words it as the warning. While the pager is
   // off no agent can read an answer, so there is nothing to warn about.
@@ -386,6 +395,17 @@ export class Pager {
       return on ? { push: row?.push ? decode(PushTarget, JSON.parse(row.push)) : null, due: due.map(d => ({ ...d, preview: this.preview(d.agent_id, d.decision_id) })) } : null;
     });
     for (const d of warned?.due ?? []) await this.alertPhone(d.agent_id, warned?.push ?? null, d.decision_id, 'warning', d.preview);
+  }
+  // An answer picked up (B32.12): the owner gets no warning for it, or, if it came after the warning, the decision goes
+  // back to waiting for the agent (B5.13); the phone still waits for the acknowledgement (I6). The first time stays, and
+  // nothing brings the warning's clock back, so it never warns twice. In the transaction that checked the answer.
+  // When it was first picked up.
+  private pickUp(agentId: string, decisionId: string, at = iso()): string {
+    this.ctx.storage.sql.exec('INSERT OR IGNORE INTO collections_v4 VALUES (?, ?, ?)', agentId, decisionId, at);
+    this.ctx.storage.sql.exec('DELETE FROM pickups_v4 WHERE agent_id=? AND decision_id=?', agentId, decisionId);
+    const first = this.sql<{ at: string }>('SELECT at FROM collections_v4 WHERE agent_id=? AND decision_id=?', agentId, decisionId)[0];
+    if (!first) throw new Error('An answer picked up with no collection.');
+    return first.at;
   }
   // An alert goes to the pager's phone when it gave a token, with the preview the agent sealed. Apple's refusal of a
   // token drops it, unless the phone has given a new one since.
@@ -567,25 +587,43 @@ export class Pager {
     if (action === 'read') {
       const digest = await agentDigest(request);
       this.tx(() => this.agent(agentId, digest));
-      const id = decode(C.Token, param ?? ''), wait = url.searchParams.get('wait');
+      const id = decode(C.Token, param ?? ''), wait = url.searchParams.get('wait'), picksUp = !confirmsPickup(request);
       const seconds = wait === null ? 0 : decode(Schema.Number.pipe(Schema.int(), Schema.between(1, C.ANSWER_WAIT_MAX_SECONDS)), Number(wait));
       // Held until the answer is here, or until its time is up, when it is pending. Each look checks the agent and the
-      // switch first, in the transaction that collects: the answer is delivered only while the pager is on, and a wait
-      // woken by the pager turning off, by it or the agent going, or by the agent finishing, which closes the decision
-      // if it has no answer, ends refused as a new call would be. Between looks it sleeps until a wake (wake, above),
-      // its time, or its pager's auto-off, whichever is first.
+      // switch first, in the transaction that finds the answer: the answer is delivered only while the pager is on, and
+      // a wait woken by the pager turning off, by it or the agent going, or by the agent finishing, which closes the
+      // decision if it has no answer, ends refused as a new call would be. Between looks it sleeps until a wake (wake,
+      // above), its time, or its pager's auto-off, whichever is first. A wait whose command has gone still finds the
+      // answer and replies to no one, since nothing tells it its caller went: so a command at C.PICKUP_PROTOCOL picks
+      // the answer up only once it has it (received, below). Only an older command's read picks it up, as it always did.
       const answer = await this.waits.hold({ agentId, decisionId: id }, Date.now() + seconds * 1000, () => this.tx(() => {
         const a = this.agent(agentId, digest);
         this.on();
         const d = this.decision(a, id);
         if (d.closed) throw C.refuse.decisionClosed(d.closed);
         if (!d.answer) return { lookBy: this.pagerRow()?.off_at ?? null };
-        // Collected: the owner gets no warning for it, and the phone still waits for the acknowledgement (I6).
-        this.ctx.storage.sql.exec('INSERT OR IGNORE INTO collections_v4 VALUES (?, ?, ?)', agentId, id, iso());
-        this.ctx.storage.sql.exec('DELETE FROM pickups_v4 WHERE agent_id=? AND decision_id=?', agentId, id);
+        if (picksUp) this.pickUp(agentId, id);
         return { found: d.answer };
       }));
       return json(answer ? decode(C.AnswerStatus, { status: 'answered', answer }) : { status: 'pending' });
+    }
+    // The agent's command has received the answer: it read it and opened it, and says so (B32.12). Only its own agent's
+    // key says so, for that agent's own decision, naming the answer it has; anything else is refused as the same
+    // acknowledgement would be, and picks nothing up. Saying it again, as after a lost reply, changes nothing and gets
+    // the same reply. Received isn't activity, as reading isn't: the agent's 30-day clock stays as it was.
+    if (action === 'received') {
+      const digest = await agentDigest(request);
+      this.tx(() => this.agent(agentId, digest));
+      const id = decode(C.Token, param ?? ''), input = decode(C.ReceivedInput, await body(request));
+      return json(this.tx(() => {
+        const a = this.agent(agentId, digest);
+        this.on();
+        const d = this.decision(a, id);
+        if (d.closed) throw C.refuse.decisionClosed(d.closed);
+        if (!d.answer) throw C.refuse.notAnswered();
+        if (d.answer.answerId !== input.answerId) throw C.refuse.answerMismatch();
+        return decode(C.Received, { decisionId: id, answerId: input.answerId, collectedAt: this.pickUp(agentId, id) });
+      }));
     }
     if (action === 'ack') {
       const digest = await agentDigest(request);
@@ -600,6 +638,8 @@ export class Pager {
         if (d.acknowledgement) throw C.refuse.alreadyAcknowledged();
         const acknowledgedAt = iso();
         this.ctx.storage.sql.exec('INSERT INTO acknowledgements_v4 VALUES (?, ?, ?, ?)', agentId, id, input.acknowledgement, acknowledgedAt);
+        // An agent that acknowledges an answer has it, whether or not its command said so first (B32.12).
+        this.pickUp(agentId, id, acknowledgedAt);
         this.touch(agentId);
         return { push, ack: decode(C.Acknowledgement, { decisionId: id, answerId: input.answerId, acknowledgement: input.acknowledgement, acknowledgedAt }) };
       });

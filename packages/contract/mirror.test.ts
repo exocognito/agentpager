@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { expect, it } from "vitest";
 import { Schema } from "effect";
 import { createHash } from "node:crypto";
-import { AskInput, CLIENT_HEADER, CLOSED_AGENT_FINISHED, Closed, PROTOCOL, QuestionInput, Token, clientVersion, decisionIdOf, readClientVersion } from "./exchange.ts";
+import { AskInput, CLIENT_HEADER, CLOSED_AGENT_FINISHED, Closed, PICKUP_PROTOCOL, PROTOCOL, QuestionInput, Token, clientVersion, decisionIdOf, readClientVersion } from "./exchange.ts";
 
 // The iPhone app and its UI tests' agent mirror the client header in Swift (METHOD.md › Design in code): the same
 // header, the same protocol, and the app sends it on every request.
@@ -30,17 +30,20 @@ it("the app reads a decision's closed record as the contract sends it", () => {
   expect(api).toMatch(/struct SealedDecision: Codable, Hashable, Sendable \{[^}]*\n    var closed: Closed\?\n\}/);
 });
 
-it("the UI tests' agent names the same header and protocol as the command", () => {
+// It speaks protocol 2, as the m6.1 command did: its reads pick answers up, so the journeys draw what they always did.
+it("the UI tests' agent names the same header as the command, and protocol 2", () => {
   const harness = swift("AgentPagerUITests/AgentHarness.swift");
   expect(harness).toContain(`static let clientHeader = "${CLIENT_HEADER}"`);
   const sent = harness.match(/static let clientVersion = "([^"]+)"/)?.[1] ?? "";
   expect(readClientVersion(sent)?.protocol).toBe(PROTOCOL);
+  expect(PROTOCOL).toBeLessThan(PICKUP_PROTOCOL);
   expect(harness).toContain("var headers = [\"content-type\": \"application/json\", Self.clientHeader: Self.clientVersion]");
 });
 
 it("reads a client's header as its name, protocol and build, and nothing else", () => {
   expect(readClientVersion(clientVersion("cli", "3f9c2ab"))).toEqual({ client: "cli", protocol: PROTOCOL, build: "3f9c2ab" });
   expect(readClientVersion(clientVersion("cli", "dev"))).toEqual({ client: "cli", protocol: PROTOCOL, build: "dev" });
+  expect(readClientVersion(clientVersion("cli", "3f9c2ab", PICKUP_PROTOCOL))).toEqual({ client: "cli", protocol: 3, build: "3f9c2ab" });
   // A build that doesn't fit is sent with its other characters replaced, never as a header the service can't read.
   expect(readClientVersion(clientVersion("cli", "a b/c"))?.build).toBe("a-b-c");
   expect(readClientVersion(clientVersion("cli", ""))?.build).toBe("-");

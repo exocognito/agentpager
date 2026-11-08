@@ -46,7 +46,7 @@ function sideOf(parts: string[], method: string): Side | null {
   if (n === 2) return method === 'GET' ? 'agent' : null;
   if (n === 3) return method === 'POST' && (sub === 'cards' || sub === 'finish') ? 'agent' : null;
   if (n === 5 && sub === 'cards' && leaf === 'answer') return method === 'GET' ? 'agent' : method === 'POST' ? 'phone' : null;
-  if (n === 5 && sub === 'cards' && leaf === 'acknowledge') return method === 'POST' ? 'agent' : null;
+  if (n === 5 && sub === 'cards' && (leaf === 'acknowledge' || leaf === 'received')) return method === 'POST' ? 'agent' : null;
   if (n === 6 && sub === 'cards' && leaf === 'files') return method === 'GET' ? 'phone' : null;
   return null;
 }
@@ -106,6 +106,8 @@ async function api(request: Request, env: Env): Promise<Response> {
       const decisionId = parts[3];
       if (parts[4] === 'answer') return pass(agentId, `/${method === 'GET' ? 'read' : 'answer'}/${decisionId}`);
       if (parts[4] === 'acknowledge' && method === 'POST') return pass(agentId, `/ack/${decisionId}`);
+      // The command has received the answer (B32.12).
+      if (parts[4] === 'received' && method === 'POST') return pass(agentId, `/received/${decisionId}`);
     }
     if (parts.length === 6 && parts[2] === 'cards' && parts[4] === 'files' && method === 'GET') return pass(agentId, `/file/${parts[3]}/${parts[5]}`);
     if (rest === 'finish' && method === 'POST') return pass(agentId, '/finish');

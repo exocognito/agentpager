@@ -13,14 +13,14 @@ Start here. [PRODUCT.md](PRODUCT.md) says what AgentPager is for, as Sam approve
 | ✅ | [M3 · COMMAND](milestones/M3-command.md) | The agentpager command |
 | ✅ | [M4 · HOUSE](milestones/M4-house.md) | House in order: the Blueprint by area, a dev stage and the id check |
 | ✅ | [M5 · ENCRYPT](milestones/M5-encrypt.md) | Decisions the service can't read |
-| 🔨 | [M6 · TIDY](milestones/M6-tidy.md) | Tidy state: one store per pager, lighter polls and the agent's lifecycle |
+| ✅ | [M6 · TIDY](milestones/M6-tidy.md) | Tidy state: one store per pager, lighter polls and the agent's lifecycle |
 | ⏳ | [CLIENTS](milestones/next/CLIENTS.md) | The agent apps AgentPager supports |
 | ⏳ | [INSTALL](milestones/next/INSTALL.md) | AgentPager installs in a minute |
 | ⏳ | [SITE](milestones/next/SITE.md) | A front page for AgentPager as it is now |
 | ⏳ | [OPEN](milestones/next/OPEN.md) | AgentPager in the open |
 | ⏳ | [FRIENDS](milestones/next/FRIENDS.md) | AgentPager for people I invite |
 
-✅ shipped · 🔨 building · ⏳ queued. One at a time, in this order. Prod runs the `m5` release (464d559) since 7 Nov.
+✅ shipped · 🔨 building · ⏳ queued. One at a time, in this order. Prod runs the `m6` release (c9cc3c3) since 8 Nov.
 
 ## Areas
 

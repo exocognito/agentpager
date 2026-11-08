@@ -6,7 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Schema } from 'effect';
 import pngjs from 'pngjs';
-import { AGENT_IDLE_MS, CLIENT_HEADER, PagerInbox, clientVersion } from '../src/contract.ts';
+import { AGENT_IDLE_MS, CLIENT_HEADER, PagerInbox, PagerKey, clientVersion } from '../src/contract.ts';
 import { fromBase64url, open, seal } from '../../contract/envelope.ts';
 import { decodePart, encodePart } from '../../contract/parts.ts';
 import { RELEASE_TAG, stageOf } from './stages.ts';
@@ -44,9 +44,11 @@ import { RELEASE_TAG, stageOf } from './stages.ts';
 //         attachments: [{ name, type, bytes, sha256 }] (a PNG, and the Markdown page context.more makes) },
 //       open: { id: 'd_xxxx', decisionId, title, attachments: [] } } }
 //   Format 1 is the same, from before the encryption switch (M5), when the service stored decisions readable: the m4
-//   baseline. Only the smoke run's upgrade check reads one; --verify reads format 2.
+//   baseline. Nothing reads one any more: M5's upgrade check, its release's exception, ended with M5. --verify reads
+//   format 2.
 // The service forgets an agent idle for 30 days (blueprint/areas/1-pagers.md), and with it these decisions: a check
-// must run within 30 days of recordedAt. --verify is no activity, so it doesn't extend that.
+// must run within 30 days of recordedAt. --verify is no activity, so it doesn't extend that, and it checks that nothing
+// since the record has been: the agent was last active before recordedAt.
 const argv = process.argv, flag = name => { const at = argv.indexOf(name); return at === -1 ? undefined : argv[at + 1]; };
 const verifying = argv.includes('--verify'), local = flag('--stage') === 'local';
 const app = fileURLToPath(new URL('..', import.meta.url)), cli = path.join(app, '../cli');
@@ -119,8 +121,10 @@ function save(record) {
 }
 const agentFile = record => JSON.parse(readFileSync(path.join(dir, record.home, 'agents', `${record.agent.id}.json`), 'utf8'));
 
-// What the record says is on the stage, read as the phone reads it, opening each part with the pager's private key,
-// and by the binary that made it. Reads only.
+// What the record says is on the stage, read as the phone reads it, opening each part with the pager's private key; the
+// pager's key as the command fetches it at connect; the answer as its agent opens it, with the agent's own key; and
+// the agent's status, by the binary that made it, from the record's own home, which `status` only reads. Reads only:
+// it connects, answers and acknowledges nothing, and writes nothing in the record's folder.
 const key = record => fromBase64url(record.pager.privateKey);
 const opened = (record, kind, at, part) => decodePart(kind, open(key(record), kind, { pagerId: record.pager.pagerId, ...at }, part));
 async function readBack(record) {
@@ -128,11 +132,18 @@ async function readBack(record) {
   const inbox = Schema.decodeUnknownSync(PagerInbox)(await (await ok(await phone(record, `/api/pagers/${record.pager.pagerId}`), 'reading the pager')).json());
   check(inbox.pager.pagerId === record.pager.pagerId && inbox.pager.on && inbox.pager.autoOff === 'never', `the pager reads back ${inbox.pager.on ? 'on' : 'off'}, auto-off ${inbox.pager.autoOff}`);
   lines.push('the pager is on, auto-off never');
+  const given = Schema.decodeUnknownSync(PagerKey)(await (await ok(await fetch(`${record.server}/api/pagers/${record.pager.pagerId}/key`, { headers: { [CLIENT_HEADER]: clientVersion('baseline', sha.slice(0, 7)) } }), 'fetching the pager\'s key')).json());
+  const named = Buffer.from(record.pager.number.slice(4), 'base64url');
+  check(named.subarray(0, 16).toString('hex') === record.pager.pagerId && given.publicKey === record.pager.publicKey
+    && createHash('sha256').update(fromBase64url(given.publicKey)).digest().subarray(0, 8).equals(named.subarray(16, 24)), 'the service gives another key for the pager than the one its number names');
+  lines.push('the key the service gives for it is the one its number names');
   check(inbox.agents.length === 1 && inbox.agents[0].agent.agentId === record.agent.agentId && !inbox.agents[0].agent.finishedAt, `the pager lists ${inbox.agents.length} agents, not its one agent`);
   const { agent, open: waiting, answered } = inbox.agents[0], { acknowledged, open: left } = record.decisions;
   const identity = opened(record, 'identity', {}, agent.identity);
   check(identity.project === `${record.tag} baseline`, 'its identity doesn\'t open to its project');
-  lines.push(`one agent (${record.agent.id}), its identity opened, last active ${agent.lastActivityAt}`);
+  // Nothing since the record counts as activity, a read back least of all: anything that did wrote to the baseline.
+  check(!record.recordedAt || Date.parse(agent.lastActivityAt) <= Date.parse(record.recordedAt), `its agent was last active at ${agent.lastActivityAt}, after the record was made at ${record.recordedAt}`);
+  lines.push(`one agent (${record.agent.id}), its identity opened, last active ${agent.lastActivityAt}${record.recordedAt ? ', before the record was made' : ''}`);
   check(waiting.length === 1 && waiting[0].decisionId === left.decisionId && waiting[0].status === 'open' && opened(record, 'card', { decisionId: left.decisionId }, waiting[0].card).title === left.title, `${waiting.length} open decisions, not ${left.id}`);
   lines.push(`one open decision (${left.id}), its card opened`);
   const d = answered[0];
@@ -141,7 +152,9 @@ async function readBack(record) {
   `${answered.length} answered decisions, not ${acknowledged.id} answered, collected and acknowledged`);
   const card = opened(record, 'card', { decisionId: d.decisionId }, d.card);
   check(card.title === acknowledged.title && card.answerKey === identity.answerKey, 'its card doesn\'t open to its question, naming its agent\'s key');
-  lines.push(`one acknowledged decision (${acknowledged.id}), its answer collected, its card and acknowledgement opened`);
+  const choice = decodePart('answer', open(fromBase64url(agentFile(record).privateKey), 'answer', { pagerId: record.pager.pagerId, decisionId: d.decisionId }, d.answer.answer)).choice;
+  check(choice.kind === 'option' && choice.number === acknowledged.option, 'its answer doesn\'t open, with its agent\'s key, to the option the phone sent');
+  lines.push(`one acknowledged decision (${acknowledged.id}), its answer collected, its card and acknowledgement opened, its answer opened by its agent's key`);
   const listed = (card.attachments ?? []).map((a, i) => `${a.name} ${a.type} ${d.attachments[i]?.bytes}`).sort().join(', ');
   check(listed === acknowledged.attachments.map(a => `${a.name} ${a.type} ${a.bytes}`).sort().join(', '), `its attachments read back as ${listed || 'none'}`);
   for (const [slot, a] of (card.attachments ?? []).entries()) {
@@ -239,7 +252,7 @@ async function record() {
 
     const connected = command(binary, home, ['connect', '--server', origin, '--app', 'baseline', '--project', `${tag} baseline`], { AGENTPAGER_PAGER: pager.number });
     const file = JSON.parse(readFileSync(path.join(home, 'agents', `${connected.result.agent}.json`), 'utf8'));
-    secrets.add(file.agentKey);
+    secrets.add(file.agentKey); secrets.add(file.privateKey);
     r.agent = { id: connected.result.agent, agentId: file.agentId }; save(r);
     say(`ok agentpager ${binaryVersion} connected as ${r.agent.id} under its own AGENTPAGER_HOME`);
 
@@ -296,9 +309,10 @@ async function verify() {
   check(existsSync(recordFile), `No baseline at ${dir}.`);
   const r = JSON.parse(readFileSync(recordFile, 'utf8'));
   for (const s of [r.pager.number, r.pager.publicKey, r.pager.privateKey, r.pager.phoneKey]) secrets.add(s);
-  check(r.format !== 1, `${recordFile} is from before the encryption switch (format 1): the smoke run's upgrade check reads it, not --verify.`);
+  check(r.format !== 1, `${recordFile} is from before the encryption switch (format 1), which nothing reads back.`);
   check(r.format === 2 && r.state === 'recorded' && r.stage === stage.name && r.server === origin && r.tag === tag, `${recordFile} is ${r.state}, for ${r.stage} ${r.tag}, not a recorded baseline for ${stage.name} ${tag}.`);
-  secrets.add(agentFile(r).agentKey);
+  const file = agentFile(r);
+  secrets.add(file.agentKey); secrets.add(file.privateKey);
   say(`Baseline ${stage.name} ${tag}, recorded ${r.recordedAt} with agentpager ${r.binaryVersion}, read back at ${new Date().toISOString()}`);
   for (const line of await readBack(r)) say(`ok ${line}`);
 }

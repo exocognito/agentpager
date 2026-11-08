@@ -1,7 +1,7 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readdirSync, writeFileSync } from 'node:fs';
 import { createHash, randomBytes } from 'node:crypto';
-import { homedir, tmpdir } from 'node:os';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { stageOf } from './stages.ts';
@@ -11,14 +11,14 @@ import { decodePart, encodePart } from '../../contract/parts.ts';
 
 // The smoke run (METHOD.md › Tests and checks): node scripts/smoke.mjs --stage dev|prod checks that the stage serves
 // this checkout's commit and that its Worker and Registry answer, from outside, paging no one and needing no phone. It
-// leaves nothing behind but one finished agent on the upgrade baseline's pager: its one throwaway pager is deleted
-// with its agent. The full suites stay local. A failed step is tried once more; a second failure fails the run.
+// leaves nothing behind: its one throwaway pager is deleted with its agent, and the upgrade check only reads. The full
+// suites stay local. A failed step is tried once more; a second failure fails the run.
 //   --stage local --server <url>   the same against a local server, without the checks only a deployed stage has
 //                                  (HTTPS, the deploy's own verification), and with a local upgrade baseline
-//   --baseline-tag <tag>           the release whose upgrade baseline it checks, m4 unless named
-// The upgrade check (METHOD.md › The milestone loop, step 4) reads the baseline baseline.mjs recorded on this stage
-// (~/.agentpager-baselines/<stage>/<tag>, or under AGENTPAGER_BASELINES), whose keys are secrets: nothing of them is
-// printed. It never changes the record: the old command runs on a copy of its home.
+//   --baseline-tag <tag>           the release whose upgrade baseline it checks, m5 unless named
+// The upgrade check (METHOD.md › The milestone loop, step 4) reads back the baseline baseline.mjs recorded on this
+// stage (~/.agentpager-baselines/<stage>/<tag>, or under AGENTPAGER_BASELINES), whose keys are secrets: nothing of them
+// is printed. It never changes the record.
 const argv = process.argv, flag = name => { const at = argv.indexOf(name); return at === -1 ? undefined : argv[at + 1]; };
 const local = flag('--stage') === 'local';
 const stage = local ? { name: 'local' } : stageOf(argv);
@@ -161,73 +161,21 @@ await step('The binary built from this commit checks a pager\'s key, asks it a c
 });
 
 // The upgrade from the last release, on dev (and a local server), where the baseline is recorded (METHOD.md › The
-// milestone loop, step 4); prod is checked at the release by opening a real thing from before it (step 7). Here, the
-// release's exception in blueprint/milestones/M5-encrypt.md: its pager
-// survives with its key, number and switch; nothing it stored before the switch is listed or read; its command is
-// refused with how to update, and its agent file is told to connect again; the new command connects to its number.
-const upgrade = stage.name !== 'prod', tag = flag('--baseline-tag') ?? 'm4';
-const baselines = path.resolve(process.env.AGENTPAGER_BASELINES || path.join(homedir(), '.agentpager-baselines'));
-const dir = path.join(baselines, stage.name, tag);
-let record;
-function baseline() {
-  if (record) return record;
-  const file = path.join(dir, 'record.json');
-  check(existsSync(file), `No ${tag} baseline at ${dir}: record it with baseline.mjs before this release reaches ${stage.name}.`);
-  let r;
-  try { r = JSON.parse(readFileSync(file, 'utf8')); } catch { throw new Error(`The ${tag} baseline at ${file} can't be read.`); }
-  check(r.format === 1 && r.state === 'recorded' && r.stage === stage.name && r.server === origin && r.tag === tag && r.pager?.pagerId && r.agent?.id && r.decisions?.acknowledged && r.decisions?.open,
-    `The baseline at ${file} is ${r.state} for ${r.stage} ${r.tag} at ${r.server}, not a recorded ${tag} baseline for ${stage.name} at ${origin}.`);
-  check(existsSync(path.join(dir, r.binary)) && existsSync(path.join(dir, r.home, 'agents', `${r.agent.id}.json`)), `The baseline at ${dir} has lost its command or its agent's file.`);
-  record = r;
-  return r;
-}
-if (upgrade) await step(`The ${tag} upgrade baseline's pager is still there and on, read with its phone key, and the key the service gives is the one its number names`, async () => {
-  const r = baseline();
-  const read = await phoneCall(r.pager.phoneKey, `/api/pagers/${r.pager.pagerId}`), text = await read.text();
-  check(read.status === 200, `reading the pager: ${read.status} ${text.slice(0, 200)}`); candidate(read);
-  const inbox = JSON.parse(text);
-  check(inbox.pager.pagerId === r.pager.pagerId && inbox.pager.on === true && inbox.pager.autoOff === r.pager.autoOff, `the pager reads ${inbox.pager.on ? 'on' : 'off'}, auto-off ${inbox.pager.autoOff}`);
-  const key = await (await fetch(`${origin}/api/pagers/${r.pager.pagerId}/key`, { headers: asClient })).json();
-  const named = Buffer.from(r.pager.number.slice(4), 'base64url').subarray(16, 24);
-  check(key.publicKey === r.pager.publicKey && createHash('sha256').update(fromBase64url(key.publicKey)).digest().subarray(0, 8).equals(named), 'the service gives another key than the one the number names');
-});
-if (upgrade) await step(`Nothing the ${tag} baseline stored before the switch is listed or read: its agent, its decisions and their attachments are gone`, async () => {
-  const r = baseline(), inbox = await (await phoneCall(r.pager.phoneKey, `/api/pagers/${r.pager.pagerId}`)).json();
-  const old = [r.decisions.acknowledged.decisionId, r.decisions.open.decisionId];
-  check(!inbox.agents.some(a => a.agent.agentId === r.agent.agentId), 'the pager still lists the agent from before the switch');
-  check(!inbox.agents.some(a => [...a.open, ...a.answered].some(d => old.includes(d.decisionId))), 'the pager still lists a decision from before the switch');
-  const file = await phoneCall(r.pager.phoneKey, `/api/agents/${r.agent.agentId}/cards/${r.decisions.acknowledged.decisionId}/files/0`);
-  const value = await file.json();
-  check(file.status === 404 && value.error === 'UnknownAgent', `its attachment: ${file.status} ${value.error}`);
-});
-if (upgrade) await step(`The ${tag} command, with a copy of the baseline's home, is refused and told how to update`, async () => {
-  const r = baseline(), home = mkdtempSync(path.join(tmpdir(), 'agentpager-smoke-old-'));
-  cpSync(path.join(dir, r.home), home, { recursive: true });
-  const run = runIn(path.join(dir, r.binary), home);
-  for (const args of [['status', '--agent', r.agent.id], ['wait', '--agent', r.agent.id, r.decisions.open.id], ['finish', '--agent', r.agent.id]]) {
-    const out = run(...args);
-    check(out.status === 2 && said(out).includes('This agentpager command is too old for this server') && said(out).includes(`${origin}/start`), `agentpager ${args[0]}: exit ${out.status}: ${said(out).slice(0, 300)}`);
-  }
-});
-if (upgrade) await step(`The new command, with a copy of the ${tag} agent's file, is told to connect again`, async () => {
-  const r = baseline(), home = mkdtempSync(path.join(tmpdir(), 'agentpager-smoke-file-'));
-  mkdirSync(path.join(home, 'agents'), { recursive: true, mode: 0o700 });
-  cpSync(path.join(dir, r.home, 'agents', `${r.agent.id}.json`), path.join(home, 'agents', `${r.agent.id}.json`));
-  const out = runIn(binary(), home)('status', '--agent', r.agent.id);
-  check(out.status === 2 && said(out).includes(`Agent ${r.agent.id} was connected before this version of agentpager`) && said(out).includes('Connect again'), `agentpager status: exit ${out.status}: ${said(out).slice(0, 300)}`);
-});
-if (upgrade) await step(`The new command connects to the ${tag} baseline's number, as a new agent its phone key reads, and finishes`, async () => {
-  const r = baseline(), home = mkdtempSync(path.join(tmpdir(), 'agentpager-smoke-again-'));
-  const run = runIn(binary(), home, { AGENTPAGER_PAGER: r.pager.number });
-  const connected = run('connect', '--server', origin, '--app', 'smoke', '--project', `${tag} upgrade check`, '--json');
-  check(connected.status === 0, `connect: exit ${connected.status}: ${said(connected)}`);
-  const id = JSON.parse(connected.stdout).result.agent, agentId = JSON.parse(readFileSync(path.join(home, 'agents', `${id}.json`), 'utf8')).agentId;
-  const finished = run('finish', '--agent', id);
-  check(finished.status === 0, `finish: exit ${finished.status}: ${said(finished)}`);
-  const inbox = await (await phoneCall(r.pager.phoneKey, `/api/pagers/${r.pager.pagerId}`)).json(), agent = inbox.agents.find(a => a.agent.agentId === agentId);
-  check(agent && agent.agent.finishedAt, 'the pager doesn\'t list the new agent as finished');
-  const identity = decodePart('identity', open(fromBase64url(r.pager.privateKey), 'identity', { pagerId: r.pager.pagerId }, agent.agent.identity));
-  check(identity.project === `${tag} upgrade check`, 'the pager\'s key doesn\'t open the new agent\'s identity');
+// milestone loop, step 4); prod is checked at the release by opening a real thing from before it (step 7). It is
+// baseline.mjs --verify, which reads the record back: the pager, on, with the key its number names; its one agent; the
+// open decision, still open; the acknowledged one, with its answer, collection and acknowledgement and both
+// attachments byte for byte, every part opened with the record's keys; and the release's own command reading its
+// agent's status. It connects nothing to the baseline's pager, answers and acknowledges nothing, counts as no activity
+// and writes nothing in the record's folder, so every smoke run can repeat it and the next release finds the baseline
+// as recorded. The baseline is picked by name, the last release's (m5), and moved on here once the next release's is
+// recorded (step 7). M5's checks against m4, which proved its release's exception, ended with M5; the m4 folder stays
+// on disk as it was, and nothing reads it.
+const upgrade = stage.name !== 'prod', tag = flag('--baseline-tag') ?? 'm5';
+if (upgrade) await step(`The ${tag} upgrade baseline still opens, only read: its pager with its key and number, both decisions with their parts and attachments, the answer and acknowledgement, and the ${tag} command's status for its agent`, async () => {
+  const args = ['--experimental-strip-types', 'scripts/baseline.mjs', '--stage', stage.name, ...(local ? ['--server', origin] : []), '--tag', tag, '--verify'];
+  const r = spawnSync(process.execPath, args, { cwd: app, encoding: 'utf8', timeout: 240_000 });
+  for (const line of (r.stdout ?? '').split('\n').filter(Boolean)) console.log(redact(`  ${line}`));
+  check(r.status === 0, `baseline.mjs --verify: exit ${r.status ?? r.signal}${r.stderr?.trim() ? `: ${r.stderr.trim().slice(-400)}` : ''}`);
 });
 if (!local) await step('The deploy\'s own verification', async () => {
   const r = spawnSync(process.execPath, ['--experimental-strip-types', 'scripts/deploy.mjs', '--stage', stage.name, '--verify'], { cwd: app, stdio: 'inherit', timeout: 240_000 });

@@ -20,7 +20,7 @@
 <!-- B25.8, B25.9 and B25.10 dropped in Sam's review, 6 Nov 2026; ids are never reused -->
 11. An agent can connect to a server other than agentpager.me. Every later call for that agent, from the command line or MCP, goes to the same server.
 <!-- B25.12 dropped in Sam's review, 6 Nov 2026; ids are never reused -->
-13. An agent that finishes shows as finished on the phone and can ask nothing more. It can still wait for and acknowledge the answers to what it already asked, and finishing again changes nothing.
+13. An agent that finishes shows as finished on the phone and can ask nothing more. Its open decisions close unanswered and can't be answered. It can still wait for and acknowledge the answers already sent, and finishing again changes nothing.
 14. @M5: A command too old for the service is refused on every call, stores nothing, and is told plainly how to update.
 
 - The text usually goes in the project's AGENTS.md.
@@ -37,6 +37,7 @@
 8. The agent acknowledges an answer with its next steps, and the owner sees them on the decision (B7, B17). Only the first acknowledgement counts, and one sent before the answer is refused, with how to wait first.
 <!-- B32.9 dropped in Sam's review, 6 Nov 2026; ids are never reused -->
 10. A reply the command can't get or can't read is never taken as success. When nothing left the machine, the agent is told so. When the request may have reached the owner, the agent is told to check its status before trying again.
+11. @M6: A wait for a decision that closed unanswered ends, telling the agent so. A wait with no end stops too.
 
 - An acknowledgement is the agent's own words, never AgentPager's. Collecting an answer is not acknowledging it (I6).
 - If no agent collects an answer 3 minutes after Send, the owner is told once, on the decision (B5) and by an alert (B17).

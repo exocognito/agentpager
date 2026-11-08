@@ -122,7 +122,7 @@ test('the move from m5: every pager, agent and decision m5 stored reads back the
   const fin = await old.makePager();
   const done = await old.connect(fin.number, 'Claude Code', 'finished'), waiting = await old.connect(fin.number, 'pi', 'finished');
   const doneAcked = await old.ask(done, 'Finished: answered?');
-  await old.ask(done, 'Finished: left open?');
+  const doneOpen = await old.ask(done, 'Finished: left open?');
   const uncollected = await old.ask(waiting, 'Not collected yet?');
   const doneReceipt = await old.answer(done.agent.agentId, fin.phone, doneAcked.decisionId);
   await old.read(done, doneAcked.decisionId);
@@ -208,8 +208,17 @@ test('the move from m5: every pager, agent and decision m5 stored reads back the
   // This code's service, on the same storage and address.
   const f = await fixture('upgrade', undefined, { persist, port });
   try {
-    // Every pager the phone read from m5 reads the same, but for the agents housekeeping has done with.
-    for (const p of [baselinePager, warned.p, off, fin, heavy]) assert.deepEqual(await read(f, p), before.get(p.pagerId), `the pager ${p.pagerId.slice(0, 6)}… reads as m5 stored it`);
+    // Every pager the phone read from m5 reads the same, but for the agents housekeeping has done with, and the
+    // decision an agent that finished on m5 left with no answer, which reads as closed when it finished (B25.13).
+    for (const p of [baselinePager, warned.p, off, heavy]) assert.deepEqual(await read(f, p), before.get(p.pagerId), `the pager ${p.pagerId.slice(0, 6)}… reads as m5 stored it`);
+    const finBefore = Schema.decodeUnknownSync(C.PagerInbox)(before.get(fin.pagerId));
+    assert.deepEqual(Schema.decodeUnknownSync(C.PagerInbox)(await read(f, fin)), {
+      ...finBefore,
+      agents: finBefore.agents.map(x => x.agent.finishedAt === null ? x : {
+        agent: { ...x.agent, openCount: 0 }, open: x.open.map(d => ({ ...d, closed: { at: x.agent.finishedAt ?? '', reason: C.CLOSED_AGENT_FINISHED } })), answered: x.answered,
+      }),
+    }, 'the finished agent\'s open decision, closed when it finished; nothing else changed');
+    assert.deepEqual(finBefore.agents.map(x => [x.agent.agentId, x.open.map(d => d.decisionId)]), [[done.agent.agentId, [doneOpen.decisionId]], [waiting.agent.agentId, []]]);
     const houseBefore = Schema.decodeUnknownSync(C.PagerInbox)(before.get(house.pagerId));
     assert.deepEqual(await read(f, house), { ...houseBefore, agents: houseBefore.agents.filter(x => x.agent.agentId === live.agent.agentId) }, 'only the agent housekeeping isn\'t done with');
     // The baseline passes every check --verify makes, only reading.
@@ -280,7 +289,16 @@ test('the move from m5: every pager, agent and decision m5 stored reads back the
     assert.equal((await f.read(offAgent, offOpen.decisionId)).status, 'answered');
     await f.ack(offAgent, offOpen.decisionId, offAnswer.answerId, 'Carrying on after the move.');
     // The finished agent asks nothing more, and its acknowledgement stays the first; the other collects its answer.
+    // The decision it left with no answer can't be answered, waited for or acknowledged.
     await f.refused(409, 'AgentFinished', `/api/agents/${done.agent.agentId}/cards`, { agent: done.agentKey, data: await f.sealed(done, question('After finishing?')) });
+    const doneOpenRoute = `/api/agents/${done.agent.agentId}/cards/${doneOpen.decisionId}/answer`;
+    for (const r of [
+      await f.refused(409, 'DecisionClosed', doneOpenRoute, { phone: fin.phone, data: await f.sealedAnswer(done.agent.agentId, fin.phone, doneOpen.decisionId) }),
+      await f.refused(409, 'DecisionClosed', `${doneOpenRoute}?wait=5`, { agent: done.agentKey }),
+      await f.refused(409, 'DecisionClosed', doneOpenRoute.replace(/answer$/, 'acknowledge'), { agent: done.agentKey, data: f.sealedAck(done, doneOpen.decisionId, doneReceipt.answerId) }),
+    ]) {
+      assert.equal(r.message, C.DECISION_CLOSED_MESSAGE);
+    }
     await f.refused(409, 'AlreadyAcknowledged', `/api/agents/${done.agent.agentId}/cards/${doneAcked.decisionId}/acknowledge`, { agent: done.agentKey, data: f.sealedAck(done, doneAcked.decisionId, doneReceipt.answerId, 'Again.') });
     const late2 = await f.read(waiting, uncollected.decisionId);
     assert.equal(late2.status === 'answered' && late2.answer.answerId, uncollectedReceipt.answerId);

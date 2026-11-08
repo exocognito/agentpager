@@ -35,7 +35,7 @@ const SOURCES = [
 
 // The journeys: UI tests against the local server, each playing the agent over the HTTP API.
 const JOURNEYS = [
-  { name: 'pager', test: 'FlowTests/testPagerJourney', about: 'Make a pager; two agents connect with its number and ask; answer one through the Undo window; the agent confirms; the closed record.' },
+  { name: 'pager', test: 'FlowTests/testPagerJourney', about: 'Make a pager; two agents connect with its number and ask; answer one through the Undo window; the agent confirms; the closed record; the agent finishes, and its decision left unanswered closes.' },
   { name: 'briefs', test: 'BriefTests/testBriefs', about: 'The four example briefs (D1–D4) from a real agent: the Options sheet, images, background pages, picking and sending, asking for changes, and an answered brief.' },
   { name: 'undo-and-changes', test: 'FlowTests/testUndoChangesAndNotConfirmed', about: 'An answer whose sends all fail (Answer Not Confirmed, Retry), Undo inside the window, leaving the app during Undo, and Ask for changes.' },
   { name: 'off-and-on', test: 'FlowTests/testOffAndOn', about: 'Switch a pager off: its agents are refused and its decision shows Turn on; turn it back on and answer.' },

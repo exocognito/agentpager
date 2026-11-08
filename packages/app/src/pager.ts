@@ -36,6 +36,13 @@ import { Waits, type Reach } from './wake.ts';
 //   erase_v4            what an old store still holds of a pager or agent this store has deleted, still to erase there
 // Decisions, attachments, answers, acknowledgements, collections and warnings are written once and never changed.
 //
+// A decision closes unanswered when its agent finishes before it has an answer (B25.13, blueprint/areas/2-agents.md),
+// and nothing more is stored for it: the agent's finish is the mark. Every answer is stored in a transaction that checks
+// the agent hasn't finished, and the finish is one transaction, so a finished agent's decisions with no answer are
+// exactly those its finish closed, at the time it finished (closure, below). An answer that landed first stays the
+// answer, and its agent can still collect and acknowledge it. An agent that finished before M6 left its unanswered
+// decisions open; they read as closed too, from when it finished, as B25.13 now holds for every finished agent.
+//
 // An agent's wait for its answer is held here, in memory, and woken by what it waits for (wake.ts).
 
 const Create = Schema.Struct({ fingerprint: Fingerprint, publicKey: C.PublicKey, phoneHash: Digest, autoOff: C.AutoOff });
@@ -270,9 +277,19 @@ export class Pager {
     if (!sameDigest(digest, by === 'agent' ? a.agent_hash : a.phone_hash)) throw C.refuse.unauthorized();
     return a;
   }
-  private openCount(agentId: string) { return this.sql<{ n: number }>('SELECT count(*) AS n FROM decisions_v4 d WHERE agent_id=? AND NOT EXISTS (SELECT 1 FROM answers_v4 a WHERE a.agent_id=d.agent_id AND a.decision_id=d.decision_id)', agentId)[0].n; }
+  // Its decisions with no answer, in ask order.
+  private unanswered(agentId: string) { return this.sql<{ decision_id: string }>('SELECT decision_id FROM decisions_v4 d WHERE agent_id=? AND NOT EXISTS (SELECT 1 FROM answers_v4 a WHERE a.agent_id=d.agent_id AND a.decision_id=d.decision_id) ORDER BY rowid', agentId).map(r => r.decision_id); }
+  // Those still waiting for the owner: none once the agent has finished, since its finish closed them.
+  private openCount(a: AgentRow) { return a.finished_at ? 0 : this.unanswered(a.agent_id).length; }
+  // How a decision of this agent's with no answer closed, if it has: when its agent finished (B25.13).
+  private closure(a: AgentRow): C.Closed | undefined { return a.finished_at === null ? undefined : { at: a.finished_at, reason: C.CLOSED_AGENT_FINISHED }; }
+  // The agent's decisions that closed unanswered, in ask order: none until it finishes.
+  private closedOf(a: AgentRow): C.ClosedDecision[] {
+    const closed = this.closure(a);
+    return closed ? this.unanswered(a.agent_id).map(decisionId => ({ decisionId, ...closed })) : [];
+  }
   private summary(a: AgentRow): C.Agent {
-    return decode(C.Agent, { agentId: a.agent_id, identity: a.identity, createdAt: a.created_at, finishedAt: a.finished_at, lastActivityAt: a.last_activity_at, openCount: this.openCount(a.agent_id) });
+    return decode(C.Agent, { agentId: a.agent_id, identity: a.identity, createdAt: a.created_at, finishedAt: a.finished_at, lastActivityAt: a.last_activity_at, openCount: this.openCount(a) });
   }
   // Activity, always while the pager is on: the agent's 30-day clock starts again, with no time off counted.
   private touch(agentId: string, at = iso()) { this.ctx.storage.sql.exec('UPDATE agents_v4 SET last_activity_at=?, off_ms=0 WHERE agent_id=?', at, agentId); }
@@ -282,14 +299,16 @@ export class Pager {
     return row.preview;
   }
   // A decision as the phone and the agent read it: its parts as stored, and what the service knows of them. Only its
-  // own agent's decisions are found (I21.3).
-  private decision(agentId: string, id: string): C.Decision {
+  // own agent's decisions are found (I21.3). One with no answer whose agent has finished closed unanswered then; its
+  // status stays open on the wire, so the m5 app still reads it (packages/contract/exchange.ts › Decision).
+  private decision(agent: AgentRow, id: string): C.Decision {
+    const agentId = agent.agent_id;
     const d = this.sql<{ card: string; asked_at: string }>('SELECT card, asked_at FROM decisions_v4 WHERE agent_id=? AND decision_id=?', agentId, id)[0];
     if (!d) throw C.refuse.unknownDecision();
     const attachments = this.sql<{ part: string }>('SELECT part FROM attachments_v4 WHERE agent_id=? AND decision_id=? ORDER BY slot', agentId, id).map(r => ({ bytes: C.sealedBytes(r.part) }));
     const asked = { decisionId: id, card: d.card, attachments, askedAt: d.asked_at };
     const a = this.sql<AnswerRow>('SELECT answer_id, request_id, part, sent_at FROM answers_v4 WHERE agent_id=? AND decision_id=?', agentId, id)[0];
-    if (!a) return decode(C.Decision, { ...asked, status: 'open' });
+    if (!a) { const closed = this.closure(agent); return decode(C.Decision, { ...asked, status: 'open', ...(closed ? { closed } : {}) }); }
     const answer: C.Answer = { answerId: a.answer_id, decisionId: id, requestId: a.request_id, answer: a.part, sentAt: a.sent_at };
     const ack = this.sql<{ part: string; acknowledged_at: string }>('SELECT part, acknowledged_at FROM acknowledgements_v4 WHERE agent_id=? AND decision_id=?', agentId, id)[0];
     const at = (table: 'collections_v4' | 'warnings_v4') => this.sql<{ at: string }>(`SELECT at FROM ${table} WHERE agent_id=? AND decision_id=?`, agentId, id)[0]?.at;
@@ -299,9 +318,10 @@ export class Pager {
       ...(ack ? { acknowledgement: { decisionId: id, answerId: a.answer_id, acknowledgement: ack.part, acknowledgedAt: ack.acknowledged_at } } : {}),
     });
   }
-  // One agent as the phone reads it: open decisions in ask order, answered ones newest first.
+  // One agent as the phone reads it: open decisions in ask order, answered ones newest first. Those that closed
+  // unanswered are among the open ones, each marked closed.
   private inboxOf(a: AgentRow): C.AgentInbox {
-    const all = this.sql<{ decision_id: string }>('SELECT decision_id FROM decisions_v4 WHERE agent_id=? ORDER BY rowid', a.agent_id).map(r => this.decision(a.agent_id, r.decision_id));
+    const all = this.sql<{ decision_id: string }>('SELECT decision_id FROM decisions_v4 WHERE agent_id=? ORDER BY rowid', a.agent_id).map(r => this.decision(a, r.decision_id));
     const answered = all.filter(d => d.answer).sort((x, y) => Date.parse(y.answer?.sentAt ?? '') - Date.parse(x.answer?.sentAt ?? ''));
     return { agent: this.summary(a), open: all.filter(d => !d.answer), answered };
   }
@@ -511,9 +531,13 @@ export class Pager {
   // collects something checks its pager is on in the same transaction that writes.
   private async agentCall(request: Request, url: URL, [named, action, param, slot]: string[]): Promise<Response> {
     const agentId = decode(C.Token, named ?? '');
+    // Status: the agent, whether its pager is on, and its decisions that closed unanswered, if any.
     if (action === 'status') {
       const digest = await agentDigest(request);
-      return json(this.tx(() => decode(C.AgentStatus, { agent: this.summary(this.agent(agentId, digest)), pager: { on: this.pagerRow()?.enabled === 1 } })));
+      return json(this.tx(() => {
+        const a = this.agent(agentId, digest), closed = this.closedOf(a);
+        return decode(C.AgentStatus, { agent: this.summary(a), pager: { on: this.pagerRow()?.enabled === 1 }, ...(closed.length ? { closed } : {}) });
+      }));
     }
     if (action === 'ask') {
       const digest = await agentDigest(request);
@@ -523,14 +547,15 @@ export class Pager {
       // bound to it: the command sealed them for this id.
       const decisionId = await C.decisionIdOf(agentId, input.requestId);
       const asked = this.tx(() => {
-        if (this.agent(agentId, digest).finished_at) throw C.refuse.finished();
+        const a = this.agent(agentId, digest);
+        if (a.finished_at) throw C.refuse.finished();
         const push = this.on();
         // The same card again (its reply was lost) finds its decision, which stays as first stored: nothing is stored
         // and no alert goes, even when this agent's open decisions are now at their limit. Another card is refused.
         const known = this.sql<{ digest: string }>('SELECT digest FROM decisions_v4 WHERE agent_id=? AND decision_id=?', agentId, decisionId)[0];
         if (known?.digest === input.digest) return { push, again: true };
         if (known) throw C.refuse.requestIdTaken();
-        if (this.openCount(agentId) >= C.MAX_OPEN_DECISIONS) throw C.refuse.tooMany();
+        if (this.openCount(a) >= C.MAX_OPEN_DECISIONS) throw C.refuse.tooMany();
         this.ctx.storage.sql.exec('INSERT INTO decisions_v4 VALUES (?, ?, ?, ?, ?, ?)', agentId, decisionId, input.card, input.preview, input.digest, iso());
         (input.attachments ?? []).forEach((part, at) => this.ctx.storage.sql.exec('INSERT INTO attachments_v4 VALUES (?, ?, ?, ?)', agentId, decisionId, at, part));
         this.touch(agentId);
@@ -546,12 +571,14 @@ export class Pager {
       const seconds = wait === null ? 0 : decode(Schema.Number.pipe(Schema.int(), Schema.between(1, C.ANSWER_WAIT_MAX_SECONDS)), Number(wait));
       // Held until the answer is here, or until its time is up, when it is pending. Each look checks the agent and the
       // switch first, in the transaction that collects: the answer is delivered only while the pager is on, and a wait
-      // woken by the pager turning off, or by it or the agent going, ends refused as a new call would be. Between
-      // looks it sleeps until a wake (wake, above), its time, or its pager's auto-off, whichever is first.
+      // woken by the pager turning off, by it or the agent going, or by the agent finishing, which closes the decision
+      // if it has no answer, ends refused as a new call would be. Between looks it sleeps until a wake (wake, above),
+      // its time, or its pager's auto-off, whichever is first.
       const answer = await this.waits.hold({ agentId, decisionId: id }, Date.now() + seconds * 1000, () => this.tx(() => {
-        this.agent(agentId, digest);
+        const a = this.agent(agentId, digest);
         this.on();
-        const d = this.decision(agentId, id);
+        const d = this.decision(a, id);
+        if (d.closed) throw C.refuse.decisionClosed(d.closed);
         if (!d.answer) return { lookBy: this.pagerRow()?.off_at ?? null };
         // Collected: the owner gets no warning for it, and the phone still waits for the acknowledgement (I6).
         this.ctx.storage.sql.exec('INSERT OR IGNORE INTO collections_v4 VALUES (?, ?, ?)', agentId, id, iso());
@@ -565,8 +592,9 @@ export class Pager {
       this.tx(() => this.agent(agentId, digest));
       const id = decode(C.Token, param ?? ''), input = decode(C.AcknowledgementInput, await body(request));
       const done = this.tx(() => {
-        this.agent(agentId, digest);
-        const push = this.on(), d = this.decision(agentId, id);
+        const a = this.agent(agentId, digest);
+        const push = this.on(), d = this.decision(a, id);
+        if (d.closed) throw C.refuse.decisionClosed(d.closed);
         if (!d.answer) throw C.refuse.notAnswered();
         if (d.answer.answerId !== input.answerId) throw C.refuse.answerMismatch();
         if (d.acknowledgement) throw C.refuse.alreadyAcknowledged();
@@ -578,12 +606,15 @@ export class Pager {
       await this.alertPhone(agentId, done.push, id, 'acknowledgement', input.preview);
       return json(done.ack);
     }
-    // Finishing tells the phone this agent is done; its decisions stay, and it asks nothing more.
+    // Finishing tells the phone this agent is done, and it asks nothing more. Its decisions with no answer close
+    // unanswered in the same transaction, so none can be answered after it; those answered before it keep their
+    // answers, which the agent can still collect and acknowledge (B25.13). Finishing again changes nothing, and names
+    // the same decisions.
     if (action === 'finish') {
       const digest = await agentDigest(request);
       this.tx(() => this.agent(agentId, digest));
       await emptyBody(request);
-      return json(this.tx(() => {
+      const finished = this.tx(() => {
         const a = this.agent(agentId, digest);
         this.on();
         const finishedAt = a.finished_at ?? iso();
@@ -591,8 +622,11 @@ export class Pager {
           this.ctx.storage.sql.exec('UPDATE agents_v4 SET finished_at=? WHERE agent_id=?', finishedAt, agentId);
           this.touch(agentId, finishedAt);
         }
-        return { finishedAt };
-      }));
+        return decode(C.Finished, { finishedAt, closed: this.closedOf({ ...a, finished_at: finishedAt }) });
+      });
+      // Closed: the waits for them end, told so.
+      this.wake({ agentId });
+      return json(finished);
     }
     const digest = await phoneDigest(request);
     // One attachment of a decision, for the phone: its encrypted part, by its slot in the card's list. Readable while
@@ -601,8 +635,7 @@ export class Pager {
       this.tx(() => this.agent(agentId, digest, 'phone'));
       const id = decode(C.Token, param ?? ''), at = decode(Slot, slot ?? '');
       const part = this.tx(() => {
-        this.agent(agentId, digest, 'phone');
-        this.decision(agentId, id);
+        this.decision(this.agent(agentId, digest, 'phone'), id);
         const row = this.sql<{ part: string }>('SELECT part FROM attachments_v4 WHERE agent_id=? AND decision_id=? AND slot=?', agentId, id, at)[0];
         if (!row) throw C.refuse.unknownFile();
         return row.part;
@@ -613,15 +646,19 @@ export class Pager {
       this.tx(() => this.agent(agentId, digest, 'phone'));
       const id = decode(C.Token, param ?? ''), input = decode(C.AnswerInput, await body(request));
       const receipt = this.tx(() => {
-        this.agent(agentId, digest, 'phone');
+        const a = this.agent(agentId, digest, 'phone');
         this.on();
-        const d = this.decision(agentId, id);
+        const d = this.decision(a, id);
         // The phone resends an answer after a lost reply as the same request: the same request id and the same part.
+        // An answer stored before its agent finished stays the answer, so its resend still gets its receipt.
         if (d.answer) {
           const receipt = decode(C.Receipt, { decisionId: id, answerId: d.answer.answerId, sentAt: d.answer.sentAt });
           if (d.answer.requestId === input.requestId && d.answer.answer === input.answer) return receipt;
           throw C.refuse.alreadyAnswered(receipt);
         }
+        // Its agent finished first: nothing is stored. The phone holds an answer through its Undo window and sends it
+        // once the window closes (I6), so one still in its window when the agent finished is refused here too.
+        if (d.closed) throw C.refuse.decisionClosed(d.closed);
         if (this.sql('SELECT 1 FROM answers_v4 WHERE agent_id=? AND request_id=?', agentId, input.requestId).length) throw C.refuse.invalid('requestId already belongs to another decision.');
         const sentAt = iso(), answerId = token();
         this.ctx.storage.sql.exec('INSERT INTO answers_v4 VALUES (?, ?, ?, ?, ?, ?)', agentId, id, input.requestId, answerId, input.answer, sentAt);

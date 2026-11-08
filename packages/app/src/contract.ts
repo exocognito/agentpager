@@ -1,4 +1,4 @@
-import { MAX_OPEN_DECISIONS, type Receipt, type RefusalTag } from '../../contract/exchange.ts';
+import { DECISION_CLOSED_MESSAGE, MAX_OPEN_DECISIONS, type Closed, type Receipt, type RefusalTag } from '../../contract/exchange.ts';
 import { PICKUP_MINUTES } from '../../contract/alerts.ts';
 
 // The server's side of the contract. The wire contract itself, every shape a client sends or receives, is
@@ -35,6 +35,9 @@ export const refuse = {
   pagerExists: () => new Refusal('PagerExists', 'A pager with this number already exists.'),
   pagerDeleted: () => new Refusal('PagerDeleted', 'Your owner deleted this pager. Stop paging; ask your owner for a pager number only if they want more decisions.'),
   finished: () => new Refusal('AgentFinished', 'This agent has finished. To ask about new work, connect again.'),
+  // A wait for, read of or acknowledgement of a decision that closed unanswered, or the phone's answer to one. The
+  // words are the agent's: the m5 command prints them as they are (packages/contract/exchange.ts › DecisionClosed).
+  decisionClosed: (closed: Closed) => new Refusal('DecisionClosed', DECISION_CLOSED_MESSAGE, { closed }),
   tooMany: () => new Refusal('TooManyOpenDecisions', `Your owner already has ${MAX_OPEN_DECISIONS} unanswered decisions from you. Wait for answers before asking more.`, { limit: MAX_OPEN_DECISIONS }),
   notAnswered: () => new Refusal('NotAnswered', 'This decision has no answer yet.'),
   alreadyAcknowledged: () => new Refusal('AlreadyAcknowledged', 'This answer is already acknowledged; only the first acknowledgement counts.'),

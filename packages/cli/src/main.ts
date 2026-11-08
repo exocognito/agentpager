@@ -18,7 +18,7 @@ const HELP = `agentpager: send your owner decisions on their phone, and get thei
   agentpager ack --agent <id> <decision> "<next steps>"
   agentpager status --agent <id>
   agentpager history --agent <id> [--limit N]
-  agentpager finish --agent <id>
+  agentpager finish --agent <id>            done: unanswered decisions close, and it asks nothing more
   agentpager agents | share --agent <id> | setup [--print] | mcp | version | update
 
 Every command takes --json. Exit codes: 0 done, 2 refused, 4 pager off, 5 no usable reply from the server (unreachable, no reply, or a reply not understood), 6 unknown agent id.

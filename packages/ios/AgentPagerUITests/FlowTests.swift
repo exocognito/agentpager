@@ -157,10 +157,65 @@ final class FlowTests: XCTestCase {
         XCTAssertFalse(app.buttons["tile-A"].exists, "a closed decision can't be answered again")
         shot("answered-decision", after: "Tap the decision: the closed record")
 
-        // Finishing shows on the decision; the agent asks nothing more.
+        // Finishing shows on the decision; the agent asks nothing more, and its other decision, never answered, closes
+        // and joins the answered ones (B25.13, B5.17).
         try agent.finish()
         waitUntil(8, "finished") { app.staticTexts["who-asked"].label == "Codex · finished" }
         XCTAssertThrowsError(try agent.ask("Again?", options: ["One", "Two"])) { e in XCTAssertEqual((e as? ToolError)?.tag, "AgentFinished") }
+        back()
+        let closed = app.buttons["answered-What should we aim for first?"]
+        waitUntil(8, "closed among the answered") { closed.exists && closed.label.contains("Codex finished before you answered") }
+        shot("finished", after: "Codex finishes: its decision you hadn’t answered closes and joins atomic-pages’ answered ones")
+        back()
+        waitUntil(5, "folded with the answered") { app.buttons["answered-atomic-pages"].label.contains("1 answered, 1 closed") }
+        XCTAssertFalse(app.buttons["open-What should we aim for first?"].exists, "no longer open")
+        back()
+        waitUntil(5, "only Claude Code's decision counts as open") { app.buttons["pager-Work"].label.contains("1 open") }
+    }
+
+    // B5.17 and B25.13 on the real service: an agent finishes with two decisions its owner hasn't answered, one of
+    // them sent and still in its Undo window, where the answer is still on the phone (I6). Both close: each shows with
+    // the project's answered decisions, says Codex finished before the owner answered, and offers nothing to pick or
+    // send; neither counts as open; and the answer that was in its Undo window is never stored.
+    func test_B5_17_B25_13_decisionsAnAgentFinishedBeforeYouAnsweredCloseAndShowWithTheAnsweredOnes() throws {
+        launch()
+        let number = makePager("Done")
+        try agent.connect(number: number, app: "Codex", project: "finishing")
+        _ = try agent.ask("Ship tonight?", options: ["Ship", "Wait"])
+        let cache = try agent.ask("Keep the cache?", options: ["Keep", "Drop"])
+        open("Keep the cache?")
+        app.buttons["tile-A"].tap()
+        let sentAt = Date()
+        app.buttons["send-option"].tap()
+        wait(app.buttons["undo-button"], 3)
+        try agent.finish()
+        XCTAssertLessThan(Date().timeIntervalSince(sentAt), 5, "the agent finished inside the Undo window")
+
+        let row = answeredRow("finishing", "Keep the cache?")
+        waitUntil(10, "the one in its Undo window closed") { row.label.contains("Codex finished before you answered") }
+        let other = app.buttons["answered-Ship tonight?"]
+        waitUntil(5, "the other closed") { other.exists && other.label.contains("Codex finished before you answered") }
+        // Past its Undo window, the answer it held was never stored: the agent's wait is told the decision closed.
+        RunLoop.current.run(until: sentAt.addingTimeInterval(7))
+        XCTAssertThrowsError(try agent.waitForAnswer(cache, seconds: 1)) { e in XCTAssertEqual((e as? ToolError)?.tag, "DecisionClosed") }
+        XCTAssertTrue(row.label.contains("Codex finished before you answered"), row.label)
+        XCTAssertFalse(app.alerts.firstMatch.exists, "nothing reported as not confirmed")
+
+        other.tap()
+        let bar = app.descendants(matching: .any)["closed-unanswered"]
+        wait(bar)
+        XCTAssertTrue(bar.label.contains("Codex finished before you answered"), bar.label)
+        XCTAssertEqual(app.staticTexts["who-asked"].label, "Codex · finished")
+        XCTAssertTrue(app.descendants(matching: .any)["brief-header"].exists, "the question still reads")
+        for control in ["tile-A", "tile-B", "send-option", "ask-for-changes", "turn-on"] { XCTAssertFalse(app.buttons[control].exists, control) }
+        back()
+        back()
+        waitUntil(5, "folded with the answered") { app.buttons["answered-finishing"].label.contains("2 closed") }
+        XCTAssertFalse(app.buttons["open-Ship tonight?"].exists, "neither is open")
+        back()
+        let done = app.buttons["pager-Done"]
+        wait(done)
+        XCTAssertFalse(done.label.contains(" open"), "nothing counts as waiting: \(done.label)")
     }
 
     // I4.9 and B30.2: a card moved to another decision, as a service could hand one back, and a card that opens but isn't

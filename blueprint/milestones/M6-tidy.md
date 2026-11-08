@@ -1,6 +1,6 @@
 # M6 · Tidy state
 
-> **Status:** planning · **Started:** 7 Nov 2026 · **Order:** after M5; CLIENTS follows · **Word:** TIDY
+> **Status:** building · **Started:** 7 Nov 2026 · **Order:** after M5; CLIENTS follows · **Word:** TIDY
 
 ## Objective
 
@@ -11,53 +11,34 @@ Three of the hardening items the 30 Oct engineering review held for ENCRYPT, whi
 
 ## Owner decides first
 
-Six questions for Sam, each with options and ★ on the recommendation, so Sam can answer in one line, such as `1a 2a 3a 4a 5b 6a`. Questions 1 and 2 are TIDY's own, from its queued doc; 3 to 6 came up in planning. Each builds on What's known, below.
+### Answered on 7 Nov
 
-1. **What the move to one store per pager keeps.** Each pager's row is in the Registry and each agent's decisions are in that agent's own store, so one store per pager moves stored data.
-   - (a) ★ Keep everything: every pager, agent, decision, attachment, answer and acknowledgement, with when each answer was collected or warned about, and each agent's id, key and last activity. Each agent's next call works as before, and the phone shows the same. The upgrade check proves it on dev against the `m5` baseline, before 8 Dec 2026, when the baseline's agent would be forgotten:
-     - after the move reaches dev, `pnpm smoke:dev` reads the baseline back as `baseline.mjs --verify` does, and every check passes unchanged: the pager, on, with its key and number; its one agent, whose who-asked opens; the open decision; the acknowledged one with its answer, its collection and its acknowledgement; both attachments, byte for byte; and the `m5` command's own status for that agent;
-     - and the agent's last activity is unchanged, so its forget date doesn't move;
-     - the check only reads, so every smoke run can repeat it;
-     - a local test runs the whole loop on moved data: `m5`'s service on fresh storage, a local baseline, then TIDY's service on the same storage, where the phone answers the open decision and the `m5` command collects and acknowledges it.
-   - (b) Start again: the move deletes every agent and decision and keeps every pager, as M5 did. Sam's agents connect again, and the phone's decisions go; each machine's history keeps its own. A second release exception in a row (METHOD › Stages and releases), with less code.
-   - Not offered: keep the agents and drop their decisions. Agents waiting on an answer would find their decision gone, which costs both (a)'s move and (b)'s loss.
-   - Why ★: it is METHOD's rule, and the last chance to practise a move that keeps data before FRIENDS brings data that isn't Sam's. It costs one pull request through the adversarial loop and a local upgrade test.
-2. **A decision that finishing closed.** Sam chose on 6 Nov that finishing closes the agent's open decisions so they can't be answered. What the phone shows, and what an agent waiting on one is told:
-   - (a) ★ The phone moves it to its project's answered decisions, saying who asked finished before it was answered. Its question and brief stay readable, with nothing to pick or send, and it no longer counts as waiting, on the pager or the badge. An agent waiting on it is told that it closed unanswered when the agent finished, and its wait ends, a wait with no end too.
-   - (b) The agent is told the same. On the phone it stays among the project's open decisions, after the ones the owner can answer, greyed, with the same words, until the agent is forgotten. The owner sees what was left undone first; the open list then holds decisions the owner can't answer.
-   - Not offered: the decision leaves the phone at finish. PRODUCT.md › Unblock my agent from my phone says the owner can look back at an agent's decisions until its pager is deleted or it has been idle 30 days.
-   - In each, an answer the service stored before the agent finished stays the answer, and the agent can still collect and acknowledge it (B25.13).
-   - Why ★: a closed decision is done, like an answered one, and the open list keeps holding only what the owner can act on.
-3. **An off pager's agents and the 30-day clock.** The service forgets an agent 30 days after its last activity, whether or not its pager is on, and the phone shows only what the service lists. So a pager off for more than 30 days comes back with none of its agents or decisions. B22.4 says that while a pager is off the phone keeps everything, as PRODUCT.md › A pager is on until I turn it off does, and I17.6 says an agent idle for 30 days is forgotten. Two lines disagree there, so Sam chooses (METHOD › Rules of thumb):
-   - (a) ★ The clock runs only while the pager is on: an agent is forgotten 30 days after its last activity or its pager last turning on, whichever is later. B22.4 holds however long a pager stays off. I17.6 and TERMS › Agent change to say so.
-   - (b) The clock runs while the pager is off, as today. PRODUCT.md and B22.4 change to say the phone keeps an off pager's decisions for up to 30 days.
-   - Not offered: the phone keeps its own copy of what the service forgot. That is a new feature, and the phone couldn't fetch those decisions' attachments.
-   - Why ★: turning a pager off is the owner's pause, and coming back to an empty pager breaks what Sam approved. The cost is that an abandoned off pager keeps its encrypted decisions on the service until the owner deletes it.
-4. **Clients from M5, through TIDY's release.** The release deploys the service, then the command on Sam's machines, then the app (AGENTS.md › Stages). METHOD says a client from the previous release keeps working or is told plainly to update, and the `m5` app can't be told plainly: on any refusal it says only that it can't reach the server.
-   - (a) ★ Both keep working: the service keeps M5's routes and replies, and adds only what the `m5` command and app ignore. Until it is updated, the `m5` app shows a decision that finishing closed as still open, and Send on it is refused, so it shows as open again; the `m5` command shows the service's own words for it. No exception.
-   - (b) Both must update: the service refuses `m5` clients. The command is told how to update (B25.14). The app says only that it can't reach the server until Sam's phone has the new build, a release exception, as M5's question 8 was. Sam's agents' waits end at the deploy, until their binaries are replaced. Less code.
-   - Not offered: keep the command working and require the new app. The phone would still need (b)'s exception, and the closed state can be added without breaking the `m5` app.
-   - Why ★: nothing breaks between the service deploy and the client builds, and with 1(a) Sam's agents carry on without connecting again.
-5. **PRODUCT.md › Stack** names the service's storage, one Durable Object for the pagers and one per agent, which TIDY changes. Only Sam changes PRODUCT.md.
-   - (a) The sentence names the new shape: one Durable Object per pager, holding its agents and their decisions.
-   - (b) ★ The sentence keeps where the service runs, a Cloudflare Worker at agentpager.me, and drops how it stores things, which the code holds; 6 Privacy's header says it as built.
-   - Not offered: leave it as it is. It would contradict the code, and PRODUCT.md outranks the code (METHOD › Rules of thumb), so the code would read as wrong.
-   - Why ★: METHOD keeps structure in code, and the layout would go stale again at the next change. What Sam relies on, that turning a pager off stops everything at once, is I17's.
-6. **TIDY's walk.** Sam released M5 without its walk on dev, and said Sam would dogfood at TIDY ([M5-encrypt.md](M5-encrypt.md) › Log, 7 Nov).
-   - (a) ★ No walk on dev: once TIDY is green on dev, its upgrade check included, and reviewed, the root releases it, and Sam dogfoods it on prod. Fixes follow as `m6.<k>`.
-   - (b) Sam walks it on dev first, on HomePhoneLite, then the release.
-   - Why ★: it is how Sam chose to work on 7 Nov, and the upgrade check proves the move on dev, against the `m5` baseline, before prod has it.
+Sam chose the recommended option of each of the six questions the root asked in its Claude Code session on 7 Nov 2026. To questions 1 to 5 Sam answered there: "I'm pretty sure I agree with your recs to all the above decisions", which is 1a 2a 3a 4a 5b. Sam had answered question 6 earlier that day, before it was asked, in the message that released M5: "I'll dogfood at Tidy" ([M5-encrypt.md](M5-encrypt.md) › Log, 7 Nov), which is 6a. The choices:
+
+1. **What the move to one store per pager keeps:** everything, over starting again, which would have been a second release exception in a row. Every pager, agent, decision, attachment, answer and acknowledgement moves, with when each answer was collected or warned about, and each agent's id, key and last activity. Each agent's next call works as before, and the phone shows the same. The upgrade check proves it on dev against the `m5` baseline, before 8 Dec 2026, when the baseline's agent would be forgotten:
+   - `pnpm smoke:dev` already reads the baseline back as `baseline.mjs --verify` does (#69, What's known). After the move reaches dev, every check passes unchanged: the pager, on, with its key and number; its one agent, whose who-asked opens; the open decision; the acknowledged one with its answer, its collection and its acknowledgement; both attachments, byte for byte; and the `m5` command's own status for that agent;
+   - and the agent's last activity is unchanged, which `--verify` checks, so its forget date doesn't move;
+   - the check only reads, so every smoke run can repeat it;
+   - a local test runs the whole loop on moved data: `m5`'s service on fresh storage, a local baseline, then TIDY's service on the same storage, where the phone answers the open decision and the `m5` command collects and acknowledges it.
+2. **A decision that finishing closed** moves on the phone to its project's answered decisions, over staying, greyed, among the open ones. It says who asked finished before it was answered. Its question and brief stay readable, with nothing to pick or send, and it no longer counts as waiting, on the pager or the badge. An agent waiting on it is told that it closed unanswered when the agent finished, and its wait ends, a wait with no end too. An answer the service stored before the agent finished stays the answer, and the agent can still collect and acknowledge it (B25.13). B5.17 and B32.11, below, say so.
+3. **An off pager's agents and the 30-day clock:** the clock runs only while the pager is on, over running while it is off. So B22.4 holds however long a pager stays off, and I17.6 and TERMS › Agent change to say so, below. An abandoned off pager keeps its encrypted decisions on the service until the owner deletes it.
+   - **The root's call, for Sam to overturn:** the clock pauses while the pager is off, rather than starting again each time the pager turns on. The question's wording, 30 days after the agent's last activity or its pager last turning on, whichever is later, would forget no agent on a pager turned on at least once every 30 days, which a 24-hour or 7-day auto-off makes routine (B22.6). The question's own heading, a clock that runs only while the pager is on, describes the paused clock. I17.6, below, is worded for it.
+4. **Clients from M5, through TIDY's release:** both keep working, over making both update. The service keeps M5's routes and replies, and adds only what the `m5` command and app ignore. Until it is updated, the `m5` app shows a decision that finishing closed as still open, and Send on it is refused, so it shows as open again; the `m5` command shows the service's own words for it. No release exception.
+5. **PRODUCT.md › Stack** keeps where the service runs, a Cloudflare Worker at agentpager.me, and drops how it stores things, which the code holds, over naming the new shape. Done with these answers. 6 Privacy's header says how the service stores things, as built, with the store's pull request.
+6. **TIDY's walk:** none on dev, over a walk on HomePhoneLite first. Once TIDY is green on dev, its upgrade check included, and reviewed, the root releases it, and Sam dogfoods it on prod. Fixes follow as `m6.<k>`.
+
+On which questions are worth asking, Sam also typed in the root's Claude Code session on 7 Nov 2026: "I'd prefer to spend the time on just the material decisions that you are low confidence I would agree with." [METHOD.md › Sessions](../../METHOD.md#sessions) now says so, with DEC-2026-11-07-material-questions: a milestone asks only the questions that matter where the owner might not take the recommendation, and lists every other choice in one line, decided on its recommendation, for the owner to overturn.
 
 ## Slice
 
 | Layer | What M6 delivers there |
 | --- | --- |
-| Blueprint | this doc; Sam's answers; the approved lines in their areas with the code that makes them true; L10 retired; PRODUCT.md › Stack as Sam chooses (question 5) |
-| Service | one store per pager, holding its row, its agents and their decisions, so turning a pager off and every call on it happen one after the other (L10); what M5 stored moved into it (question 1); the phone's read of a pager served by that one store; a waiting agent's read ended by what it waits for, its answer, its decision closing or its pager turning off or going, instead of a check every 100 ms; finishing closes the agent's open decisions; the 30-day clock as question 3 chooses; M5's routes and replies kept (question 4) |
+| Blueprint | this doc; Sam's answers; the approved lines in their areas with the code that makes them true; L10 retired; PRODUCT.md › Stack without how the service stores things (question 5); METHOD's rule on which questions the owner is asked |
+| Service | one store per pager, holding its row, its agents and their decisions, so turning a pager off and every call on it happen one after the other (L10); what M5 stored moved into it (question 1); the phone's read of a pager served by that one store; a waiting agent's read ended by what it waits for, its answer, its decision closing or its pager turning off or going, instead of a check every 100 ms; finishing closes the agent's open decisions; the 30-day clock paused while a pager is off (question 3); M5's routes and replies kept (question 4) |
 | Command | its words for a decision that closed unanswered, in wait, status, history and finish; the history file's trim takes a lock, a small fix found in planning (What's known) |
-| Phone app | a decision that finishing closed, shown as question 2 chooses; nothing else changes on screen |
+| Phone app | a decision that finishing closed, shown with its project's answered decisions (question 2); nothing else changes on screen |
 | Tests | tests named by the ids M6 adds and touches, I17.2 among them with a call that lands as the pager turns off; a local upgrade test from `m5`'s service to TIDY's on the same storage |
-| Dev stage | the upgrade check against the `m5` baseline in `pnpm smoke:dev`, in place of M5's against `m4`, run before 8 Dec 2026; the `m6` baseline recorded at the release |
+| Dev stage | the upgrade check against the `m5` baseline in `pnpm smoke:dev`, in place of M5's against `m4` (#69), passing with the move on dev before 8 Dec 2026; the `m6` baseline recorded at the release |
 
 **One new kind of complexity:** moving stored data from one store to another, once. The wake and the closed state are changes of kinds the product already has: a wait held inside one store, and one more state for a decision, with words for it on each side. In this order they stay that way: the move first, alone, with nothing on the wire changed; then the wake, inside the new store; then the lifecycle, through every layer. The pull requests, in order, are in [.agents/plans/2026-11-07-m6-tidy.md](../../.agents/plans/2026-11-07-m6-tidy.md).
 
@@ -70,7 +51,7 @@ Six questions for Sam, each with options and ★ on the recommendation, so Sam c
 
 ## What's known
 
-Verified on 7 Nov 2026 against `main` at 464d559, the `m5` tag, which dev and prod both run (`X-AgentPager-Build`). Assumptions are marked.
+Verified on 7 Nov 2026 against `main` at 464d559, the `m5` tag, which prod runs (`X-AgentPager-Build`). Dev runs ab6312c, which adds only the plan and the upgrade check (#68, #69). Assumptions are marked.
 
 - **Today's stores** (`packages/app/src/worker.ts`, `registry.ts`, `agent.ts`; `packages/app/scripts/build.mjs`, `deploy.mjs`):
   - One Registry holds every pager's row (its public key, its phone key's digest, its switch, auto-off and alert target) and which agents connected to it.
@@ -90,36 +71,34 @@ Verified on 7 Nov 2026 against `main` at 464d559, the `m5` tag, which dev and pr
   - The command ignores fields it doesn't know (`packages/cli/src/client.ts`), prints any refusal's own words, and its wait with no end stops at one (`commands.ts`).
 - **The history** (`packages/cli/src/store.ts`): already one file per pager on each machine, which every agent on that pager appends to. Past 1,000 lines the command rewrites it without the lock the agent's file takes, so two agents on one machine can lose a line then.
 - **The `m5` baseline,** recorded on dev at the release (`~/.agentpager-baselines/dev/m5/`, by the `m5` binary): a pager with no alert target, one agent, one decision answered, collected and acknowledged with a PNG and a page, and one open. `baseline.mjs --verify` reads it back and changes nothing. Its agent is forgotten if idle after 8 Dec 2026.
-  - `pnpm smoke:dev` still checks M5's exception against the `m4` baseline (`smoke.mjs`), and leaves a finished agent on that baseline's pager each run. A check against `m5` can't, since `--verify` expects one agent.
+  - Since #69 (ab6312c), `pnpm smoke:dev`'s upgrade check is that read-back, against the `m5` baseline (`smoke.mjs`): the pager with its key and number; its one agent, last active before the record was made; both decisions with their parts and attachments; and the `m5` command's status for that agent. It connects nothing to the baseline's pager and counts as no activity, so every run can repeat it. M5's checks against `m4` ended with M5, and nothing reads the `m4` baseline. On dev at ab6312c, `pnpm smoke:dev` passed 10 of 10.
 - **Assumed:**
   - A Durable Object can't read another's storage, so the move copies each pager's row from the Registry and each agent's rows from its store, through calls between them.
   - One pager's store holds all of its agents' decisions: a SQLite-backed Durable Object holds up to 10 GB.
   - Once a pager's switch and the calls on it are in one store, a transaction there can't interleave with another call, so the two can't race. The store's pull request tests it.
   - A wait held in memory goes when its store restarts, and the command asks again, so a missed wake costs at most one wait's time.
 
-## Proposed lines
+## Approved lines
 
-For Sam's approval, in the areas' grammar. None is in an area yet: each reaches its area with the code that makes it true, and its tests name its id.
+Sam approved these with the options chosen (Owner decides first), in the areas' grammar, except I17.6's wording, which is the root's call on question 3, for Sam to overturn. None is in an area yet: each reaches its area with the code that makes it true, in PRs 4 to 6 of the plan, and its tests name its id.
 
-**B25.13, changed** (2 Agents), whatever question 2 chooses
+**B25.13, changed** (2 Agents)
 13. An agent that finishes shows as finished on the phone and can ask nothing more. Its open decisions close unanswered and can't be answered. It can still wait for and acknowledge the answers already sent, and finishing again changes nothing.
 
 **B32, a clause added** (2 Agents)
 11. @M6: A wait for a decision that closed unanswered ends, telling the agent so. A wait with no end stops too.
 
-**B5, a clause added** (5 Answering), with question 2's (a)
+**B5, a clause added** (5 Answering)
 17. @M6: A decision that closed unanswered, because its agent finished, offers nothing to pick or send, and says that who asked finished before it was answered. It shows with its project's answered decisions, and its brief stays readable.
-- With (b), its second sentence reads: It stays among its project's open decisions, after the ones the owner can answer, and its brief stays readable.
 
-**I17.6, changed** (1 Pagers), with question 3's (a)
-6. An agent is forgotten the same way, and its pager stops listing it, 30 days after its last activity or its pager last turning on, whichever is later, and never while its pager is off. Activity is asking, the owner's answer, acknowledging and finishing; waiting for an answer is not.
-- With (b), I17.6 stays, and B22.4's first sentence reads: While a pager is off, the phone keeps everything for up to 30 days, and its decisions stay readable.
+**I17.6, changed** (1 Pagers), worded for the paused clock (question 3)
+6. An agent is forgotten the same way, and its pager stops listing it, after 30 days with no activity while its pager is on; time its pager spends off doesn't count. Activity is asking, the owner's answer, acknowledging and finishing; waiting for an answer is not.
 
 **I17's notes** (1 Pagers): the note that a call the service has already checked can still land (L10) goes; I17.2 then holds as written.
 
 **TERMS, changed**
 - Decision: One question from an agent, with the owner's answer and the agent's acknowledgement. The app calls it a decision. It is open until the owner answers it; if its agent finishes first, it closes unanswered and can't be answered.
-- Agent, with question 3's (a): its last sentence reads: It lasts until its pager is deleted, and is forgotten after 30 days with no activity while its pager is on.
+- Agent: its last sentence reads: It lasts until its pager is deleted, and is forgotten after 30 days with no activity while its pager is on.
 
 **Retires,** once built: L10, turning a pager off can let one call through (1 Pagers).
 
@@ -131,8 +110,8 @@ For Sam's approval, in the areas' grammar. None is in an area yet: each reaches 
 
 ## Adds · Changes · Retires
 
-- **Adds,** once approved and built: B32.11 and B5.17. One store per pager, with what M5 stored moved into it (question 1). The upgrade check against the `m5` baseline on dev, and the `m6` baseline at the release.
-- **Changes:** B25.13 and TERMS › Decision, for what finishing does to open decisions; I17.6 and TERMS › Agent with question 3's (a), or PRODUCT.md and B22.4 with (b); I17's notes, which lose L10's; PRODUCT.md › Stack, as Sam chooses (question 5); the headers of 1 Pagers, 2 Agents and 6 Privacy, which name the stores, as built.
+- **Adds,** once built: B32.11 and B5.17. One store per pager, with what M5 stored moved into it (question 1). The upgrade check against the `m5` baseline on dev, built in #69, and the `m6` baseline at the release.
+- **Changes:** B25.13 and TERMS › Decision, for what finishing does to open decisions; I17.6 and TERMS › Agent, for the 30-day clock paused while a pager is off (question 3); I17's notes, which lose L10's; the headers of 1 Pagers, 2 Agents and 6 Privacy, which name the stores, as built. Done with the answers: PRODUCT.md › Stack, which no longer says how the service stores things (question 5); METHOD.md › Sessions and › The milestone loop, which ask the owner only the questions that matter where the owner might not take the recommendation, with DEC-2026-11-07-material-questions.
 - **Retires:** L10, turning a pager off can let one call through (1 Pagers). Its id is never reused.
 
 ## Log
@@ -140,3 +119,5 @@ For Sam's approval, in the areas' grammar. None is in an area yet: each reaches 
 - 6 Nov · queued: Sam split three of ENCRYPT's hardening items into this milestone, to run right after ENCRYPT and before CLIENTS.
 - 6 Nov · Sam chose its word on the pager, TIDY over the proposed STORE ([M5-encrypt.md](M5-encrypt.md), question 7).
 - 7 Nov · planning: M5 released, and TIDY started as M6. PR #68 moves this doc out of `next/`, asks Sam's six questions, proposes the lines, marks M5 released and adds the plan, `.agents/plans/2026-11-07-m6-tidy.md`. `pnpm check` green (154 clauses, 25 tested), `pnpm test:all` 629 passed (556, 3, 8, Swift 17, 32 and 13).
+- 7 Nov · building: PR #69 moves `pnpm smoke:dev`'s upgrade check from M5's checks against `m4` to a read-back of the `m5` baseline that only reads, and steadies a test's timing. Dev runs ab6312c, and `pnpm smoke:dev` passed 10 of 10 there. `pnpm check` green (154 clauses, 25 tested), `pnpm test:all` 629 passed (556, 3, 8, Swift 17, 32 and 13).
+- 7 Nov · building: Sam answered the six questions in the root's Claude Code session, choosing every recommendation: 1a 2a 3a 4a 5b, and 6a from the message that released M5. The root's call on question 3, for Sam to overturn: the 30-day clock pauses while a pager is off, rather than starting again each time it turns on, since the question's wording would forget no agent on a pager turned on at least once every 30 days; I17.6's approved wording says so. Sam also asked to be asked only the questions that matter where Sam might not take the recommendation, now in METHOD.md with DEC-2026-11-07-material-questions. PR #70 records the answers and the approved lines, takes how the service stores things out of PRODUCT.md › Stack, and marks the plan's PR 3 done. `pnpm check` green (154 clauses, 25 tested), `pnpm test:all` 629 passed (556, 3, 8, Swift 17, 32 and 13).

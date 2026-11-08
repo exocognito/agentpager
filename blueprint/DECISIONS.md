@@ -168,3 +168,14 @@ This file is append only. A reversed or narrowed decision gets a new entry, and 
   - The order after M4 is ENCRYPT, TIDY, CLIENTS, INSTALL, SITE, OPEN, FRIENDS, one at a time.
 - **Why:** a milestone keeps its word once it starts (METHOD.md › Ids), so the word is settled while it is queued.
 - **Serves:** README.md › Milestones; `milestones/next/TIDY.md`.
+
+## DEC-2026-11-07-material-questions · Sam is asked only what Sam might not agree with
+
+- **Decided by:** Sam, on 7 Nov 2026.
+- **Basis:** "I'd prefer to spend the time on just the material decisions that you are low confidence I would agree with." (Sam in the M6 root's Claude Code session, the day Sam answered M6's six questions with every recommendation: [M6-tidy.md](milestones/M6-tidy.md) › Owner decides first.)
+- **Decided, and still standing:**
+  - A milestone asks Sam only the questions that matter and where Sam might not take the recommendation, each numbered, with options and ★ on the recommendation.
+  - Every other choice is decided on its recommendation and listed in one line, so Sam can overturn any of them.
+  - Only Sam adds, changes or retires lines and terms. Proposed lines are still put to Sam, and can be approved together in one answer.
+- **Why:** Sam would rather spend the time only on those questions.
+- **Serves:** METHOD.md › Sessions (Questions to the owner) and › The milestone loop (Plan: Owner decides first).

@@ -96,10 +96,10 @@ const wakes = (c: Caller | null) => c !== null && (c.app !== 'codex' || (c.threa
 export const NUDGE = 'AgentPager can\'t wake an agent in this app, so when your owner answers, they may have to nudge you to read it.';
 // The words for a decision: its own wake when this call comes from it (the adapter's session, or the Codex thread whose
 // watcher is running or starts now), else the caller's app's.
-function howFor(c: Caller | null, a: AgentFile, d: { short: string; wake?: DecisionWake }): How {
+async function howFor(c: Caller | null, a: AgentFile, d: { short: string; wake?: DecisionWake }): Promise<How> {
   const w = d.wake;
   if (w && w.app !== 'codex' && (c?.app === 'claude-code' || c?.app === 'pi') && c.wake?.app === w.app && c.wake.session === w.session) return 'adapter';
-  if (w?.app === 'codex' && c?.app === 'codex' && c.thread === w.thread && watcherFor(a.id, d.short)) return { codex: w.via };
+  if (w?.app === 'codex' && c?.app === 'codex' && c.thread === w.thread && await watcherFor(a.id, d.short)) return { codex: w.via };
   return c?.app === 'claude-code' || c?.app === 'claude-desktop' ? c.app : null;
 }
 
@@ -301,23 +301,28 @@ export async function ask(agent: string, card: Source, via?: Via, holdMs = SENDI
   const caller = identify(via);
   const wake: DecisionWake | undefined = caller?.app === 'pi' ? caller.wake : caller?.app === 'claude-code' ? caller.wake ?? undefined
     : caller?.app === 'codex' && caller.thread !== null && codexCli() !== null ? { app: 'codex', thread: caller.thread, via: caller.via } : undefined;
-  // The short id is given out only once it is recorded; otherwise the reply names the server's id.
-  let short = id, reminder: string | null = null, recorded = false;
+  // The short id is given out only once it is recorded; otherwise the reply names the server's id. A decision this
+  // machine already recorded (an earlier run of the same ask got its reply first) keeps its short id and its wake, so it
+  // has one watcher and is rung once, and isn't counted or added to the history again.
+  let short = id, reminder: string | null = null, recorded: DecisionWake | undefined | null = null, again = false;
   try {
     let chosen = '';
     updateAgent(a.id, x => {
+      const known = Object.keys(x.decisions).find(k => x.decisions[k].id === id);
+      if (known) { chosen = known; recorded = x.decisions[known].wake; again = true; return; }
       chosen = shortId('d_', taken => taken in x.decisions);
       x.decisions[chosen] = { id, title: brief.title, options: brief.card.options.map(o => o.label), askedAt: now.toISOString(), ...(wake ? { wake } : {}) };
+      recorded = wake;
       const cards = x.cardsSinceRules + 1, since = x.rulesShownAt ? now.getTime() - Date.parse(x.rulesShownAt) : Infinity;
       if (since > REMINDER_MS || cards >= REMINDER_CARDS) {
         reminder = since > REMINDER_MS ? `It's been ${Number.isFinite(since) ? Math.floor(since / 3_600_000) + ' hours' : 'a while'} since you last read the card contract.` : `That's ${cards} cards since you last read the card contract.`;
         x.rulesShownAt = now.toISOString(); x.cardsSinceRules = 0;
       } else x.cardsSinceRules = cards;
     });
-    if (chosen) { short = chosen; recorded = true; }
-    appendHistory(a.pager, { at: now.toISOString(), event: 'asked', agent: a.id, app: a.app, project: a.project, decision: short, title: brief.title, detail: brief.detail, options: brief.card.options.map(o => o.label), recommended: brief.card.recommended });
+    if (chosen) short = chosen;
+    if (!again) appendHistory(a.pager, { at: now.toISOString(), event: 'asked', agent: a.id, app: a.app, project: a.project, decision: short, title: brief.title, detail: brief.detail, options: brief.card.options.map(o => o.label), recommended: brief.card.recommended });
   } catch { /* Sent, but not recorded here: the reply gives the server's id, which wait and ack also take. */ }
-  const how = howFor(caller, a, recorded ? { short, wake } : { short });
+  const how = await howFor(caller, a, recorded ? { short, wake: recorded } : { short });
   const lines = ['Sent. Your owner sees it as:', `  ${brief.title}`, `  ${brief.detail}`, `Decision ${short}. ${waitHow(how, a.id, short)}`];
   if (reminder) lines.push('', `${reminder} The short version:`, `  ${SHORT}`);
   return done(lines.join('\n'), { decision: short });
@@ -341,7 +346,7 @@ export async function wait(agent: string, ref: string, opts: { seconds?: number;
     }
     if (r.value.status !== 'answered') {
       if (opts.forever) continue;
-      return pending(a, d, opts.seconds !== undefined && seconds < WAIT_SECONDS, howFor(identify(opts.via), a, d));
+      return pending(a, d, opts.seconds !== undefined && seconds < WAIT_SECONDS, await howFor(identify(opts.via), a, d));
     }
     const { sentAt } = r.value.answer, choice = openAnswer(keysOf(a), d.id, r.value.answer.answer);
     // Only the phone, which read the card, holds the key the answer is sealed to; an answer that doesn't open, or names
@@ -499,21 +504,31 @@ function watching(pid: number, id: string, short: string): boolean {
   catch { return false; }
 }
 // Starts the watcher for a decision a Codex thread asked, when it hasn't rung, nothing here has the answer yet and no
-// watcher runs. True when one runs now. Its environment is this process's, without the pager's number.
-function watcherFor(id: string, short: string): boolean {
-  let x: AgentFile | null;
-  try { x = loadAgent(id); } catch { return false; }
-  const d = x?.decisions[short], w = d?.wake;
+// watcher runs. True when one runs: the one already there, or the new one once it has put itself in the agent's file,
+// within STARTS_MS, or has rung already; so the agent is told a note will come only when something will ring it. Its
+// environment and working folder are this process's, without the pager's number.
+const STARTS_MS = 3_000;
+async function watcherFor(id: string, short: string): Promise<boolean> {
+  const now = () => { try { return loadAgent(id)?.decisions[short] ?? null; } catch { return null; } };
+  const d = now(), w = d?.wake;
   if (!d || w?.app !== 'codex' || w.ring || d.answered || d.acknowledged || d.closed) return false;
   if (w.watcher !== undefined && watching(w.watcher, id, short)) return true;
   const env = { ...process.env };
   delete env.AGENTPAGER_PAGER;
-  try {
-    const child = spawn(program[0], [...program.slice(1), 'watch', '--agent', id, short], { detached: true, stdio: 'ignore', env, cwd: '/' });
-    child.on('error', () => { /* it never started: no watcher */ });
-    child.unref();
-    return child.pid !== undefined;
-  } catch { return false; }
+  let child: ReturnType<typeof spawn>, ended = false;
+  try { child = spawn(program[0], [...program.slice(1), 'watch', '--agent', id, short], { detached: true, stdio: 'ignore', env }); } catch { return false; }
+  child.on('error', () => { ended = true; });
+  child.on('exit', () => { ended = true; });
+  child.unref();
+  if (child.pid === undefined) return false;
+  for (const until = Date.now() + STARTS_MS; Date.now() < until;) {
+    const x = now()?.wake;
+    if (x?.app === 'codex' && (x.ring || x.watcher === child.pid)) return true;
+    // It ended without watching, as when another watcher started first: that one counts.
+    if (ended) return x?.app === 'codex' && x.watcher !== undefined && watching(x.watcher, id, short);
+    await new Promise(res => setTimeout(res, 25));
+  }
+  return false;
 }
 // queueTimeoutMs, retryMs and forMs: a test shortens them.
 export async function watch(agent: string, ref: string, opts: { queueTimeoutMs?: number; retryMs?: number; forMs?: number } = {}): Promise<Result> {

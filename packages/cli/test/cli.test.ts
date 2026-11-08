@@ -322,11 +322,15 @@ test('B27.9 B32.10 A lost ask reply is never taken as success, and asking the sa
     assert.equal(later2.code, 5, later2.text);
     assert.match(later2.text, /Asking again with the same card is safe/);
     go();
-    assert.equal((await paused).code, 0, 'the paused run gets its reply');
+    const outlasted = await paused;
+    assert.equal(outlasted.code, 0, 'the paused run gets its reply');
     const outlived = Object.values(store.loadAgent(id)?.asking ?? {});
     assert.equal(outlived.length, 1, 'the later run\'s request id is still kept');
-    assert.equal((await op.ask(id, { file: card('Outlived?') })).code, 0);
+    const third = await op.ask(id, { file: card('Outlived?') });
+    assert.equal(third.code, 0);
     assert.equal((await onPhone()).filter(([title]) => title === 'Outlived?').length, 1, 'one decision');
+    assert.equal(field(third, 'decision'), field(outlasted, 'decision'), 'recorded once here too, under one short id, so it has one wake');
+    assert.equal(store.readHistory(store.loadAgent(id)?.pager ?? '').filter(e => e.event === 'asked' && e.title === 'Outlived?').length, 1, 'and asked once in the history');
 
     // Once settled, the same card asked again is a new decision, as the agent meant it.
     const later = await op.ask(id, { file: card('Lost twice?') });

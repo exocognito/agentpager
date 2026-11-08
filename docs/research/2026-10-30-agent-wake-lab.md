@@ -1,6 +1,6 @@
 # The agent wake lab, 30 Oct 2026
 
-Which agent apps act on an owner's answer by themselves, with nothing for the owner to nudge? Sam's rule is that an answer reaches the agent unprompted ([M3](../../blueprint/milestones/M3-command.md), Sam's answers). This lab tested Claude's apps. What was built from it is B33 in [2 Agents](../../blueprint/areas/2-agents.md), and [CLIENTS](../../blueprint/milestones/next/CLIENTS.md) decides which apps AgentPager supports.
+Which agent apps act on an owner's answer by themselves, with nothing for the owner to nudge? Sam's rule is that an answer reaches the agent unprompted ([M3](../../blueprint/milestones/M3-command.md), Sam's answers). This lab tested Claude's apps. What was built from it is B33 in [2 Agents](../../blueprint/areas/2-agents.md), and [CLIENTS](../../blueprint/milestones/M7-clients.md) decides which apps AgentPager supports.
 
 ## How it was tested
 

@@ -179,3 +179,30 @@ This file is append only. A reversed or narrowed decision gets a new entry, and 
   - Only Sam adds, changes or retires lines and terms. Proposed lines are still put to Sam, and can be approved together in one answer.
 - **Why:** Sam would rather spend the time only on those questions.
 - **Serves:** METHOD.md › Sessions (Questions to the owner) and › The milestone loop (Plan: Owner decides first).
+
+## DEC-2026-11-08-clients · Each supported agent app is woken the way it allows
+
+- **Decided by:** Sam, on 8 Nov 2026.
+- **Basis:** "D1 yes" (Sam in the M7 root's Claude Code session, taking the root's recommendation for which agent apps AgentPager supports; [M7-clients.md](milestones/M7-clients.md) › Owner decides first records the pick). The root had cross-checked it that day, client by client, against the wakes Plannotator v0.28.53 ships.
+- **Decided, and still standing:**
+  - The supported agent apps, each woken the way it allows when its answer arrives:
+    - Claude Code: a plugin whose mod hands the answer to the agent as a new turn. The background wait stays as the fallback where mods don't run, such as `claude -p`, SDK runs like the Claude desktop app's Code tab, and Windows.
+    - Codex, in the terminal and in the ChatGPT app: the agentpager command itself runs `codex queue`, with no Codex plugin. What it queues says only that an answer is waiting, never the answer.
+    - pi: an extension that only wakes the agent, which uses the agentpager command line rather than MCP tools.
+    - Claude Desktop chats: supported as waiting in their turn.
+  - Every other app still connects, with a one-line warning.
+  - The command stays the only place that holds keys and decrypts.
+  - INSTALL's setup covers the supported apps, and SITE's front page names them as the apps that work.
+- **Why:** Sam asked on 5 Nov for a "clear point of view on which clients we will support and which we will not (based on our ability to wake an idle agent), and then use that as anchor in our going forward designs" ([M7-clients.md](milestones/M7-clients.md) › Objective).
+- **Serves:** B33 and B29, as M7 changes them; L11 and L12 in 2 Agents; `milestones/M7-clients.md`; `milestones/next/INSTALL.md` (setup); `milestones/next/SITE.md` (the list); PRODUCT.md › Reach the agents owners actually use.
+
+## DEC-2026-11-08-friends-after-cleanup · Friends come after a first cleanup of the site and the repository
+
+- **Decided by:** Sam, on 8 Nov 2026.
+- **Basis:** "D2 B - I most want the site and repo cleaned up before introducing friends, at least a first round of cleanup and update on both, and we can plan another final round of cleanup and polish before distributing to more people" (Sam in the M7 root's Claude Code session).
+- **Decided, and still standing:**
+  - FRIENDS stays after SITE and OPEN. Friends are introduced only after at least a first round of cleanup and update of both the site and the repository, which SITE's and OPEN's first passes are.
+  - A final round of cleanup and polish is planned before AgentPager goes to more people than the friends FRIENDS invites. It is a note in FRIENDS's doc, not a milestone, until Sam commits to it.
+  - The order after M6 is CLIENTS, INSTALL, SITE, OPEN, FRIENDS, one at a time.
+- **Why:** Sam most wants the site and the repository cleaned up before friends are introduced.
+- **Serves:** README.md › Milestones; `milestones/next/FRIENDS.md`, `milestones/next/SITE.md` and `milestones/next/OPEN.md`.

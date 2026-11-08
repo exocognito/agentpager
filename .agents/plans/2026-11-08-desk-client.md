@@ -50,6 +50,7 @@ ENCRYPT has shipped: [V] it is [M5](../../blueprint/milestones/M5-encrypt.md), r
   - B7.4 and its note: an answered decision shows its answer on every device of the owner's that holds the pager.
   - I17.5: deleting a pager forgets its desks too.
   - L9 narrows. Linking moves a pager's keys to another device, which is half of moving a pager to a new phone.
+  - PRODUCT.md, which only Sam changes: [Stack](../../blueprint/PRODUCT.md#stack) says the owner's side is a native iPhone app, and the principles speak of the phone. The phone stays the pager that alerts, and the desk would be a second place to answer.
 
 ## How the desk authenticates: linking
 

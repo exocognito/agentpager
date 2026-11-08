@@ -11,7 +11,7 @@ A clause is tested when a test's name in `packages/` carries its id (METHOD.md �
 - [B26 · Make a pager on the phone](../areas/1-pagers.md#b26--m2--make-a-pager-on-the-phone): B26.1, B26.2, B26.3, B26.4, B26.5, B26.7, B26.8
 - [B23 · Pagers and the Pager screen](../areas/1-pagers.md#b23--m2--pagers-and-the-pager-screen): B23.4, B23.5, B23.7, B23.8, B23.9, B23.10
 - [B22 · Turn a pager off and on, or delete it](../areas/1-pagers.md#b22--m2--turn-a-pager-off-and-on-or-delete-it): B22.2, B22.3, B22.4, B22.5, B22.6, B22.7, B22.8, B22.9
-- [I17 · Off pagers deliver nothing](../areas/1-pagers.md#i17--m2--off-pagers-deliver-nothing): I17.1, I17.2, I17.3, I17.4, I17.5, I17.6
+- [I17 · Off pagers deliver nothing](../areas/1-pagers.md#i17--m2--off-pagers-deliver-nothing): I17.1, I17.3, I17.4, I17.5, I17.6
 - [I24 · A restart loses nothing](../areas/1-pagers.md#i24--m3--a-restart-loses-nothing): I24.1
 
 ## 2 Agents

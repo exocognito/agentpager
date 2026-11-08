@@ -26,7 +26,7 @@ Start here. [PRODUCT.md](PRODUCT.md) says what AgentPager is for, as Sam approve
 
 | # | Area | Holds | Ids |
 | --- | --- | --- | --- |
-| 1 | [Pagers](areas/1-pagers.md) | Making a pager and giving out its number, the Pagers and Pager screens, turning a pager off and on, and deleting it | B22 B23 B26 · I17 I24 · L9 L10 L25 |
+| 1 | [Pagers](areas/1-pagers.md) | Making a pager and giving out its number, the Pagers and Pager screens, turning a pager off and on, and deleting it | B22 B23 B26 · I17 I24 · L9 L25 |
 | 2 | [Agents](areas/2-agents.md) | The agent's side, through the agentpager command: connecting as a new agent, waiting for the answer, acknowledging it, and the history on its machine | B25 B31 B32 B33 · I21 · L11 L12 L13 L14 L15 |
 | 3 | [Cards](areas/3-cards.md) | What an agent writes and sends: `card.yaml`, the one review before sending, and the checks that refuse a broken card | B27 · I4 I22 · L16 |
 | 4 | [Getting paged](areas/4-getting-paged.md) | Alerts when the app is closed, opening one to its decision, the badge, and the warning when no agent picks up an answer | B17 |

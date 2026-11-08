@@ -3,7 +3,7 @@
 > **Definition:** The pagers the owner makes on the phone, and the iPhone app that holds them: making a pager and giving out its number, the Pagers and Pager screens, turning a pager off and on, auto-off, deleting, and what an off or deleted pager means for its agents. Reading and answering a decision is 5 Answering, alerts and the badge are 4 Getting paged, connecting with a number is 2 Agents, the pager's keys and the number's fingerprint are 6 Privacy, and installing the app is 7 Getting started, with its limit L24.
 > **Serves:** [Unblock my agent from my phone](../PRODUCT.md#unblock-my-agent-from-my-phone) · [Only agents I give a number reach my phone](../PRODUCT.md#only-agents-i-give-a-number-reach-my-phone) · [A pager is on until I turn it off](../PRODUCT.md#a-pager-is-on-until-i-turn-it-off) · [Stack](../PRODUCT.md#stack) · [Feel native](../PRODUCT.md#feel-native) · [Pinned design decisions](../PRODUCT.md#pinned-design-decisions)
 > **Relies on:** an iPhone with iOS 26, where the app runs · the iPhone's Keychain, which keeps each pager's keys on that phone only and out of its backups · iOS Settings, which holds the app's server address · Cloudflare, where the service keeps each pager's state and its agents (6 Privacy)
-> **Code:** `packages/ios/AgentPager/`, the app: `Views/PagersView.swift`, `Views/PagerView.swift`, `Views/PagerDetailView.swift`, `Model/AppModel.swift`, `Model/Keychain.swift`, `Model/Wording.swift`, `Settings.bundle` · `packages/app/src/registry.ts` (pagers, off, auto-off, delete) · `packages/app/src/agent.ts` (the off check on every call, forgetting idle agents) · `packages/app/src/contract.ts` (the auto-off and idle times)
+> **Code:** `packages/ios/AgentPager/`, the app: `Views/PagersView.swift`, `Views/PagerView.swift`, `Views/PagerDetailView.swift`, `Model/AppModel.swift`, `Model/Keychain.swift`, `Model/Wording.swift`, `Settings.bundle` · `packages/app/src/pager.ts`, each pager's own store (the pager, off, auto-off, delete, the off check in the same step as every call, forgetting idle agents) · `packages/app/src/move.ts`, `registry.ts` and `agent.ts` (what M5 stored, which each pager's store takes over at its first call) · `packages/app/src/contract.ts` (the auto-off and idle times)
 > **Screens:** [pagers](../generated/screens/phone/pagers.png) · [empty](../generated/screens/phone/empty.png) · [pager](../generated/screens/phone/pager.png) · [detail](../generated/screens/phone/detail.png) · [new](../generated/screens/phone/new.png) · journeys: [pager](../generated/screens/journeys/pager/README.md), [off-and-on](../generated/screens/journeys/off-and-on/README.md), [delete](../generated/screens/journeys/delete/README.md)
 > **Walked by:** J4, J5
 
@@ -65,7 +65,6 @@ Why: [Only agents I give a number reach my phone](../PRODUCT.md#only-agents-i-gi
 5. When a pager is deleted, the service deletes the pager, its agents, and their decisions, attachments, answers, acknowledgements and key digests. Its number connects nothing, and its agents' keys are refused as unknown.
 6. An agent with no activity for 30 days is forgotten the same way, and its pager stops listing it. Activity is asking, the owner's answer, acknowledging and finishing; waiting for an answer is not.
 
-- A call the service has already checked when the owner turns the pager off can still land (L10).
 - Nothing is claimed about copies in the platform's own backups, such as Cloudflare's point-in-time recovery.
 - The agentpager command's files on an agent's machine, its history among them (B31), stay after a pager is deleted (L15, in 2 Agents).
 
@@ -84,12 +83,7 @@ Why: [Unblock my agent from my phone](../PRODUCT.md#unblock-my-agent-from-my-pho
 - What would fix it: a way to move a pager's keys to another phone, or to recover them.
 - When to revisit: when an owner changes phone.
 
-### L10 · @M2 · Turning a pager off can let one call through
-
-- What people meet: an agent's call that the service has already checked against its pager when the owner turns the pager off still lands. The window is one check inside the service; everything sent after the switch is refused (I17.2).
-- Why it waits: accepted on 30 Oct 2026 for dogfooding, to fix later.
-- What would fix it: one writer per pager, which [M6 · TIDY](../milestones/M6-tidy.md) builds.
-- When to revisit: TIDY, right after ENCRYPT.
+<!-- L10 retired by M6 · TIDY, which gave each pager one store, 7 Nov 2026; ids are never reused -->
 
 ### L25 · @M5 · A leaked number can connect any number of agents
 

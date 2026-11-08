@@ -250,3 +250,30 @@ test('I17.2 A call that lands as the pager turns off is refused as off with noth
     await f.artifact('outcomes.json', outcomes);
   } finally { await f.stop(); }
 });
+
+// Auto-off comes due while a wait is held: an answer sent just before it is collected only if the collection lands
+// before it too. Each trial answers a held wait a few milliseconds before its pager's auto-off, so the wait's next look
+// falls on either side of it.
+test('I17.2 A wait held across its pager\'s auto-off collects nothing after the auto-off', { timeout: 180_000 }, async () => {
+  const f = await fixture('auto-off-race', { autoOffMs: 3_000, idleMs: 0 });
+  try {
+    const trials = await Promise.all([10, 25, 40, 55, 70, 85, 100, 115].map(async early => {
+      const p = await f.makePager('24h'), a = await f.connect(p.number);
+      const asked = await f.ask(a, `Answered ${early} ms before auto-off?`), answer = await f.sealedAnswer(a.agent.agentId, p.phone, asked.decisionId);
+      const offAt = Date.parse(p.pager.offAt ?? '');
+      const waiting = f.request(`/api/agents/${a.agent.agentId}/cards/${asked.decisionId}/answer?wait=10`, { agent: a.agentKey });
+      await pause(offAt - early - Date.now());
+      const sent = await f.request(`/api/agents/${a.agent.agentId}/cards/${asked.decisionId}/answer`, { phone: p.phone, data: answer });
+      const waited = await waiting;
+      const seen = (await f.pager(p.pagerId, p.phone)).agents[0];
+      const d = [...seen.open, ...seen.answered].find(x => x.decisionId === asked.decisionId);
+      return { early, sent: sent.status, waited: waited.status, collectedAt: d?.collectedAt, offAt };
+    }));
+    assert.ok(trials.some(t => t.sent === 200), 'an answer landed before auto-off');
+    for (const t of trials) {
+      if (t.collectedAt !== undefined) assert.ok(Date.parse(t.collectedAt) <= t.offAt, `answered ${t.early} ms early, collected at ${t.collectedAt}, after auto-off at ${new Date(t.offAt).toISOString()}`);
+      else assert.ok(t.sent !== 200 || t.waited === 409, `answered ${t.early} ms early: a wait that got no answer is refused as off`);
+    }
+    await f.artifact('trials.json', trials);
+  } finally { await f.stop(); }
+});

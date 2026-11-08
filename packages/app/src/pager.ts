@@ -108,7 +108,13 @@ export class Pager {
     if (!this.sql("SELECT 1 FROM sqlite_master WHERE type='table' AND name='moved_v4'").length) return undefined;
     return this.sql<MovedRow>('SELECT pager_id, at, from_registry FROM moved_v4 WHERE id=1')[0];
   }
-  private pagerRow(): PagerRow | undefined { return this.sql<PagerRow>('SELECT * FROM pager_v4 WHERE id=1')[0]; }
+  // The pager, with auto-off landed if it has come due: in the same state as the switch, off since the time it was
+  // due. Every check of the switch reads it here, inside the transaction that writes, so a call held across the
+  // deadline, such as a wait, sees it.
+  private pagerRow(): PagerRow | undefined {
+    this.ctx.storage.sql.exec('UPDATE pager_v4 SET enabled=0, off_since=off_at, off_at=NULL WHERE enabled=1 AND off_at IS NOT NULL AND off_at <= ?', Date.now());
+    return this.sql<PagerRow>('SELECT * FROM pager_v4 WHERE id=1')[0];
+  }
   private agentRow(agentId: string): AgentRow | undefined { return this.sql<AgentRow>('SELECT * FROM agents_v4 WHERE agent_id=?', agentId)[0]; }
   private agentRows(): AgentRow[] { return this.sql<AgentRow>('SELECT * FROM agents_v4 ORDER BY rowid'); }
 
@@ -176,14 +182,14 @@ export class Pager {
     for (const table of ['warnings_v4', 'collections_v4', 'pickups_v4', 'acknowledgements_v4', 'answers_v4', 'attachments_v4', 'decisions_v4', 'agents_v4', 'pager_v4', 'erase_v4']) this.ctx.storage.sql.exec(`DELETE FROM ${table}`);
   }
 
-  // At every call and every alarm, before anything else: auto-off lands in the same state as the switch, off since the
-  // time it was due, and an agent idle for clocks.idleMs is forgotten, and its pager stops listing it. So no call,
-  // the move's first included, finds an agent whose time has come.
+  // At every call and every alarm, before anything else: auto-off lands if it has come due (pagerRow), and an agent
+  // idle for clocks.idleMs is forgotten, and its pager stops listing it. So no call, the move's first included, finds
+  // an agent whose time has come.
   // Whether it forgot anyone.
   private housekeep(): boolean {
     const now = Date.now();
     return this.tx(() => {
-      this.ctx.storage.sql.exec('UPDATE pager_v4 SET enabled=0, off_since=off_at, off_at=NULL WHERE enabled=1 AND off_at IS NOT NULL AND off_at <= ?', now);
+      this.pagerRow();
       const idle = this.agentRows().filter(a => now >= Date.parse(a.last_activity_at) + clocks.idleMs);
       for (const a of idle) this.forgetAgent(a);
       return idle.length > 0;

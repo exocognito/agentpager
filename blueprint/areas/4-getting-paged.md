@@ -3,7 +3,7 @@
 > **Definition:** How a decision gets the owner's attention: alerts while AgentPager is closed, opening an alert to its decision, the app icon's badge, the one alert when no agent picks up an answer, and how the app shows a new decision while it is open. Reading and answering the decision belongs to 5 Answering.
 > **Serves:** [What it's for](../PRODUCT.md#what-its-for) · [Get paged when my agent needs me](../PRODUCT.md#get-paged-when-my-agent-needs-me) · [Return to completed work, not an unseen question](../PRODUCT.md#return-to-completed-work-not-an-unseen-question)
 > **Relies on:** Apple's push service (APNs), through Sam's paid Apple Developer Program team and its push key · the iPhone's own notification settings, where the owner allows AgentPager's alerts and its time-sensitive alerts
-> **Code:** `packages/contract/alerts.ts` (what an alert carries and the words it shows); `packages/app/src/push.ts`, `agent.ts`, `registry.ts`; `packages/ios/AgentPagerNotifications/NotificationService.swift` (the alert extension), `packages/ios/AgentPagerCrypto` (`Alerts.swift`); `packages/ios/AgentPager/Model/Alerts.swift`, `AppModel.swift`
+> **Code:** `packages/contract/alerts.ts` (what an alert carries and the words it shows); `packages/app/src/push.ts`, `pager.ts`; `packages/ios/AgentPagerNotifications/NotificationService.swift` (the alert extension), `packages/ios/AgentPagerCrypto` (`Alerts.swift`); `packages/ios/AgentPager/Model/Alerts.swift`, `AppModel.swift`
 > **Screens:** none
 > **Walked by:** J5
 

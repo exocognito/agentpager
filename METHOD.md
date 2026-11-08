@@ -154,7 +154,7 @@ Never fix a miss the owner cares about with a test alone. A test follows from a 
    - its objective, as the owner approved it;
    - its slice: a table of what it delivers in each layer;
    - what's out of scope, only where a builder would wrongly assume it's in;
-   - **Owner decides first**: its numbered questions;
+   - **Owner decides first**: its numbered questions, only those that matter where the owner might not take the recommendation, then every other choice in one line, decided on its recommendation, for the owner to overturn;
    - the ids it adds, changes and retires.
 
    Shape it so it delivers at least one new piece of value through every layer it touches, and takes on at most one new kind of complexity.
@@ -174,7 +174,7 @@ Never fix a miss the owner cares about with a test alone. A test follows from a 
   - what to look at in `generated/`;
   - each finding, fixed or raised as a question;
   - anything that would change a line.
-- **Questions to the owner** are numbered, each with options and ★ on the recommendation, so the owner can answer "1a 2b". When the owner is away, page them the way AGENTS.md says, one decision per card, recommendation first.
+- **Questions to the owner** are only the choices that matter and where the owner might not take the recommendation. Each is numbered, with options and ★ on the recommendation, so the owner can answer "1a 2b". Every other choice is decided on its recommendation and listed in one line, so the owner can overturn any of them. Lines and terms are always the owner's to approve (Changing intent), and proposed lines can be approved together in one answer. When the owner is away, page them the way AGENTS.md says, one decision per card, recommendation first.
 - **Logs are short.** A milestone's log gets a few lines per step: what changed, the test counts, the pull request. The evidence stays in the pull request and the results files.
 
 ## Don't

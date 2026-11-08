@@ -103,7 +103,7 @@ Keep the first version focused and its foundations explicit.
 
 - My side is a native iPhone app.
 - No accounts and no paid plans.
-- It runs on a Cloudflare Worker at agentpager.me, with one Durable Object for the pagers and one per agent.
+- It runs on a Cloudflare Worker at agentpager.me.
 - Agents reach it only through the agentpager command, as a command line or a local MCP server.
 
 ## Roadmap

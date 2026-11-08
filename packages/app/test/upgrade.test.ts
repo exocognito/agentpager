@@ -1,5 +1,5 @@
 import { test } from 'node:test';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { mkdtempSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { Schema } from 'effect';
 import pngjs from 'pngjs';
-import { fixture, release, assert, C, token, until, app, question, asQuestion, asClient } from './support.ts';
+import { fixture, release, assert, C, token, until, app, question, asQuestion, asClient, pause } from './support.ts';
 import { fromBase64url, open, seal } from '../../contract/envelope.ts';
 import { decodePart, encodePart } from '../../contract/parts.ts';
 
@@ -230,20 +230,35 @@ test('the move from m5: every pager, agent and decision m5 stored reads back the
     const refused = await f.request(`/api/pagers/${cutPager.pagerId}`, { phone: cutPager.phone });
     assert.deepEqual([refused.status, tagOf(refused.value)], [500, 'InternalError']);
 
-    // On the moved data, the phone answers the baseline's open decision, and m5's command collects and acknowledges it.
+    // On the moved data, m5's command waits for the baseline's open decision, the phone answers it, and the command
+    // has the answer within a second of the send (PRODUCT.md's bar; wake.test.ts), then acknowledges it.
     const inbox = Schema.decodeUnknownSync(C.PagerInbox)(await read(f, baselinePager)), privateKey = fromBase64url(record.pager.privateKey) ?? new Uint8Array();
     const openOne = inbox.agents[0].open[0];
     assert.equal(openOne.decisionId, record.decisions.open.decisionId);
     const card = decodePart('card', open(privateKey, 'card', { pagerId: record.pager.pagerId, decisionId: openOne.decisionId }, openOne.card));
     const answer = seal(fromBase64url(card.answerKey) ?? new Uint8Array(), 'answer', { pagerId: record.pager.pagerId, decisionId: openOne.decisionId }, encodePart('answer', { choice: { kind: 'option', number: 2 } }));
-    await f.ok(C.Receipt, `/api/agents/${record.agent.agentId}/cards/${openOne.decisionId}/answer`, { phone: record.pager.phoneKey, data: { requestId: token(), answer } });
-    const recordDir = path.join(baselines, 'local', 'm5'), command = (...args: string[]) => {
-      const r = spawnSync(path.join(recordDir, record.binary), [...args, '--json'], { env: { PATH: process.env.PATH ?? '', HOME: process.env.HOME ?? '', AGENTPAGER_HOME: path.join(recordDir, record.home) }, encoding: 'utf8', timeout: 90_000 });
+    const recordDir = path.join(baselines, 'local', 'm5'), binary = path.join(recordDir, record.binary);
+    const commandEnv = { PATH: process.env.PATH ?? '', HOME: process.env.HOME ?? '', AGENTPAGER_HOME: path.join(recordDir, record.home) };
+    const command = (...args: string[]) => {
+      const r = spawnSync(binary, [...args, '--json'], { env: commandEnv, encoding: 'utf8', timeout: 90_000 });
       assert.equal(r.status, 0, `agentpager ${args[0]}: ${r.stdout}${r.stderr}`);
       return JSON.parse(r.stdout).result;
     };
-    const collected = command('wait', '--agent', record.agent.id, record.decisions.open.id);
-    assert.deepEqual([collected.status, collected.option], ['answered', 'B']);
+    let waited = false;
+    const m5Wait = new Promise<{ result: { status: string; option?: string }; at: number }>((resolve, reject) => {
+      const c = spawn(binary, ['wait', '--agent', record.agent.id, record.decisions.open.id, '--json'], { env: commandEnv, stdio: ['ignore', 'pipe', 'pipe'] });
+      let out = '', err = '';
+      c.stdout.on('data', d => { out += d; }); c.stderr.on('data', d => { err += d; });
+      const limit = setTimeout(() => c.kill(), 90_000);
+      c.on('close', code => { clearTimeout(limit); waited = true; if (code === 0) resolve({ result: JSON.parse(out).result, at: Date.now() }); else reject(new Error(`agentpager wait: ${out}${err}`)); });
+    });
+    await pause(2_000);
+    assert.equal(waited, false, 'm5\'s command holds its wait until the answer comes');
+    const sent = Date.now();
+    await f.ok(C.Receipt, `/api/agents/${record.agent.agentId}/cards/${openOne.decisionId}/answer`, { phone: record.pager.phoneKey, data: { requestId: token(), answer } });
+    const collected = await m5Wait;
+    assert.deepEqual([collected.result.status, collected.result.option], ['answered', 'B']);
+    assert.ok(collected.at - sent < 1_000, `m5's command had the answer ${collected.at - sent} ms after the send`);
     command('ack', '--agent', record.agent.id, record.decisions.open.id, 'Answered after the move.');
     const after = Schema.decodeUnknownSync(C.PagerInbox)(await read(f, baselinePager)).agents[0].answered.find(d => d.decisionId === openOne.decisionId);
     assert.equal(after?.status, 'acknowledged');

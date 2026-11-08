@@ -6,6 +6,7 @@ import { body, decode, emptyBody, iso, json, refusal, sameDigest, sha256, token 
 import { clocks, forward, type Env } from './env.ts';
 import { alert, PushTarget, type Alert } from './push.ts';
 import { AgentExport, AttachmentPart, Digest, Fingerprint, RegistryExport } from './move.ts';
+import { Waits, type Reach } from './wake.ts';
 
 // One pager's store, one per pager, named by its pager id: the pager's row, its agents and their decisions. Every call
 // on the pager is handled here, one after the other, so turning the pager off and any call on it never interleave:
@@ -33,6 +34,8 @@ import { AgentExport, AttachmentPart, Digest, Fingerprint, RegistryExport } from
 //   pickups_v4, collections_v4, warnings_v4   when an answer is due its not-picked-up warning, was collected, was warned
 //   erase_v4            what an old store still holds of a pager or agent this store has deleted, still to erase there
 // Decisions, attachments, answers, acknowledgements, collections and warnings are written once and never changed.
+//
+// An agent's wait for its answer is held here, in memory, and woken by what it waits for (wake.ts).
 
 const Create = Schema.Struct({ fingerprint: Fingerprint, publicKey: C.PublicKey, phoneHash: Digest, autoOff: C.AutoOff });
 const Connect = Schema.Struct({ agentId: C.Token, fingerprint: Fingerprint, identity: C.Sealed('identity') });
@@ -65,6 +68,8 @@ function handed<A, I>(schema: Schema.Schema<A, I>, value: unknown, from: string)
 export class Pager {
   // The move under way in this instance, which every call waits for.
   private moving: Promise<boolean> | null = null;
+  // The agents' waits for their answers, held while their requests are open.
+  private waits = new Waits();
   constructor(private ctx: DurableObjectState, private env: Env) {
     // An erasure queued just before a restart, whose alarm wasn't set, is tried from this start.
     void ctx.blockConcurrencyWhile(async () => {
@@ -188,13 +193,19 @@ export class Pager {
   // Whether it forgot anyone.
   private housekeep(): boolean {
     const now = Date.now();
-    return this.tx(() => {
+    const forgotten = this.tx(() => {
       this.pagerRow();
       const idle = this.agentRows().filter(a => now >= Date.parse(a.last_activity_at) + clocks.idleMs);
       for (const a of idle) this.forgetAgent(a);
-      return idle.length > 0;
+      return idle.map(a => a.agent_id);
     });
+    for (const agentId of forgotten) this.wake({ agentId });
+    return forgotten.length > 0;
   }
+  // Every write that ends what a wait waits for calls this once it is done, for the waits it reaches: a decision's
+  // answer stored, its agent forgotten, or its pager's switch or auto-off changed or the pager deleted. Each wait it
+  // reaches looks again (read, below).
+  private wake(reach: Reach) { this.waits.wake(reach); }
   // Called in the same turn as the transaction that queued an erasure, before anything else is awaited, so the erasure
   // is tried again a minute later even if this call is cut off before it is done. The call's own end sets the alarm
   // to whatever is due first.
@@ -353,7 +364,7 @@ export class Pager {
     // turn-off choice it asks for now; anyone else is refused.
     if (action === 'create') {
       const p = decode(Create, await body(request)), now = Date.now();
-      return json(this.tx(() => {
+      const made = this.tx(() => {
         if (!this.movedRow()) { this.schema(); this.ctx.storage.sql.exec('INSERT INTO moved_v4 VALUES (1, ?, ?, 0)', pagerId, now); }
         const existing = this.pagerRow();
         if (existing) {
@@ -361,7 +372,10 @@ export class Pager {
           if (existing.auto_off !== p.autoOff) this.ctx.storage.sql.exec('UPDATE pager_v4 SET auto_off=?, off_at=? WHERE id=1', p.autoOff, existing.enabled === 1 ? this.offAt(p.autoOff, now) : null);
         } else this.ctx.storage.sql.exec('INSERT INTO pager_v4 VALUES (1, ?, ?, ?, 1, ?, ?, NULL, NULL, ?)', p.fingerprint, p.publicKey, p.phoneHash, p.autoOff, this.offAt(p.autoOff, now), now);
         return { pager: this.pager(pagerId, this.mine(p.phoneHash)) };
-      }));
+      });
+      // Its auto-off may have moved.
+      this.wake('all');
+      return json(made);
     }
     // A pager's public key, for anyone with its id: the command checks it against the number (I19).
     if (action === 'key' && request.method === 'GET') {
@@ -403,7 +417,7 @@ export class Pager {
     if (action === 'settings') {
       this.mine(digest);
       const p = decode(C.PagerSettingsInput, await body(request)), now = Date.now();
-      return json(this.tx(() => {
+      const set = this.tx(() => {
         let row = this.mine(digest);
         if (p.autoOff !== undefined) {
           // Counted from now while on; an off pager keeps the choice for when it is turned on.
@@ -413,7 +427,10 @@ export class Pager {
         if (p.on === true && row.enabled === 0) this.ctx.storage.sql.exec('UPDATE pager_v4 SET enabled=1, off_since=NULL, off_at=? WHERE id=1', this.offAt(decode(C.AutoOff, row.auto_off), now));
         if (p.on === false && row.enabled === 1) this.ctx.storage.sql.exec('UPDATE pager_v4 SET enabled=0, off_since=?, off_at=NULL WHERE id=1', now);
         return { pager: this.pager(pagerId, this.mine(digest)) };
-      }));
+      });
+      // Turned off, every wait ends refused; with its auto-off moved, each looks again by the new time.
+      this.wake('all');
+      return json(set);
     }
     if (action === 'push') {
       this.mine(digest);
@@ -432,6 +449,7 @@ export class Pager {
         if (this.movedRow()?.from_registry === 1) this.queue({ store: 'pager', id: pagerId });
         this.ctx.storage.sql.exec('DELETE FROM pager_v4 WHERE id=1');
       });
+      this.wake('all');
       await this.armErase();
       await this.erase();
       return json({ ok: true });
@@ -490,24 +508,21 @@ export class Pager {
       this.tx(() => this.agent(agentId, digest));
       const id = decode(C.Token, param ?? ''), wait = url.searchParams.get('wait');
       const seconds = wait === null ? 0 : decode(Schema.Number.pipe(Schema.int(), Schema.between(1, C.ANSWER_WAIT_MAX_SECONDS)), Number(wait));
-      this.tx(() => { this.agent(agentId, digest); this.on(); });
-      const until = Date.now() + seconds * 1000;
-      for (;;) {
-        // The answer is delivered only while the pager is on, checked as it is collected.
-        const answer = this.tx(() => {
-          this.agent(agentId, digest);
-          const d = this.decision(agentId, id);
-          if (!d.answer) return null;
-          this.on();
-          // Collected: the owner gets no warning for it, and the phone still waits for the acknowledgement (I6).
-          this.ctx.storage.sql.exec('INSERT OR IGNORE INTO collections_v4 VALUES (?, ?, ?)', agentId, id, iso());
-          this.ctx.storage.sql.exec('DELETE FROM pickups_v4 WHERE agent_id=? AND decision_id=?', agentId, id);
-          return d.answer;
-        });
-        if (answer) return json(decode(C.AnswerStatus, { status: 'answered', answer }));
-        if (Date.now() >= until) return json({ status: 'pending' });
-        await new Promise(r => setTimeout(r, Math.min(100, until - Date.now())));
-      }
+      // Held until the answer is here, or until its time is up, when it is pending. Each look checks the agent and the
+      // switch first, in the transaction that collects: the answer is delivered only while the pager is on, and a wait
+      // woken by the pager turning off, or by it or the agent going, ends refused as a new call would be. Between
+      // looks it sleeps until a wake (wake, above), its time, or its pager's auto-off, whichever is first.
+      const answer = await this.waits.hold({ agentId, decisionId: id }, Date.now() + seconds * 1000, () => this.tx(() => {
+        this.agent(agentId, digest);
+        this.on();
+        const d = this.decision(agentId, id);
+        if (!d.answer) return { lookBy: this.pagerRow()?.off_at ?? null };
+        // Collected: the owner gets no warning for it, and the phone still waits for the acknowledgement (I6).
+        this.ctx.storage.sql.exec('INSERT OR IGNORE INTO collections_v4 VALUES (?, ?, ?)', agentId, id, iso());
+        this.ctx.storage.sql.exec('DELETE FROM pickups_v4 WHERE agent_id=? AND decision_id=?', agentId, id);
+        return { found: d.answer };
+      }));
+      return json(answer ? decode(C.AnswerStatus, { status: 'answered', answer }) : { status: 'pending' });
     }
     if (action === 'ack') {
       const digest = await agentDigest(request);
@@ -561,7 +576,7 @@ export class Pager {
     if (action === 'answer') {
       this.tx(() => this.agent(agentId, digest, 'phone'));
       const id = decode(C.Token, param ?? ''), input = decode(C.AnswerInput, await body(request));
-      return json(this.tx(() => {
+      const receipt = this.tx(() => {
         this.agent(agentId, digest, 'phone');
         this.on();
         const d = this.decision(agentId, id);
@@ -577,7 +592,10 @@ export class Pager {
         this.ctx.storage.sql.exec('INSERT INTO pickups_v4 VALUES (?, ?, ?)', agentId, id, Date.parse(sentAt) + clocks.pickupMs);
         this.touch(agentId);
         return decode(C.Receipt, { decisionId: id, answerId, sentAt });
-      }));
+      });
+      // Stored: the waits for it collect it now. The phone sends it once its Undo window has closed (I6).
+      this.wake({ agentId, decisionId: id });
+      return json(receipt);
     }
     throw C.refuse.notFound();
   }

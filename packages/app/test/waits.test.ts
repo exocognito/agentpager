@@ -23,8 +23,9 @@ function clock() {
 }
 const settle = () => new Promise(r => setImmediate(r));
 // A look that counts how often it ran, and finds what `found` holds once it holds something.
-function looks<A>(lookBy: () => number | null = () => null) {
-  const l = { count: 0, found: undefined as A | undefined, throws: undefined as Error | undefined, look: (): Look<A> => {
+type Looks<A> = { count: number; found?: A; throws?: Error; look: () => Look<A> };
+function looks<A>(lookBy: () => number | null = () => null): Looks<A> {
+  const l: Looks<A> = { count: 0, look: () => {
     l.count++;
     if (l.throws) throw l.throws;
     return l.found === undefined ? { lookBy: lookBy() } : { found: l.found };

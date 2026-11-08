@@ -158,7 +158,7 @@ test('B33.4 The Codex CLI that rings is 0.149 or later, AGENTPAGER_CODEX\'s when
   assert.equal(wake.note('ap-7f3k', 'd_2x8w', 'shell'), 'AgentPager: your owner answered decision d_2x8w. Run agentpager wait --agent ap-7f3k d_2x8w to read the answer, then acknowledge it.');
 });
 
-test('B33.4 B33.1 B32.2 A Codex thread that asks over MCP is told a note will come; its watcher outlives Codex, rings that thread once without the answer, and leaves the answer for the agent\'s wait', { timeout: 120_000 }, async () => {
+test('B33.4 B33.1 B32.12 A Codex thread that asks over MCP is told a note will come; its watcher outlives Codex, rings that thread once without the answer, and never picks the answer up: the agent\'s own wait does', { timeout: 120_000 }, async () => {
   const p = await f.makePager(), thread = v7();
   rollout(thread, terminal);
   const client = new Client({ name: 'codex-mcp-client', version: '0.163.0' });
@@ -197,6 +197,7 @@ test('B33.4 B33.1 B32.2 A Codex thread that asks over MCP is told a note will co
     await until(async () => alive(pid), up => !up);
     assert.deepEqual(record(id), { version: 1, agent: id, decisions: [{ decision: d, askedAt: store.loadAgent(id)?.decisions[d]?.askedAt, state: 'waiting', wake: { app: 'codex', thread, rung: 'queued' } }] });
     assert.equal(watcherOf(id, d), undefined, 'the watcher is gone, and says so');
+    assert.equal((await decisionId(p, 'Which colour, over MCP?'))?.collectedAt, undefined, 'the watcher saw the answer but never picked it up, so the owner would still be warned');
 
     // The note's turn: the agent's own wait reads the answer, and its acknowledgement takes it off the record.
     const again = new Client({ name: 'codex-mcp-client', version: '0.163.0' });
@@ -205,6 +206,7 @@ test('B33.4 B33.1 B32.2 A Codex thread that asks over MCP is told a note will co
       const r = await again.callTool({ name: 'wait', arguments: { agent: id, decision: d }, _meta: meta(thread, { trigger: 'queue' }) });
       assert.match(JSON.stringify(r.content), /launch code 4417/);
       assert.deepEqual(states(id), ['answered']);
+      assert.ok((await decisionId(p, 'Which colour, over MCP?'))?.collectedAt, 'the agent\'s wait picked it up');
       await again.callTool({ name: 'ack', arguments: { agent: id, decision: d, nextSteps: 'Blue it is.' }, _meta: meta(thread, { trigger: 'queue' }) });
       assert.deepEqual(record(id), { version: 1, agent: id, decisions: [] });
     } finally { await again.close(); }

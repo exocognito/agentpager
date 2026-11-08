@@ -1,6 +1,6 @@
 # FRIENDS · AgentPager for people I invite
 
-> **Status:** queued · **Order:** last: Sam invites owners once they can install AgentPager, read what it is, inspect its code, and know the service can't read their decisions · numbered when it starts
+> **Status:** queued · **Order:** last, after SITE and OPEN (DEC-2026-11-08-friends-after-cleanup): Sam invites owners once they can install AgentPager, read what it is, inspect its code, and know the service can't read their decisions · numbered when it starts
 
 ## Objective
 
@@ -12,6 +12,9 @@ I invite the first owners beyond me. They install the app and the command (INSTA
 
 ## What's known
 
+- **After a first cleanup.** Sam, 8 Nov 2026, in the M7 root's Claude Code session, choosing B for the root's question D2: "D2 B - I most want the site and repo cleaned up before introducing friends, at least a first round of cleanup and update on both, and we can plan another final round of cleanup and polish before distributing to more people". So FRIENDS keeps its place, after SITE and OPEN:
+  - Friends are introduced only after at least a first round of cleanup and update of both the site and the repository. SITE's first pass is that round for the site, and OPEN's for the repository.
+  - A final round of cleanup and polish is planned before AgentPager goes to more people than the friends this milestone invites. It stays this note, not a milestone, until Sam commits to it.
 - Encryption comes before this rollout ([PRODUCT.md](../../PRODUCT.md)).
 - K1 waits here (below): it has never been measured, and its probe isn't built. When the probe is built, its second clause, an answer reaching a waiting agent, becomes its own metric in [2 Agents](../../areas/2-agents.md).
 - J5 is walked whole here, by an invited owner, with the TestFlight build and the demo agent from INSTALL.
@@ -51,3 +54,4 @@ The lines the old Blueprint held for this milestone, as the [M4 ledger](https://
 - 30 Oct · MSHIP, written on 8 Oct as MAPP's successor, became MFRIENDS.
 - 31 Oct · narrowed in the next roadmap: Sam invites the first owners and hears back. INSTALL and SITE took its other parts.
 - 5 Nov · Sam kept it last.
+- 8 Nov · Sam kept it after SITE and OPEN, with a final round of cleanup and polish to plan before AgentPager goes to more people (What's known, DEC-2026-11-08-friends-after-cleanup).

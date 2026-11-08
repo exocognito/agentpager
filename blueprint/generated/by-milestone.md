@@ -116,3 +116,7 @@ Added to earlier entries:
 
 - **B32.11**, in [B32 · Wait for the answer, then acknowledge it](../areas/2-agents.md#b32--m3--wait-for-the-answer-then-acknowledge-it): A wait for a decision that closed unanswered ends, telling the agent so. A wait with no end stops too.
 - **B5.17**, in [B5 · Read and answer a decision](../areas/5-answering.md#b5--m1--read-and-answer-a-decision): A decision that closed unanswered, because its agent finished, offers nothing to pick or send, and says that who asked finished before it was answered. It shows with its project's answered decisions, and its brief stays readable.
+
+## [M7 · CLIENTS](../milestones/M7-clients.md)
+
+0 entries with 0 clauses, and 0 clauses added to earlier entries.

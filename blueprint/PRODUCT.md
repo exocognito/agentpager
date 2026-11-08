@@ -72,7 +72,7 @@ Use plain language I can understand without specialist knowledge. Options are di
 
 Any agent that can run the agentpager command can use AgentPager. Cloud sessions with a shell should work too, untested so far. Agents with no machine of their own, like claude.ai in a browser, are out. The command sets itself up in the agent apps it finds. A waiting agent has my answer within a second of the Undo window closing, with nothing for me to nudge.
 
-> **Note, added in M4:** the old strategy's sentence went on to name terminal agents, and desktop apps like Claude Desktop and Cursor. Which apps that covers is what [CLIENTS](milestones/next/CLIENTS.md) decides; today only Claude agents wake by themselves (L11).
+> **Note, added in M4:** the old strategy's sentence went on to name terminal agents, and desktop apps like Claude Desktop and Cursor. Which apps that covers is what [CLIENTS](milestones/M7-clients.md) decides; today only Claude agents wake by themselves (L11).
 
 ### Feel native
 

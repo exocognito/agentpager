@@ -14,6 +14,7 @@ Someone who lands on agentpager.me understands in a few seconds what AgentPager 
 
 - Today's front page still describes the first version, with QR codes, emoji pairing and a planned Pro plan: see it at [390 px](../../generated/screens/web/front-page-390-1.png) and [1280 px](../../generated/screens/web/front-page-1280-1.png). Its code is in `packages/app/src/site/`, with a QR picture left over from v1.
 - What agents read at /start is already v2 (B18).
+- Its first pass is the first round of cleanup and update of the site that Sam wants before friends are introduced ([FRIENDS](FRIENDS.md), DEC-2026-11-08-friends-after-cleanup).
 - Since ENCRYPT, the service holds decisions, their attachments, who asked, answers and acknowledgements only encrypted ([I20](../../areas/6-privacy.md#i20--m5--the-service-holds-nothing-readable)). What encryption doesn't hide, for this note, is in [M5-encrypt.md › What's known](../M5-encrypt.md#whats-known), under What encryption doesn't hide.
 
 ## Still open

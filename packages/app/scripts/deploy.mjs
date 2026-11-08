@@ -2,7 +2,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdtempSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
-import { ZONE, stageOf, deployRefusal, hostRefusal, stageConfig, storageRefusal, checkSettled } from './stages.ts';
+import { ZONE, stageOf, deployRefusal, hostRefusal, stageConfig, storageRefusal, checkSettled, allPages } from './stages.ts';
 
 // node scripts/deploy.mjs --stage dev|prod deploys this checkout's commit to that stage (AGENTS.md › Stages).
 // With --verify it deploys nothing and only checks what that stage runs, for the smoke run.
@@ -23,17 +23,20 @@ try {
   const field = name => item.fields.find(f => f.label === name || f.id === name)?.value;
   const credential = field('credential'), account = field('account_id');
   if (!credential || !account) throw new Error('Vault fields missing.');
-  const cf = async (route, init = {}) => {
-    const response = await fetch('https://api.cloudflare.com/client/v4' + route, { ...init, headers: { authorization: `Bearer ${credential}`, 'content-type': 'application/json' } });
+  const answer = async route => {
+    const response = await fetch('https://api.cloudflare.com/client/v4' + route, { headers: { authorization: `Bearer ${credential}`, 'content-type': 'application/json' } });
     const value = await response.json();
     if (!response.ok || !value.success) throw new Error(`Cloudflare operation failed: ${route} (${response.status}); owner may need to grant scoped access.`);
-    return value.result;
+    return value;
   };
-  const zones = await cf(`/zones?name=${ZONE}`);
+  const cf = async route => (await answer(route)).result;
+  // Every page of a list (stages.ts › allPages), the first asked for as the route reads; `pages.read` counts them.
+  const cfList = (route, pages = { read: 0 }) => allPages(page => { pages.read = page; return answer(page === 1 ? route : `${route}${route.includes('?') ? '&' : '?'}page=${page}`); });
+  const zones = await cfList(`/zones?name=${ZONE}`);
   if (zones.length !== 1) throw new Error(`Expected the ${ZONE} zone.`);
   console.log(`${verifyOnly ? 'Verify' : 'Deploy candidate'} ${sha}; stage ${stage.name}; Worker ${stage.worker}; account ${account}; zone ${ZONE} (${zones[0].id}); https://${stage.host}`);
   if (!verifyOnly) {
-    const taken = hostRefusal(stage, await cf(`/accounts/${account}/workers/domains`), await cf(`/zones/${zones[0].id}/dns_records?name=${stage.host}`));
+    const taken = hostRefusal(stage, await cfList(`/accounts/${account}/workers/domains`), await cfList(`/zones/${zones[0].id}/dns_records?name=${stage.host}`));
     if (taken) throw new Error(`deploy:${stage.name} refused: ${taken}`);
     // The APNs key (alerts, D7) reaches only the Worker secret, through wrangler's stdin. Every stage gets the same key.
     let apns;
@@ -54,21 +57,21 @@ try {
     console.log(`${secret.stdout || ''}${secret.stderr || ''}`.replaceAll(apnsKey, '[REDACTED]').replaceAll(credential, '[REDACTED]').replaceAll(serviceToken, '[REDACTED]'));
     if (secret.status !== 0) throw new Error('Setting the APNs key secret failed.');
   }
-  const domains = await cf(`/accounts/${account}/workers/domains`);
+  const domains = await cfList(`/accounts/${account}/workers/domains`);
   if (!domains.some(d => d.hostname === stage.host && d.service === stage.worker)) throw new Error(`Custom domain binding ${stage.host} → ${stage.worker} missing.`);
-  const dns = await cf(`/zones/${zones[0].id}/dns_records?name=${stage.host}`);
+  const dns = await cfList(`/zones/${zones[0].id}/dns_records?name=${stage.host}`);
   if (!dns.some(d => d.name === stage.host && d.proxied)) throw new Error(`Proxied DNS record for ${stage.host} missing.`);
   console.log('Verified custom domain, DNS:', JSON.stringify(dns.map(d => ({ type: d.type, name: d.name, proxied: d.proxied }))));
   // Every class a SQLite namespace of this Worker, every binding naming it, and the push key's secret set; asked again
   // while Cloudflare's reads lag the deploy.
   let seenStorage;
   await checkSettled(async () => {
-    const namespaces = await cf(`/accounts/${account}/workers/durable_objects/namespaces`);
+    const pages = { read: 0 }, namespaces = await cfList(`/accounts/${account}/workers/durable_objects/namespaces`, pages);
     const settings = await cf(`/accounts/${account}/workers/scripts/${stage.worker}/settings`);
-    seenStorage = { placement: namespaces.filter(n => n.script === stage.worker), bindings: settings.bindings.filter(b => b.type === 'durable_object_namespace') };
+    seenStorage = { placement: namespaces.filter(n => n.script === stage.worker), bindings: settings.bindings.filter(b => b.type === 'durable_object_namespace'), of: namespaces.length, pages: pages.read };
     return storageRefusal(stage.worker, namespaces, settings.bindings);
   }, line => console.log(line));
-  console.log('Durable Object placement:', JSON.stringify(seenStorage.placement));
+  console.log(`Durable Object placement (of the account's ${seenStorage.of} namespaces, read in ${seenStorage.pages} pages):`, JSON.stringify(seenStorage.placement));
   console.log('Bindings:', JSON.stringify(seenStorage.bindings));
   // A new hostname's record takes Cloudflare a moment to serve, and a resolver that asks before then keeps the
   // negative answer for up to the zone's 30 minutes. So this machine asks only once public DNS answers.

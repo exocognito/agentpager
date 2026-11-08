@@ -67,6 +67,22 @@ export function storageRefusal(worker: string, namespaces: readonly Namespace[],
   if (!bindings.some(b => b.type === 'secret_text' && b.name === 'APNS_KEY_P8')) return 'The Worker secret APNS_KEY_P8 is missing, so no alerts go out.';
   return null;
 }
+// One page of a Cloudflare list, as its API answers.
+export type ListPage<T> = { result: T[]; result_info?: { page?: number; per_page?: number; total_pages?: number; total_count?: number } };
+// Cloudflare answers a list a page at a time, and the account has more Durable Object namespaces than one page holds:
+// on 7 Nov 2026 the new Pager namespace of ownerpager-dev wasn't on the first page, so the check after the deploy
+// failed while dev served it. So a list is read page by page, to the last page result_info counts or the first empty
+// one. A list that reports no pages, as the Workers domains list documents none, is read once.
+export async function allPages<T>(read: (page: number) => Promise<ListPage<T>>, most = 100): Promise<T[]> {
+  const all: T[] = [];
+  for (let page = 1; ; page++) {
+    const { result, result_info: info } = await read(page);
+    all.push(...result);
+    const pages = info?.total_pages ?? (info?.total_count !== undefined && info.per_page ? Math.ceil(info.total_count / info.per_page) : 1);
+    if (!result.length || page >= pages) return all;
+    if (page === most) throw new Error(`Cloudflare's list runs past ${most} pages.`);
+  }
+}
 // Cloudflare's reads of a Worker's settings can lag a deploy that has just finished, while the Worker already serves
 // the new build: on 7 Nov 2026 the check after a deploy failed once with "Incorrect AGENT binding.". So the check is
 // asked again, a few times over about 30 s, and fails with what it last saw only after that.

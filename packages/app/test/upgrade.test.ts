@@ -292,7 +292,11 @@ test('the move from m5: every pager, agent and decision m5 stored reads back the
     // The decision it left with no answer can't be answered, waited for or acknowledged.
     await f.refused(409, 'AgentFinished', `/api/agents/${done.agent.agentId}/cards`, { agent: done.agentKey, data: await f.sealed(done, question('After finishing?')) });
     const doneOpenRoute = `/api/agents/${done.agent.agentId}/cards/${doneOpen.decisionId}/answer`;
-    for (const r of [await f.refused(409, 'DecisionClosed', doneOpenRoute, { phone: fin.phone, data: await f.sealedAnswer(done.agent.agentId, fin.phone, doneOpen.decisionId) }), await f.refused(409, 'DecisionClosed', `${doneOpenRoute}?wait=5`, { agent: done.agentKey })]) {
+    for (const r of [
+      await f.refused(409, 'DecisionClosed', doneOpenRoute, { phone: fin.phone, data: await f.sealedAnswer(done.agent.agentId, fin.phone, doneOpen.decisionId) }),
+      await f.refused(409, 'DecisionClosed', `${doneOpenRoute}?wait=5`, { agent: done.agentKey }),
+      await f.refused(409, 'DecisionClosed', doneOpenRoute.replace(/answer$/, 'acknowledge'), { agent: done.agentKey, data: f.sealedAck(done, doneOpen.decisionId, doneReceipt.answerId) }),
+    ]) {
       assert.equal(r.message, C.DECISION_CLOSED_MESSAGE);
     }
     await f.refused(409, 'AlreadyAcknowledged', `/api/agents/${done.agent.agentId}/cards/${doneAcked.decisionId}/acknowledge`, { agent: done.agentKey, data: f.sealedAck(done, doneAcked.decisionId, doneReceipt.answerId, 'Again.') });

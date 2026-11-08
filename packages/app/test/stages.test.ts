@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { STAGES, RELEASE_TAG, DURABLE_OBJECTS, stageOf, deployRefusal, hostRefusal, stageConfig, storageRefusal, checkSettled, type Binding, type Namespace } from '../scripts/stages.ts';
+import { STAGES, RELEASE_TAG, DURABLE_OBJECTS, stageOf, deployRefusal, hostRefusal, stageConfig, storageRefusal, checkSettled, allPages, type Binding, type ListPage, type Namespace } from '../scripts/stages.ts';
 import { app } from './support.ts';
 
 const { dev, prod } = STAGES;
@@ -88,6 +88,36 @@ test('The deploy checks every class is a SQLite namespace of its Worker, bound b
   // A binding to another class's namespace, as a lagging read of the settings can show.
   assert.equal(storageRefusal(worker, namespaces, bindings.map(b => b.name === 'AGENT' ? { ...b, namespace_id: 'ns2' } : b)), 'Incorrect AGENT binding.');
   assert.equal(storageRefusal(worker, namespaces, bindings.filter(b => b.type !== 'secret_text')), 'The Worker secret APNS_KEY_P8 is missing, so no alerts go out.');
+});
+
+test('The deploy reads every page of a Cloudflare list, as it must for the account\'s namespaces', async () => {
+  // As on dev on 7 Nov 2026: 21 namespaces, 20 a page, and the new Pager namespace alone on the second page.
+  const [agent, registry, pager] = namespaces;
+  const others: Namespace[] = Array.from({ length: 18 }, (_, i) => ({ id: `other${i}`, class: 'Site', script: 'atomicpage', use_sqlite: true }));
+  const pages = [[...others, registry, agent], [pager]];
+  const lister = (info: (page: number) => ListPage<Namespace>['result_info'], held = pages) => {
+    const asked: number[] = [];
+    return { asked, read: async (page: number): Promise<ListPage<Namespace>> => { asked.push(page); return { result: held[page - 1] ?? [], result_info: info(page) }; } };
+  };
+  assert.equal(storageRefusal(worker, pages[0], bindings), 'Pager is not a SQLite namespace on ownerpager-dev.', 'the first page alone');
+  const counted = lister(page => ({ page, per_page: 20, total_pages: 2, total_count: 21 }));
+  const all = await allPages(counted.read);
+  assert.deepEqual([counted.asked, all.length], [[1, 2], 21]);
+  assert.equal(storageRefusal(worker, all, bindings), null);
+  // With no total_pages, total_count and per_page count them.
+  const byCount = lister(page => ({ page, per_page: 20, total_count: 21 }));
+  assert.equal((await allPages(byCount.read)).length, 21);
+  assert.deepEqual(byCount.asked, [1, 2]);
+  // A list that reports no pages, as the Workers domains list documents none, is read once.
+  const unpaged = lister(() => undefined);
+  assert.deepEqual([(await allPages(unpaged.read)).length, unpaged.asked], [20, [1]]);
+  // An empty page ends the list, whatever result_info claims.
+  const claimsMore = lister(page => ({ page, per_page: 20, total_pages: 5 }));
+  assert.deepEqual([(await allPages(claimsMore.read)).length, claimsMore.asked], [21, [1, 2, 3]]);
+  // A list that never ends fails rather than reading forever.
+  const endless = lister(page => ({ page, per_page: 1, total_pages: 1_000 }), Array.from({ length: 1_000 }, () => [agent]));
+  await assert.rejects(allPages(endless.read, 4), { message: 'Cloudflare\'s list runs past 4 pages.' });
+  assert.deepEqual(endless.asked, [1, 2, 3, 4]);
 });
 
 test('The deploy asks again while Cloudflare\'s reads lag the deploy, and fails with what it last saw after about 30 s', async () => {

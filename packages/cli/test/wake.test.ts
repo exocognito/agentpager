@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { fixture, assert, until } from '../../app/test/support.ts';
+import { fixture, assert, pause, until } from '../../app/test/support.ts';
 
 // How each supported app is woken from the command's side (B33, blueprint/areas/2-agents.md;
 // docs/research/2026-11-08-clients-wake-lab.md): who's asking (B33.1), the words for an app whose AgentPager adapter
@@ -219,7 +219,7 @@ test('B33.4 B33.1 B32.12 A Codex thread that asks over MCP is told a note will c
   } finally { if (!closed) await client.close(); }
 });
 
-test('B33.4 A thread is rung once, recorded before codex queue runs: never again after a timed-out call, a call cut off, or a second watcher, and never by a watcher that started too late', { timeout: 120_000 }, async () => {
+test('B33.4 A thread is rung once, recorded before codex queue runs: never again after a timed-out call, a call cut off, or a second watcher, and never by a watcher that started too late; a pager turned off and on again still rings', { timeout: 120_000 }, async () => {
   inShell({});
   const p = await f.makePager(), id = field(await op.connect({ number: p.number, app: 'Codex', project: 'wake' }), 'agent');
   // Decisions asked from a shell no app marks, each then given a Codex thread's wake, as an ask from that thread records it.
@@ -272,6 +272,19 @@ test('B33.4 A thread is rung once, recorded before codex queue runs: never again
   assert.deepEqual(both.map(o => o.trim()).sort(), [`Nothing to watch: it has rung, this machine has the answer, or another watcher runs.`, `Rang thread ${twice.thread}: queued.`].sort());
   assert.equal(ringsFor(twice.thread).length, 1, 'rung once');
 
+  // The pager turned off while a watcher waits: it keeps looking, and once the pager is on again and the owner answers,
+  // it rings.
+  const offOn = await asked('Off, then on?', v7());
+  const offWatch = op.watch(id, offOn.d, { offRetryMs: 100 });
+  await until(async () => watcherOf(id, offOn.d), pid => pid === process.pid);
+  await f.settings(p.pagerId, p.phone, { on: false });
+  await pause(600);
+  assert.equal(watcherOf(id, offOn.d), process.pid, 'still watching while off');
+  await f.settings(p.pagerId, p.phone, { on: true });
+  await answer(offOn);
+  assert.equal((await offWatch).text, `Rang thread ${offOn.thread}: queued.`);
+  assert.equal(ringsFor(offOn.thread).length, 1);
+
   // A watcher that can't start in time (here the agent's file is held busy) is stopped: the agent is told to wait itself,
   // and nothing is left to ring it as well.
   const late = await asked('Started late?', v7());
@@ -294,7 +307,7 @@ test('B33.4 A thread is rung once, recorded before codex queue runs: never again
   assert.equal(ringsFor(read.thread).length, 0);
 });
 
-test('B33.4 B25.13 B32.11 A watcher stops, ringing no one and leaving nothing running, when its decision closes as the agent finishes, when the pager is turned off or deleted, and when the server stays away', { timeout: 180_000 }, async () => {
+test('B33.4 B25.13 B32.11 A watcher stops, ringing no one and leaving nothing running, when its decision closes as the agent finishes, when the pager is deleted, and when the server stays away; a wait from the thread starts it again after a restart', { timeout: 180_000 }, async () => {
   const thread = v7();
   rollout(thread, terminal);
   // An agent in Codex's shell, its thread the terminal's: each ask starts a watcher.
@@ -312,11 +325,10 @@ test('B33.4 B25.13 B32.11 A watcher stops, ringing no one and leaving nothing ru
   await stops(finished.pid);
   assert.deepEqual(record(finished.id), { version: 1, agent: finished.id, decisions: [] }, 'the decision closed unanswered, and leaves the record');
 
-  const off = await fromCodex('Turned off?');
-  await f.settings(off.p.pagerId, off.p.phone, { on: false });
+  // A watcher gone without a word (the machine restarted, say): a wait from the same thread starts another.
+  const off = await fromCodex('Restarted?');
+  process.kill(off.pid, 'SIGKILL');
   await stops(off.pid);
-  await f.settings(off.p.pagerId, off.p.phone, { on: true });
-  // Turned on again, a wait from the same thread starts a watcher again.
   inShell({ CODEX_THREAD_ID: thread });
   assert.ok((await op.wait(off.id, off.d, { seconds: 1 })).text.endsWith(`Carry on or end your turn, and when the note comes, run agentpager wait --agent ${off.id} ${off.d} to read it.`));
   const again = await watcherStarts(off.id, off.d);

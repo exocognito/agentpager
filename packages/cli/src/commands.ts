@@ -489,10 +489,12 @@ export async function finish(agent: string): Promise<Result> {
 // receives the answer: it doesn't open it, and never tells the service it has it, so an answer only it saw still
 // brings the owner's warning that no agent picked it up (B32.12). The ring is recorded in the agent's file before
 // `codex queue` runs, so the thread is never rung twice, whatever happens to the call or this process. It stops on the
-// answer, rung or not; when this machine already has the answer; when the decision closes, the pager is turned off or
-// deleted, or the agent is gone; when the server has been unreachable for a day; 30 days after it started; and at once
-// when another watcher runs for the decision. It prints nothing anyone reads.
-const UNREACHABLE_MS = 24 * 3_600_000, WATCH_MS = 30 * 24 * 3_600_000;
+// answer, rung or not; when this machine already has the answer; when the decision closes, the pager is deleted, or the
+// agent is gone; when the server has been unreachable for a day; 30 days after it started; and at once when another
+// watcher runs for the decision. While the pager is off it looks again a minute apart, since its decisions open again
+// when it is turned on, by the owner or as auto-off ends, and an answer then must still ring. It prints nothing anyone
+// reads.
+const UNREACHABLE_MS = 24 * 3_600_000, WATCH_MS = 30 * 24 * 3_600_000, OFF_RETRY_MS = 60_000;
 // This program, run again as the watcher: the compiled binary itself (Bun's, whose sources are under /$bunfs/), or Node
 // with this source.
 const program = import.meta.url.startsWith('file:///$bunfs/') ? [process.execPath] : [process.execPath, '--experimental-strip-types', fileURLToPath(new URL('./main.ts', import.meta.url))];
@@ -533,8 +535,8 @@ async function watcherFor(id: string, short: string): Promise<boolean> {
   const x = now()?.wake;
   return x?.app === 'codex' && x.ring !== undefined;
 }
-// queueTimeoutMs, retryMs and forMs: a test shortens them.
-export async function watch(agent: string, ref: string, opts: { queueTimeoutMs?: number; retryMs?: number; forMs?: number } = {}): Promise<Result> {
+// queueTimeoutMs, retryMs, offRetryMs and forMs: a test shortens them.
+export async function watch(agent: string, ref: string, opts: { queueTimeoutMs?: number; retryMs?: number; offRetryMs?: number; forMs?: number } = {}): Promise<Result> {
   const a = agentOf(agent);
   if ('code' in a) return a;
   const d = a.decisions[ref] ? { short: ref, ...a.decisions[ref] } : null;
@@ -570,6 +572,7 @@ export async function watch(agent: string, ref: string, opts: { queueTimeoutMs?:
         await new Promise(res => setTimeout(res, opts.retryMs ?? RETRY_MS));
         continue;
       }
+      if (r.error === 'PagerOff') { failing = null; await new Promise(res => setTimeout(res, opts.offRetryMs ?? OFF_RETRY_MS)); continue; }
       const closed = closedOf(r);
       if (closed) noteClosed(a, [{ decisionId: d.id, ...closed }]);
       return done(`Stopped: ${closed ? 'the decision closed unanswered' : r.error}.`);

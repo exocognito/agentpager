@@ -133,16 +133,27 @@ export function agentIds(): string[] {
 // History: per pager, append only, capped at 1,000 lines with the oldest dropped. Never printed unasked.
 export const HISTORY_CAP = 1000;
 const historyPath = (pager: string) => path.join(home(), 'history', `${pager}.jsonl`);
-export type HistoryEvent = { [key: string]: unknown; at: string; event: 'asked' | 'answered' | 'acknowledged' | 'closed'; agent: string; decision: string };
+// Each line is one event: these four fields, and whatever else its kind of event holds.
+const HistoryEvent = Schema.Struct(
+  { at: Schema.String, event: Schema.Literal('asked', 'answered', 'acknowledged', 'closed'), agent: Schema.String, decision: Schema.String },
+  Schema.Record({ key: Schema.String, value: Schema.Unknown }),
+);
+export type HistoryEvent = typeof HistoryEvent.Type;
 // Every agent on the pager appends to its one file, each from its own process: the append and the trim take the
 // pager's history lock, so a trim never drops a line another agent appended after reading. The trimmed file is
-// written beside it and renamed over it, so a crash leaves the old file or the new one, never part of one.
+// written beside it and renamed over it, so a crash leaves the old file or the new one, never part of one. The trim
+// keeps each line as it is, one that isn't an event among them, and drops only the oldest.
 export function appendHistory(pager: string, e: HistoryEvent) {
   const file = historyPath(pager);
   mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
   lockedAt(`${file}.lock`, 'the history is busy', () => {
-    appendFileSync(file, JSON.stringify(e) + '\n', { mode: 0o600 });
-    const lines = readFileSync(file, 'utf8').split('\n').filter(Boolean);
+    let before = '';
+    try { before = readFileSync(file, 'utf8'); } catch (err) { if (!(err instanceof Error && 'code' in err && err.code === 'ENOENT')) throw err; }
+    // An append that failed part way leaves a line with no end. This one starts a line of its own, so it is never
+    // joined to that line and skipped with it.
+    const line = (before && !before.endsWith('\n') ? '\n' : '') + JSON.stringify(e) + '\n';
+    appendFileSync(file, line, { mode: 0o600 });
+    const lines = (before + line).split('\n').filter(Boolean);
     if (lines.length <= HISTORY_CAP) return;
     const temp = `${file}.${process.pid}.tmp`;
     writeFileSync(temp, lines.slice(-HISTORY_CAP).join('\n') + '\n', { mode: 0o600, flush: true });
@@ -150,9 +161,15 @@ export function appendHistory(pager: string, e: HistoryEvent) {
     renameSync(temp, file);
   });
 }
+// Read without the lock, so reading stays cheap and never waits on a busy history. Another agent's append may be part
+// way through, and one that failed leaves a line with no end: a line that isn't a whole event is skipped, and every
+// other line is kept. No file is no history.
 export function readHistory(pager: string): HistoryEvent[] {
-  try { return readFileSync(historyPath(pager), 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l)); } catch { return []; }
+  let text: string;
+  try { text = readFileSync(historyPath(pager), 'utf8'); } catch { return []; }
+  return text.split('\n').map(json).filter(Schema.is(HistoryEvent));
 }
+const json = (line: string): unknown => { try { return JSON.parse(line); } catch { return undefined; } };
 
 // The pager id inside a number: `ap1_` and base64url of the pager id (16 bytes) and the key fingerprint (8 bytes).
 export function pagerOf(number: string): string | null {

@@ -1,16 +1,19 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 // The history is one file per pager on each machine, and every agent on that pager appends to it from its own
 // process. Past the cap each append also trims the file, so here several processes append at once across the cap.
+// Reads take no lock, so a read can meet a line another agent is still writing, or one an append that failed left.
 const home = mkdtempSync(path.join(tmpdir(), 'agentpager-history-'));
 process.env.AGENTPAGER_HOME = home;
 const store = await import('../src/store.ts');
+const op = await import('../src/commands.ts');
+const { newKeys } = await import('../src/seal.ts');
 const pager = 'f'.repeat(32), file = path.join(home, 'history', `${pager}.jsonl`);
 
 // One writer: loads the command's store, says it's ready, waits for the go file, then appends its lines in order, a
@@ -58,5 +61,52 @@ test('B31.4 Agents appending at once past the cap keep the latest 1,000 lines, n
   assert.equal(store.readHistory(pager).length, store.HISTORY_CAP);
   // Still readable only by this user, and nothing left beside it: no lock, no half-written copy.
   assert.equal(statSync(file).mode & 0o777, 0o600);
-  assert.deepEqual(readdirSync(path.dirname(file)), [`${pager}.jsonl`]);
+  assert.deepEqual(readdirSync(path.dirname(file)).filter(f => f.startsWith(pager)), [`${pager}.jsonl`]);
+});
+
+// A decision as ask records it, and each pager's file, written here as a test of its own.
+const asked = (agent: string, n: number) => ({ at: `2026-11-08T10:0${n}:00.000Z`, event: 'asked' as const, agent, app: 'Codex', project: 'history', decision: `d_${n}${n}${n}${n}`, title: `Question ${n}?`, options: ['Yes', 'No'] });
+const line = (e: object) => JSON.stringify(e) + '\n';
+function historyFile(pager: string, text: string) {
+  const at = path.join(home, 'history', `${pager}.jsonl`);
+  mkdirSync(path.dirname(at), { recursive: true, mode: 0o700 });
+  writeFileSync(at, text, { mode: 0o600 });
+  return at;
+}
+
+test('A history that ends part way through a line still reads every whole line, and the next append starts a line of its own', () => {
+  const pager = 'a'.repeat(32), id = 'ap-half';
+  assert.deepEqual(store.readHistory(pager), [], 'no file is no history');
+  // As a read meets it while another agent's append is under way, or as an append that failed leaves it.
+  const whole = [asked(id, 1), asked(id, 2)], half = line(asked(id, 3)).slice(0, 40);
+  const file = historyFile(pager, whole.map(line).join('') + half);
+  assert.deepEqual(store.readHistory(pager), whole);
+  // agentpager history shows both.
+  const keys = newKeys();
+  store.saveAgent({ id, server: 'http://127.0.0.1:9', pager, agentId: 'A'.repeat(32), agentKey: 'K'.repeat(32), privateKey: keys.privateKey, pagerKey: newKeys().publicKey, app: 'Codex', project: 'history', createdAt: whole[0].at, rulesShownAt: null, cardsSinceRules: 0, decisions: {} });
+  const shown = op.history(id);
+  assert.equal(shown.code, 0);
+  assert.deepEqual(shown.text.split('\n').filter(l => l.startsWith('  Question')), ['  Question 2?', '  Question 1?']);
+  // The next append isn't joined to the half line, so it reads too, and the half line stays as it was.
+  store.appendHistory(pager, asked(id, 4));
+  assert.deepEqual(store.readHistory(pager), [...whole, asked(id, 4)]);
+  assert.equal(readFileSync(file, 'utf8'), whole.map(line).join('') + half + '\n' + line(asked(id, 4)));
+});
+
+test('A broken line inside the history is skipped, and the lines either side of it still read', () => {
+  const pager = 'b'.repeat(32), before = asked('ap-mids', 1), after = asked('ap-mids', 2);
+  // Part of a line, zero bytes as a crash can leave, and JSON that isn't an event.
+  historyFile(pager, line(before) + '{"at":"2026-11-08T10:0\n' + '\0\0\0\n' + 'null\n[1]\n"asked"\n{"event":"asked"}\n\n' + line(after));
+  assert.deepEqual(store.readHistory(pager), [before, after]);
+});
+
+test('B31.4 A trim past the cap keeps a broken line among the latest 1,000 as it is, and drops only the oldest', () => {
+  const pager = 'c'.repeat(32);
+  const lines = Array.from({ length: store.HISTORY_CAP }, (_, seq) => line({ at: '2026-11-08T10:00:00.000Z', event: 'asked', agent: 'ap-trim', decision: `d_${seq}`, seq }));
+  lines[500] = '{"at":"2026-11\n';
+  const file = historyFile(pager, lines.join(''));
+  const next = { at: '2026-11-08T11:00:00.000Z', event: 'asked' as const, agent: 'ap-trim', decision: 'd_next', seq: store.HISTORY_CAP };
+  store.appendHistory(pager, next);
+  assert.equal(readFileSync(file, 'utf8'), [...lines.slice(1), line(next)].join(''));
+  assert.equal(store.readHistory(pager).length, store.HISTORY_CAP - 1);
 });

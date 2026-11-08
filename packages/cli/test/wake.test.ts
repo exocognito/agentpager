@@ -219,7 +219,7 @@ test('B33.4 B33.1 B32.12 A Codex thread that asks over MCP is told a note will c
   } finally { if (!closed) await client.close(); }
 });
 
-test('B33.4 A thread is rung once, recorded before codex queue runs: never again after a timed-out call, a call cut off, or a second watcher, and never by a watcher that started too late; a pager turned off and on again still rings', { timeout: 120_000 }, async () => {
+test('B33.4 A thread is rung once, recorded before codex queue runs: never again after a timed-out call, a call cut off, or a second watcher, and never by a watcher that started too late; a pager turned off and on again, or a lock a dead process left, still rings', { timeout: 120_000 }, async () => {
   inShell({});
   const p = await f.makePager(), id = field(await op.connect({ number: p.number, app: 'Codex', project: 'wake' }), 'agent');
   // Decisions asked from a shell no app marks, each then given a Codex thread's wake, as an ask from that thread records it.
@@ -284,6 +284,16 @@ test('B33.4 A thread is rung once, recorded before codex queue runs: never again
   await answer(offOn);
   assert.equal((await offWatch).text, `Rang thread ${offOn.thread}: queued.`);
   assert.equal(ringsFor(offOn.thread).length, 1);
+
+  // A lock on the agent's file left by a process that died, when the answer comes: the watcher waits it out and rings.
+  const held = await asked('Lock left behind?', v7());
+  const heldWatch = op.watch(id, held.d);
+  await until(async () => watcherOf(id, held.d), pid => pid === process.pid);
+  const left = path.join(home, 'agents', `${id}.lock`);
+  mkdirSync(left);
+  await answer(held);
+  assert.equal((await heldWatch).text, `Rang thread ${held.thread}: queued.`, 'held past one try\'s 5 s, then broken as stale at 10 s');
+  assert.equal(ringsFor(held.thread).length, 1);
 
   // A watcher that can't start in time (here the agent's file is held busy) is stopped: the agent is told to wait itself,
   // and nothing is left to ring it as well.

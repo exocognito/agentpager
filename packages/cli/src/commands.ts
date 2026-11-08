@@ -535,6 +535,14 @@ async function watcherFor(id: string, short: string): Promise<boolean> {
   const x = now()?.wake;
   return x?.app === 'codex' && x.ring !== undefined;
 }
+// A change to the agent's file that has to land: tried again while another process holds the file, past the 10 s after
+// which a lock left by a process that died is broken (store.ts), up to about half a minute.
+function persist(id: string, change: (x: AgentFile) => void) {
+  for (let tries = 1; ; tries++) {
+    try { return updateAgent(id, change); }
+    catch (e) { if (!(e instanceof Error && 'code' in e && e.code === 'EBUSY') || tries >= 6) throw e; }
+  }
+}
 // queueTimeoutMs, retryMs, offRetryMs and forMs: a test shortens them.
 export async function watch(agent: string, ref: string, opts: { queueTimeoutMs?: number; retryMs?: number; offRetryMs?: number; forMs?: number } = {}): Promise<Result> {
   const a = agentOf(agent);
@@ -581,7 +589,7 @@ export async function watch(agent: string, ref: string, opts: { queueTimeoutMs?:
     const cli = codexCli();
     let thread = '', via: 'mcp' | 'shell' = 'mcp', claimed = false;
     try {
-      updateAgent(a.id, x => {
+      persist(a.id, x => {
         const w = theirs(x);
         if (!w || w.watcher !== process.pid) return;
         w.ring = { at: new Date().toISOString(), outcome: cli ? 'ringing' : 'no-cli' };
@@ -590,10 +598,10 @@ export async function watch(agent: string, ref: string, opts: { queueTimeoutMs?:
     } catch { /* not recorded, so not rung */ }
     if (!cli || !claimed) return done(cli ? 'Not rung: this machine has the answer, or it rang already.' : 'Not rung: no Codex CLI here can ring it.');
     const outcome: RingOutcome = await ring(cli, thread, note(a.id, short, via), opts.queueTimeoutMs ?? QUEUE_TIMEOUT_MS);
-    try { updateAgent(a.id, x => { const w = x.decisions[short]?.wake; if (w?.app === 'codex' && w.ring) w.ring = { at: w.ring.at, outcome }; }); } catch { /* left as ringing: never rung again */ }
+    try { persist(a.id, x => { const w = x.decisions[short]?.wake; if (w?.app === 'codex' && w.ring) w.ring = { at: w.ring.at, outcome }; }); } catch { /* left as ringing: never rung again */ }
     return done(`Rang thread ${thread}: ${outcome}.`);
   } finally {
-    try { updateAgent(a.id, x => { const w = x.decisions[short]?.wake; if (w?.app === 'codex' && w.watcher === process.pid) delete w.watcher; }); } catch { /* left: the next start finds no process */ }
+    try { persist(a.id, x => { const w = x.decisions[short]?.wake; if (w?.app === 'codex' && w.watcher === process.pid) delete w.watcher; }); } catch { /* left: the next start finds no process */ }
   }
 }
 

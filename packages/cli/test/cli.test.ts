@@ -22,8 +22,8 @@ test('the binary: connect, refusals, ask, wait, ack, status, history, off, finis
   const f = await fixture('cli');
   const home = mkdtempSync(path.join(tmpdir(), 'agentpager-cli-')), work = mkdtempSync(path.join(tmpdir(), 'agentpager-card-'));
   process.env.AGENTPAGER_HOME = home; process.env.AGENTPAGER_SERVER = f.origin; delete process.env.AGENTPAGER_PAGER;
-  // An agent the binary can't name gets the words every agent gets (wait.test.ts has Claude's).
-  delete process.env.CLAUDECODE;
+  // An agent the binary can't name gets the words every agent gets (wait.test.ts has Claude's, wake.test.ts Codex's).
+  for (const v of ['CLAUDECODE', 'CODEX_SANDBOX', 'CODEX_HOME', 'CODEX_THREAD_ID', 'CURSOR_TRACE_ID', 'PI_CODING_AGENT', 'AGENTPAGER_WAKE']) delete process.env[v];
   const op = await import('../src/commands.ts');
   const client = new Client({ name: 'codex-mcp-client', version: '1' });
   try {
@@ -37,7 +37,8 @@ test('the binary: connect, refusals, ask, wait, ack, status, history, off, finis
     assert.equal(c.code, 0, c.text);
     const id = field(c, 'agent');
     assert.match(id, /^ap-[a-z0-9]{4}$/);
-    assert.equal(c.text, `Connected as agent ${id} on your owner's pager (project atomic-pages, as Codex).\nYour owner's phone shows you as a new agent. Use --agent ${id} for every question in\nthis piece of work; running connect again adds another agent.\nBefore your first card: agentpager rules`);
+    // An app the command can't name (this shell has no app's marker) is told it may need a nudge (B33.1).
+    assert.equal(c.text, `Connected as agent ${id} on your owner's pager (project atomic-pages, as Codex).\nYour owner's phone shows you as a new agent. Use --agent ${id} for every question in\nthis piece of work; running connect again adds another agent.\nAgentPager can't wake an agent in this app, so when your owner answers, they may have to nudge you to read it.\nBefore your first card: agentpager rules`);
     const file = path.join(home, 'agents', `${id}.json`);
     assert.equal(statSync(file).mode & 0o777, 0o600, 'the agent file is private');
     assert.ok(!c.text.includes(JSON.parse(readFileSync(file, 'utf8')).agentKey), 'the key is never printed');

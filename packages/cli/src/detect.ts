@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { realpathSync } from 'node:fs';
 import { homedir, hostname } from 'node:os';
 import path from 'node:path';
+import { CODEX_CLIENT, wakeableThread } from './codex.ts';
 
 // Who asked ("Codex") and the project its decisions are grouped under on the phone (B25, blueprint/areas/2-agents.md).
 // A harness is known by a marker in its environment, else by its process name. Verified: CLAUDECODE (Claude Code,
@@ -13,17 +14,55 @@ const NAMES: [RegExp, string][] = [[/^claude$/i, 'Claude Code'], [/^Claude$/, 'C
 // (verified 30 Oct 2026: every tool call of 145 in the lab); its claude-ai client only lists them.
 const CLIENTS: [RegExp, string][] = [[/claude-code/i, 'Claude Code'], [/^local-agent-mode-/, 'Claude Desktop'], [/claude/i, 'Claude'], [/codex/i, 'Codex'], [/cursor/i, 'Cursor'], [/^pi/i, 'pi']];
 
-// The harness whose waiting the binary knows how to word (B33.1, blueprint/areas/2-agents.md). Only a positive
-// identification counts: over MCP the client's own name, from a shell CLAUDECODE=1 with no other harness's
-// marker inherited around it. Anything else is null and gets the words every agent gets.
-export type Harness = 'claude-code' | 'claude-desktop';
-export const HARNESS_APP: Record<Harness, string> = { 'claude-code': 'Claude Code', 'claude-desktop': 'Claude Desktop' };
-export function harness(mcpClient?: string): Harness | null {
-  if (mcpClient !== undefined) return /^claude-code$/i.test(mcpClient) ? 'claude-code' : /^local-agent-mode-/.test(mcpClient) ? 'claude-desktop' : null;
-  if (process.env.CLAUDECODE !== '1') return null;
-  return MARKERS.some(([variable, app]) => app !== 'Claude Code' && process.env[variable]) ? null : 'claude-code';
+// The app whose waiting the binary words for it (B33.1, blueprint/areas/2-agents.md), only when it can tell for certain.
+// Over MCP, by the client's own name: Claude Code, a Claude Desktop chat (local-agent-mode-<server>), or Codex, which
+// names the thread on each call (codex.ts). From a shell, by the one app whose marker is there: CLAUDECODE=1 for Claude
+// Code, CODEX_THREAD_ID for Codex, and AGENTPAGER_WAKE for an app whose AgentPager adapter wakes it. Markers of two apps
+// mean one runs inside the other, and nothing says which asked: neither is named. Anything else is null and gets the
+// words every agent gets.
+//
+// AGENTPAGER_WAKE is `<app>:<session>`, set at each session start by the adapter that will wake the agent with the
+// answer, for the commands the agent runs from its shell: `claude-code:<id>` by the Claude Code plugin's mod, `pi:<id>`
+// by the pi extension, where the id is the app's own for the session (letters, digits, ".", "_" and "-", up to 128).
+// The command records each decision asked under it (the record of what's waiting, store.ts), and tells the agent not
+// to wait. It counts only from a shell: an MCP server keeps the variables it started with, which may name an earlier
+// session. An adapter that won't wake a session, such as in `claude -p`, clears it for that session, since a session
+// started inside another inherits its variables.
+export type Wake = { app: 'claude-code' | 'pi'; session: string };
+export type Caller =
+  | { app: 'claude-code'; wake: Wake | null }
+  | { app: 'claude-desktop' }
+  | { app: 'codex'; via: 'mcp' | 'shell'; thread: string | null }
+  | { app: 'pi'; wake: Wake };
+export const HARNESS_APP: Record<'claude-code' | 'claude-desktop', string> = { 'claude-code': 'Claude Code', 'claude-desktop': 'Claude Desktop' };
+export function wakeOf(value: string | undefined): Wake | null {
+  const m = value === undefined ? null : /^(claude-code|pi):([A-Za-z0-9._-]{1,128})$/.exec(value);
+  return m ? { app: m[1] === 'pi' ? 'pi' : 'claude-code', session: m[2] } : null;
 }
-
+// The markers each app sets in the shells it runs commands in. Codex's own CODEX_HOME and CODEX_SANDBOX count as
+// Codex being there, but only CODEX_THREAD_ID says which thread it is.
+const SHELL: [string, (env: NodeJS.ProcessEnv) => boolean][] = [
+  ['claude-code', env => env.CLAUDECODE === '1' || wakeOf(env.AGENTPAGER_WAKE)?.app === 'claude-code'],
+  ['codex', env => Boolean(env.CODEX_THREAD_ID || env.CODEX_SANDBOX || env.CODEX_HOME)],
+  ['pi', env => Boolean(env.PI_CODING_AGENT) || wakeOf(env.AGENTPAGER_WAKE)?.app === 'pi'],
+  ['cursor', env => Boolean(env.CURSOR_TRACE_ID)],
+];
+export function identify(mcp?: { client?: string; meta?: unknown }, env: NodeJS.ProcessEnv = process.env): Caller | null {
+  const wake = wakeOf(env.AGENTPAGER_WAKE);
+  if (mcp?.client !== undefined) {
+    const c = mcp.client;
+    if (/^claude-code$/i.test(c)) return { app: 'claude-code', wake: null };
+    if (/^local-agent-mode-/.test(c)) return { app: 'claude-desktop' };
+    if (c === CODEX_CLIENT) return { app: 'codex', via: 'mcp', thread: wakeableThread({ meta: mcp.meta }) };
+    return null;
+  }
+  const there = SHELL.filter(([, marked]) => marked(env)).map(([app]) => app);
+  if (there.length !== 1) return null;
+  if (there[0] === 'claude-code') return env.CLAUDECODE === '1' ? { app: 'claude-code', wake: wake?.app === 'claude-code' ? wake : null } : null;
+  if (there[0] === 'codex') return env.CODEX_THREAD_ID ? { app: 'codex', via: 'shell', thread: wakeableThread({ env }) } : null;
+  if (there[0] === 'pi') return wake?.app === 'pi' ? { app: 'pi', wake } : null;
+  return null;
+}
 export function detectApp(mcpClient?: string): string {
   if (mcpClient) for (const [re, app] of CLIENTS) if (re.test(mcpClient)) return app;
   for (const [variable, app] of MARKERS) if (process.env[variable]) return app;

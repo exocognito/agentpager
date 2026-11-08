@@ -54,14 +54,15 @@ export const TOOLS = [
 
 const str = (v: unknown) => typeof v === 'string' ? v : undefined;
 const num = (v: unknown) => typeof v === 'number' ? v : undefined;
-export async function runTool(name: string, args: { [key: string]: unknown }, client?: string): Promise<op.Result> {
-  const a = str(args.agent) ?? '', d = str(args.decision) ?? '';
+// client: the MCP client's name; meta: the call's `_meta`, where Codex names its thread (codex.ts).
+export async function runTool(name: string, args: { [key: string]: unknown }, client?: string, meta?: unknown): Promise<op.Result> {
+  const a = str(args.agent) ?? '', d = str(args.decision) ?? '', via = { client, meta };
   switch (name) {
-    case 'connect': return op.connect({ number: str(args.number), app: str(args.app), project: str(args.project), server: str(args.server), mcpClient: client });
+    case 'connect': return op.connect({ number: str(args.number), app: str(args.app), project: str(args.project), server: str(args.server), mcpClient: client, meta });
     case 'rules': return op.rules(str(args.agent));
     case 'review': return op.review({ object: args.card });
-    case 'ask': return op.ask(a, { object: args.card }, client);
-    case 'wait': return op.wait(a, d, { seconds: num(args.seconds), client });
+    case 'ask': return op.ask(a, { object: args.card }, via);
+    case 'wait': return op.wait(a, d, { seconds: num(args.seconds), via });
     case 'ack': return op.ack(a, d, str(args.nextSteps) ?? '');
     case 'status': return op.status(a);
     case 'history': return op.history(a, num(args.limit));
@@ -76,7 +77,7 @@ export async function serve() {
   server.setRequestHandler(CallToolRequestSchema, async request => {
     // Any failure is a one-line refusal, never a protocol error.
     let result: op.Result;
-    try { result = await runTool(request.params.name, request.params.arguments ?? {}, server.getClientVersion()?.name); }
+    try { result = await runTool(request.params.name, request.params.arguments ?? {}, server.getClientVersion()?.name, request.params._meta); }
     catch (e) { result = { code: 2, text: `Refused: ${e instanceof Error ? e.message : 'the tool failed'}` }; }
     return { ...(result.code === 0 ? {} : { isError: true }), content: [{ type: 'text', text: result.text }] };
   });

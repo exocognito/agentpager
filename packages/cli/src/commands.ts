@@ -1,12 +1,15 @@
 import { readFileSync } from 'node:fs';
+import { execFileSync, spawn } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 import { Option, Schema } from 'effect';
 import { Acknowledgement, AgentStatus, AnswerStatus, Asked, CLOSED_AGENT_FINISHED, Connected, DecisionClosedRefusal, Finished, PagerKey, Received, acceptsChoice, decisionIdOf, type Closed, type ClosedDecision } from '../../contract/exchange.ts';
 import { call, type Failure } from './client.ts';
 import { compile, type Source } from './card.ts';
-import { HARNESS_APP, detectApp, detectMachine, detectProject, harness, self, type Harness } from './detect.ts';
+import { HARNESS_APP, detectApp, detectMachine, detectProject, identify, self, type Caller } from './detect.ts';
+import { QUEUE_TIMEOUT_MS, codexCli, note, ring } from './codex.ts';
 import { REVIEW, SHORT, EXAMPLE, rulesText } from './rules.ts';
-import { UnreadableAgent, agentIds, appendHistory, fingerprintOf, home, loadAgent, pagerOf, readHistory, saveAgent, server, shortId, updateAgent, writable, type AgentFile, type HistoryEvent } from './store.ts';
+import { UnreadableAgent, agentIds, appendHistory, fingerprintOf, home, loadAgent, pagerOf, readHistory, saveAgent, server, shortId, updateAgent, writable, type AgentFile, type DecisionWake, type HistoryEvent, type RingOutcome } from './store.ts';
 import { Unsendable, askDigest, fingerprint, newKeys, openAnswer, sealAcknowledgement, sealAsk, sealIdentity } from './seal.ts';
 
 // The operations, shared by the CLI and the MCP server, with their replies word for word
@@ -64,17 +67,41 @@ const quote = (s: string, max = 60) => {
   const cut = s.slice(0, max - 1), space = cut.lastIndexOf(' ');
   return (space > max / 2 ? cut.slice(0, space) : cut).replace(/[\s,;:]+$/, '') + '…';
 };
-// How to wait, in the words of the harness that is waiting (B33; docs/research/2026-10-30-agent-wake-lab.md). Claude Code wakes when
-// a background command ends. A Claude Desktop chat is reached only while its turn lasts, through a link to this
-// computer that drops and comes back by itself. Every other agent gets the words in 'Keep waiting'.
+// How to wait, in the words of the app that is waiting (B33; docs/research/2026-10-30-agent-wake-lab.md and
+// 2026-11-08-clients-wake-lab.md), chosen by How (howFor, below). Claude Code wakes when a background command ends. A
+// Claude Desktop chat is reached only while its turn lasts, through a link to this computer that drops and comes back
+// by itself. An agent whose AgentPager adapter wakes it (AGENTPAGER_WAKE) gets the answer as a new turn, and a Codex
+// thread gets a note that its answer is in, so neither waits: waiting as well would wake it twice. Every other agent
+// gets the words in 'Keep waiting'.
+// Via: what an MCP call says of its caller, the client's name and the call's `_meta`; a command from a shell has none.
+export type Via = { client?: string; meta?: unknown };
+type How = 'claude-code' | 'claude-desktop' | 'adapter' | { codex: 'mcp' | 'shell' } | null;
 const background = (id: string, short: string) => `run \`${self()} wait --agent ${id} ${short} --forever\` as a background command, then carry on or end your turn. It ends when your owner answers, and you get the answer then.`;
 const relink = 'If a wait call fails or the wait tool disappears, the link to this computer dropped; it comes back by itself within seconds: run sleep 10 in your shell, then call wait again, up to 10 times.';
-const waitHow = (h: Harness, id: string, short: string) => h === 'claude-code' ? `Wait for the answer in the background: ${background(id, short)}` : [
-  'Don\'t end your turn until it\'s answered: the answer reaches you only while you\'re working.',
-  `Other work that doesn't need it? Do it, and call the agentpager wait tool (agent ${id}, decision ${short}) with seconds 1 between steps.`,
-  'Nothing else to do? Call wait without seconds (it holds 50 s), again and again, until it returns the answer.',
-  relink,
-].join('\n');
+const adapter = 'Don\'t wait for it: when your owner answers, the answer comes to you as a new message. Carry on or end your turn.';
+const codexRead = (via: 'mcp' | 'shell', id: string, short: string) => via === 'mcp' ? `call the agentpager wait tool (agent ${id}, decision ${short})` : `run agentpager wait --agent ${id} ${short}`;
+const codexWords = (via: 'mcp' | 'shell', id: string, short: string) => `Don't wait for it: when your owner answers, a note that the answer is in comes to this thread. Carry on or end your turn, and when the note comes, ${codexRead(via, id, short)} to read it.`;
+const waitHow = (h: How, id: string, short: string) => h === null ? `Wait for the answer with: agentpager wait --agent ${id} ${short}`
+  : h === 'adapter' ? adapter : typeof h === 'object' ? codexWords(h.codex, id, short)
+  : h === 'claude-code' ? `Wait for the answer in the background: ${background(id, short)}` : [
+    'Don\'t end your turn until it\'s answered: the answer reaches you only while you\'re working.',
+    `Other work that doesn't need it? Do it, and call the agentpager wait tool (agent ${id}, decision ${short}) with seconds 1 between steps.`,
+    'Nothing else to do? Call wait without seconds (it holds 50 s), again and again, until it returns the answer.',
+    relink,
+  ].join('\n');
+// What an agent's app does with an answer when it arrives: Claude Code and a Claude Desktop chat are told how to wait
+// for it, an adapter's session gets it as a new turn, and a Codex thread gets a note when a Codex CLI here can ring it.
+// Any other agent may need its owner to nudge it (B33.1).
+const wakes = (c: Caller | null) => c !== null && (c.app !== 'codex' || (c.thread !== null && codexCli() !== null));
+export const NUDGE = 'AgentPager can\'t wake an agent in this app, so when your owner answers, they may have to nudge you to read it.';
+// The words for a decision: its own wake when this call comes from it (the adapter's session, or the Codex thread whose
+// watcher is running or starts now), else the caller's app's.
+function howFor(c: Caller | null, a: AgentFile, d: { short: string; wake?: DecisionWake }): How {
+  const w = d.wake;
+  if (w && w.app !== 'codex' && (c?.app === 'claude-code' || c?.app === 'pi') && c.wake?.app === w.app && c.wake.session === w.session) return 'adapter';
+  if (w?.app === 'codex' && c?.app === 'codex' && c.thread === w.thread && watcherFor(a.id, d.short)) return { codex: w.via };
+  return c?.app === 'claude-code' || c?.app === 'claude-desktop' ? c.app : null;
+}
 
 // A decision by its short id (d_2x8w) or the server's, even one this machine failed to record.
 function decisionOf(a: AgentFile, ref: string) {
@@ -126,14 +153,15 @@ const unreadableAnswer = (short: string) => `An answer to ${short} arrived, but 
 // fingerprint in the number (I19.6, blueprint/areas/6-privacy.md); it is pinned in the agent file, and every part this
 // agent sends is sealed to it. Who asked, the project and the computer travel sealed to it too.
 export const keyMismatch = (base: string) => `Not connected, and nothing was sent: the key this pager number names doesn't match the key ${host(base)} gave for it. Check the number with the one your owner gave you. If it is right, stop and tell your owner.`;
-export async function connect(input: { number?: string; app?: string; project?: string; server?: string; mcpClient?: string }): Promise<Result> {
+export async function connect(input: { number?: string; app?: string; project?: string; server?: string; mcpClient?: string; meta?: unknown }): Promise<Result> {
   const number = input.number || process.env.AGENTPAGER_PAGER;
   if (!number) return refused('No pager number. Pass the one your owner gave you, or set AGENTPAGER_PAGER.');
   if (input.server !== undefined && !/^https?:\/\/[^\s/]+/.test(input.server)) return refused('--server takes the server\'s address, such as https://agentpager.me.');
   const pager = pagerOf(number), named = fingerprintOf(number), base = input.server ? input.server.replace(/\/+$/, '') : server();
   // A harness the binary identifies names itself: a Claude Desktop chat passes app "Claude" (lab, 30 Oct 2026), and the
   // phone has to say where the agent is.
-  const known = harness(input.mcpClient);
+  const caller = identify(input.mcpClient === undefined ? undefined : { client: input.mcpClient, meta: input.meta });
+  const known = caller?.app === 'claude-code' || caller?.app === 'claude-desktop' ? caller.app : null;
   const app = known ? HARNESS_APP[known] : input.app || detectApp(input.mcpClient), project = input.project || detectProject();
   const notInUse = refused('Not connected. This pager number is not in use. Ask your owner for their current one.');
   if (!pager || !named) return notInUse;
@@ -167,6 +195,7 @@ export async function connect(input: { number?: string; app?: string; project?: 
     `Connected as agent ${id} on your owner's pager (project ${project}, as ${app}).`,
     `Your owner's phone shows you as a new agent. Use --agent ${id} for every question in`,
     'this piece of work; running connect again adds another agent.',
+    ...(wakes(caller) ? [] : [NUDGE]),
     'Before your first card: agentpager rules',
   ].join('\n'), { agent: id, app, project });
 }
@@ -193,7 +222,7 @@ export function review(card: Source): Result {
 }
 
 // holdMs: how long this run holds the card while it sends (SENDING_MS); a test shortens it.
-export async function ask(agent: string, card: Source, client?: string, holdMs = SENDING_MS): Promise<Result> {
+export async function ask(agent: string, card: Source, via?: Via, holdMs = SENDING_MS): Promise<Result> {
   const a = agentOf(agent);
   if ('code' in a) return a;
   const compiled = compile(card);
@@ -267,29 +296,34 @@ export async function ask(agent: string, card: Source, client?: string, holdMs =
   leave(true);
   const id = r.value.decisionId;
   const now = new Date();
+  // Who wakes the agent for it, recorded with it (store.ts › Wake): the caller's adapter, or the Codex thread that
+  // asked, when a Codex CLI here can ring it.
+  const caller = identify(via);
+  const wake: DecisionWake | undefined = caller?.app === 'pi' ? caller.wake : caller?.app === 'claude-code' ? caller.wake ?? undefined
+    : caller?.app === 'codex' && caller.thread !== null && codexCli() !== null ? { app: 'codex', thread: caller.thread, via: caller.via } : undefined;
   // The short id is given out only once it is recorded; otherwise the reply names the server's id.
-  let short = id, reminder: string | null = null;
+  let short = id, reminder: string | null = null, recorded = false;
   try {
     let chosen = '';
     updateAgent(a.id, x => {
       chosen = shortId('d_', taken => taken in x.decisions);
-      x.decisions[chosen] = { id, title: brief.title, options: brief.card.options.map(o => o.label), askedAt: now.toISOString() };
+      x.decisions[chosen] = { id, title: brief.title, options: brief.card.options.map(o => o.label), askedAt: now.toISOString(), ...(wake ? { wake } : {}) };
       const cards = x.cardsSinceRules + 1, since = x.rulesShownAt ? now.getTime() - Date.parse(x.rulesShownAt) : Infinity;
       if (since > REMINDER_MS || cards >= REMINDER_CARDS) {
         reminder = since > REMINDER_MS ? `It's been ${Number.isFinite(since) ? Math.floor(since / 3_600_000) + ' hours' : 'a while'} since you last read the card contract.` : `That's ${cards} cards since you last read the card contract.`;
         x.rulesShownAt = now.toISOString(); x.cardsSinceRules = 0;
       } else x.cardsSinceRules = cards;
     });
-    if (chosen) short = chosen;
+    if (chosen) { short = chosen; recorded = true; }
     appendHistory(a.pager, { at: now.toISOString(), event: 'asked', agent: a.id, app: a.app, project: a.project, decision: short, title: brief.title, detail: brief.detail, options: brief.card.options.map(o => o.label), recommended: brief.card.recommended });
   } catch { /* Sent, but not recorded here: the reply gives the server's id, which wait and ack also take. */ }
-  const h = harness(client);
-  const lines = ['Sent. Your owner sees it as:', `  ${brief.title}`, `  ${brief.detail}`, h ? `Decision ${short}. ${waitHow(h, a.id, short)}` : `Decision ${short}. Wait for the answer with: agentpager wait --agent ${a.id} ${short}`];
+  const how = howFor(caller, a, recorded ? { short, wake } : { short });
+  const lines = ['Sent. Your owner sees it as:', `  ${brief.title}`, `  ${brief.detail}`, `Decision ${short}. ${waitHow(how, a.id, short)}`];
   if (reminder) lines.push('', `${reminder} The short version:`, `  ${SHORT}`);
   return done(lines.join('\n'), { decision: short });
 }
 
-export async function wait(agent: string, ref: string, opts: { seconds?: number; forever?: boolean; client?: string } = {}): Promise<Result> {
+export async function wait(agent: string, ref: string, opts: { seconds?: number; forever?: boolean; via?: Via } = {}): Promise<Result> {
   const a = agentOf(agent);
   if ('code' in a) return a;
   const d = decisionOf(a, ref);
@@ -307,7 +341,7 @@ export async function wait(agent: string, ref: string, opts: { seconds?: number;
     }
     if (r.value.status !== 'answered') {
       if (opts.forever) continue;
-      return pending(a, d, opts.seconds !== undefined && seconds < WAIT_SECONDS, harness(opts.client));
+      return pending(a, d, opts.seconds !== undefined && seconds < WAIT_SECONDS, howFor(identify(opts.via), a, d));
     }
     const { sentAt } = r.value.answer, choice = openAnswer(keysOf(a), d.id, r.value.answer.answer);
     // Only the phone, which read the card, holds the key the answer is sealed to; an answer that doesn't open, or names
@@ -349,8 +383,10 @@ async function received(a: AgentFile, decisionId: string, answerId: string) {
   }
 }
 
-export function pending(a: AgentFile, d: { short: string; title: string; askedAt?: string }, quick: boolean, h: Harness | null): Result {
+export function pending(a: AgentFile, d: { short: string; title: string; askedAt?: string }, quick: boolean, h: How): Result {
   const head = `Pending. Your owner hasn't answered "${d.title}" yet.`;
+  if (h === 'adapter') return done(`${head}\nDon't wait for it: the answer comes to you as a new message when your owner answers. Carry on or end your turn.`, { status: 'pending' });
+  if (typeof h === 'object' && h !== null) return done(`${head}\nDon't wait for it: a note that the answer is in comes to this thread when your owner answers. Carry on or end your turn, and when the note comes, ${codexRead(h.codex, a.id, d.short)} to read it.`, { status: 'pending' });
   if (h === 'claude-code') return done(`${head}\nKeep waiting in the background: ${background(a.id, d.short)}`, { status: 'pending' });
   if (h !== 'claude-desktop') return done(`${head}\nKeep waiting: agentpager wait --agent ${a.id} ${d.short}`, { status: 'pending' });
   if (d.askedAt && Date.now() - Date.parse(d.askedAt) >= DESKTOP_WAIT_MS) return done([
@@ -439,6 +475,102 @@ export async function finish(agent: string): Promise<Result> {
   if (!shut.length) return done(`${head}\nIt had no open decisions to close.`, { closed: [] });
   const closed = noteClosed(a, shut), one = closed.length === 1;
   return done(`${head}\nFinishing closed ${one ? 'its open decision' : `its ${closed.length} open decisions`} unanswered: ${closed.join(', ')}. Your owner can't answer ${one ? 'it' : 'them'} now, and a wait for ${one ? 'it' : 'them'} ends.`, { closed });
+}
+
+// Codex's doorbell (B33.4, blueprint/areas/2-agents.md; codex.ts): the watcher that waits for one decision's answer and
+// rings the Codex thread that asked it, once. It runs as a process of its own, `agentpager watch --agent <id>
+// <decision>`, started detached by the call that asked, or by a later wait from that thread when none runs, so it
+// outlives that call and Codex itself, which stops its MCP servers when it quits. It waits as a wait does, but never
+// receives the answer: it doesn't open it, and never tells the service it has it, so an answer only it saw still
+// brings the owner's warning that no agent picked it up (B32.12). The ring is recorded in the agent's file before
+// `codex queue` runs, so the thread is never rung twice, whatever happens to the call or this process. It stops on the
+// answer, rung or not; when this machine already has the answer; when the decision closes, the pager is turned off or
+// deleted, or the agent is gone; when the server has been unreachable for a day; 30 days after it started; and at once
+// when another watcher runs for the decision. It prints nothing anyone reads.
+const UNREACHABLE_MS = 24 * 3_600_000, WATCH_MS = 30 * 24 * 3_600_000;
+// This program, run again as the watcher: the compiled binary itself (Bun's, whose sources are under /$bunfs/), or Node
+// with this source.
+const program = import.meta.url.startsWith('file:///$bunfs/') ? [process.execPath] : [process.execPath, '--experimental-strip-types', fileURLToPath(new URL('./main.ts', import.meta.url))];
+// Whether that process is this decision's watcher: alive, and running it, so a process id reused after a restart
+// doesn't count.
+function watching(pid: number, id: string, short: string): boolean {
+  try { process.kill(pid, 0); } catch (e) { if (!(e instanceof Error && 'code' in e && e.code === 'EPERM')) return false; }
+  try { return new RegExp(`(^|\\s)watch --agent ${id} ${short}$`).test(execFileSync('ps', ['-o', 'command=', '-p', String(pid)], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()); }
+  catch { return false; }
+}
+// Starts the watcher for a decision a Codex thread asked, when it hasn't rung, nothing here has the answer yet and no
+// watcher runs. True when one runs now. Its environment is this process's, without the pager's number.
+function watcherFor(id: string, short: string): boolean {
+  let x: AgentFile | null;
+  try { x = loadAgent(id); } catch { return false; }
+  const d = x?.decisions[short], w = d?.wake;
+  if (!d || w?.app !== 'codex' || w.ring || d.answered || d.acknowledged || d.closed) return false;
+  if (w.watcher !== undefined && watching(w.watcher, id, short)) return true;
+  const env = { ...process.env };
+  delete env.AGENTPAGER_PAGER;
+  try {
+    const child = spawn(program[0], [...program.slice(1), 'watch', '--agent', id, short], { detached: true, stdio: 'ignore', env, cwd: '/' });
+    child.on('error', () => { /* it never started: no watcher */ });
+    child.unref();
+    return child.pid !== undefined;
+  } catch { return false; }
+}
+// queueTimeoutMs, retryMs and forMs: a test shortens them.
+export async function watch(agent: string, ref: string, opts: { queueTimeoutMs?: number; retryMs?: number; forMs?: number } = {}): Promise<Result> {
+  const a = agentOf(agent);
+  if ('code' in a) return a;
+  const d = a.decisions[ref] ? { short: ref, ...a.decisions[ref] } : null;
+  if (!d) return refused(`Agent ${a.id} has no decision ${ref}.`);
+  const short = d.short, theirs = (x: AgentFile) => {
+    const e = x.decisions[short], w = e?.wake;
+    return e && w?.app === 'codex' && !w.ring && !e.answered && !e.acknowledged && !e.closed ? w : null;
+  };
+  let mine = false;
+  try {
+    updateAgent(a.id, x => {
+      const w = theirs(x);
+      if (!w || (w.watcher !== undefined && w.watcher !== process.pid && watching(w.watcher, a.id, short))) return;
+      w.watcher = process.pid; mine = true;
+    });
+  } catch { /* busy: not registered */ }
+  if (!mine) return done('Nothing to watch: it has rung, this machine has the answer, or another watcher runs.');
+  try {
+    const started = Date.now();
+    let failing: number | null = null;
+    for (;;) {
+      if (Date.now() - started > (opts.forMs ?? WATCH_MS)) return done('Stopped: watched for as long as a watcher may.');
+      const r = await call(AnswerStatus, a.server, 'GET', `/api/agents/${a.agentId}/cards/${d.id}/answer?wait=${WAIT_SECONDS}`, { key: a.agentKey, timeoutMs: (WAIT_SECONDS + 20) * 1000 });
+      if (r.ok && r.value.status === 'pending') { failing = null; continue; }
+      if (r.ok) break;
+      // An unreachable or restarting server, or a page that isn't its reply (a Wi-Fi sign-in), is tried again.
+      if (r.status === 0 || r.status >= 500 || r.error === 'NotUnderstood') {
+        failing ??= Date.now();
+        if (Date.now() - failing > UNREACHABLE_MS) return done('Stopped: the server has been unreachable for a day.');
+        await new Promise(res => setTimeout(res, opts.retryMs ?? RETRY_MS));
+        continue;
+      }
+      const closed = closedOf(r);
+      if (closed) noteClosed(a, [{ decisionId: d.id, ...closed }]);
+      return done(`Stopped: ${closed ? 'the decision closed unanswered' : r.error}.`);
+    }
+    // Answered: recorded as rung before the call, so no watcher rings it again.
+    const cli = codexCli();
+    let thread = '', via: 'mcp' | 'shell' = 'mcp', claimed = false;
+    try {
+      updateAgent(a.id, x => {
+        const w = theirs(x);
+        if (!w || w.watcher !== process.pid) return;
+        w.ring = { at: new Date().toISOString(), outcome: cli ? 'ringing' : 'no-cli' };
+        ({ thread, via } = w); claimed = cli !== null;
+      });
+    } catch { /* not recorded, so not rung */ }
+    if (!cli || !claimed) return done(cli ? 'Not rung: this machine has the answer, or it rang already.' : 'Not rung: no Codex CLI here can ring it.');
+    const outcome: RingOutcome = await ring(cli, thread, note(a.id, short, via), opts.queueTimeoutMs ?? QUEUE_TIMEOUT_MS);
+    try { updateAgent(a.id, x => { const w = x.decisions[short]?.wake; if (w?.app === 'codex' && w.ring) w.ring = { at: w.ring.at, outcome }; }); } catch { /* left as ringing: never rung again */ }
+    return done(`Rang thread ${thread}: ${outcome}.`);
+  } finally {
+    try { updateAgent(a.id, x => { const w = x.decisions[short]?.wake; if (w?.app === 'codex' && w.watcher === process.pid) delete w.watcher; }); } catch { /* left: the next start finds no process */ }
+  }
 }
 
 export function agents(): Result {

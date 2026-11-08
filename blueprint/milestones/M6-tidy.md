@@ -139,3 +139,4 @@ For Sam's approval, in the areas' grammar. None is in an area yet: each reaches 
 
 - 6 Nov · queued: Sam split three of ENCRYPT's hardening items into this milestone, to run right after ENCRYPT and before CLIENTS.
 - 6 Nov · Sam chose its word on the pager, TIDY over the proposed STORE ([M5-encrypt.md](M5-encrypt.md), question 7).
+- 7 Nov · planning: M5 released, and TIDY started as M6. PR #68 moves this doc out of `next/`, asks Sam's six questions, proposes the lines, marks M5 released and adds the plan, `.agents/plans/2026-11-07-m6-tidy.md`. `pnpm check` green (154 clauses, 25 tested), `pnpm test:all` 629 passed (556, 3, 8, Swift 17, 32 and 13).

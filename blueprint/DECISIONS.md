@@ -206,3 +206,15 @@ This file is append only. A reversed or narrowed decision gets a new entry, and 
   - The order after M6 is CLIENTS, INSTALL, SITE, OPEN, FRIENDS, one at a time.
 - **Why:** Sam most wants the site and the repository cleaned up before friends are introduced.
 - **Serves:** README.md › Milestones; `milestones/next/FRIENDS.md`, `milestones/next/SITE.md` and `milestones/next/OPEN.md`.
+- → DEC-2026-11-08-desk-after-clients, in part: DESK comes between CLIENTS and INSTALL.
+
+## DEC-2026-11-08-desk-after-clients · Answering from a Mac is queued right after CLIENTS
+
+- **Decided by:** Sam, on 8 Nov 2026.
+- **Basis:** Sam's pager, at 15:28. A card asked whether to add answering AgentPager decisions from a Mac to the roadmap. Sam chose its recommended option: queue it right after the work then running, CLIENTS, and before INSTALL. The options passed over were queuing it last, after FRIENDS, and leaving it off the roadmap. The proposal the card summed up is [.agents/plans/2026-11-08-desk-client.md](../.agents/plans/2026-11-08-desk-client.md).
+- **Decided, and still standing:**
+  - DESK is queued: a Mac Sam links to a pager from the phone shows and answers that pager's decisions with the phone's authority. The phone still alerts, and nothing changes for agents.
+  - The order after M6 is CLIENTS, DESK, INSTALL, SITE, OPEN, FRIENDS, one at a time.
+  - Its design questions, from its form to what the cockpit may read, are asked when it starts ([DESK.md](milestones/next/DESK.md) › Still open).
+- **Why:** Sam's cockpit, which shows all of Sam's agent sessions, can read AgentPager decisions only from one machine's history at a time, and can't answer them. DESK changes encryption promises and the wire contract, which are better settled before OPEN publishes the code and before FRIENDS rely on it.
+- **Serves:** README.md › Milestones; `milestones/next/DESK.md`, `milestones/next/INSTALL.md`; the order lines in [M7-clients.md](milestones/M7-clients.md).

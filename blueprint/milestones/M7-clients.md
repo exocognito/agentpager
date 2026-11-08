@@ -1,6 +1,6 @@
 # M7 · The agent apps AgentPager supports
 
-> **Status:** planning · **Started:** 8 Nov 2026 · **Order:** after M6; INSTALL follows; its list anchors INSTALL and SITE · **Word:** CLIENTS
+> **Status:** planning · **Started:** 8 Nov 2026 · **Order:** after M6; DESK follows (DEC-2026-11-08-desk-after-clients), then INSTALL; its list anchors INSTALL and SITE · **Word:** CLIENTS
 
 ## Objective
 

@@ -382,4 +382,38 @@ final class SealedTests: XCTestCase {
         XCTAssertEqual(model.undo?.decisionId, other)
         XCTAssertEqual(model.openCount(p.pagerId), 0)
     }
+
+    // A decision that closes while this phone still means to answer it, in its Undo window or after sends that failed:
+    // the next read that says it closed takes all of it away, the Answer Not Confirmed alert included, and shows it as
+    // closed, never as sending; and a send of it that comes back later, as one kept across a relaunch does, never goes.
+    @MainActor
+    func test_B5_17_aDecisionThatClosesWhileItsAnswerWaitsToGoIsNoLongerSending() throws {
+        let model = AppModel(live: false)
+        let a = pager("A", server: model.server.absoluteString)
+        model.pagers = [a]
+        var read = try read(of: a, title: "Closing?")
+        XCTAssertNil(model.apply(a, .success(read)))
+        let prepared = { (requestId: String) in PreparedAnswer(pagerId: a.pagerId, agentId: self.agentId, decisionId: self.decisionId, requestId: requestId, choice: .option(1), sealed: "sealed", deadline: Date().addingTimeInterval(5)) }
+        model.undo = prepared("r-undo")
+        model.inFlight[decisionId] = prepared("r-failed")
+        model.notConfirmed = [prepared("r-failed")]
+        let before = try XCTUnwrap(model.asked(a.pagerId, agentId, decisionId)?.decision)
+        XCTAssertEqual(model.rowState(before), .sending)
+        XCTAssertEqual(model.choice(before), .option(1))
+
+        read.agents[0].open[0].closed = Closed(at: Date(), reason: Closed.agentFinished)
+        XCTAssertNil(model.apply(a, .success(read)))
+        XCTAssertNil(model.undo)
+        XCTAssertTrue(model.inFlight.isEmpty)
+        XCTAssertTrue(model.notConfirmed.isEmpty)
+        let after = try XCTUnwrap(model.asked(a.pagerId, agentId, decisionId)?.decision)
+        XCTAssertEqual(model.rowState(after), .closed)
+        XCTAssertNil(model.choice(after))
+        XCTAssertEqual(model.groups(a.pagerId).first?.answered.map(\.decision.decisionId), [decisionId])
+        XCTAssertEqual(model.openCount(a.pagerId), 0)
+
+        model.commit(prepared("r-later"))
+        XCTAssertTrue(model.inFlight.isEmpty)
+        XCTAssertEqual(model.rowState(after), .closed)
+    }
 }

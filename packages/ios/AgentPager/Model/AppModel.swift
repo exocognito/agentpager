@@ -31,7 +31,7 @@ struct PreparedAnswer: Identifiable, Hashable, Codable {
 }
 
 // notPickedUp: the service warned that no agent had read the answer in time, and none has since (I6). closed: it closed
-// unanswered, and this phone isn't sending an answer to it (B5.17).
+// unanswered (B5.17), which outranks anything this phone meant to send it.
 enum RowState: Hashable { case sending, waiting, notPickedUp, confirmed, closed }
 
 // A decision with who asked it.
@@ -228,8 +228,13 @@ final class AppModel {
             if sealedInboxes[p.pagerId] != sealed { sealedInboxes[p.pagerId] = sealed }
             if inboxes[p.pagerId] != inbox { inboxes[p.pagerId] = inbox }
             let answered = Set(inbox.agents.flatMap { $0.answered.map(\.decisionId) })
-            for (decisionId, a) in inFlight where a.pagerId == p.pagerId && answered.contains(decisionId) { inFlight[decisionId] = nil }
-            notConfirmed.removeAll { $0.pagerId == p.pagerId && answered.contains($0.decisionId) }
+            // A decision that closed unanswered takes no answer, and the service refuses any send to it (DecisionClosed),
+            // so whatever this phone still means to send it goes, in its Undo window too (B5.17).
+            let closed = Set(inbox.agents.flatMap { ($0.open + $0.answered).filter { $0.closed != nil }.map(\.decisionId) })
+            let settled = answered.union(closed)
+            for (decisionId, a) in inFlight where a.pagerId == p.pagerId && settled.contains(decisionId) { inFlight[decisionId] = nil }
+            notConfirmed.removeAll { $0.pagerId == p.pagerId && settled.contains($0.decisionId) }
+            if let u = undo, u.pagerId == p.pagerId, closed.contains(u.decisionId) { undo = nil }
             return nil
         case .failure(let error):
             // Only the server saying the pager is gone drops it: the keys can't be got back, and a 401 or 404 can
@@ -414,15 +419,16 @@ final class AppModel {
         }
     }
 
-    // The owner's answer: the one sent, or one still in its Undo window or on its way.
+    // The owner's answer: the one sent, or one still in its Undo window or on its way. None for a decision that closed
+    // unanswered, whatever this phone meant to send it.
     func choice(_ d: Decision) -> Choice? {
+        guard d.closed == nil else { return nil }
         if let u = undo, u.decisionId == d.decisionId { return u.choice }
         return inFlight[d.decisionId]?.choice ?? d.answer?.choice
     }
     func rowState(_ d: Decision) -> RowState {
-        if sending(d.decisionId) { return .sending }
         if d.closed != nil { return .closed }
-        if d.answer == nil { return .sending }
+        if sending(d.decisionId) || d.answer == nil { return .sending }
         if d.acknowledgement != nil { return .confirmed }
         return d.warnedAt != nil && d.collectedAt == nil ? .notPickedUp : .waiting
     }
@@ -491,6 +497,12 @@ final class AppModel {
     func commit(_ p: PreparedAnswer) {
         // A pager no longer on this phone takes its answers with it.
         guard pagers.contains(where: { $0.pagerId == p.pagerId }) else {
+            inFlight[p.decisionId] = nil
+            notConfirmed.removeAll { $0.requestId == p.requestId }
+            return
+        }
+        // Nor does a decision that has closed unanswered since: the service would refuse it (B5.17).
+        if asked(p.pagerId, p.agentId, p.decisionId)?.decision.closed != nil {
             inFlight[p.decisionId] = nil
             notConfirmed.removeAll { $0.requestId == p.requestId }
             return

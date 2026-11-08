@@ -82,7 +82,7 @@ struct DecisionView: View {
     }
 
     @ViewBuilder private func bar(_ a: Asked, open: Bool) -> some View {
-        if let closed = a.decision.closed, model.choice(a.decision) == nil { UnansweredBar(asked: a, closed: closed) }
+        if let closed = a.decision.closed { UnansweredBar(asked: a, closed: closed) }
         else if !open { ClosedBar(asked: a) }
         else if !model.isOn(pagerId) { OffBar(decision: a.decision, pagerName: model.pager(pagerId)?.name ?? "This") { Task { await model.setOn(pagerId, true) } } }
         else {

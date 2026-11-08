@@ -65,21 +65,23 @@ export function saveAgent(a: AgentFile) {
 }
 // Several agents (a coordinator and its helpers, each its own process) may share one id: each change takes the
 // agent's lock, re-reads the file and is applied to what is there now, so one's write never drops another's
-// decision. The lock is a directory (mkdir is atomic); one left by a crashed process is broken after 10 seconds.
+// decision. A lock is a directory (mkdir is atomic); one left by a crashed process is broken after 10 seconds. The
+// history takes one of its own, per pager.
 const LOCK_STALE_MS = 10_000, LOCK_WAIT_MS = 5_000;
 const pause = (ms: number) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
-function locked<A>(id: string, run: () => A): A {
-  const lock = path.join(agentsDir(), `${id}.lock`), until = Date.now() + LOCK_WAIT_MS;
+function lockedAt<A>(lock: string, busy: string, run: () => A): A {
+  const until = Date.now() + LOCK_WAIT_MS;
   for (;;) {
     try { mkdirSync(lock); break; } catch (e) {
       if (!(e instanceof Error && 'code' in e && e.code === 'EEXIST')) throw e;
       try { if (Date.now() - statSync(lock).mtimeMs > LOCK_STALE_MS) { rmSync(lock, { recursive: true, force: true }); continue; } } catch { continue; }
-      if (Date.now() > until) throw Object.assign(new Error(`agent ${id} is busy`), { code: 'EBUSY' });
+      if (Date.now() > until) throw Object.assign(new Error(busy), { code: 'EBUSY' });
       pause(10);
     }
   }
   try { return run(); } finally { rmSync(lock, { recursive: true, force: true }); }
 }
+const locked = <A>(id: string, run: () => A): A => lockedAt(path.join(agentsDir(), `${id}.lock`), `agent ${id} is busy`, run);
 export function updateAgent(id: string, change: (a: AgentFile) => void): AgentFile | null {
   return locked(id, () => {
     const a = loadAgent(id);
@@ -130,11 +132,21 @@ export function agentIds(): string[] {
 export const HISTORY_CAP = 1000;
 const historyPath = (pager: string) => path.join(home(), 'history', `${pager}.jsonl`);
 export type HistoryEvent = { [key: string]: unknown; at: string; event: 'asked' | 'answered' | 'acknowledged'; agent: string; decision: string };
+// Every agent on the pager appends to its one file, each from its own process: the append and the trim take the
+// pager's history lock, so a trim never drops a line another agent appended after reading. The trimmed file is
+// written beside it and renamed over it, so a crash leaves the old file or the new one, never part of one.
 export function appendHistory(pager: string, e: HistoryEvent) {
-  mkdirSync(path.dirname(historyPath(pager)), { recursive: true, mode: 0o700 });
-  appendFileSync(historyPath(pager), JSON.stringify(e) + '\n', { mode: 0o600 });
-  const lines = readFileSync(historyPath(pager), 'utf8').split('\n').filter(Boolean);
-  if (lines.length > HISTORY_CAP) writeFileSync(historyPath(pager), lines.slice(-HISTORY_CAP).join('\n') + '\n', { mode: 0o600 });
+  const file = historyPath(pager);
+  mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
+  lockedAt(`${file}.lock`, 'the history is busy', () => {
+    appendFileSync(file, JSON.stringify(e) + '\n', { mode: 0o600 });
+    const lines = readFileSync(file, 'utf8').split('\n').filter(Boolean);
+    if (lines.length <= HISTORY_CAP) return;
+    const temp = `${file}.${process.pid}.tmp`;
+    writeFileSync(temp, lines.slice(-HISTORY_CAP).join('\n') + '\n', { mode: 0o600, flush: true });
+    chmodSync(temp, 0o600);
+    renameSync(temp, file);
+  });
 }
 export function readHistory(pager: string): HistoryEvent[] {
   try { return readFileSync(historyPath(pager), 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l)); } catch { return []; }

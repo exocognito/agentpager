@@ -34,12 +34,14 @@ export const RegistryExport = Schema.Struct({
 });
 export type RegistryExport = typeof RegistryExport.Type;
 
-// Everything one agent's store holds, decisions in the order they were asked. No agent: it was forgotten.
+// Everything one agent's store holds, decisions in the order they were asked, but for its attachments' parts, which
+// the agent's store gives one at a time (AttachmentPart), so the move never holds more than one in memory. No agent:
+// it was forgotten.
 const Of = { decisionId: C.Token };
 export const AgentExport = Schema.Struct({
   agent: Schema.NullOr(Meta),
   decisions: Schema.Array(Schema.Struct({ ...Of, card: C.Sealed('card'), preview: C.Sealed('decisionPreview'), digest: C.AskDigest, askedAt: C.Timestamp })),
-  attachments: Schema.Array(Schema.Struct({ ...Of, slot: Schema.Number.pipe(Schema.int(), Schema.between(0, 9)), part: C.Sealed('attachment') })),
+  attachments: Schema.Array(Schema.Struct({ ...Of, slot: Schema.Number.pipe(Schema.int(), Schema.between(0, 9)) })),
   answers: Schema.Array(Schema.Struct({ ...Of, requestId: C.Token, answerId: C.Token, part: C.Sealed('answer'), sentAt: C.Timestamp })),
   acknowledgements: Schema.Array(Schema.Struct({ ...Of, part: C.Sealed('acknowledgement'), acknowledgedAt: C.Timestamp })),
   pickups: Schema.Array(Schema.Struct({ ...Of, due: Millis })),
@@ -47,3 +49,4 @@ export const AgentExport = Schema.Struct({
   warnings: Schema.Array(Schema.Struct({ ...Of, at: C.Timestamp })),
 });
 export type AgentExport = typeof AgentExport.Type;
+export const AttachmentPart = C.Sealed('attachment');

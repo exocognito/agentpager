@@ -1,11 +1,13 @@
 import { test } from 'node:test';
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { randomBytes } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { Schema } from 'effect';
-import { fixture, release, assert, C, token, until, app, question } from './support.ts';
+import pngjs from 'pngjs';
+import { fixture, release, assert, C, token, until, app, question, asQuestion, asClient } from './support.ts';
 import { fromBase64url, open, seal } from '../../contract/envelope.ts';
 import { decodePart, encodePart } from '../../contract/parts.ts';
 
@@ -64,6 +66,13 @@ const holds = (persist: string, marker: string) => files(persist).some(f => read
 const ErrorTag = Schema.Struct({ error: Schema.String });
 const tagOf = (value: unknown) => Schema.is(ErrorTag)(value) ? value.error : undefined;
 const DAY = 24 * 3_600_000;
+// An image that doesn't compress: 400 by 400 random pixels, about 640 KB.
+function noise() { const png = new pngjs.PNG({ width: 400, height: 400 }); randomBytes(png.data.length).copy(png.data); return pngjs.PNG.sync.write(png); }
+// A brief carrying three such images, about 1.9 MB of attachments, near the 3 MB a decision may carry.
+const heavyQuestion = (title: string) => {
+  const q = question(title), names = ['one', 'two', 'three'];
+  return asQuestion({ ...q, card: { ...q.card, markdown: q.card.markdown.replace('Both are ready to start.\n', `Both are ready to start.\n\n${names.map(n => `![${n}](${n}.png)`).join('\n')}\n`) }, attachments: names.map(n => ({ name: `${n}.png`, type: 'image/png', base64: noise().toString('base64') })) });
+};
 
 // The upgrade baseline's record (scripts/baseline.mjs), as much of it as this test reads. Its keys are secrets: they
 // stay in the test's own temp folder, and no message here names them.
@@ -127,21 +136,36 @@ test('the move from m5: every pager, agent and decision m5 stored reads back the
   const late = await old.connected('Codex', 'warning due');
   const lateAsk = await old.ask(late.a, 'Warned after the move?');
   await old.answer(late.a.agent.agentId, late.p.phone, lateAsk.decisionId);
-  // A pager whose move is refused the first time.
-  const cut = await old.connected('Codex', 'cut');
-  await old.ask(cut.a, 'Moved at the second try?');
+  // A pager whose move is refused the first time, at its second agent, once it has copied its first.
+  const cutPager = await old.makePager();
+  const cutFirst = await old.connect(cutPager.number, 'Codex', 'cut, first'), cutAgent = await old.connect(cutPager.number, 'Codex', 'cut');
+  await old.ask(cutFirst, 'Copied before the refusal?');
+  await old.ask(cutAgent, 'Moved at the second try?');
+  // A pager heavy with attachments: two agents, each with four decisions of three images that don't compress, about
+  // 15 MB in all. Each part is kept as the phone fetches it, to compare after the move.
+  const heavy = await old.makePager(), heavyParts = new Map<string, string>();
+  const part = async (origin: string, route: string) => { const r = await fetch(origin + route, { headers: { ...asClient, 'x-phone-key': heavy.phone } }); assert.equal(r.status, 200, route); return r.text(); };
+  for (const n of [1, 2]) {
+    const a = await old.connect(heavy.number, 'Codex', `heavy ${n}`);
+    for (let d = 1; d <= 4; d++) {
+      const asked = await old.ok(C.Asked, `/api/agents/${a.agent.agentId}/cards`, { agent: a.agentKey, data: await old.sealed(a, heavyQuestion(`Heavy ${n}.${d}?`)) });
+      for (const slot of [0, 1, 2]) { const route = `/api/agents/${a.agent.agentId}/cards/${asked.decisionId}/files/${slot}`; heavyParts.set(route, await part(old.origin, route)); }
+    }
+  }
+  // A pager deleted after the move, whose deletion is then cut off before the Registry erased its row.
+  const doomed = await old.connected('Codex', 'deleted after the move');
 
   // What the phone reads of each, from m5's service.
   const read = async (f: typeof old, p: { pagerId: string; phone: string }) => { const r = await f.request(`/api/pagers/${p.pagerId}`, { phone: p.phone }); assert.equal(r.status, 200, JSON.stringify(r.value)); return r.value; };
   const baselinePager = { pagerId: record.pager.pagerId, phone: record.pager.phoneKey };
   const before = new Map<string, unknown>();
-  for (const p of [baselinePager, warned.p, off, fin, house, late.p, cut.p]) before.set(p.pagerId, await read(old, p));
+  for (const p of [baselinePager, warned.p, off, fin, house, late.p, cutPager, heavy, doomed.p]) before.set(p.pagerId, await read(old, p));
   await old.stop();
 
   // Below the service: what the old stores hold, kept to compare after the move, and the states made by hand.
   const registry = registryOf(persist);
   const registryRows = () => rows(registry, 'SELECT * FROM pagers_v2 ORDER BY pager_id');
-  const agentFiles = new Map([record.agent.agentId, ...[warned.a, offAgent, done, waiting, live, forgot, unlisted, due, goneAgent, preSwitch, late.a, cut.a].map(a => a.agent.agentId)].map(id => [id, named(persist, 'Agent', id)]));
+  const agentFiles = new Map([record.agent.agentId, ...[warned.a, offAgent, done, waiting, live, forgot, unlisted, due, goneAgent, preSwitch, late.a, cutFirst, cutAgent, doomed.a].map(a => a.agent.agentId)].map(id => [id, named(persist, 'Agent', id)]));
   const oldAgent = (agentId: string) => { const file = agentFiles.get(agentId); assert.ok(file); return file; };
   const dump = (file: string) => ['agent_v3', 'decisions_v3', 'attachments_v3', 'answers_v3', 'acknowledgements_v3', 'pickups_v3', 'collections_v3', 'warnings_v3'].map(t => rows(file, `SELECT * FROM ${t} ORDER BY rowid`));
   // m5's delete, cut off before it reached the agents: the pager and its listing gone, its agents queued to forget.
@@ -169,7 +193,7 @@ test('the move from m5: every pager, agent and decision m5 stored reads back the
   db(oldAgent(late.a.agent.agentId), d => d.prepare('UPDATE pickups_v3 SET due=?').run(Date.now() - 1_000));
   alarmAt(persist, 'Agent', oldAgent(late.a.agent.agentId), Date.now());
   // An agent whose store names another pager than the one listing it: the move refuses it, and writes nothing.
-  const cutFile = oldAgent(cut.a.agent.agentId), elsewhere = '0'.repeat(32);
+  const cutFile = oldAgent(cutAgent.agent.agentId), elsewhere = '0'.repeat(32);
   setMeta(cutFile, m => ({ ...m, pagerId: elsewhere }));
   const keptRegistry = registryRows(), keptBaseline = dump(oldAgent(record.agent.agentId)), keptFinished = dump(oldAgent(done.agent.agentId));
   const lastActive = metaOf(oldAgent(record.agent.agentId))?.lastActivityAt;
@@ -179,13 +203,15 @@ test('the move from m5: every pager, agent and decision m5 stored reads back the
   const f = await fixture('upgrade', undefined, { persist, port });
   try {
     // Every pager the phone read from m5 reads the same, but for the agents housekeeping has done with.
-    for (const p of [baselinePager, warned.p, off, fin]) assert.deepEqual(await read(f, p), before.get(p.pagerId), `the pager ${p.pagerId.slice(0, 6)}… reads as m5 stored it`);
+    for (const p of [baselinePager, warned.p, off, fin, heavy]) assert.deepEqual(await read(f, p), before.get(p.pagerId), `the pager ${p.pagerId.slice(0, 6)}… reads as m5 stored it`);
     const houseBefore = Schema.decodeUnknownSync(C.PagerInbox)(before.get(house.pagerId));
     assert.deepEqual(await read(f, house), { ...houseBefore, agents: houseBefore.agents.filter(x => x.agent.agentId === live.agent.agentId) }, 'only the agent housekeeping isn\'t done with');
     // The baseline passes every check --verify makes, only reading.
     const verified = baseline(f.origin, '--verify');
     assert.equal(verified.status, 0, `baseline.mjs --verify: ${verified.stdout}${verified.stderr}`);
     assert.match(verified.stdout, /ok the agentpager \w+ copy reads its agent's status: pager on/);
+    // Every attachment of the heavy pager comes back as the same part.
+    for (const [route, kept] of heavyParts) assert.equal(await part(f.origin, route), kept, `${route.slice(-60)} moved unchanged`);
     // The baseline's agent's last activity, and so its forget date, didn't move.
     assert.equal(Schema.decodeUnknownSync(C.PagerInbox)(await read(f, baselinePager)).agents[0].agent.lastActivityAt, lastActive);
 
@@ -201,7 +227,7 @@ test('the move from m5: every pager, agent and decision m5 stored reads back the
     const lateBefore = Schema.decodeUnknownSync(C.PagerInbox)(before.get(late.p.pagerId));
     assert.equal(warning.agents[0].answered[0].answer?.answerId, lateBefore.agents[0].answered[0].answer?.answerId);
     // The pager whose move is refused fails as the server's own failure, never as a pager that is gone.
-    const refused = await f.request(`/api/pagers/${cut.p.pagerId}`, { phone: cut.p.phone });
+    const refused = await f.request(`/api/pagers/${cutPager.pagerId}`, { phone: cutPager.phone });
     assert.deepEqual([refused.status, tagOf(refused.value)], [500, 'InternalError']);
 
     // On the moved data, the phone answers the baseline's open decision, and m5's command collects and acknowledges it.
@@ -241,13 +267,28 @@ test('the move from m5: every pager, agent and decision m5 stored reads back the
 
     // A move refused is written nowhere: the pager's store holds nothing of it, and the old stores are as they were.
     const settled = new Map<string, unknown>();
+    // The pager deleted after the move: deleted with its agent, and the Registry's row of it erased.
+    await f.ok(Schema.Struct({ ok: Schema.Literal(true) }), `/api/pagers/${doomed.p.pagerId}/delete`, { method: 'POST', phone: doomed.p.phone });
     for (const p of [baselinePager, warned.p, off, fin, house, late.p]) settled.set(p.pagerId, await read(f, p));
     await f.stop();
-    assert.equal(wrote(persist, 'Pager', cut.p.pagerId), false, 'the refused move wrote nothing');
-    // Put right, the move runs again from the start, and the pager reads as m5 stored it.
-    setMeta(cutFile, m => ({ ...m, pagerId: cut.p.pagerId }));
+    const cutStore = named(persist, 'Pager', cutPager.pagerId);
+    assert.deepEqual([rows(cutStore, 'SELECT * FROM moved_v4').length, rows(cutStore, 'SELECT * FROM pager_v4').length], [0, 0], 'the refused move shows nothing: no mark, no pager');
+    assert.equal(rows(cutStore, 'SELECT * FROM agents_v4').length, 1, 'what it copied before the refusal waits, unread, to be cleared');
+    // Put right, the move runs again from the start, and the pager reads as m5 stored it, nothing copied twice.
+    setMeta(cutFile, m => ({ ...m, pagerId: cutPager.pagerId }));
+    // The deletion cut off before the Registry erased the pager's row, and before its alarm was set: the row back, the
+    // erasure queued, no alarm.
+    const doomedStore = named(persist, 'Pager', doomed.p.pagerId), doomedRow = keptRegistry.find(r => r.pager_id === doomed.p.pagerId);
+    assert.ok(doomedRow);
+    assert.equal(rows(registry, 'SELECT * FROM pagers_v2 WHERE pager_id=?', doomed.p.pagerId).length, 0, 'the delete erased the Registry\'s row');
+    db(registry, d => d.prepare(`INSERT INTO pagers_v2 VALUES (${Object.keys(doomedRow).map(() => '?').join(', ')})`).run(...Object.values(doomedRow).map(v => typeof v === 'string' || typeof v === 'number' ? v : null)));
+    db(doomedStore, d => { d.prepare("INSERT INTO erase_v4 VALUES ('pager', ?, ?)").run(doomed.p.pagerId, Date.now()); d.exec('DELETE FROM _cf_METADATA WHERE key=1'); });
+    db(path.join(persist, 'v3', 'do', 'ownerpager-Pager', 'metadata.sqlite'), d => d.prepare('DELETE FROM _cf_ALARM WHERE actor_id=?').run(path.basename(doomedStore, '.sqlite')));
     await f.start();
-    assert.deepEqual(await read(f, cut.p), before.get(cut.p.pagerId), 'the pager moved at its second try reads as m5 stored it');
+    assert.deepEqual(await read(f, cutPager), before.get(cutPager.pagerId), 'the pager moved at its second try reads as m5 stored it');
+    // Any call on the deleted pager's store, which still refuses the pager as gone, finds the erasure and arms it.
+    await f.refused(410, 'NumberInvalid', `/api/pagers/${doomed.p.pagerId}/key`);
+    await until(async () => rows(registry, 'SELECT * FROM pagers_v2 WHERE pager_id=?', doomed.p.pagerId).length, n => n === 0);
     // Moving again finds it done: after a restart every pager reads as it did.
     await f.restart();
     for (const [pagerId, value] of settled) {
@@ -259,7 +300,7 @@ test('the move from m5: every pager, agent and decision m5 stored reads back the
 
     // Below the service, after the move.
     // Each moved pager's store is marked moved once, and holds the Registry's row as it was, alert target included.
-    for (const p of [baselinePager, warned.p, off, fin, house, late.p, cut.p]) {
+    for (const p of [baselinePager, warned.p, off, fin, house, late.p, cutPager, heavy]) {
       const store = named(persist, 'Pager', p.pagerId);
       assert.deepEqual(rows(store, 'SELECT pager_id, from_registry FROM moved_v4'), [{ pager_id: p.pagerId, from_registry: 1 }]);
       const [mine] = rows(store, 'SELECT fingerprint, public_key, phone_hash, auto_off, off_since, push, created_at FROM pager_v4');
@@ -271,7 +312,7 @@ test('the move from m5: every pager, agent and decision m5 stored reads back the
     // Nothing is written for the deleted pager, nor for a pager no one made: the calls naming them stored nothing.
     assert.equal(wrote(persist, 'Pager', gone.pagerId), false, 'the deleted pager has no store');
     // The old stores keep what they held, unused: the Registry's rows, and the agents' rows, as before the move.
-    assert.deepEqual(registryRows(), keptRegistry, 'the Registry\'s rows as m5 left them');
+    assert.deepEqual(registryRows(), keptRegistry.filter(r => r.pager_id !== doomed.p.pagerId), 'the Registry\'s rows as m5 left them, but for the pager deleted since');
     assert.deepEqual(dump(oldAgent(record.agent.agentId)), keptBaseline, 'the baseline agent\'s old rows, untouched by the move and the calls since');
     assert.deepEqual(dump(oldAgent(done.agent.agentId)), keptFinished);
     // What was deleted or forgotten is gone from the old stores too: the deleted pager's agents, the one from before

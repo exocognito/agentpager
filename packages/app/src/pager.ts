@@ -5,16 +5,16 @@ import { AttachmentIndex } from '../../contract/parts.ts';
 import { body, decode, emptyBody, iso, json, refusal, sameDigest, sha256, token } from './shared.ts';
 import { clocks, forward, type Env } from './env.ts';
 import { alert, PushTarget, type Alert } from './push.ts';
-import { AgentExport, Digest, Fingerprint, RegistryExport } from './move.ts';
+import { AgentExport, AttachmentPart, Digest, Fingerprint, RegistryExport } from './move.ts';
 
 // One pager's store, one per pager, named by its pager id: the pager's row, its agents and their decisions. Every call
 // on the pager is handled here, one after the other, so turning the pager off and any call on it never interleave:
 // each call checks the switch and writes in one transaction (I17.2, blueprint/areas/1-pagers.md).
 //
 // Before M6 the pager's row lived in the Registry and each agent's rows in that agent's own store (registry.ts,
-// agent.ts). The first call on a pager moves them here, once (move): it reads the Registry's row for the pager and
-// every agent's rows, then writes them all in one transaction with the mark that says it is done. A move cut off by a
-// restart or a deploy wrote nothing, and runs again from the start at the next call. The old stores keep what they
+// agent.ts). The first call on a pager moves them here, once (move): it copies every agent's rows, then writes the
+// pager's row with the mark that says it is done, in one transaction. Nothing here is read without that mark, so a
+// move cut off by a restart or a deploy shows nothing, and the next call clears what it left and starts again. The old stores keep what they
 // held, unused; a later release removes them. What the old stores still hold of a pager deleted here, or of an agent
 // forgotten here, is erased from them (erase_v4), so nothing deleted stays anywhere.
 //
@@ -65,7 +65,12 @@ function handed<A, I>(schema: Schema.Schema<A, I>, value: unknown, from: string)
 export class Pager {
   // The move under way in this instance, which every call waits for.
   private moving: Promise<boolean> | null = null;
-  constructor(private ctx: DurableObjectState, private env: Env) {}
+  constructor(private ctx: DurableObjectState, private env: Env) {
+    // An erasure queued just before a restart, whose alarm wasn't set, is tried from this start.
+    void ctx.blockConcurrencyWhile(async () => {
+      if (this.movedRow() && this.sql('SELECT 1 FROM erase_v4 LIMIT 1').length && await ctx.storage.getAlarm() === null) await ctx.storage.setAlarm(Date.now());
+    });
+  }
   // Made in the transaction that first writes here: the move's, or the phone's making the pager. Until then this store
   // holds nothing, so a call naming a pager that doesn't exist stores nothing.
   private schema() {
@@ -108,10 +113,12 @@ export class Pager {
   private agentRows(): AgentRow[] { return this.sql<AgentRow>('SELECT * FROM agents_v4 ORDER BY rowid'); }
 
   // The move: the first call on this pager after M6's deploy, whatever it is, takes the pager's row from the Registry
-  // and each agent's rows from that agent's store, and writes them here in one transaction, with the mark that it is
-  // done. Nothing is written before that transaction, so a move cut off at any point leaves this store as it was, and
-  // the next call starts it again. Once done it never runs again for this pager, even after the pager is deleted, so
-  // nothing an old store still holds can come back. An agent the Registry lists whose store has forgotten it isn't
+  // and each agent's rows from that agent's store. It copies the agents' rows here one agent at a time, and each
+  // attachment's part on its own, so it never holds more than one agent's rows and one part in memory; then it writes
+  // the pager's row and the mark that it is done, in one transaction. Until that transaction nothing here is read: every
+  // call waits for the move, and the clocks wait for the mark. So a move cut off at any point shows nothing, and the
+  // next call clears what it copied and starts again. Once done it never runs again for this pager, even after the
+  // pager is deleted, so nothing an old store still holds can come back. An agent the Registry lists whose store has forgotten it isn't
   // moved. A pager the Registry doesn't have (never made, or deleted before M6) isn't here, and nothing is written
   // for it: its calls are refused as for a pager that doesn't exist, and only the phone's making it writes here.
   private async ready(pagerId: string): Promise<boolean> {
@@ -129,46 +136,63 @@ export class Pager {
     const from = handed(RegistryExport, await listed.json(), 'the Registry');
     if (!from.pager) return false;
     const p = from.pager;
-    const agents: (AgentExport & { agent: NonNullable<AgentExport['agent']> })[] = [];
+    // What a move cut off here copied: never read, since it has no mark, and cleared before this one starts.
+    this.tx(() => { this.schema(); this.clear(); });
+    let agents = 0, decisions = 0;
     for (const agentId of from.agents) {
       const reply = await forward(this.env.AGENT, agentId, '/export', { method: 'POST', headers: {} });
       if (!reply.ok) throw new Error(`An agent's store refused the move: ${reply.status}.`);
       const x = handed(AgentExport, await reply.json(), 'an agent\'s store');
       if (!x.agent) continue;
-      if (x.agent.agentId !== agentId || x.agent.pagerId !== pagerId) throw new Error('An agent\'s store names another agent or pager than the Registry lists it under.');
-      agents.push({ ...x, agent: x.agent });
-    }
-    this.tx(() => {
-      if (this.movedRow()) return;
-      this.schema();
-      this.ctx.storage.sql.exec('INSERT INTO pager_v4 VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?)', p.fingerprint, p.publicKey, p.phoneHash, p.enabled, p.autoOff, p.offAt, p.offSince, p.push, p.createdAt);
-      for (const x of agents) {
-        const m = x.agent, id = m.agentId, put = (query: string, ...values: unknown[]) => this.ctx.storage.sql.exec(query, id, ...values);
+      const m = x.agent;
+      if (m.agentId !== agentId || m.pagerId !== pagerId) throw new Error('An agent\'s store names another agent or pager than the Registry lists it under.');
+      this.tx(() => {
+        const put = (query: string, ...values: unknown[]) => this.ctx.storage.sql.exec(query, agentId, ...values);
         put('INSERT INTO agents_v4 VALUES (?, ?, ?, ?, ?, ?, ?, 1)', m.identity, m.agentHash, m.phoneHash, m.createdAt, m.finishedAt, m.lastActivityAt);
         for (const d of x.decisions) put('INSERT INTO decisions_v4 VALUES (?, ?, ?, ?, ?, ?)', d.decisionId, d.card, d.preview, d.digest, d.askedAt);
-        for (const a of x.attachments) put('INSERT INTO attachments_v4 VALUES (?, ?, ?, ?)', a.decisionId, a.slot, a.part);
         for (const a of x.answers) put('INSERT INTO answers_v4 VALUES (?, ?, ?, ?, ?, ?)', a.decisionId, a.requestId, a.answerId, a.part, a.sentAt);
         for (const a of x.acknowledgements) put('INSERT INTO acknowledgements_v4 VALUES (?, ?, ?, ?)', a.decisionId, a.part, a.acknowledgedAt);
         for (const a of x.pickups) put('INSERT INTO pickups_v4 VALUES (?, ?, ?)', a.decisionId, a.due);
         for (const a of x.collections) put('INSERT INTO collections_v4 VALUES (?, ?, ?)', a.decisionId, a.at);
         for (const a of x.warnings) put('INSERT INTO warnings_v4 VALUES (?, ?, ?)', a.decisionId, a.at);
+      });
+      for (const a of x.attachments) {
+        const part = await forward(this.env.AGENT, agentId, `/export/${a.decisionId}/${a.slot}`, { method: 'POST', headers: {} });
+        if (!part.ok) throw new Error(`An agent's store refused an attachment to the move: ${part.status}.`);
+        this.ctx.storage.sql.exec('INSERT INTO attachments_v4 VALUES (?, ?, ?, ?)', agentId, a.decisionId, a.slot, handed(AttachmentPart, await part.text(), 'an agent\'s store'));
       }
+      agents++; decisions += x.decisions.length;
+    }
+    // The move shows only now: the pager's row and the mark, together.
+    this.tx(() => {
+      this.ctx.storage.sql.exec('INSERT INTO pager_v4 VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?)', p.fingerprint, p.publicKey, p.phoneHash, p.enabled, p.autoOff, p.offAt, p.offSince, p.push, p.createdAt);
       this.ctx.storage.sql.exec('INSERT INTO moved_v4 VALUES (1, ?, ?, 1)', pagerId, Date.now());
     });
-    console.log(`Moved a pager into its own store: ${agents.length} agents, ${agents.reduce((n, x) => n + x.decisions.length, 0)} decisions.`);
+    console.log(`Moved a pager into its own store: ${agents} agents, ${decisions} decisions.`);
     return true;
+  }
+  // Every row but the mark. Only for a store without its mark, which no call has read.
+  private clear() {
+    for (const table of ['warnings_v4', 'collections_v4', 'pickups_v4', 'acknowledgements_v4', 'answers_v4', 'attachments_v4', 'decisions_v4', 'agents_v4', 'pager_v4', 'erase_v4']) this.ctx.storage.sql.exec(`DELETE FROM ${table}`);
   }
 
   // At every call and every alarm, before anything else: auto-off lands in the same state as the switch, off since the
   // time it was due, and an agent idle for clocks.idleMs is forgotten, and its pager stops listing it. So no call,
   // the move's first included, finds an agent whose time has come.
-  private housekeep() {
+  // Whether it forgot anyone.
+  private housekeep(): boolean {
     const now = Date.now();
-    this.tx(() => {
+    return this.tx(() => {
       this.ctx.storage.sql.exec('UPDATE pager_v4 SET enabled=0, off_since=off_at, off_at=NULL WHERE enabled=1 AND off_at IS NOT NULL AND off_at <= ?', now);
-      for (const a of this.agentRows()) if (now >= Date.parse(a.last_activity_at) + clocks.idleMs) this.forgetAgent(a);
+      const idle = this.agentRows().filter(a => now >= Date.parse(a.last_activity_at) + clocks.idleMs);
+      for (const a of idle) this.forgetAgent(a);
+      return idle.length > 0;
     });
   }
+  // Called in the same turn as the transaction that queued an erasure, before anything else is awaited, so the erasure
+  // is tried again a minute later even if this call is cut off before it is done. The call's own end sets the alarm
+  // to whatever is due first.
+  private armErase() { return this.ctx.storage.setAlarm(Date.now() + ERASE_RETRY_MS); }
   // Turned on now: it turns off by itself after its auto-off time, if it has one.
   private offAt(autoOff: C.AutoOff, now: number) { return autoOff === 'never' ? null : now + clocks.autoOffMs(autoOff); }
   private pager(pagerId: string, row: PagerRow): C.Pager {
@@ -317,7 +341,7 @@ export class Pager {
     const pagerId = decode(C.PagerId, named ?? '');
     const here = await this.ready(pagerId);
     if (!here && action !== 'create') return this.absent(request, action, rest);
-    if (here) this.housekeep();
+    if (here && this.housekeep()) await this.armErase();
     if (action === 'agent') return this.agentCall(request, url, rest);
     // The phone makes the pager. The same phone making it again (its reply was lost) gets the pager back, with the
     // turn-off choice it asks for now; anyone else is refused.
@@ -402,6 +426,7 @@ export class Pager {
         if (this.movedRow()?.from_registry === 1) this.queue({ store: 'pager', id: pagerId });
         this.ctx.storage.sql.exec('DELETE FROM pager_v4 WHERE id=1');
       });
+      await this.armErase();
       await this.erase();
       return json({ ok: true });
     }

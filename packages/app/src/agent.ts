@@ -35,7 +35,7 @@ export class Agent {
     });
   }
   private has(table: string) { return this.ctx.storage.sql.exec("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", table).toArray().length > 0; }
-  private rows<T extends Record<string, string | number | null>>(query: string) { return this.ctx.storage.sql.exec<T>(query).toArray(); }
+  private rows<T extends Record<string, string | number | null>>(query: string, ...values: (string | number)[]) { return this.ctx.storage.sql.exec<T>(query, ...values).toArray(); }
   // What M5 stored of this agent, if anything.
   private meta(): Meta | null {
     if (!this.has('agent_v3')) return null;
@@ -49,14 +49,15 @@ export class Agent {
     const m = this.meta();
     return m ? { agentId: m.agentId, pagerId: m.pagerId } : null;
   }
-  // Everything M5 stored of this agent, for its pager's move, read and never changed.
+  // Everything M5 stored of this agent, for its pager's move, read and never changed. Its attachments are listed by
+  // slot, and each part is given on its own (/export/<decision>/<slot>).
   private export(): AgentExport {
     const agent = this.meta();
     if (!agent) return { agent: null, decisions: [], attachments: [], answers: [], acknowledgements: [], pickups: [], collections: [], warnings: [] };
     return {
       agent,
       decisions: this.rows<{ decisionId: string; card: string; preview: string; digest: string; askedAt: string }>('SELECT id AS decisionId, card, preview, digest, asked_at AS askedAt FROM decisions_v3 ORDER BY rowid'),
-      attachments: this.rows<{ decisionId: string; slot: number; part: string }>('SELECT decision_id AS decisionId, slot, part FROM attachments_v3 ORDER BY decision_id, slot'),
+      attachments: this.rows<{ decisionId: string; slot: number }>('SELECT decision_id AS decisionId, slot FROM attachments_v3 ORDER BY decision_id, slot'),
       answers: this.rows<{ decisionId: string; requestId: string; answerId: string; part: string; sentAt: string }>('SELECT decision_id AS decisionId, request_id AS requestId, answer_id AS answerId, part, sent_at AS sentAt FROM answers_v3'),
       acknowledgements: this.rows<{ decisionId: string; part: string; acknowledgedAt: string }>('SELECT decision_id AS decisionId, part, acknowledged_at AS acknowledgedAt FROM acknowledgements_v3'),
       pickups: this.rows<{ decisionId: string; due: number }>('SELECT decision_id AS decisionId, due FROM pickups_v3'),
@@ -97,7 +98,7 @@ export class Agent {
     try { return await this.handle(request); } catch (error) { return refusal(error); }
   }
   private async handle(request: Request): Promise<Response> {
-    const url = new URL(request.url), action = url.pathname.split('/').filter(Boolean)[0];
+    const url = new URL(request.url), [action, decisionId, slot] = url.pathname.split('/').filter(Boolean);
     // From the Worker: a new agent connects. This store keeps the way to its pager, whose store makes the agent if the
     // number and the switch allow. A refusal leaves nothing here, not even the table.
     if (action === 'open') {
@@ -111,8 +112,13 @@ export class Agent {
       if (reply.status >= 400 && reply.status < 500) await this.ctx.storage.deleteAll();
       return reply;
     }
-    // From its pager's store, at the move.
-    if (action === 'export') return json(this.export());
+    // From its pager's store, at the move: the rows, then each attachment's part.
+    if (action === 'export' && decisionId === undefined) return json(this.export());
+    if (action === 'export') {
+      const row = this.meta() ? this.rows<{ part: string }>('SELECT part FROM attachments_v3 WHERE decision_id=? AND slot=?', decisionId, Number(slot))[0] : undefined;
+      if (!row) throw C.refuse.unknownFile();
+      return new Response(row.part, { headers: { 'content-type': 'text/plain; charset=utf-8' } });
+    }
     // From its pager's store, once it has forgotten the agent or deleted its pager, or from the Registry, for a pager
     // deleted before M6.
     if (action === 'forget') { await this.forget(); return json({ ok: true }); }

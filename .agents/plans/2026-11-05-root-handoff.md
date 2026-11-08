@@ -47,7 +47,7 @@ Read `AGENTS.md`, then `blueprint/README.md`. This file covers only what those t
   - the id check's "Known limits" at the top of `scripts/blueprint.mjs`;
   - `DECISIONS.md` still names the retired limit L20.
 - **The primary clone** sits on `main` at cfb78c0, behind `origin/main`, with a change to `blueprint/areas/5-answering.md` and an untracked `review.txt` [V]; whose they are isn't recorded here [A]. No agent works in it; leave both as they are.
-- **In progress when this was written:** the worktree `m6-history-read`, on branch `m6/history-read` at c9cc3c3, with no pull request yet [V]; whose it is isn't recorded here [A]. It isn't on the list below.
+- **In progress when this was written:** the worktree `m6-history-read`, on branch `m6/history-read`, whose draft pull request #80 is an `m6.1` fix to how the command reads its history [V]. It isn't on the list below.
 
 ## For Sam to approve trashing
 

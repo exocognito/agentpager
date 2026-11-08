@@ -25,7 +25,8 @@ import { Waits, type Reach } from './wake.ts';
 //   pager_v4            the pager: its public key, its phone key as a digest, its switch, auto-off, off-since and where
 //                       its phone gets alerts. No name: that lives only on the phone
 //   agents_v4           each agent, in connect order: its identity part, its key and its pager's phone key as digests,
-//                       when it connected, finished and was last active, and whether it came from an old store
+//                       when it connected, finished and was last active, whether it came from an old store, and how long
+//                       its pager has been off since its last activity (off_ms), which its 30-day clock doesn't count
 //   decisions_v4        each decision, by its agent: its card part, its alert's preview part, and the digest its agent
 //                       sent with it (C.AskDigest), so asking the same card again with that request id finds it
 //   attachments_v4      each attachment's part, by its slot in the card's list
@@ -45,9 +46,12 @@ const Slot = Schema.String.pipe(Schema.pattern(/^[0-9]$/), Schema.compose(Schema
 const ALERT_EXPIRY_MS = 24 * 3_600_000;
 // An old store that couldn't be reached to erase is tried again this much later.
 const ERASE_RETRY_MS = 60_000;
+// agents_v4's last column, as made and as added to a store made before it (upgrade): how long, in ms, the agent's pager
+// has been off since its last activity.
+const OFF_MS = 'off_ms INTEGER NOT NULL DEFAULT 0 CHECK(off_ms >= 0)';
 
 type PagerRow = { fingerprint: string; public_key: string; phone_hash: string; enabled: number; auto_off: string; off_at: number | null; off_since: number | null; push: string | null; created_at: number };
-type AgentRow = { agent_id: string; identity: string; agent_hash: string; phone_hash: string; created_at: string; finished_at: string | null; last_activity_at: string; moved: number };
+type AgentRow = { agent_id: string; identity: string; agent_hash: string; phone_hash: string; created_at: string; finished_at: string | null; last_activity_at: string; moved: number; off_ms: number };
 type MovedRow = { pager_id: string; at: number; from_registry: number };
 type AnswerRow = { answer_id: string; request_id: string; part: string; sent_at: string };
 type Erase = { store: 'agent' | 'listing' | 'pager'; id: string };
@@ -71,8 +75,9 @@ export class Pager {
   // The agents' waits for their answers, held while their requests are open.
   private waits = new Waits();
   constructor(private ctx: DurableObjectState, private env: Env) {
-    // An erasure queued just before a restart, whose alarm wasn't set, is tried from this start.
     void ctx.blockConcurrencyWhile(async () => {
+      this.upgrade();
+      // An erasure queued just before a restart, whose alarm wasn't set, is tried from this start.
       if (this.movedRow() && this.sql('SELECT 1 FROM erase_v4 LIMIT 1').length && await ctx.storage.getAlarm() === null) await ctx.storage.setAlarm(Date.now());
     });
   }
@@ -84,7 +89,7 @@ export class Pager {
       CREATE TABLE IF NOT EXISTS pager_v4 (id INTEGER PRIMARY KEY CHECK(id=1), fingerprint TEXT NOT NULL, public_key TEXT NOT NULL, phone_hash TEXT NOT NULL,
         enabled INTEGER NOT NULL CHECK(enabled IN (0, 1)), auto_off TEXT NOT NULL, off_at INTEGER, off_since INTEGER, push TEXT, created_at INTEGER NOT NULL);
       CREATE TABLE IF NOT EXISTS agents_v4 (agent_id TEXT PRIMARY KEY, identity TEXT NOT NULL, agent_hash TEXT NOT NULL, phone_hash TEXT NOT NULL,
-        created_at TEXT NOT NULL, finished_at TEXT, last_activity_at TEXT NOT NULL, moved INTEGER NOT NULL CHECK(moved IN (0, 1)));
+        created_at TEXT NOT NULL, finished_at TEXT, last_activity_at TEXT NOT NULL, moved INTEGER NOT NULL CHECK(moved IN (0, 1)), ${OFF_MS});
       CREATE TABLE IF NOT EXISTS decisions_v4 (agent_id TEXT NOT NULL REFERENCES agents_v4(agent_id), decision_id TEXT NOT NULL, card TEXT NOT NULL, preview TEXT NOT NULL,
         digest TEXT NOT NULL, asked_at TEXT NOT NULL, PRIMARY KEY (agent_id, decision_id));
       CREATE TABLE IF NOT EXISTS attachments_v4 (agent_id TEXT NOT NULL, decision_id TEXT NOT NULL, slot INTEGER NOT NULL, part TEXT NOT NULL,
@@ -106,6 +111,15 @@ export class Pager {
       CREATE TRIGGER IF NOT EXISTS acknowledgement_immutable_v4 BEFORE UPDATE ON acknowledgements_v4 BEGIN SELECT RAISE(ABORT,'immutable acknowledgement'); END;
       CREATE TRIGGER IF NOT EXISTS collection_immutable_v4 BEFORE UPDATE ON collections_v4 BEGIN SELECT RAISE(ABORT,'immutable collection'); END;
       CREATE TRIGGER IF NOT EXISTS warning_immutable_v4 BEFORE UPDATE ON warnings_v4 BEGIN SELECT RAISE(ABORT,'immutable warning'); END;`);
+  }
+  // A store made by M6's first build, before the clock paused while the pager is off, has no off_ms. Each of its agents
+  // gets 0: that build kept no record of time off, so each keeps the date it had, 30 days after its last activity; and
+  // if its pager is off now, the time since it turned off is added when it turns on (resume), as for any pager. Run
+  // before anything is served, so every call and alarm finds the column.
+  private upgrade() {
+    if (!this.sql("SELECT 1 FROM sqlite_master WHERE type='table' AND name='agents_v4'").length) return;
+    if (this.sql<{ name: string }>('PRAGMA table_info(agents_v4)').some(c => c.name === 'off_ms')) return;
+    this.ctx.storage.sql.exec(`ALTER TABLE agents_v4 ADD COLUMN ${OFF_MS}`);
   }
   private sql<T extends Record<string, SqlStorageValue>>(query: string, ...bindings: unknown[]) { return this.ctx.storage.sql.exec<T>(query, ...bindings).toArray(); }
   private tx<A>(run: () => A): A { return this.ctx.storage.transactionSync(run); }
@@ -159,7 +173,7 @@ export class Pager {
       if (m.agentId !== agentId || m.pagerId !== pagerId) throw new Error('An agent\'s store names another agent or pager than the Registry lists it under.');
       this.tx(() => {
         const put = (query: string, ...values: unknown[]) => this.ctx.storage.sql.exec(query, agentId, ...values);
-        put('INSERT INTO agents_v4 VALUES (?, ?, ?, ?, ?, ?, ?, 1)', m.identity, m.agentHash, m.phoneHash, m.createdAt, m.finishedAt, m.lastActivityAt);
+        put('INSERT INTO agents_v4 VALUES (?, ?, ?, ?, ?, ?, ?, 1, 0)', m.identity, m.agentHash, m.phoneHash, m.createdAt, m.finishedAt, m.lastActivityAt);
         for (const d of x.decisions) put('INSERT INTO decisions_v4 VALUES (?, ?, ?, ?, ?, ?)', d.decisionId, d.card, d.preview, d.digest, d.askedAt);
         for (const a of x.answers) put('INSERT INTO answers_v4 VALUES (?, ?, ?, ?, ?, ?)', a.decisionId, a.requestId, a.answerId, a.part, a.sentAt);
         for (const a of x.acknowledgements) put('INSERT INTO acknowledgements_v4 VALUES (?, ?, ?, ?)', a.decisionId, a.part, a.acknowledgedAt);
@@ -188,19 +202,36 @@ export class Pager {
   }
 
   // At every call and every alarm, before anything else: auto-off lands if it has come due (pagerRow), and an agent
-  // idle for clocks.idleMs is forgotten, and its pager stops listing it. So no call, the move's first included, finds
-  // an agent whose time has come.
+  // whose 30-day clock has run out is forgotten, and its pager stops listing it. So no call, the move's first included,
+  // finds an agent whose time has come. Only while the pager is on: an off pager's agents are kept however long it
+  // stays off (I17.6, B22.4).
   // Whether it forgot anyone.
   private housekeep(): boolean {
     const now = Date.now();
     const forgotten = this.tx(() => {
-      this.pagerRow();
-      const idle = this.agentRows().filter(a => now >= Date.parse(a.last_activity_at) + clocks.idleMs);
+      if (this.pagerRow()?.enabled !== 1) return [];
+      const idle = this.agentRows().filter(a => now >= this.forgetAt(a));
       for (const a of idle) this.forgetAgent(a);
       return idle.map(a => a.agent_id);
     });
     for (const agentId of forgotten) this.wake({ agentId });
     return forgotten.length > 0;
+  }
+  // When the agent is forgotten if its pager stays on and the agent does nothing more: once its pager has been on for
+  // 30 days since its last activity (I17.6). Each stretch the pager spends off since then is added when it turns on
+  // again (resume), so turning off pauses the clock and turning on resumes it. While the pager is off nothing is
+  // forgotten (housekeep).
+  private forgetAt(a: AgentRow) { return Date.parse(a.last_activity_at) + clocks.idleMs + a.off_ms; }
+  // Turned on: each agent's clock resumes where turning off paused it. The time the pager was off, from when the switch
+  // turned it off or, for auto-off, from when it was due (pagerRow), is added to each agent's off_ms. An agent last
+  // active after the pager turned off, which only a call M5 let through as its pager turned off can be, gets only the
+  // time since its last activity. Last activity stays as it was. In the transaction that turns the pager on.
+  private resume(row: PagerRow, now: number) {
+    if (row.off_since === null) throw new Error('An off pager without the time it turned off.');
+    for (const a of this.agentRows()) {
+      const off = now - Math.max(row.off_since, Date.parse(a.last_activity_at));
+      if (off > 0) this.ctx.storage.sql.exec('UPDATE agents_v4 SET off_ms=off_ms+? WHERE agent_id=?', off, a.agent_id);
+    }
   }
   // Every write that ends what a wait waits for calls this once it is done, for the waits it reaches: a decision's
   // answer stored, its agent forgotten, or its pager's switch or auto-off changed or the pager deleted. Each wait it
@@ -243,7 +274,8 @@ export class Pager {
   private summary(a: AgentRow): C.Agent {
     return decode(C.Agent, { agentId: a.agent_id, identity: a.identity, createdAt: a.created_at, finishedAt: a.finished_at, lastActivityAt: a.last_activity_at, openCount: this.openCount(a.agent_id) });
   }
-  private touch(agentId: string, at = iso()) { this.ctx.storage.sql.exec('UPDATE agents_v4 SET last_activity_at=? WHERE agent_id=?', at, agentId); }
+  // Activity, always while the pager is on: the agent's 30-day clock starts again, with no time off counted.
+  private touch(agentId: string, at = iso()) { this.ctx.storage.sql.exec('UPDATE agents_v4 SET last_activity_at=?, off_ms=0 WHERE agent_id=?', at, agentId); }
   private preview(agentId: string, id: string) {
     const row = this.sql<{ preview: string }>('SELECT preview FROM decisions_v4 WHERE agent_id=? AND decision_id=?', agentId, id)[0];
     if (!row) throw C.refuse.unknownDecision();
@@ -299,10 +331,11 @@ export class Pager {
   }
 
   // The one alarm serves every clock: each agent's housekeeping, the next answer due a warning, and what is still to
-  // erase from an old store.
+  // erase from an old store. While the pager is off no agent's clock runs, so none sets it; turning the pager on is a
+  // call, whose end sets it again.
   private async afterwards() {
     if (!this.movedRow()) return;
-    const idle = Math.min(...this.agentRows().map(a => Date.parse(a.last_activity_at) + clocks.idleMs));
+    const idle = this.pagerRow()?.enabled === 1 ? Math.min(...this.agentRows().map(a => this.forgetAt(a))) : Infinity;
     const due = (table: 'pickups_v4' | 'erase_v4') => this.sql<{ due: number | null }>(`SELECT min(due) AS due FROM ${table}`)[0]?.due ?? Infinity;
     const next = Math.min(idle, due('pickups_v4'), due('erase_v4'));
     const set = await this.ctx.storage.getAlarm();
@@ -393,8 +426,8 @@ export class Pager {
         if (!row || row.fingerprint !== input.fingerprint) throw C.refuse.numberInvalid();
         if (row.enabled !== 1) throw C.refuse.pagerOff();
         if (this.agentRow(input.agentId)) throw C.refuse.invalid('This agent already exists.');
-        const made: AgentRow = { agent_id: input.agentId, identity: input.identity, agent_hash: agentHash, phone_hash: row.phone_hash, created_at: now, finished_at: null, last_activity_at: now, moved: 0 };
-        this.ctx.storage.sql.exec('INSERT INTO agents_v4 VALUES (?, ?, ?, ?, ?, ?, ?, ?)', made.agent_id, made.identity, made.agent_hash, made.phone_hash, made.created_at, made.finished_at, made.last_activity_at, made.moved);
+        const made: AgentRow = { agent_id: input.agentId, identity: input.identity, agent_hash: agentHash, phone_hash: row.phone_hash, created_at: now, finished_at: null, last_activity_at: now, moved: 0, off_ms: 0 };
+        this.ctx.storage.sql.exec('INSERT INTO agents_v4 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', made.agent_id, made.identity, made.agent_hash, made.phone_hash, made.created_at, made.finished_at, made.last_activity_at, made.moved, made.off_ms);
         return this.summary(made);
       });
       const message = 'Connected as a new agent on your owner\'s pager. Your owner\'s phone shows you as a new agent. Use this agentId and agentKey for every question in this piece of work; connecting again adds another agent.';
@@ -424,7 +457,10 @@ export class Pager {
           this.ctx.storage.sql.exec('UPDATE pager_v4 SET auto_off=?, off_at=? WHERE id=1', p.autoOff, row.enabled === 1 ? this.offAt(p.autoOff, now) : null);
           row = this.mine(digest);
         }
-        if (p.on === true && row.enabled === 0) this.ctx.storage.sql.exec('UPDATE pager_v4 SET enabled=1, off_since=NULL, off_at=? WHERE id=1', this.offAt(decode(C.AutoOff, row.auto_off), now));
+        if (p.on === true && row.enabled === 0) {
+          this.resume(row, now);
+          this.ctx.storage.sql.exec('UPDATE pager_v4 SET enabled=1, off_since=NULL, off_at=? WHERE id=1', this.offAt(decode(C.AutoOff, row.auto_off), now));
+        }
         if (p.on === false && row.enabled === 1) this.ctx.storage.sql.exec('UPDATE pager_v4 SET enabled=0, off_since=?, off_at=NULL WHERE id=1', now);
         return { pager: this.pager(pagerId, this.mine(digest)) };
       });

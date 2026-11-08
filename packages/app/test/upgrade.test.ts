@@ -49,7 +49,13 @@ function alarmAt(persist: string, kind: 'Agent', file: string, ms: number) {
   const changed = db(path.join(persist, 'v3', 'do', `ownerpager-${kind}`, 'metadata.sqlite'), d => d.prepare('UPDATE _cf_ALARM SET scheduled_time=? WHERE actor_id=?').run(ns, actor).changes);
   assert.equal(Number(changed), 1, 'the scheduler had the object\'s alarm');
 }
-const alarmOf = (persist: string, kind: 'Agent', file: string) => rows(path.join(persist, 'v3', 'do', `ownerpager-${kind}`, 'metadata.sqlite'), 'SELECT scheduled_time FROM _cf_ALARM WHERE actor_id=?', path.basename(file, '.sqlite'))[0];
+// An object's alarm, if it has one, in nanoseconds, which only a BigInt holds.
+const alarmOf = (persist: string, kind: 'Agent' | 'Pager', file: string) => db(path.join(persist, 'v3', 'do', `ownerpager-${kind}`, 'metadata.sqlite'), d => {
+  const q = d.prepare('SELECT scheduled_time FROM _cf_ALARM WHERE actor_id=?');
+  q.setReadBigInts(true);
+  const r = q.get(path.basename(file, '.sqlite'));
+  return r ? { ...r } : undefined;
+});
 // The agent M5 stored, as its agent_v3 row holds it.
 const Meta = Schema.Struct({ agentId: Schema.String, pagerId: Schema.String, lastActivityAt: Schema.String }, { key: Schema.String, value: Schema.Unknown });
 const metaOf = (file: string) => db(file, d => {
@@ -341,5 +347,117 @@ test('the move from m5: every pager, agent and decision m5 stored reads back the
     assert.equal(alarmOf(persist, 'Agent', oldAgent(late.a.agent.agentId)), undefined, 'the held agent\'s old alarm is gone');
     assert.equal(alarmOf(persist, 'Agent', oldAgent(unlisted.agent.agentId)), undefined);
     await f.artifact('moved.json', { pagers: before.size, agents: [...before.values()].reduce((n: number, v) => n + Schema.decodeUnknownSync(C.PagerInbox)(v).agents.length, 0) });
+  } finally { await f.stop(); }
+});
+
+// The paused clock (I17.6) on what dev holds: what m5 stored, some of it moved by M6's first build, which dev runs (one
+// store per pager, #72, and the wake, #75, at 00d1cd9), whose stores have no record of time off. Each agent keeps the
+// forget date it had, 30 days after its last activity, unless its pager is off now: then the time since the pager
+// turned off counts from then, and the agent is kept for as long as the pager stays off. Last activity never changes.
+// The m5 baseline, moved by the first build as dev's was, passes every check --verify makes, its agent still due 30
+// days after its last activity. A move the first build began and was refused, which left its rows without the column,
+// runs again from the start. Each state the old rule's clocks would take days to reach is made below the service.
+const FIRST = '00d1cd95921784938fb90edb5902063a3e83dfbd';
+test('I17.6 Agents moved by M6\'s first build and those not moved yet keep their forget dates, and an off pager\'s agents are kept while it is off and resume their clocks when it turns on', { timeout: 900_000 }, async () => {
+  const m5 = release('m5'), first = release(FIRST);
+  const dir = mkdtempSync(path.join(tmpdir(), 'agentpager-clock-')), persist = path.join(dir, 'persist'), baselines = path.join(dir, 'baselines');
+  const baseline = (origin: string, ...more: string[]) => spawnSync(process.execPath, ['--experimental-strip-types', 'scripts/baseline.mjs', '--stage', 'local', '--server', origin, '--tag', 'm5', ...more],
+    { cwd: app, env: { ...process.env, AGENTPAGER_BASELINES: baselines }, encoding: 'utf8', timeout: 300_000 });
+  const read = async (f: Awaited<ReturnType<typeof fixture>>, p: { pagerId: string; phone: string }) => { const r = await f.request(`/api/pagers/${p.pagerId}`, { phone: p.phone }); assert.equal(r.status, 200, JSON.stringify(r.value)); return Schema.decodeUnknownSync(C.PagerInbox)(r.value); };
+
+  // On m5: the baseline, and pagers on and off with agents for each kind of clock.
+  let old = await fixture('clock-m5', undefined, { app: m5, persist });
+  const recorded = baseline(old.origin, '--binary', m5.binary);
+  assert.equal(recorded.status, 0, `baseline.mjs: ${recorded.stdout}${recorded.stderr}`);
+  const record = Schema.decodeUnknownSync(Record)(JSON.parse(readFileSync(path.join(baselines, 'local', 'm5', 'record.json'), 'utf8')));
+  const baselinePager = { pagerId: record.pager.pagerId, phone: record.pager.phoneKey };
+  // To be moved by the first build: a pager on, and one off.
+  const movedOn = await old.makePager(), kept = await old.connect(movedOn.number, 'Codex', 'idle 29 days'), spent = await old.connect(movedOn.number, 'Codex', 'idle 31 days');
+  const movedOff = await old.makePager(), pausedMoved = await old.connect(movedOff.number, 'Codex', 'moved, idle 11 days of 31'), spentMoved = await old.connect(movedOff.number, 'Codex', 'moved, idle 35 days of 55');
+  // Not moved yet: a pager off, the same two clocks.
+  const unmoved = await old.makePager(), pausedUnmoved = await old.connect(unmoved.number, 'Codex', 'not moved, idle 11 days of 31'), spentUnmoved = await old.connect(unmoved.number, 'Codex', 'not moved, idle 35 days of 55');
+  // Its move refused by the first build at the second agent, once it had copied the first.
+  const cut = await old.makePager(), cutFirst = await old.connect(cut.number, 'Codex', 'cut, first'), cutSecond = await old.connect(cut.number, 'Codex', 'cut, second');
+  for (const a of [kept, spent, pausedMoved, spentMoved, pausedUnmoved, spentUnmoved, cutFirst, cutSecond]) await old.ask(a, `Asked by ${a.agent.project}?`);
+  for (const p of [movedOff, unmoved]) await old.settings(p.pagerId, p.phone, { on: false });
+  const port = old.port;
+  await old.stop();
+  const cutFile = named(persist, 'Agent', cutSecond.agent.agentId), unmovedFiles = [pausedUnmoved, spentUnmoved].map(a => named(persist, 'Agent', a.agent.agentId));
+  setMeta(cutFile, m => ({ ...m, pagerId: '0'.repeat(32) }));
+
+  // M6's first build on the same storage: the phone's reads move the baseline's pager and the two to move; the cut
+  // pager's move is refused; the pager not moved yet isn't called.
+  const mid = await fixture('clock-first', undefined, { app: first, persist, port });
+  for (const p of [baselinePager, movedOn, movedOff]) await read(mid, p);
+  assert.equal((await mid.request(`/api/pagers/${cut.pagerId}`, { phone: cut.phone })).status, 500);
+  await mid.stop();
+
+  // Below the service. The first build's stores have no column for time off, and the cut move's copied rows wait,
+  // unread, without one either. The agents' last activities and the pagers' times off, set back by days.
+  const pagerFile = (p: { pagerId: string }) => named(persist, 'Pager', p.pagerId);
+  const columns = (file: string) => rows(file, "SELECT name FROM pragma_table_info('agents_v4')").map(r => r.name);
+  for (const p of [baselinePager, movedOn, movedOff, cut]) assert.ok(columns(pagerFile(p)).length > 0 && !columns(pagerFile(p)).includes('off_ms'), 'the first build\'s agents, with no time off');
+  assert.deepEqual([rows(pagerFile(cut), 'SELECT * FROM moved_v4').length, rows(pagerFile(cut), 'SELECT * FROM agents_v4').length], [0, 1], 'the refused move: no mark, its first agent copied');
+  setMeta(cutFile, m => ({ ...m, pagerId: cut.pagerId }));
+  const now = Date.now(), ago = (days: number) => new Date(now - days * DAY).toISOString(), offSince = now - 20 * DAY;
+  const last = new Map(([[kept, 29], [spent, 31], [pausedMoved, 31], [spentMoved, 55], [pausedUnmoved, 31], [spentUnmoved, 55]] as const).map(([a, days]) => [a.agent.agentId, ago(days)]));
+  for (const [p, agents] of [[movedOn, [kept, spent]], [movedOff, [pausedMoved, spentMoved]]] as const) {
+    db(pagerFile(p), d => { for (const a of agents) d.prepare('UPDATE agents_v4 SET last_activity_at=? WHERE agent_id=?').run(last.get(a.agent.agentId) ?? '', a.agent.agentId); });
+  }
+  db(pagerFile(movedOff), d => d.prepare('UPDATE pager_v4 SET off_since=?').run(offSince));
+  db(registryOf(persist), d => d.prepare('UPDATE pagers_v2 SET off_since=? WHERE pager_id=?').run(offSince, unmoved.pagerId));
+  for (const [i, a] of [pausedUnmoved, spentUnmoved].entries()) setMeta(unmovedFiles[i] ?? '', m => ({ ...m, lastActivityAt: last.get(a.agent.agentId) ?? '' }));
+  // The old store's own clock, which counted time off, comes due for the agent on the pager not moved yet.
+  alarmAt(persist, 'Agent', unmovedFiles[0] ?? '', Date.now());
+  const baselineLast = String(rows(pagerFile(baselinePager), 'SELECT last_activity_at FROM agents_v4')[0]?.last_activity_at);
+
+  // This code. The old store's clock moves its pager, which holds the agent, so that clock stops and forgets nothing.
+  const f = await fixture('clock', undefined, { persist, port });
+  try {
+    await until(async () => alarmOf(persist, 'Agent', unmovedFiles[0] ?? ''), alarm => alarm === undefined);
+    const listed = async (p: { pagerId: string; phone: string }) => (await read(f, p)).agents.map(x => [x.agent.agentId, x.agent.lastActivityAt]);
+    const as = (...agents: { agent: { agentId: string } }[]) => agents.map(a => [a.agent.agentId, last.get(a.agent.agentId)]);
+    // Once what a forgotten agent's old stores held is erased, a call's end sets the pager's clock to what is due next.
+    const settle = async (p: { pagerId: string; phone: string }) => { await until(async () => Number(rows(pagerFile(p), 'SELECT count(*) AS n FROM erase_v4')[0]?.n), n => n === 0); await read(f, p); };
+    // On, the agent idle 31 days is forgotten, as before; off, both agents are kept, whatever the old rule counted.
+    assert.deepEqual(await listed(movedOn), as(kept), 'on: the agent idle 31 days forgotten, the one idle 29 kept');
+    assert.deepEqual(await listed(movedOff), as(pausedMoved, spentMoved), 'off, moved: both kept');
+    assert.deepEqual(await listed(unmoved), as(pausedUnmoved, spentUnmoved), 'off, not moved: both kept');
+    assert.deepEqual((await read(f, cut)).agents.map(x => x.agent.agentId), [cutFirst, cutSecond].map(a => a.agent.agentId), 'the refused move, run again from the start');
+    for (const a of [pausedMoved, spentMoved, pausedUnmoved, spentUnmoved]) assert.equal((await f.request(`/api/agents/${a.agent.agentId}`, { agent: a.agentKey })).status, 200, `${a.agent.project}: known while its pager is off`);
+    const verified = baseline(f.origin, '--verify');
+    assert.equal(verified.status, 0, `baseline.mjs --verify: ${verified.stdout}${verified.stderr}`);
+    assert.equal((await read(f, baselinePager)).agents[0]?.agent.lastActivityAt, baselineLast, 'the baseline\'s last activity as it was');
+    await settle(movedOn);
+    await f.stop();
+
+    // Below: each agent's time off is 0, so each pager on keeps its next forget date, 30 days after its agent's last
+    // activity; a pager off has no clock set at all.
+    const offOf = (p: { pagerId: string }) => rows(pagerFile(p), 'SELECT agent_id, last_activity_at, off_ms FROM agents_v4 ORDER BY rowid');
+    for (const p of [baselinePager, movedOn, movedOff, unmoved, cut]) for (const a of offOf(p)) assert.equal(a.off_ms, 0, `${String(a.agent_id).slice(0, 6)}…: no time off`);
+    const alarm = (p: { pagerId: string }) => alarmOf(persist, 'Pager', pagerFile(p))?.scheduled_time;
+    const ns = (at: string, extra = 0) => BigInt(Date.parse(at) + 30 * DAY + extra) * 1_000_000n;
+    assert.equal(alarm(baselinePager), ns(baselineLast), 'the baseline\'s agent still due 30 days after its last activity');
+    assert.equal(alarm(movedOn), ns(last.get(kept.agent.agentId) ?? ''), 'the agent idle 29 days due in a day');
+    for (const p of [movedOff, unmoved]) assert.equal(alarm(p), undefined, 'a pager off sets no clock');
+
+    // On again: the agent whose 30 days of the pager on ran out before it turned off is forgotten now; the other's
+    // clock resumes with the 19 days it had left.
+    await f.start();
+    const turned = new Map<string, { on: number; onDone: number }>();
+    for (const p of [movedOff, unmoved]) { const on = Date.now(); await f.settings(p.pagerId, p.phone, { on: true }); turned.set(p.pagerId, { on, onDone: Date.now() }); }
+    assert.deepEqual(await listed(movedOff), as(pausedMoved), 'moved: the agent with no time left forgotten once on');
+    assert.deepEqual(await listed(unmoved), as(pausedUnmoved), 'not moved: the same');
+    for (const p of [movedOff, unmoved]) await settle(p);
+    await f.stop();
+    for (const [p, a] of [[movedOff, pausedMoved], [unmoved, pausedUnmoved]] as const) {
+      const t = turned.get(p.pagerId), [row] = offOf(p);
+      assert.ok(t && row);
+      assert.deepEqual([row.agent_id, row.last_activity_at], [a.agent.agentId, last.get(a.agent.agentId)], 'last activity as it was');
+      const off = Number(row.off_ms);
+      assert.ok(off >= t.on - offSince && off <= t.onDone - offSince, `${a.agent.project}: the 20 days its pager was off`);
+      assert.equal(alarm(p), ns(String(row.last_activity_at), off), 'due 30 days of its pager on after its last activity');
+      assert.ok(Date.parse(String(row.last_activity_at)) + 30 * DAY + off - Date.now() > 18 * DAY, 'about 19 days from now');
+    }
   } finally { await f.stop(); }
 });

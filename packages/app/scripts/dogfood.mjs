@@ -1,5 +1,6 @@
-// Dogfood server: production clocks (auto-off after 24h/7d/30d, agents forgotten after 30 idle days), listening on every
-// interface so a phone on the same Wi-Fi can reach it, with data kept across restarts in ~/.agentpager-dogfood.
+// Dogfood server: production clocks (auto-off after 24h/7d/30d, agents forgotten after 30 idle days of their pager
+// on), listening on every interface so a phone on the same Wi-Fi can reach it, with data kept across restarts in
+// ~/.agentpager-dogfood.
 import { spawn, execFileSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';

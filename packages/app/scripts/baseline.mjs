@@ -46,9 +46,10 @@ import { RELEASE_TAG, stageOf } from './stages.ts';
 //   Format 1 is the same, from before the encryption switch (M5), when the service stored decisions readable: the m4
 //   baseline. Nothing reads one any more: M5's upgrade check, its release's exception, ended with M5. --verify reads
 //   format 2.
-// The service forgets an agent idle for 30 days (blueprint/areas/1-pagers.md), and with it these decisions: a check
-// must run within 30 days of recordedAt. --verify is no activity, so it doesn't extend that, and it checks that nothing
-// since the record has been: the agent was last active before recordedAt.
+// The service forgets an agent idle for 30 days while its pager is on (I17.6, blueprint/areas/1-pagers.md), and with
+// it these decisions. The baseline's pager stays on, so a check must run within 30 days of recordedAt. --verify is no
+// activity, so it doesn't extend that, and it checks that nothing since the record has been: the agent was last active
+// before recordedAt.
 const argv = process.argv, flag = name => { const at = argv.indexOf(name); return at === -1 ? undefined : argv[at + 1]; };
 const verifying = argv.includes('--verify'), local = flag('--stage') === 'local';
 const app = fileURLToPath(new URL('..', import.meta.url)), cli = path.join(app, '../cli');

@@ -1,15 +1,15 @@
 # Handoff to the next root session (8 Nov 2026, M6 TIDY released)
 
-Read `AGENTS.md`, then `blueprint/README.md`. This file covers only what those two files don't. Claims are marked [V] verified or [A] assumed; each [V] was checked on 8 Nov 2026, when this was brought up to date, by the root at the release or by the pull request that brought it up to date (#PRNUM).
+Read `AGENTS.md`, then `blueprint/README.md`. This file covers only what those two files don't. Claims are marked [V] verified or [A] assumed; each [V] was checked on 8 Nov 2026, when this was brought up to date, by the root at the release or by the pull request that brought it up to date (#79).
 
 ## Where things stand
 
 - **The root** is session 9c483b84, a Claude Code session on pro [V]. On 6 Nov it was in Herdr pane w1:pK and paged Sam as agentpager agent ap-9tbn; on 7 Nov it connected again to Sam's real pager on prod with the `m5` binary (`blueprint/milestones/M5-encrypt.md` › Log), so its agent's id may have changed since [A]. The previous root, session 86f845ec, stepped back on 6 Nov and no longer merges, deploys or touches the repo.
-- **8 Nov: M6 TIDY is released, and CLIENTS is next.** No walk on dev, as Sam chose (question 6): Sam dogfoods M6 on prod, and fixes follow as `m6.<k>`. The tag `m6` is annotated (tag object 7e2211a), pushed, on c9cc3c3, #78's merge. M6's pull requests merged in this order: #68, #69, #70, #71, #72, #74, #75, #73, #76, #77 and #78; #PRNUM records the release (`blueprint/milestones/M6-tidy.md` › Log). The root's plan is `.agents/plans/2026-11-07-m6-tidy.md`. [V]
+- **8 Nov: M6 TIDY is released, and CLIENTS is next.** No walk on dev, as Sam chose (question 6): Sam dogfoods M6 on prod, and fixes follow as `m6.<k>`. The tag `m6` is annotated (tag object 7e2211a), pushed, on c9cc3c3, #78's merge. M6's pull requests merged in this order: #68, #69, #70, #71, #72, #74, #75, #73, #76, #77 and #78; #79 records the release (`blueprint/milestones/M6-tidy.md` › Log). The root's plan is `.agents/plans/2026-11-07-m6-tidy.md`. [V]
 - **M5 ENCRYPT is shipped:** released on 7 Nov without its walk, at Sam's word (`blueprint/milestones/M5-encrypt.md`). **M4 HOUSE is shipped** too (`blueprint/milestones/M4-house.md`); its ledger is kept at tag `m4-house-ledger`. [V]
-- **dev** (https://dev.agentpager.me) runs c9cc3c3, by its `X-AgentPager-Build` header, where `pnpm smoke:dev` passed 10 of 10, its upgrade check reading the `m5` baseline. Once #PRNUM merges, the upgrade check reads the `m6` baseline instead, and the root runs `pnpm smoke:dev` again. [V]
+- **dev** (https://dev.agentpager.me) runs c9cc3c3, by its `X-AgentPager-Build` header, where `pnpm smoke:dev` passed 10 of 10, its upgrade check reading the `m5` baseline. Once #79 merges, the upgrade check reads the `m6` baseline instead, and the root runs `pnpm smoke:dev` again. [V]
 - **prod** (agentpager.me) runs the `m6` release, c9cc3c3, by its header. `pnpm deploy:prod` ran from the clean worktree `m6-release` at the tag, and `pnpm smoke:prod` passed 9 of 9, 0 failed. Sam's real pager has moved into its own store: after the deploy, the `m5` command (464d559), as the root's agent there, read its status, the pager on with 0 open, and the `m6` binary then read the same. [V]
-- **Binaries:** the ones on air, mini and pro are c9cc3c3, built at `m6`, each copied and then moved over the old one. [V by `agentpager version` on each at the release; on pro again by #PRNUM]
+- **Binaries:** the ones on air, mini and pro are c9cc3c3, built at `m6`, each copied and then moved over the old one. [V by `agentpager version` on each at the release; on pro again by #79]
 - **Phones:**
   - Sam's iPhone Air: the app built at `m6` is ready but not installed, since the phone was unreachable at the release. It is a Debug build for any iOS device, with agentpager.me as its default server and the alert extension, bundle `me.agentpager.app.dev`, as M5's, in this root's temp folder: `/private/tmp/claude-501/-Users-smcllns-Projects-agentpager/9c483b84-af30-4404-8405-a682adc7cdf1/scratchpad/m6/iphone-m6-build/Build/Products/Debug-iphoneos/AgentPager.app`. [V] Until it is installed, the phone has the `m5` app, last installed there at M5's release, which works with M6 (question 4). [A]
   - HomePhoneLite, the dev phone, was disconnected when `pnpm phone:dev` ran at c473367, so it still has an older app from `main` [V]; which one isn't recorded here [A].
@@ -25,8 +25,8 @@ Read `AGENTS.md`, then `blueprint/README.md`. This file covers only what those t
 
 - All three are on pro in `~/.agentpager-baselines/dev/`, outside every worktree. They hold keys and pager numbers, so nothing prints them. [V]
 - `m4`: format 1, from before the encryption switch. Nothing reads it: M5's switch deleted its agent, and its pager stays. [V, #58 and #63]
-- `m5`: recorded at M5's release by the `m5` binary. It proved M6's move on dev: after each merge from #72 on, `pnpm smoke:dev` read it back unchanged from the moved store. Once #PRNUM merges, nothing reads it. Its agent is forgotten if idle after 8 Dec 2026. [V]
-- `m6`: recorded on 8 Nov by the `m6` binary (c9cc3c3). `--verify` passed at the release and again from #PRNUM's worktree: the pager on, with the key its number names; one open decision; one acknowledged decision with its answer; both attachments; and the `m6` copy's status for its agent. `pnpm smoke:dev` reads it from #PRNUM on, only reading. [V]
+- `m5`: recorded at M5's release by the `m5` binary. It proved M6's move on dev: after each merge from #72 on, `pnpm smoke:dev` read it back unchanged from the moved store. Once #79 merges, nothing reads it. Its agent is forgotten if idle after 8 Dec 2026. [V]
+- `m6`: recorded on 8 Nov by the `m6` binary (c9cc3c3). `--verify` passed at the release and again from #79's worktree: the pager on, with the key its number names; one open decision; one acknowledged decision with its answer; both attachments; and the `m6` copy's status for its agent. `pnpm smoke:dev` reads it from #79 on, only reading. [V]
 - **The deadline:** the `m6` baseline's agent is forgotten if idle after 2026-12-08T08:33Z [V]. So the next milestone's upgrade check, `pnpm smoke:dev` with its code on dev, must run before 8 Dec 2026. After that the agent is gone, and the check fails until it moves to a newer baseline (`packages/app/README.md` › Upgrade baseline).
 
 ## Things you inherit
@@ -63,7 +63,7 @@ Nothing is trashed until Sam approves the exact command. Everything below awaits
   - `m5-root-phone`, detached at 7a7a16d, the root's phone build [A]: done.
   - M6's merged pull requests, with their local branches: `m6-plan` (#68), `m6-upgrade` (#69), `m6-answers` (#70), `m6-history-lock` (#71), `m6-store` (#72), `m6-closed` (#73), `m6-deploy-check` (#74), `m6-wake` (#75), `m6-clock` (#76), `m6-finish` (#77) and `m6-wrapup` (#78). Their branches are still on GitHub too.
   - `m6-release`, detached at c9cc3c3, from which the root deployed prod at `m6`: done.
-  - `m6-released` (#PRNUM, which brought this file up to date): once it merges.
+  - `m6-released` (#79, which brought this file up to date): once it merges.
 - **Temp folders:**
   - `/private/tmp/claude-501/-Users-smcllns-Projects-agentpager/9c483b84-af30-4404-8405-a682adc7cdf1/`, this root's, 8.7 GB: logs, review briefs, build output, and test baselines whose keys are for local servers only. It holds the `m6` app for the iPhone Air (Where things stand), so not before that is installed, or built again from the tag.
   - `/private/tmp/claude-501/-Users-smcllns-Projects-agentpager/86f845ec-30ed-4f3f-8a1b-48f4067f3344/`, the previous root's, 5.2 GB.

@@ -14,7 +14,7 @@ CLIENTS decides which agent apps AgentPager supports, judged on one test: can an
 
 The root put three questions, D1 to D3, to Sam on 8 Nov 2026, on its [canvas](https://claude.ai/artifact/WZQnoig563EEVKZSCXigaj) and in its Claude Code session, where Sam answered two of them. D3, the licence, stays open until OPEN ([OPEN](next/OPEN.md), question 1).
 
-**D1, which agent apps, and how each is woken.** Sam typed: "D1 yes", taking the recommendation. It answers the queued doc's first three questions (the list, what an app off it meets, and which wakes to build), except cloud sessions, which wait for the lab (Still open). The pick: each agent is woken the way its app allows, as Plannotator v0.28.53, a tool that sends an owner's feedback to their agents, already does.
+**D1, which agent apps, and how each is woken.** Sam typed: "D1 yes", taking the recommendation. It answers the queued doc's first three questions (the list, what an app off it meets, and which wakes to build), except cloud sessions, which waited for the lab; it didn't run one, so L13 stays (Approved lines). The pick: each agent is woken the way its app allows, as Plannotator v0.28.53, a tool that sends an owner's feedback to their agents, already does.
 - **Claude Code:** a plugin whose mod hands the answer to the agent as a new turn. Today's background wait (B33.2) stays as the fallback where mods don't run: `claude -p`, SDK runs such as the Claude desktop app's Code tab, and Windows.
 - **Codex, in the terminal and in the ChatGPT app:** the agentpager command itself runs `codex queue`, with no Codex plugin. What it queues says only that an answer is waiting, never the answer, since its text shows in the process list (`ps`).
 - **pi:** an extension that only wakes the agent. The agent uses the agentpager command line, not MCP tools, since pi sends every tool's definition with every request.
@@ -33,19 +33,11 @@ The root put three questions, D1 to D3, to Sam on 8 Nov 2026, on its [canvas](ht
 - CLIENTS fixes the not-picked-up warning that never fires when a wait whose client has gone collects the answer (What's known).
 - CLIENTS reaches dev, with its upgrade check against the `m6` baseline, before 8 Dec 2026: that baseline's agent is forgotten after 2026-12-08T08:33Z.
 
-### Still open, after the wake lab
-
-Once the lab reports, the root puts these to Sam together. No line is written yet; each names the ids it will touch.
-1. B33's clauses for each supported app: B33 changes.
-2. B29's setup for the supported apps, with the reminder line at session start: B29 changes.
-3. A line for the not-picked-up fix: the clauses that promise the warning are B5.13 and B17.8, with TERMS › Not picked up.
-4. Which limits retire: L11, only Claude agents wake by themselves, once the three wakes ship (Claude Code's mod, Codex's queue and pi's extension); L13, cloud sessions are untested, only if the lab runs a cloud session. L12, a Desktop chat stops waiting after two hours, stays: Claude Desktop chats still wait in their turn.
-
 ## Slice
 
 | Layer | What M7 delivers there |
 | --- | --- |
-| Blueprint | this doc; Sam's answers; DEC-2026-11-08-clients and DEC-2026-11-08-friends-after-cleanup; after the lab, the approved lines in 2 Agents and 7 Getting started with the code that makes them true, and the limits that retire |
+| Blueprint | this doc; Sam's answers; DEC-2026-11-08-clients and DEC-2026-11-08-friends-after-cleanup; the approved lines in 2 Agents, 7 Getting started and TERMS, each with the code that makes it true, L11 narrowed among them |
 | Command | Codex's wake: the command runs `codex queue` into the agent's thread, with a note that an answer is waiting and never the answer; the waiting words for each supported app; the one-line warning for an app off the list; still the only place that holds keys and decrypts |
 | Service | the not-picked-up fix: an answer that a wait whose client has gone collects still brings the owner's warning |
 | Adapters | the Claude Code plugin with its mod, which hands the answer over as a new turn, through a plugin marketplace, with the background wait kept where mods don't run; the pi extension, which only wakes, as a pi package |
@@ -87,12 +79,47 @@ Verified on 8 Nov 2026 against `main` at 49d36bd, which dev runs; prod runs `m6.
 - **The not-picked-up gap,** found in M6 ([M6-tidy.md](M6-tidy.md) › Not solved, carried forward; #75): a wait whose client has gone away still runs to its time. If the answer comes meanwhile, the wait collects it, so the owner's warning that no agent picked it up (B5.13, B17.8) never comes. The next wait still gets the answer. It was so before M6.
 - **The old per-agent stores** stay on dev and prod, unused, until Sam's dogfooding of M6 on prod clears them; what a pager's store deletes or forgets, it erases from them too ([M6-tidy.md](M6-tidy.md) › Out of scope). M7 leaves them as they are.
 
+## Approved lines
+
+Sam approved these by typing "Lines yes" in the root's Claude Code session on 8 Nov 2026, after the root put them to Sam there once the [wake lab](../../docs/research/2026-11-08-clients-wake-lab.md) had reported. Each waits here until the pull request named for it brings it to its area file, or to TERMS, with the code that makes it true, and its tests name its id. The pull requests are the plan's rows ([.agents/plans/2026-11-08-m7-clients.md](../../.agents/plans/2026-11-08-m7-clients.md)):
+- **The not-picked-up fix:** B32.12 and TERMS › Not picked up.
+- **The command's Codex wake:** B33.1 and B33.4.
+- **The Claude Code plugin:** B33.2.
+- **The pi extension:** B33.5.
+- **Setup:** B29.1.
+- **Whichever of the three wakes ships last** (the command's Codex wake, the Claude Code plugin or the pi extension): B33's new title, and L11.
+- B33's notes change with each wake, for its app.
+
+**B33, retitled `Each supported agent app wakes its agent`** (2 Agents), with its id and `@M3` kept. B33.1 and B33.2 change, B33.3 stays as it is, and B33.4 and B33.5 are added.
+1. The command words its waiting for an agent's app only when it identifies the app for certain. An agent in an app not named below is told, when it connects, that its owner may have to nudge it to read an answer.
+2. Claude Code in a terminal, with AgentPager's plugin, gets the answer as a new turn: within a second once it is idle, or as its next turn when busy. It isn't told to wait. Without the plugin, and where the plugin can't start a turn (`claude -p`, the desktop app's Code tab), it is told to run the wait with no end as a background command, as before.
+3. Unchanged.
+4. @M7: Codex, in a terminal or the ChatGPT app, gets a note that its answer is in, in the thread that asked: within a second when the thread is idle, as its next turn when busy, and when it is resumed if Codex was closed. The note never holds the answer. A `codex exec` run isn't woken.
+5. @M7: pi, with AgentPager's extension, gets the answer as a follow-up turn once it settles. A run in print or JSON mode isn't woken.
+- B33's notes: verified in the 8 Nov wake lab, with the app versions it names, and re-tested at every release.
+
+**B29.1, widened** (7 Getting started)
+1. `agentpager setup` adds the command to each agent app it finds on the machine: Claude Code and pi with AgentPager's plugin and extension, Codex, Claude Desktop and Cursor.
+
+**B32, a clause added** (2 Agents). B5.13 and B17.8, which promise the owner's warning, hold unchanged.
+12. @M7: An answer counts as picked up only once the agent's command has received it. A wait whose agent went away before then doesn't count, so the owner is still told it wasn't picked up (B5.13).
+
+**TERMS › Not picked up, changed:** An answer no agent has received 3 minutes after Send. The owner is told once.
+
+**L11, narrowed and retitled `Apps other than Claude, Codex and pi don't wake by themselves`** (2 Agents), with its id kept
+- What people meet: agents in Cursor, Gemini CLI, OpenCode and every other app are told when they connect that they may need a nudge. One that ends its turn gets the answer only when something starts its next turn, so the owner has to nudge it. The owner is told when no agent has picked up an answer after 3 minutes (B17).
+- Why it waits: on 8 Nov Sam chose to wake Claude Code, Codex and pi first (DEC-2026-11-08-clients).
+- What would fix it: a tested wake for each app, worded for that app as B33 does for Claude Code, Codex and pi.
+- When to revisit: when an owner uses one.
+
+**Staying unchanged:** L12, a Desktop chat stops waiting after two hours, since Claude Desktop chats still wait in their turn; L13, cloud sessions are untested, since the lab didn't run a cloud session.
+
 ## Adds · Changes · Retires
 
-The lines are put to Sam after the lab (Still open); the ids they will touch are named here.
-- **Adds:** the Claude Code plugin with its mod; the pi extension; Codex's wake in the command; the not-picked-up fix; a recorded wake test for each supported app. DEC-2026-11-08-clients, and DEC-2026-11-08-friends-after-cleanup for D2.
-- **Changes:** B33, for each supported app; B29, so setup covers them, with the reminder line at session start; B5.13 and B17.8, if the not-picked-up fix needs a line.
-- **Retires,** if Sam agrees after the lab: L11, only Claude agents wake by themselves (2 Agents), once the three wakes ship; L13, cloud sessions are untested (2 Agents), only if the lab runs a cloud session. L12, a Desktop chat stops waiting after two hours, stays.
+The lines are in Approved lines, each with the pull request that brings it to its area.
+- **Adds:** B32.12, B33.4 and B33.5; the Claude Code plugin with its mod; the pi extension; Codex's wake in the command; the not-picked-up fix; a recorded wake test for each supported app. DEC-2026-11-08-clients, and DEC-2026-11-08-friends-after-cleanup for D2.
+- **Changes:** B33, retitled, with B33.1, B33.2 and its notes; B29.1, widened to the supported apps; TERMS › Not picked up; L11, narrowed to the apps off the list and retitled (2 Agents). B5.13 and B17.8 hold unchanged.
+- **Retires:** nothing. L11 narrows instead of retiring. L12, a Desktop chat stops waiting after two hours, and L13, cloud sessions are untested, stay.
 
 ## Log
 

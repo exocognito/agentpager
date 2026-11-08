@@ -63,7 +63,7 @@ Why: [Only agents I give a number reach my phone](../PRODUCT.md#only-agents-i-gi
 3. Nothing is queued: nothing refused while a pager is off arrives once it is turned on again.
 4. While a pager is off, an agent can still ask whether its pager is on, and the phone still reads the pager and every decision with its attachments.
 5. When a pager is deleted, the service deletes the pager, its agents, and their decisions, attachments, answers, acknowledgements and key digests. Its number connects nothing, and its agents' keys are refused as unknown.
-6. An agent with no activity for 30 days is forgotten the same way, and its pager stops listing it. Activity is asking, the owner's answer, acknowledging and finishing; waiting for an answer is not.
+6. An agent is forgotten the same way, and its pager stops listing it, after 30 days with no activity while its pager is on; time its pager spends off doesn't count. Activity is asking, the owner's answer, acknowledging and finishing; waiting for an answer is not.
 
 - Nothing is claimed about copies in the platform's own backups, such as Cloudflare's point-in-time recovery.
 - The agentpager command's files on an agent's machine, its history among them (B31), stay after a pager is deleted (L15, in 2 Agents).

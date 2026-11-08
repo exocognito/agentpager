@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { mock, test } from 'node:test';
 import { assert, pause } from './support.ts';
 import { read } from '../src/shared.ts';
 
@@ -30,9 +30,20 @@ test('a 500 is read again; a refusal is not', async () => {
 });
 
 test('an answer wait read again still answers within its wait', async () => {
-  const left = object([reset, pending]);
-  await read('/read/d1?wait=5', left.call);
-  assert.deepEqual(left.asked, ['/read/d1?wait=5', '/read/d1?wait=3'], 'it pauses 1 s, then holds the whole seconds left');
+  // On a clock the test moves, since the whole seconds left turn on one millisecond: a 5 s wait that fails at once
+  // pauses 1 s and holds the 4 s left, and one that fails 1 ms in pauses 1 s and holds 3, never past the 5 s.
+  mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 0 });
+  try {
+    for (const [failsAt, holds] of [[0, 4], [1, 3]]) {
+      const left = object([() => { mock.timers.tick(failsAt); return reset(); }, pending]), start = Date.now();
+      const reading = read('/read/d1?wait=5', left.call);
+      await new Promise(r => setImmediate(r));
+      mock.timers.tick(1000);
+      await reading;
+      assert.deepEqual(left.asked, ['/read/d1?wait=5', `/read/d1?wait=${holds}`], `failing ${failsAt} ms in, it pauses 1 s, then holds the whole seconds left`);
+      assert.ok(Date.now() - start + holds * 1000 <= 5000, `it holds until ${Date.now() - start + holds * 1000} ms`);
+    }
+  } finally { mock.timers.reset(); }
   // It fails 500 ms into a 1 s wait: it pauses only for the 500 ms left, then reads at once.
   const late = object([async () => { await pause(500); return reset(); }, pending]);
   const a = await timed(() => read('/read/d1?wait=1', late.call));

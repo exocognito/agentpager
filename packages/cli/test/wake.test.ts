@@ -295,6 +295,17 @@ test('B33.4 A thread is rung once, recorded before codex queue runs: never again
   assert.equal((await heldWatch).text, `Rang thread ${held.thread}: queued.`, 'held past one try\'s 5 s, then broken as stale at 10 s');
   assert.equal(ringsFor(held.thread).length, 1);
 
+  // A claim that can't be written (here the record's folder is read-only) isn't one: nothing is rung.
+  const unsaved = await asked('Claim not saved?', v7());
+  const unsavedWatch = op.watch(id, unsaved.d);
+  await until(async () => watcherOf(id, unsaved.d), pid => pid === process.pid);
+  chmodSync(path.join(home, 'waiting'), 0o500);
+  try {
+    await answer(unsaved);
+    assert.equal((await unsavedWatch).text, 'Not rung: this machine has the answer, or it rang already.');
+  } finally { chmodSync(path.join(home, 'waiting'), 0o700); }
+  assert.equal(ringsFor(unsaved.thread).length, 0);
+
   // A watcher that can't start in time (here the agent's file is held busy) is stopped: the agent is told to wait itself,
   // and nothing is left to ring it as well.
   const late = await asked('Started late?', v7());
@@ -405,6 +416,14 @@ test('B33.1 B25.6 An agent whose AgentPager adapter wakes it is told not to wait
   // Another session, or Claude Code without the plugin, waits in the background as before.
   process.env.AGENTPAGER_WAKE = 'claude-code:sess-2';
   assert.match((await op.wait(id, d1, { seconds: 1 })).text, /\nKeep waiting in the background: run `.+ wait --agent ap-[a-z0-9]{4} d_[a-z0-9]{4} --forever` as a background command/);
+  process.env.AGENTPAGER_WAKE = 'claude-code:sess-1';
+  // A decision the record can't hold (here its folder is read-only) is never sent, so nothing can be left for the plugin
+  // to miss: the agent's file and the record are written together or not at all.
+  chmodSync(path.join(home, 'waiting'), 0o500);
+  let unsaved: Awaited<ReturnType<typeof op.ask>>;
+  try { unsaved = await op.ask(id, card('Not saved?')); } finally { chmodSync(path.join(home, 'waiting'), 0o700); }
+  assert.deepEqual([unsaved.code, unsaved.text], [2, `Can't write ${home} (EACCES). Nothing was sent. Set AGENTPAGER_HOME to a folder this agent can write, and try again.`]);
+  assert.equal(await decisionId(p, 'Not saved?'), undefined, 'the owner never got it');
   delete process.env.AGENTPAGER_WAKE;
   const plain = await op.ask(id, card('Without the plugin?')), d2 = field(plain, 'decision');
   assert.match(plain.text, new RegExp(`\\nDecision ${d2}\\. Wait for the answer in the background: run \``));

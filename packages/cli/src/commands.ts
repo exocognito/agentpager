@@ -304,22 +304,24 @@ export async function ask(agent: string, card: Source, via?: Via, holdMs = SENDI
   // The short id is given out only once it is recorded; otherwise the reply names the server's id. A decision this
   // machine already recorded (an earlier run of the same ask got its reply first) keeps its short id and its wake, so it
   // has one watcher and is rung once, and isn't counted or added to the history again.
+  // recorded: the wake as saved here, set only once the agent's file and the record of what's waiting are written, so
+  // a reply never says something will wake the agent for a decision that isn't on the record.
   let short = id, reminder: string | null = null, recorded: DecisionWake | undefined | null = null, again = false;
   try {
-    let chosen = '';
+    let chosen = '', saving: DecisionWake | undefined;
     updateAgent(a.id, x => {
       const known = Object.keys(x.decisions).find(k => x.decisions[k].id === id);
-      if (known) { chosen = known; recorded = x.decisions[known].wake; again = true; return; }
+      if (known) { chosen = known; saving = x.decisions[known].wake; again = true; return; }
       chosen = shortId('d_', taken => taken in x.decisions);
       x.decisions[chosen] = { id, title: brief.title, options: brief.card.options.map(o => o.label), askedAt: now.toISOString(), ...(wake ? { wake } : {}) };
-      recorded = wake;
+      saving = wake;
       const cards = x.cardsSinceRules + 1, since = x.rulesShownAt ? now.getTime() - Date.parse(x.rulesShownAt) : Infinity;
       if (since > REMINDER_MS || cards >= REMINDER_CARDS) {
         reminder = since > REMINDER_MS ? `It's been ${Number.isFinite(since) ? Math.floor(since / 3_600_000) + ' hours' : 'a while'} since you last read the card contract.` : `That's ${cards} cards since you last read the card contract.`;
         x.rulesShownAt = now.toISOString(); x.cardsSinceRules = 0;
       } else x.cardsSinceRules = cards;
     });
-    if (chosen) short = chosen;
+    if (chosen) { short = chosen; recorded = saving; }
     if (!again) appendHistory(a.pager, { at: now.toISOString(), event: 'asked', agent: a.id, app: a.app, project: a.project, decision: short, title: brief.title, detail: brief.detail, options: brief.card.options.map(o => o.label), recommended: brief.card.recommended });
   } catch { /* Sent, but not recorded here: the reply gives the server's id, which wait and ack also take. */ }
   const how = await howFor(caller, a, recorded ? { short, wake: recorded } : { short });
@@ -587,14 +589,17 @@ export async function watch(agent: string, ref: string, opts: { queueTimeoutMs?:
     }
     // Answered: recorded as rung before the call, so no watcher rings it again.
     const cli = codexCli();
+    // Rung only once the claim is written: a claim that didn't land isn't one.
     let thread = '', via: 'mcp' | 'shell' = 'mcp', claimed = false;
     try {
+      let claiming = false;
       persist(a.id, x => {
         const w = theirs(x);
         if (!w || w.watcher !== process.pid) return;
         w.ring = { at: new Date().toISOString(), outcome: cli ? 'ringing' : 'no-cli' };
-        ({ thread, via } = w); claimed = cli !== null;
+        ({ thread, via } = w); claiming = cli !== null;
       });
+      claimed = claiming;
     } catch { /* not recorded, so not rung */ }
     if (!cli || !claimed) return done(cli ? 'Not rung: this machine has the answer, or it rang already.' : 'Not rung: no Codex CLI here can ring it.');
     const outcome: RingOutcome = await ring(cli, thread, note(a.id, short, via), opts.queueTimeoutMs ?? QUEUE_TIMEOUT_MS);

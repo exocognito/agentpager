@@ -76,17 +76,23 @@ export function shortId(prefix: string, taken: (id: string) => boolean): string 
 
 const agentsDir = () => path.join(home(), 'agents');
 const agentPath = (id: string) => path.join(agentsDir(), `${id}.json`);
-// Written beside its file and renamed over it, so a reader never sees part of one.
-function writePrivate(file: string, text: string) {
+// Each file is written beside itself and renamed over itself, so a reader never sees part of one. Both are written
+// before either is renamed, so a write that fails (a full disk, a folder it can't write) changes neither, and the
+// record never names a decision the agent's file doesn't, or the other way round.
+function staged(file: string, text: string) {
   mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
   const temp = `${file}.${process.pid}.tmp`;
-  writeFileSync(temp, text, { mode: 0o600 });
-  chmodSync(temp, 0o600);
-  renameSync(temp, file);
+  try { writeFileSync(temp, text, { mode: 0o600 }); chmodSync(temp, 0o600); }
+  catch (e) { rmSync(temp, { force: true }); throw e; }
+  return { temp, file };
 }
 export function saveAgent(a: AgentFile) {
-  writePrivate(agentPath(a.id), JSON.stringify(a, null, 2) + '\n');
-  writePrivate(waitingPath(a.id), JSON.stringify(waitingOf(a), null, 2) + '\n');
+  const agent = staged(agentPath(a.id), JSON.stringify(a, null, 2) + '\n');
+  let record: { temp: string; file: string };
+  try { record = staged(waitingPath(a.id), JSON.stringify(waitingOf(a), null, 2) + '\n'); }
+  catch (e) { rmSync(agent.temp, { force: true }); throw e; }
+  renameSync(agent.temp, agent.file);
+  renameSync(record.temp, record.file);
 }
 
 // The record of what's waiting, waiting/<agent id>.json: the contract with the adapters that wake an agent, the Claude

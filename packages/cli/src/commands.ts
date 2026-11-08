@@ -505,8 +505,9 @@ function watching(pid: number, id: string, short: string): boolean {
 }
 // Starts the watcher for a decision a Codex thread asked, when it hasn't rung, nothing here has the answer yet and no
 // watcher runs. True when one runs: the one already there, or the new one once it has put itself in the agent's file,
-// within STARTS_MS, or has rung already; so the agent is told a note will come only when something will ring it. Its
-// environment and working folder are this process's, without the pager's number.
+// within STARTS_MS, or has rung already; so the agent is told a note will come only when something will ring it. A new
+// one that hasn't by then is stopped, so it can't ring an agent told to wait for itself, unless it has begun to ring.
+// Its environment and working folder are this process's, without the pager's number.
 const STARTS_MS = 3_000;
 async function watcherFor(id: string, short: string): Promise<boolean> {
   const now = () => { try { return loadAgent(id)?.decisions[short] ?? null; } catch { return null; } };
@@ -528,7 +529,9 @@ async function watcherFor(id: string, short: string): Promise<boolean> {
     if (ended) return x?.app === 'codex' && x.watcher !== undefined && watching(x.watcher, id, short);
     await new Promise(res => setTimeout(res, 25));
   }
-  return false;
+  try { process.kill(child.pid, 'SIGKILL'); } catch { /* it ended */ }
+  const x = now()?.wake;
+  return x?.app === 'codex' && x.ring !== undefined;
 }
 // queueTimeoutMs, retryMs and forMs: a test shortens them.
 export async function watch(agent: string, ref: string, opts: { queueTimeoutMs?: number; retryMs?: number; forMs?: number } = {}): Promise<Result> {

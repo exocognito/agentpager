@@ -1,6 +1,6 @@
 import { after, before, test } from 'node:test';
 import { spawn } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmdirSync, statSync, writeFileSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -91,8 +91,13 @@ const states = (id: string) => {
 
 let f: Awaited<ReturnType<typeof fixture>>;
 before(async () => { f = await fixture('cli-wake'); process.env.AGENTPAGER_SERVER = f.origin; });
-// Only the watchers these tests started are stopped, by their process ids, if any is still there.
-after(async () => { for (const pid of started) if (alive(pid) && running(pid).includes(' watch --agent ')) process.kill(pid, 'SIGTERM'); await f?.stop(); });
+// Only the watchers these tests started are stopped, by their process ids, if any is still there: those the tests saw
+// start, and any other that put itself in an agent file of this test's home.
+after(async () => {
+  for (const id of store.agentIds()) for (const d of Object.values(store.loadAgent(id)?.decisions ?? {})) if (d.wake?.app === 'codex' && d.wake.watcher) started.add(d.wake.watcher);
+  for (const pid of started) if (alive(pid) && running(pid).includes(' watch --agent ')) process.kill(pid, 'SIGTERM');
+  await f?.stop();
+});
 
 // A shell with only these of the apps' variables; a Codex thread's reads the test's own CODEX_HOME.
 const inShell = (env: Record<string, string>) => {
@@ -214,7 +219,7 @@ test('B33.4 B33.1 B32.12 A Codex thread that asks over MCP is told a note will c
   } finally { if (!closed) await client.close(); }
 });
 
-test('B33.4 A thread is rung once, recorded before codex queue runs: never again after a timed-out call, a call cut off, or a second watcher', { timeout: 120_000 }, async () => {
+test('B33.4 A thread is rung once, recorded before codex queue runs: never again after a timed-out call, a call cut off, or a second watcher, and never by a watcher that started too late', { timeout: 120_000 }, async () => {
   inShell({});
   const p = await f.makePager(), id = field(await op.connect({ number: p.number, app: 'Codex', project: 'wake' }), 'agent');
   // Decisions asked from a shell no app marks, each then given a Codex thread's wake, as an ask from that thread records it.
@@ -266,6 +271,20 @@ test('B33.4 A thread is rung once, recorded before codex queue runs: never again
   const both = await Promise.all(outs);
   assert.deepEqual(both.map(o => o.trim()).sort(), [`Nothing to watch: it has rung, this machine has the answer, or another watcher runs.`, `Rang thread ${twice.thread}: queued.`].sort());
   assert.equal(ringsFor(twice.thread).length, 1, 'rung once');
+
+  // A watcher that can't start in time (here the agent's file is held busy) is stopped: the agent is told to wait itself,
+  // and nothing is left to ring it as well.
+  const late = await asked('Started late?', v7());
+  rollout(late.thread, terminal);
+  const lock = path.join(home, 'agents', `${id}.lock`);
+  mkdirSync(lock);
+  inShell({ CODEX_THREAD_ID: late.thread });
+  const lateWait = await op.wait(id, late.d, { seconds: 1 });
+  rmdirSync(lock);
+  inShell({});
+  assert.ok(lateWait.text.endsWith(`Keep waiting: agentpager wait --agent ${id} ${late.d}`), lateWait.text);
+  assert.equal(watcherOf(id, late.d), undefined, 'it never took the decision');
+  assert.equal(execFileSync('ps', ['-axo', 'command='], { encoding: 'utf8' }).split('\n').filter(l => l.endsWith(` watch --agent ${id} ${late.d}`)).length, 0, 'and it is gone');
 
   // The agent read the answer itself before the watcher saw it: nothing to ring.
   const read = await asked('Read already?', v7());

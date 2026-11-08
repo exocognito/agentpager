@@ -88,7 +88,7 @@ Why: [Unblock my agent from my phone](../PRODUCT.md#unblock-my-agent-from-my-pho
 
 - What people meet: an agent's call that the service has already checked against its pager when the owner turns the pager off still lands. The window is one check inside the service; everything sent after the switch is refused (I17.2).
 - Why it waits: accepted on 30 Oct 2026 for dogfooding, to fix later.
-- What would fix it: one writer per pager, which [TIDY](../milestones/next/TIDY.md) builds.
+- What would fix it: one writer per pager, which [M6 · TIDY](../milestones/M6-tidy.md) builds.
 - When to revisit: TIDY, right after ENCRYPT.
 
 ### L25 · @M5 · A leaked number can connect any number of agents

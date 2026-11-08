@@ -1,6 +1,6 @@
 # M5 · Decisions the service can't read
 
-> **Status:** built and on dev; the two phone changes from Sam's answers of 7 Nov are built (#67), and Sam's walk follows on the new build · **Started:** 6 Nov 2026 · **On dev:** 6 Nov 2026, at 6df2016 · **Order:** after M4; [TIDY](next/TIDY.md) follows · **Word:** ENCRYPT
+> **Status:** released, without its walk on dev, at Sam's word; Sam dogfoods it on prod at [M6 · TIDY](M6-tidy.md) · **Started:** 6 Nov 2026 · **On dev:** 6 Nov 2026, at 6df2016 · **Released:** 7 Nov 2026 · **Tag:** `m5`, on 464d559 · **Order:** after M4; [M6 · TIDY](M6-tidy.md) follows · **Word:** ENCRYPT
 
 ## Objective
 
@@ -18,7 +18,7 @@ The guarantee Sam approved in the old strategy on 30 Oct, waiting here until it 
 Sam chose the recommended option of each of five numbered questions the previous root asked in its Claude Code session on 6 Nov 2026, answering: "Agree with all your recs, though for starting M5 I would like you to give to a herdr pane with fresh Opus 5.5 xhigh thinking bypass perms, and ask them to orchestrate subagents to see it through to green on dev and I'll test there". The choices:
 
 1. **M4's files.** The commit before the removal is tagged `m4-house-ledger`, M4's ledger is deleted from the tree, and [M4-house.md](M4-house.md) stays as M4's record, like M1 to M3. Sam's line test and look rule, which lived only there, move first to [METHOD.md › Writing lines](../../METHOD.md#writing-lines), with DEC-2026-11-06-line-test. Done in this milestone's first pull request.
-2. **Scope** (also the ledger's ⚑82). ENCRYPT keeps encryption and the two small hardening items, the ask request id and the client-version header: both change the wire contract the switch changes anyway, and the header is how question 4's refusal works from now on. The other three items become their own milestone, right after ENCRYPT and before CLIENTS: [TIDY](next/TIDY.md), with DEC-2026-11-06-store-after-encrypt and, for its word, question 7.
+2. **Scope** (also the ledger's ⚑82). ENCRYPT keeps encryption and the two small hardening items, the ask request id and the client-version header: both change the wire contract the switch changes anyway, and the header is how question 4's refusal works from now on. The other three items become their own milestone, right after ENCRYPT and before CLIENTS: [TIDY](M6-tidy.md), with DEC-2026-11-06-store-after-encrypt and, for its word, question 7.
 3. **Decisions stored before the switch** are deleted at the switch. This is the release's exception to METHOD's rule that a release never loses data (below). The history on each agent's machine keeps its own copies (B31).
 4. **Clients from before the switch.** An agentpager command from before the switch is refused, and told how to update. An agent connected before the switch connects again, which gives it its key pair: agent keys are made at connect.
 5. **What finish does to open decisions:** they close and can't be answered. This goes to TIDY, with the agent's lifecycle, not to M5.
@@ -26,7 +26,7 @@ Sam chose the recommended option of each of five numbered questions the previous
 Sam answered questions 6 to 9 on Sam's pager on 6 Nov 2026, between 14:37 and 14:39, by choosing an option on each card. The choices:
 
 6. **The lines** (below, trimmed by the line test): approved as written. Each reaches its area file with the code that makes it true: B25.14 and B27.9 with the hardening pull request (#59); B30, I20, I19.6, I19.7, B17.11 and I4.9, and the changes to I4.1, I4.7, I22 and TERMS › Keys, with the encryption switch, which retires L17 and L19.
-7. **The word for the milestone after ENCRYPT:** TIDY · Tidy state, chosen over the proposed STORE: one store per pager, lighter polls and the agent's lifecycle. Its doc is [next/TIDY.md](next/TIDY.md), with DEC-2026-11-06-tidy.
+7. **The word for the milestone after ENCRYPT:** TIDY · Tidy state, chosen over the proposed STORE: one store per pager, lighter polls and the agent's lifecycle. Its doc is now [M6-tidy.md](M6-tidy.md), with DEC-2026-11-06-tidy.
 8. **The iPhone app from before the switch** can't be told plainly to update. On a refusal it shows only its general line that it can't reach the server, and keeps showing its last read; only a refusal that says the pager is gone drops a pager. Accepted for this release, as part of the release's exception (below): Sam's own phones are the only ones, and each gets the new app right after the service.
 9. **A limit on how fast a number can connect agents,** which the 29 Oct design assumed and nothing enforces today: left out of M5, and written down as L25 in [1 Pagers](../areas/1-pagers.md), to revisit at FRIENDS.
 
@@ -54,7 +54,7 @@ The pull requests, in order, are in [.agents/plans/2026-11-06-m5-encrypt.md](../
 
 ## Out of scope
 
-- One store per pager, the smaller polls and the agent's lifecycle, with what finish does to open decisions: [TIDY](next/TIDY.md).
+- One store per pager, the smaller polls and the agent's lifecycle, with what finish does to open decisions: [TIDY](M6-tidy.md).
 - Hiding which pager and which agent, when, and how big each part is.
 - Moving a pager's keys to a new phone, or recovering them (L9).
 - Protecting a phone or an agent's machine that someone else controls.
@@ -120,6 +120,8 @@ Why: [Only agents I give a number reach my phone](../PRODUCT.md#only-agents-i-gi
 
 ## Walk on dev
 
+Not walked: Sam released M5 without it on 7 Nov, and dogfoods it on prod instead (Log).
+
 On HomePhoneLite, which runs `main`'s app with dev as its server, and with the walk command on pro, `~/.agentpager-dev/agentpager`: the command built from `main`, with its own `AGENTPAGER_HOME`. It always talks to dev and never touches `~/.agentpager`, which Sam's real agents use on prod.
 
 1. Open AgentPager on the dev phone. The dev pagers are there with their names and numbers, and their decisions from before the switch are gone (the release's exception, above).
@@ -169,3 +171,4 @@ Questions 1 and 2 add these lines, worded by the root from the options Sam chose
 - 6 Nov · ready for Sam's walk: HomePhoneLite runs `main`'s app at 6e9717a, with dev as its server and the alert extension; dev runs 6e9717a, and `pnpm smoke:dev` passed 14 of 14 there. This pull request adds Walk on dev, above.
 - 7 Nov · Sam answered the walk's five questions in the root's Claude Code session, choosing (b) on 1 and 2 and the recommended (a) on 3 to 5. PR #66 records them: the phone pins each agent's first-seen key (B30.3) and keeps each answer's record in the Keychain with its pager (B7.4), both waiting here for the phone pull request that makes them true; I4.6 narrowed, so a client too old for the service is told to update before its key is checked; TERMS adds Encrypted part; I5's note on decisions stored before 31 Oct 2026 deleted. `pnpm check` green, `pnpm test:all` 629 passed (556, 3, 8, Swift 17, 32 and 13).
 - 7 Nov · building: PR #67, the two phone changes from Sam's answers of 7 Nov. The phone keeps the key each agent first names, by pager and agent, from the first of its who-asked parts that opens, and shows an agent whose who-asked later names another key as one it can't read, with nothing to answer (B30.3). Its record of each answer it sent is in the Keychain with its pager, so it outlives the app being deleted and installed again and goes with the pager; what `answers.json` held moves in at the first launch (B7.4). In the Simulator, an answer given in `main`'s app showed after this build was installed over it, and again after `xcrun simctl uninstall` and a fresh install, with the pager and its pin. `pnpm check` green (154 clauses, 25 tested), `pnpm test:all` 629 passed (556, 3, 8, Swift 17, 32 and 13), AgentPagerTests 23 of 23 and FlowTests 9 of 9 in the Simulator.
+- 7 Nov · released: Sam typed in the root's Claude Code session on 7 Nov: "Deploy to prod and continue forward to complete tidy and I'll dogfood production when I'm ready. We still have no users so it's ok if we discover things I disagree with in prod and fix then. I'll dogfood at Tidy." So the walk on dev was skipped, at Sam's word. The root tagged `m5` on 464d559 and ran `pnpm deploy:prod` from a clean worktree at the tag, which verified 464d559 at agentpager.me; `pnpm smoke:prod` passed 9 of 9, 0 failed. With it, the release's exception (above) reached prod. The binary built at the tag (`agentpager 464d559`) is on pro, mini and air. Sam's iPhone Air has the app built from the tag, with agentpager.me as its server and the alert extension, installed over the old app. The root's agent connected again to Sam's real pager on prod with the new binary, which fetched the pager's key and found it matched the number. The `m5` upgrade baseline is recorded on dev and read back; its agent is forgotten if idle after 8 Dec 2026, so M6's upgrade check runs before then.

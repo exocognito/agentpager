@@ -5,7 +5,8 @@ Read `AGENTS.md`, then `blueprint/README.md`. This file covers only what those t
 ## Where things stand
 
 - **The root** is session 9c483b84, a Claude Code session in Herdr pane w1:pK on pro, which pages Sam as agentpager agent ap-9tbn. The previous root, session 86f845ec, stepped back on 6 Nov and no longer merges, deploys or touches the repo. [V]
-- **M5 ENCRYPT is built and on dev, awaiting Sam's walk** (`blueprint/milestones/M5-encrypt.md`). Its pull requests merged on 6 Nov in this order: #57, #58, #60, #59, #61, #62 and #63; #64 records the milestone as built. The root's plan, with each pull request's merge, is `.agents/plans/2026-11-06-m5-encrypt.md`. [V]
+- **7 Nov: M5 is released, and M6 TIDY is planning.** Sam skipped the walk on dev and will dogfood on prod at TIDY; the root tagged `m5` on 464d559, deployed prod, put the `m5` binary on air, mini and pro and the `m5` app on Sam's iPhone Air, and recorded the `m5` baseline on dev (`blueprint/milestones/M5-encrypt.md` › Log). M6's plan is `.agents/plans/2026-11-07-m6-tidy.md`. The rest of this file is as of 6 Nov.
+- **M5 ENCRYPT was built and on dev, awaiting Sam's walk** (`blueprint/milestones/M5-encrypt.md`). Its pull requests merged on 6 Nov in this order: #57, #58, #60, #59, #61, #62 and #63; #64 records the milestone as built. The root's plan, with each pull request's merge, is `.agents/plans/2026-11-06-m5-encrypt.md`. [V]
 - **M4 HOUSE is shipped:** released and reviewed on 6 Nov (`blueprint/milestones/M4-house.md`). Its ledger left the tree in M5's Plan, kept at tag `m4-house-ledger`. [V]
 - **dev** (https://dev.agentpager.me) runs 6e9717a, #64's merge, by its `X-AgentPager-Build` header. `pnpm smoke:dev` passed 14 of 14 there, the upgrade check against the `m4` baseline included. [V]
 - **prod** (agentpager.me) runs the `m4` release: the tag `m4`, on 9849671, by its header. [V]
@@ -15,6 +16,8 @@ Read `AGENTS.md`, then `blueprint/README.md`. This file covers only what those t
   - Sam's iPhone Air has the `m4` build, which works with prod until the release. [V]
 
 ## What Sam does next
+
+As of 6 Nov. On 7 Nov Sam skipped step 1 and gave the go for step 3, which the root has done.
 
 1. **Walk M5 on dev,** on HomePhoneLite with `main`'s app, and with a binary built from `main` under its own `AGENTPAGER_HOME`, with `--server https://dev.agentpager.me` (AGENTS.md › Stages): `M5-encrypt.md` › Walk on dev. The walk command on pro is `~/.agentpager-dev/agentpager`, a wrapper around the binary built at 6e9717a that keeps its own `AGENTPAGER_HOME` (`~/.agentpager-dev/home`) and always talks to dev, so it never touches `~/.agentpager`. [V]
 2. **The five questions are answered:** Sam answered them on 7 Nov, recorded in `M5-encrypt.md` › Answered on 7 Nov, before the walk. The three that change only words (I4.6, TERMS › Encrypted part, I5's note) are in docs pull request #66; questions 1 and 2 add B30.3 and B7.4, which a phone pull request builds, and the walk follows on that build.

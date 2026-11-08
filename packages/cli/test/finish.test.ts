@@ -5,7 +5,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { fixture, assert, pause, release } from '../../app/test/support.ts';
-import { DECISION_CLOSED_MESSAGE } from '../../contract/exchange.ts';
+import { Schema as Now } from 'effect';
+import { AgentStatus, DECISION_CLOSED_MESSAGE, Finished, PagerInbox } from '../../contract/exchange.ts';
 
 // Finishing closes an agent's open decisions (B25.13 and B32.11, blueprint/areas/2-agents.md), end to end: the real
 // local service, and both this command and the m5 release's, whose words for it closed.test.ts checks against
@@ -102,14 +103,14 @@ test('The m5 command on this service: its wait with no end stops as its agent fi
     const reader = path.join(m5.app, '..', 'contract', 'm5-reader.ts');
     writeFileSync(reader, 'export { Schema } from "effect";\nexport * from "./exchange.ts";\n');
     const old = await import(pathToFileURL(reader).href), { Schema } = old;
-    const inbox = await f.request(`/api/pagers/${p.pagerId}`, { phone: p.phone }), agentId = (inbox.value as { agents: { agent: { agentId: string } }[] }).agents[0]?.agent.agentId ?? '';
+    const inbox = await f.request(`/api/pagers/${p.pagerId}`, { phone: p.phone }), agentId = Now.decodeUnknownSync(PagerInbox)(inbox.value).agents[0]?.agent.agentId ?? '';
     const read = Schema.decodeUnknownSync(old.PagerInbox)(inbox.value);
     assert.deepEqual(read.agents[0].open.map((d: { status: string }) => d.status), ['open']);
     assert.equal('closed' in read.agents[0].open[0], false);
     assert.equal(read.agents[0].agent.openCount, 0);
     const agentFile = JSON.parse(readFileSync(path.join(home, 'agents', `${id}.json`), 'utf8'));
     const status = await f.request(`/api/agents/${agentId}`, { agent: agentFile.agentKey }), again = await f.request(`/api/agents/${agentId}/finish`, { method: 'POST', agent: agentFile.agentKey });
-    assert.ok(Array.isArray((status.value as { closed?: unknown }).closed) && Array.isArray((again.value as { closed?: unknown }).closed), 'this service lists what closed');
+    assert.deepEqual([Now.decodeUnknownSync(AgentStatus)(status.value).closed?.map(c => c.decisionId).length, Now.decodeUnknownSync(Finished)(again.value).closed?.length], [1, 1], 'this service lists what closed');
     assert.equal('closed' in Schema.decodeUnknownSync(old.AgentStatus)(status.value), false);
     assert.equal('closed' in Schema.decodeUnknownSync(old.Finished)(again.value), false);
   } finally { await f.stop(); }

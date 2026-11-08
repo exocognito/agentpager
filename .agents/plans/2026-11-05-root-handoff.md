@@ -59,7 +59,7 @@ Nothing is trashed until Sam approves the exact command. Everything below awaits
   - Builds at `m4`, done: `m5-baseline-m4` and `m5-hardening-m4`, detached at 9849671. The `m4` baseline keeps its own copy of the binary.
   - `m5-switch-before`, detached at 5f5fd4d, the `m4`-era server for the local upgrade check: done.
   - `m5-release`, detached at 464d559, from which the root deployed prod at `m5`: done.
-  - `m5-deploy`, detached at c9cc3c3, from which the root deploys dev: done once the root stops using it, since each deploy can start from a fresh one [A].
+  - `m5-deploy`, detached at `main`'s commit of the root's last dev deploy, from which the root deploys dev: done once the root stops using it, since each deploy can start from a fresh one [A].
   - `m5-root-phone`, detached at 7a7a16d, the root's phone build [A]: done.
   - M6's merged pull requests, with their local branches: `m6-plan` (#68), `m6-upgrade` (#69), `m6-answers` (#70), `m6-history-lock` (#71), `m6-store` (#72), `m6-closed` (#73), `m6-deploy-check` (#74), `m6-wake` (#75), `m6-clock` (#76), `m6-finish` (#77) and `m6-wrapup` (#78), and `m6-history-read` (#80), `m6.1`'s fix. Their branches are still on GitHub too.
   - `m6-release`, detached at c9cc3c3, from which the root deployed prod at `m6`: done.

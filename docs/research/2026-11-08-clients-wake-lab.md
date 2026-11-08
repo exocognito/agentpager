@@ -97,7 +97,8 @@ Latency runs from the answer stored on the service to the agent's turn starting.
 
 - **The process list.** Codex's doorbell is an argument of `codex queue`, readable by `ps` for the 50 to 100 ms the call takes. It holds the agent and decision ids, never the answer. The mod and the extension pass nothing through arguments; the answer lands in the app's own transcript, as anything the agent reads does.
 - **Double delivery.** The Claude Code mod with today's background-wait words woke the agent twice. A Codex agent that calls wait itself and then gets the doorbell spends a turn finding nothing new. Two processes on one session (Plannotator holds a lease for this) weren't tested.
-- **A lost wake.** `claude -p`, `pi -p` and `codex exec` all leave the answer on the service with nothing to bring it, and so does any Claude Code exit, since unloading a module kills its children (read from the mod types). On the daemon, a closed Codex thread gets it when resumed, or headless if the daemon still holds the thread. An embedded Codex took up to 8.6 s. In every case only the not-picked-up warning tells the owner, and today it is silenced whenever a wait has seen the answer.
+- **A lost wake.** `claude -p`, `pi -p` and `codex exec` all leave the answer on the service with nothing to bring it, and so does any Claude Code exit, since unloading a module kills its children (read from the mod types). In those cases only the not-picked-up warning tells the owner, and today it is silenced whenever a wait has seen the answer.
+- **A late wake.** On the daemon, a closed Codex thread gets the doorbell when it is resumed, or headless if the daemon still holds the thread. An embedded Codex took up to 8.6 s.
 - **Headless turns.** On the daemon, a queued turn for a just-closed thread runs with no window open: the agent acts on the answer while no one watches it.
 
 ## What the Blueprint lines could promise, per app

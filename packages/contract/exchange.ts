@@ -93,7 +93,7 @@ export type Pager = typeof Pager.Type;
 export const PagerKey = Schema.Struct({ pagerId: PagerId, publicKey: PublicKey });
 export type PagerKey = typeof PagerKey.Type;
 // An agent as the service holds it: who asked, its project and its computer are its identity part, sealed to the
-// pager's key at connect, which only the phone opens.
+// pager's key at connect, which only the phone opens. openCount: its decisions with no answer that haven't closed.
 export const Agent = Schema.Struct({
   agentId: Token, identity: Sealed("identity"), createdAt: Timestamp, finishedAt: Schema.NullOr(Timestamp),
   lastActivityAt: Timestamp, openCount: Count,
@@ -106,6 +106,17 @@ export type Agent = typeof Agent.Type;
 // Whether an answer is an option or a note is inside it, which the service can't read.
 export const DecisionStatus = Schema.Literal("open", "answered", "acknowledged");
 export type DecisionStatus = typeof DecisionStatus.Type;
+// A decision that closed unanswered (M6, blueprint/milestones/M6-tidy.md, Sam's answers 2 and 4): when, and why. It
+// can't be answered, waited for or acknowledged. Its agent finishing first (B25.13) is the only reason the service
+// gives for now. A client takes any reason, and one it doesn't know still closes the decision, in words that don't say
+// why: an app from before this field failed a whole read on a status it didn't know, and a reason added later needs
+// no new client.
+export const CLOSED_AGENT_FINISHED = "agentFinished";
+export const Closed = Schema.Struct({ at: Timestamp, reason: Schema.String.pipe(Schema.pattern(/^[A-Za-z][A-Za-z0-9]{0,39}$/)) });
+export type Closed = typeof Closed.Type;
+// One of an agent's decisions that closed unanswered, as the command's status and finish read it.
+export const ClosedDecision = Schema.Struct({ decisionId: Token, ...Closed.fields });
+export type ClosedDecision = typeof ClosedDecision.Type;
 // What the owner chose, inside an answer part (parts.ts).
 export const Choice = Schema.Union(
   Schema.Struct({ kind: Schema.Literal("option"), number: OptionNumber }),
@@ -179,8 +190,13 @@ export const Decision = Schema.Struct({
   collectedAt: Schema.optional(Timestamp),
   warnedAt: Schema.optional(Timestamp),
   acknowledgement: Schema.optional(Acknowledgement),
+  // Set once it closed unanswered. Its status stays open, and it stays in its agent's open list, so an app from
+  // before this field, which knows only these statuses and ignores fields it doesn't know, still reads the pager: it
+  // shows the decision as open, and its Send is refused (DecisionClosed).
+  closed: Schema.optional(Closed),
 }).pipe(
   Schema.filter((d) => (d.collectedAt === undefined && d.warnedAt === undefined) || d.answer !== undefined || "only an answer is collected or warned about"),
+  Schema.filter((d) => d.closed === undefined || d.status === "open" || "only a decision with no answer closes unanswered"),
   Schema.filter((d) => (d.status === "open") === (d.answer === undefined)),
   Schema.filter((d) => (d.status === "acknowledged") === (d.acknowledgement !== undefined)),
   Schema.filter((d) => !d.answer || d.answer.decisionId === d.decisionId),
@@ -197,15 +213,22 @@ export const ConnectInput = Schema.Struct({ number: Schema.String, identity: Sea
 
 // Responses.
 export const PagerReply = Schema.Struct({ pager: Pager });
-// The phone reads everything while its pager is off: open decisions in ask order, answered ones newest first.
+// The phone reads everything while its pager is off: open decisions in ask order, answered ones newest first. A
+// decision that closed unanswered is among the open ones, with its status open (Decision › closed).
 export const AgentInbox = Schema.Struct({ agent: Agent, open: Schema.Array(Decision), answered: Schema.Array(Decision) });
 export type AgentInbox = typeof AgentInbox.Type;
 export const PagerInbox = Schema.Struct({ pager: Pager, agents: Schema.Array(AgentInbox) });
 export type PagerInbox = typeof PagerInbox.Type;
 export const Connected = Schema.Struct({ agent: Agent, agentKey: Token, message: Schema.String });
 export type Connected = typeof Connected.Type;
-export const AgentStatus = Schema.Struct({ agent: Agent, pager: Schema.Struct({ on: Schema.Boolean }) });
-export const Finished = Schema.Struct({ finishedAt: Timestamp });
+// closed: the agent's decisions that closed unanswered, in ask order. Added with the field on Decision, so a service from
+// before it sends none, and a command from before it ignores it.
+export const AgentStatus = Schema.Struct({ agent: Agent, pager: Schema.Struct({ on: Schema.Boolean }), closed: Schema.optional(Schema.Array(ClosedDecision)) });
+export type AgentStatus = typeof AgentStatus.Type;
+// closed: the decisions finishing closed unanswered, in ask order: none if it had no open decision. Finishing again
+// changes nothing, so a later finish names the same ones.
+export const Finished = Schema.Struct({ finishedAt: Timestamp, closed: Schema.optional(Schema.Array(ClosedDecision)) });
+export type Finished = typeof Finished.Type;
 export const Asked = Schema.Struct({ decisionId: Token });
 export const AnswerStatus = Schema.Union(Schema.Struct({ status: Schema.Literal("pending") }), Schema.Struct({ status: Schema.Literal("answered"), answer: Answer }));
 
@@ -214,6 +237,12 @@ export const AnswerStatus = Schema.Union(Schema.Struct({ status: Schema.Literal(
 export const REFUSAL_STATUS = {
   InvalidInput: 400, UpdateRequired: 400, Unauthorized: 401, UnknownAgent: 404, UnknownPager: 404, UnknownDecision: 404, UnknownFile: 404, NotFound: 404,
   PagerOff: 409, PagerExists: 409, AgentFinished: 409, TooManyOpenDecisions: 409, NotAnswered: 409, AlreadyAcknowledged: 409,
-  AnswerMismatch: 409, AlreadyAnswered: 409, RequestIdTaken: 409, NumberInvalid: 410, PagerDeleted: 410,
+  AnswerMismatch: 409, AlreadyAnswered: 409, RequestIdTaken: 409, DecisionClosed: 409, NumberInvalid: 410, PagerDeleted: 410,
 } as const;
 export type RefusalTag = keyof typeof REFUSAL_STATUS;
+// DecisionClosed: an agent's wait for, read of or acknowledgement of a decision that closed unanswered, or the phone's
+// answer to one. Its fields: { closed: Closed }. Its words are the agent's: a command from before it (`m5`) prints a
+// refusal's own words, and ends a wait on one, a wait with no end too, so they say what happened and what to do. These
+// are the words for a decision its agent's finishing closed. The app never shows a refusal's words.
+export const DecisionClosedRefusal = Schema.Struct({ error: Schema.Literal("DecisionClosed"), message: Schema.String, closed: Closed });
+export const DECISION_CLOSED_MESSAGE = "This decision closed unanswered when this agent finished, so your owner can't answer it and no answer will come. To ask about new work, connect again.";

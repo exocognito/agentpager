@@ -5,9 +5,10 @@ import { VERSION } from './version.ts';
 // The HTTP API is the binary's transport (the server's /start documents it). A reply is decoded with its route's
 // schema from the wire contract (packages/contract/exchange.ts), so a page that isn't AgentPager's
 // (a proxy, a Wi-Fi sign-in page) is never taken for one: it is `NotUnderstood`. A refusal is the server's
-// {error, message, ...}. A call that never connected is `Unreachable`, and nothing was sent; one that timed out or
-// lost its connection is `NoReply`, and like `NotUnderstood` it may have reached the owner.
-export type Failure = { ok: false; status: number; error: string; message: string; reason?: string };
+// {error, message, ...}, kept whole as body for the fields some refusals carry. A call that never connected is
+// `Unreachable`, and nothing was sent; one that timed out or lost its connection is `NoReply`, and like `NotUnderstood`
+// it may have reached the owner.
+export type Failure = { ok: false; status: number; error: string; message: string; reason?: string; body?: unknown };
 export type Reply<A> = { ok: true; value: A } | Failure;
 
 // A timeout or a dropped connection can come after the request went out; anything else (no such host, refused, a bad
@@ -40,5 +41,5 @@ export async function call<A, I>(schema: Schema.Schema<A, I>, server: string, me
     return { ok: false, status: response.status, error: 'NotUnderstood', message: `HTTP ${response.status}, ${response.headers.get('content-type')?.split(';')[0] || 'no content type'}` };
   }
   const field = (k: string) => typeof value === 'object' && value !== null && k in value ? String(Reflect.get(value, k)) : undefined;
-  return { ok: false, status: response.status, error: field('error') ?? `HTTP${response.status}`, message: field('message') ?? `The server answered ${response.status}.`, reason: field('reason') };
+  return { ok: false, status: response.status, error: field('error') ?? `HTTP${response.status}`, message: field('message') ?? `The server answered ${response.status}.`, reason: field('reason'), body: value };
 }

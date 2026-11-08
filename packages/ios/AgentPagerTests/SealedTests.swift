@@ -305,4 +305,81 @@ final class SealedTests: XCTestCase {
             XCTAssertEqual(items.map(shape), [shape(pagerItem)], "\(kind)")
         }
     }
+
+    // MARK: B5.17 · a decision that closed unanswered
+
+    // A pager's read as the service sends one once finishing closes decisions (packages/contract/exchange.ts › Closed):
+    // the decision keeps its status, open, and carries when and why. This app reads it, a reason it doesn't know too;
+    // the `m5` app's shape (M5Read) reads it as one more open decision, ignoring the field; and a read from before the
+    // field reads as before.
+    func testAReadWithADecisionThatClosedUnansweredDecodesHereAndInTheM5App() throws {
+        let a = pager("A")
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = .sortedKeys
+        let at = Date(timeIntervalSince1970: 1_794_074_400)
+        for reason in [Closed.agentFinished, "agentForgotten"] {
+            var read = try read(of: a, title: "Closed?")
+            read.agents[0].open[0].closed = Closed(at: at, reason: reason)
+            let data = try encoder.encode(read)
+            XCTAssertTrue(String(decoding: data, as: UTF8.self).contains("\"closed\":{\"at\":\"2026-11-07T18:00:00Z\",\"reason\":\"\(reason)\"}"))
+            let shown = try XCTUnwrap(Sealed.inbox(try APIClient.decoder.decode(SealedPagerInbox.self, from: data), pager: a, answers: [:], pins: pins)?.agents.first?.open.first)
+            XCTAssertEqual([shown.title, shown.closed?.reason], ["Closed?", reason])
+            XCTAssertEqual(shown.closed?.at, at)
+            XCTAssertEqual(shown.status, .open)
+            XCTAssertFalse(shown.unreadable)
+            let m5 = try APIClient.decoder.decode(M5Read.self, from: data)
+            XCTAssertEqual(m5.agents.first?.open.map(\.status), [.open])
+        }
+        let before = try APIClient.decoder.decode(SealedPagerInbox.self, from: encoder.encode(try read(of: a, title: "Open?")))
+        let open = try XCTUnwrap(Sealed.inbox(before, pager: a, answers: [:], pins: pins)?.agents.first?.open.first)
+        XCTAssertEqual(open.title, "Open?")
+        XCTAssertNil(open.closed)
+    }
+
+    // The `m5` app's read of a pager, as tagged (git show m5:packages/ios/AgentPager/Model/API.swift): SealedStatus and
+    // these fields of SealedDecision, unchanged since, with no closed.
+    private struct M5Read: Decodable {
+        struct Decision: Decodable { var decisionId: String; var status: SealedStatus; var card: String; var attachments: [AttachmentSize]; var askedAt: Date; var answer: SealedAnswer?; var collectedAt: Date?; var warnedAt: Date?; var acknowledgement: SealedAcknowledgement? }
+        struct Agents: Decodable { var agent: SealedAgent; var open: [Decision]; var answered: [Decision] }
+        var pager: PagerState
+        var agents: [Agents]
+    }
+
+    // The phone's side of B5.17, in the model the screens draw from: a decision that closed unanswered is among its
+    // project's answered ones, not the open ones; neither the pager's count nor the badge counts it as waiting; its row
+    // says it closed, never that an answer is sending; and nothing sends to it, an option or a note. The decision
+    // beside it, still open, answers as before.
+    @MainActor
+    func test_B5_17_aDecisionThatClosedUnansweredIsAmongTheAnsweredOnesDoesntCountAsWaitingAndCantBeSent() throws {
+        let model = AppModel(live: false)
+        let p = pager("A", server: model.server.absoluteString)
+        model.pagers = [p]
+        let other = String(repeating: "E", count: 32), now = Date()
+        let options = [Option(number: 1, title: "One", label: "One", prioritizes: "speed"), Option(number: 2, title: "Two", label: "Two", prioritizes: "care")]
+        func decision(_ id: String, _ title: String, _ closed: Closed?) -> AgentPager.Decision {
+            var d = AgentPager.Decision(decisionId: id, status: .open, title: title, card: Card(type: "brief", options: options, recommended: 1, markdown: "## Options\n"), askedAt: now.addingTimeInterval(-600))
+            d.closed = closed
+            return d
+        }
+        let agent = AgentInfo(agentId: agentId, app: "Codex", project: "tidy", createdAt: now, finishedAt: now, lastActivityAt: now, openCount: 1)
+        model.inboxes[p.pagerId] = PagerInbox(pager: PagerState(pagerId: p.pagerId, on: true, autoOff: .never, createdAt: now), agents: [
+            AgentInbox(agent: agent, open: [decision(decisionId, "Closed?", Closed(at: now.addingTimeInterval(-60), reason: Closed.agentFinished)), decision(other, "Still open?", nil)], answered: []),
+        ])
+        let group = try XCTUnwrap(model.groups(p.pagerId).first)
+        XCTAssertEqual(group.open.map(\.decision.title), ["Still open?"])
+        XCTAssertEqual(group.answered.map(\.decision.title), ["Closed?"])
+        XCTAssertEqual(model.openCount(p.pagerId), 1)
+        XCTAssertEqual(model.rowState(group.answered[0].decision), .closed)
+        for choice in [Choice.option(1), .feedback("Change it.")] {
+            model.send(pagerId: p.pagerId, agentId: agentId, decisionId: decisionId, choice: choice)
+            XCTAssertNil(model.undo)
+            XCTAssertNil(model.drafts[decisionId])
+            XCTAssertTrue(model.inFlight.isEmpty)
+        }
+        XCTAssertEqual(model.rowState(group.answered[0].decision), .closed)
+        model.send(pagerId: p.pagerId, agentId: agentId, decisionId: other, choice: .option(2))
+        XCTAssertEqual(model.undo?.decisionId, other)
+        XCTAssertEqual(model.openCount(p.pagerId), 0)
+    }
 }

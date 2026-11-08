@@ -54,9 +54,11 @@ struct PagerView: View {
         .refreshable { await model.refresh(pagerId) }
     }
 
-    // "8 answered", or with who asked when nothing is open: "5 answered · Codex, pi".
+    // "8 answered", or with who asked when nothing is open: "5 answered · Codex, pi". Decisions that closed unanswered
+    // are counted apart: "3 answered, 2 closed".
     private func answeredLabel(_ g: ProjectGroup) -> String {
-        let count = "\(g.answered.count) answered"
+        let closed = g.answered.filter { model.rowState($0.decision) == .closed }.count, answered = g.answered.count - closed
+        let count = closed == 0 ? "\(answered) answered" : answered == 0 ? "\(closed) closed" : "\(answered) answered, \(closed) closed"
         guard g.open.isEmpty else { return count }
         var apps: [String] = []
         for a in g.answered where !apps.contains(a.agent.app) { apps.append(a.agent.app) }
@@ -112,6 +114,8 @@ struct AnsweredDecisionRow: View {
                 Text(d.title).lineLimit(2)
                 if d.unreadable {
                     Text(asked.agent.app).lineLimit(1).font(.subheadline).foregroundStyle(.secondary)
+                } else if state == .closed, let closed = d.closed {
+                    Text(Wording.closedUnanswered(closed, asked.agent)).lineLimit(2).font(.subheadline).foregroundStyle(.secondary)
                 } else {
                     HStack(spacing: 6) {
                         if state == .confirmed {
@@ -129,22 +133,25 @@ struct AnsweredDecisionRow: View {
     }
 }
 
-// The chosen option's letter in a filled circle, or a note's bubble.
+// The chosen option's letter in a filled circle, or a note's bubble; a grey cross for one that closed unanswered.
 struct ChoiceBadge: View {
     var decision: Decision
     var choice: Choice?
     var size: CGFloat
+    private var unanswered: Bool { choice == nil && decision.closed != nil }
     var body: some View {
         Group {
             if decision.unreadable {
                 Image(systemName: "lock").font(size > 30 ? .body : .footnote).foregroundStyle(.white)
+            } else if unanswered {
+                Image(systemName: "xmark").font(size > 30 ? .body.weight(.semibold) : .footnote.weight(.semibold)).foregroundStyle(.white).accessibilityLabel("Closed")
             } else if case .option(let n)? = choice, let o = decision.option(n) {
                 Text(o.letter).font(size > 30 ? .title3.weight(.semibold) : .subheadline.weight(.semibold)).foregroundStyle(.white)
             } else {
                 Image(systemName: "text.bubble").font(size > 30 ? .body : .footnote).foregroundStyle(.white)
             }
         }
-        .frame(width: size, height: size).background(Color.accentColor, in: .circle)
+        .frame(width: size, height: size).background(unanswered && !decision.unreadable ? Color(.systemGray) : Color.accentColor, in: .circle)
     }
 }
 

@@ -71,7 +71,7 @@ nonisolated enum Sealed {
                         card: Card(type: "brief", options: options, recommended: card.card.recommended, markdown: card.card.markdown),
                         attachments: entries.isEmpty ? nil : zip(entries, d.attachments).map { AttachmentInfo(name: $0.name, type: $0.type, bytes: $1.bytes) },
                         askedAt: d.askedAt, answer: answer, collectedAt: d.collectedAt, warnedAt: d.warnedAt, acknowledgement: acknowledgement,
-                        answerKey: card.answerKey)
+                        closed: closed(d), answerKey: card.answerKey)
     }
 
     // Nothing of it: no question, no options, no answer to show or give. What the server knows stays, so the phone
@@ -80,8 +80,10 @@ nonisolated enum Sealed {
         Decision(decisionId: d.decisionId, status: d.status == .open ? .open : d.status == .acknowledged ? .acknowledged : .answered,
                  title: Wording.unreadableDecision, card: Card(type: "brief", options: [], recommended: nil, markdown: nil), askedAt: d.askedAt,
                  answer: d.answer.map { Answer(answerId: $0.answerId, decisionId: d.decisionId, choice: .feedback(""), sentAt: $0.sentAt) },
-                 collectedAt: d.collectedAt, warnedAt: d.warnedAt, unreadable: true)
+                 collectedAt: d.collectedAt, warnedAt: d.warnedAt, closed: closed(d), unreadable: true)
     }
+    // Only a decision with no answer closes unanswered: one the service sends with an answer too shows as answered.
+    private static func closed(_ d: SealedDecision) -> Closed? { d.status == .open ? d.closed : nil }
     private static func unreadableAgent(_ a: SealedAgentInbox) -> AgentInbox {
         let agent = AgentInfo(agentId: a.agent.agentId, app: Wording.unreadableAgent, project: Wording.unreadableProject, machine: nil, createdAt: a.agent.createdAt,
                               finishedAt: a.agent.finishedAt, lastActivityAt: a.agent.lastActivityAt, openCount: a.agent.openCount, unreadable: true)

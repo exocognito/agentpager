@@ -30,8 +30,9 @@ struct PreparedAnswer: Identifiable, Hashable, Codable {
     var id: String { requestId }
 }
 
-// notPickedUp: the service warned that no agent had read the answer in time, and none has since (I6).
-enum RowState: Hashable { case sending, waiting, notPickedUp, confirmed }
+// notPickedUp: the service warned that no agent had read the answer in time, and none has since (I6). closed: it closed
+// unanswered, and this phone isn't sending an answer to it (B5.17).
+enum RowState: Hashable { case sending, waiting, notPickedUp, confirmed, closed }
 
 // A decision with who asked it.
 struct Asked: Identifiable, Hashable {
@@ -380,21 +381,26 @@ final class AppModel {
         return Asked(agent: a.agent, decision: d)
     }
 
+    // A decision waiting for the owner: open, not being sent, and not closed unanswered. The pager's count and the
+    // app's badge count these.
+    private func waiting(_ d: Decision) -> Bool { !sending(d.decisionId) && d.closed == nil }
+
     func openCount(_ pagerId: String) -> Int {
-        agents(pagerId).reduce(0) { n, a in n + a.open.filter { !sending($0.decisionId) }.count }
+        agents(pagerId).reduce(0) { n, a in n + a.open.filter(waiting).count }
     }
 
     // Decisions grouped by project. Projects with open decisions come first, the one waiting longest on top; then the
-    // rest, the most recently answered on top.
+    // rest, the most recently answered or closed on top. A decision being sent, or one that closed unanswered, is
+    // among the answered ones (B5.12, B5.17), though the service lists both as open.
     func groups(_ pagerId: String) -> [ProjectGroup] {
         var byProject: [String: ProjectGroup] = [:]
         for a in agents(pagerId) {
             var g = byProject[a.agent.project] ?? ProjectGroup(project: a.agent.project, open: [], answered: [])
-            for d in a.open { if sending(d.decisionId) { g.answered.append(Asked(agent: a.agent, decision: d)) } else { g.open.append(Asked(agent: a.agent, decision: d)) } }
+            for d in a.open { if waiting(d) { g.open.append(Asked(agent: a.agent, decision: d)) } else { g.answered.append(Asked(agent: a.agent, decision: d)) } }
             g.answered += a.answered.map { Asked(agent: a.agent, decision: $0) }
             byProject[a.agent.project] = g
         }
-        let answeredAt = { (x: Asked) in x.decision.answer?.sentAt ?? .distantFuture }
+        let answeredAt = { (x: Asked) in x.decision.answer?.sentAt ?? x.decision.closed?.at ?? .distantFuture }
         let all = byProject.values.map { g in
             ProjectGroup(project: g.project, open: g.open.sorted { $0.decision.askedAt < $1.decision.askedAt }, answered: g.answered.sorted { answeredAt($0) > answeredAt($1) })
         }
@@ -414,7 +420,9 @@ final class AppModel {
         return inFlight[d.decisionId]?.choice ?? d.answer?.choice
     }
     func rowState(_ d: Decision) -> RowState {
-        if sending(d.decisionId) || d.answer == nil { return .sending }
+        if sending(d.decisionId) { return .sending }
+        if d.closed != nil { return .closed }
+        if d.answer == nil { return .sending }
         if d.acknowledgement != nil { return .confirmed }
         return d.warnedAt != nil && d.collectedAt == nil ? .notPickedUp : .waiting
     }
@@ -451,8 +459,8 @@ final class AppModel {
 
     func send(pagerId: String, agentId: String, decisionId: String, choice: Choice) {
         // Sealed now, to the key inside the card being answered, and sent as sealed on every try (I5). A card the phone
-        // couldn't read offers nothing to send.
-        guard let d = asked(pagerId, agentId, decisionId)?.decision, !d.unreadable else { return }
+        // couldn't read offers nothing to send, and neither does one that closed unanswered (B5.17).
+        guard let d = asked(pagerId, agentId, decisionId)?.decision, !d.unreadable, d.closed == nil else { return }
         let sealed: String
         if live { guard let s = Sealed.answer(choice, to: d.answerKey, pagerId: pagerId, decisionId: decisionId) else { return }; sealed = s } else { sealed = "" }
         if let pending = undo { undo = nil; commit(pending) }

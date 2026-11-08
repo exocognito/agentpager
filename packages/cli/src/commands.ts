@@ -1,11 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { createHash, randomBytes } from 'node:crypto';
-import { Acknowledgement, AgentStatus, AnswerStatus, Asked, Connected, Finished, PagerKey, acceptsChoice, decisionIdOf } from '../../contract/exchange.ts';
+import { Option, Schema } from 'effect';
+import { Acknowledgement, AgentStatus, AnswerStatus, Asked, CLOSED_AGENT_FINISHED, Connected, DecisionClosedRefusal, Finished, PagerKey, acceptsChoice, decisionIdOf, type Closed, type ClosedDecision } from '../../contract/exchange.ts';
 import { call, type Failure } from './client.ts';
 import { compile, type Source } from './card.ts';
 import { HARNESS_APP, detectApp, detectMachine, detectProject, harness, self, type Harness } from './detect.ts';
 import { REVIEW, SHORT, EXAMPLE, rulesText } from './rules.ts';
-import { UnreadableAgent, agentIds, appendHistory, fingerprintOf, home, loadAgent, pagerOf, readHistory, saveAgent, server, shortId, updateAgent, writable, type AgentFile } from './store.ts';
+import { UnreadableAgent, agentIds, appendHistory, fingerprintOf, home, loadAgent, pagerOf, readHistory, saveAgent, server, shortId, updateAgent, writable, type AgentFile, type HistoryEvent } from './store.ts';
 import { Unsendable, askDigest, fingerprint, newKeys, openAnswer, sealAcknowledgement, sealAsk, sealIdentity } from './seal.ts';
 
 // The operations, shared by the CLI and the MCP server, with their replies word for word
@@ -82,6 +83,39 @@ function decisionOf(a: AgentFile, ref: string) {
 // What this agent seals with: its pager, the pager's key pinned at connect, and its own private key.
 const keysOf = (a: AgentFile) => ({ pager: a.pager, pagerKey: a.pagerKey, privateKey: a.privateKey });
 const identityOf = (a: AgentFile) => ({ app: a.app, project: a.project, ...(a.machine ? { machine: a.machine } : {}) });
+// A decision that closed unanswered (Closed, packages/contract/exchange.ts): the service refuses a wait for it, a read of
+// it and an acknowledgement of it as DecisionClosed, with when and why. Its agent finishing is the only reason it gives
+// for now; one this command doesn't know closes the decision all the same, in words that don't say why. A refusal
+// whose record doesn't read is left to the service's own words, as any other refusal.
+const finishedFirst = (c: Closed) => c.reason === CLOSED_AGENT_FINISHED;
+function closedOf(r: Failure): Closed | null {
+  if (r.error !== 'DecisionClosed') return null;
+  const body = Schema.decodeUnknownOption(DecisionClosedRefusal)(r.body);
+  return Option.isSome(body) ? body.value.closed : null;
+}
+// Marks this agent's decisions the service says closed unanswered, and records each in the history once, by the run
+// that marks it. Returns each one's short id, or the server's for one this machine didn't record.
+function noteClosed(a: AgentFile, closed: ReadonlyArray<ClosedDecision>): string[] {
+  const shortOf = (x: AgentFile, id: string) => Object.keys(x.decisions).find(k => x.decisions[k].id === id);
+  const marked: { short: string; c: ClosedDecision }[] = [];
+  try {
+    updateAgent(a.id, x => {
+      for (const c of closed) {
+        const short = shortOf(x, c.decisionId);
+        if (short && !x.decisions[short].closed) { x.decisions[short].closed = true; marked.push({ short, c }); }
+      }
+    });
+    for (const { short, c } of marked) appendHistory(a.pager, { at: c.at, event: 'closed', agent: a.id, decision: short, reason: c.reason });
+  } catch { /* not recorded here; the service still holds it */ }
+  return closed.map(c => shortOf(a, c.decisionId) ?? c.decisionId);
+}
+// What a wait or an acknowledgement meets on a decision that closed unanswered: it ends, saying so.
+function closedUnanswered(a: AgentFile, d: { short: string; id: string; title: string }, closed: Closed, then: string): Result {
+  noteClosed(a, [{ decisionId: d.id, ...closed }]);
+  const when = finishedFirst(closed) ? ` when agent ${a.id} finished` : '';
+  const anew = finishedFirst(closed) ? ' To ask about new work, connect again.' : '';
+  return { code: 2, text: `Closed unanswered. "${d.title}" (${d.short}) closed${when}, before your owner answered it, so no answer will come.\n${then}${anew}`, json: { status: 'closed', reason: closed.reason, closedAt: closed.at } };
+}
 const unreadableAnswer = (short: string) => `An answer to ${short} arrived, but it can't be read as your owner's answer to that card, so it may not be theirs. Don't act on it: tell your owner.`;
 
 // --server names a server other than agentpager.me; the agent file keeps it for every later call, CLI or MCP.
@@ -264,7 +298,10 @@ export async function wait(agent: string, ref: string, opts: { seconds?: number;
     // Waiting forever outlasts a dropped network or a server restart; a refusal, or a reply that isn't AgentPager's,
     // still ends it.
     if (!r.ok && opts.forever && (r.status === 0 || r.status >= 500)) { await new Promise(res => setTimeout(res, RETRY_MS)); continue; }
-    if (!r.ok) return refusal(r, a);
+    if (!r.ok) {
+      const closed = closedOf(r);
+      return closed ? closedUnanswered(a, d, closed, 'Don\'t wait for it again.') : refusal(r, a);
+    }
     if (r.value.status !== 'answered') {
       if (opts.forever) continue;
       return pending(a, d, opts.seconds !== undefined && seconds < WAIT_SECONDS, harness(opts.client));
@@ -317,7 +354,10 @@ export async function ack(agent: string, ref: string, nextSteps: string): Promis
   if (!d) return refused(`Agent ${a.id} has no decision ${ref}. Its decisions: ${Object.keys(a.decisions).join(', ') || 'none yet'}.`);
   if (!nextSteps.trim()) return refused('Say what happens next: agentpager ack --agent <id> <decision> "<next steps>"');
   const read = await call(AnswerStatus, a.server, 'GET', `/api/agents/${a.agentId}/cards/${d.id}/answer`, { key: a.agentKey });
-  if (!read.ok) return refusal(read, a);
+  if (!read.ok) {
+    const closed = closedOf(read);
+    return closed ? closedUnanswered(a, d, closed, 'There is no answer to acknowledge.') : refusal(read, a);
+  }
   if (read.value.status !== 'answered') return refused(`Your owner hasn't answered "${d.title}" yet. Wait first: agentpager wait --agent ${a.id} ${d.short}`);
   let sealed: ReturnType<typeof sealAcknowledgement>;
   try { sealed = sealAcknowledgement(keysOf(a), identityOf(a), d.id, nextSteps, d.title); }
@@ -337,14 +377,17 @@ export async function status(agent: string): Promise<Result> {
   const r = await call(AgentStatus, a.server, 'GET', `/api/agents/${a.agentId}`, { key: a.agentKey });
   if (!r.ok) return refusal(r, a);
   const on = r.value.pager.on, open = r.value.agent.openCount;
+  // What closed unanswered, from a service that lists it. Neither it nor one a wait here met counts as waiting.
+  const shut = r.value.closed ?? [], closed = noteClosed(a, shut), ids = new Set(shut.map(c => c.decisionId));
   const unacked = Object.entries(a.decisions).filter(([, d]) => d.answered && !d.acknowledged).map(([k]) => k);
-  const waiting = Object.entries(a.decisions).filter(([, d]) => !d.answered).map(([k]) => k);
+  const waiting = Object.entries(a.decisions).filter(([, d]) => !d.answered && !d.closed && !ids.has(d.id)).map(([k]) => k);
   return done([
     `Agent ${a.id} · ${a.app} · ${a.project}`,
     `Pager: ${on ? 'on' : 'off: nothing you send is delivered'}`,
     `Open decisions: ${open}${waiting.length ? ` (${waiting.join(', ')})` : ''}`,
     `Answered, not yet acknowledged: ${unacked.length ? unacked.join(', ') : 'none'}`,
-  ].join('\n'), { agent: a.id, pagerOn: on, open, waiting, unacknowledged: unacked });
+    ...(closed.length ? [`Closed unanswered${shut.every(finishedFirst) ? ' when this agent finished' : ''}: ${closed.join(', ')}`] : []),
+  ].join('\n'), { agent: a.id, pagerOn: on, open, waiting, unacknowledged: unacked, closed });
 }
 
 // This machine's decisions on the agent's pager, newest first. Never printed unasked.
@@ -353,11 +396,13 @@ export function history(agent: string, limit?: number): Result {
   if ('code' in a) return a;
   const events = readHistory(a.pager), n = limit !== undefined && Number.isFinite(limit) && limit >= 1 ? Math.min(Math.floor(limit), 1000) : 20;
   const asked = events.filter(e => e.event === 'asked').reverse().slice(0, n);
-  const byDecision = (event: string, d: string) => events.find(e => e.event === event && e.decision === d && e.agent === events.find(x => x.event === 'asked' && x.decision === d)?.agent);
+  // A short id is unique within its agent only, so each event is the asking agent's own.
+  const byDecision = (event: string, asked: HistoryEvent) => events.find(e => e.event === event && e.decision === asked.decision && e.agent === asked.agent);
   const lines = asked.map(e => {
-    const answer = byDecision('answered', e.decision), ackd = byDecision('acknowledged', e.decision);
+    const answer = byDecision('answered', e), ackd = byDecision('acknowledged', e), closed = byDecision('closed', e);
     const options = Array.isArray(e.options) ? e.options.map(String) : [];
-    const chose = answer ? ('choice' in answer ? `option ${String.fromCharCode(64 + Number(answer.choice))} "${options[Number(answer.choice) - 1] ?? ''}"` : `note "${quote(String(answer.note))}"`) : 'not answered';
+    const chose = answer ? ('choice' in answer ? `option ${String.fromCharCode(64 + Number(answer.choice))} "${options[Number(answer.choice) - 1] ?? ''}"` : `note "${quote(String(answer.note))}"`)
+      : closed ? `closed unanswered${closed.reason === CLOSED_AGENT_FINISHED ? ' when its agent finished' : ''}` : 'not answered';
     return `${new Date(e.at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} · ${e.app} · ${e.project} · ${e.decision} (${e.agent})\n  ${e.title}\n  Options: ${options.join(' / ')} → ${chose}${ackd ? `\n  Next: ${quote(String(ackd.nextSteps), 120)}` : ''}`;
   });
   return done(lines.length ? lines.join('\n') : 'No decisions on this pager from this machine yet.', events);
@@ -368,13 +413,19 @@ export async function finish(agent: string): Promise<Result> {
   if ('code' in a) return a;
   const r = await call(Finished, a.server, 'POST', `/api/agents/${a.agentId}/finish`, { key: a.agentKey });
   if (!r.ok) return refusal(r, a);
-  return done(`Finished. Your owner's phone shows ${a.id} as finished; it asks nothing more. Its decisions stay on the phone.`);
+  const head = `Finished. Your owner's phone shows ${a.id} as finished; it asks nothing more. Its decisions stay on the phone.`;
+  // What finishing closed, from a service that says.
+  const shut = r.value.closed;
+  if (!shut) return done(head);
+  if (!shut.length) return done(`${head}\nIt had no open decisions to close.`, { closed: [] });
+  const closed = noteClosed(a, shut), one = closed.length === 1;
+  return done(`${head}\nFinishing closed ${one ? 'its open decision' : `its ${closed.length} open decisions`} unanswered: ${closed.join(', ')}. Your owner can't answer ${one ? 'it' : 'them'} now, and a wait for ${one ? 'it' : 'them'} ends.`, { closed });
 }
 
 export function agents(): Result {
   const all = agentIds().map(agentOf).filter((a): a is AgentFile => !('code' in a));
   if (!all.length) return done('No agents on this machine. Connect with: agentpager connect <number>', []);
-  const rows = all.map(a => `${a.id}  pager ${a.pager.slice(0, 8)}  ${a.project} · ${a.app}  ${a.createdAt.slice(0, 16).replace('T', ' ')}  ${Object.values(a.decisions).filter(d => !d.answered).length} open`);
+  const rows = all.map(a => `${a.id}  pager ${a.pager.slice(0, 8)}  ${a.project} · ${a.app}  ${a.createdAt.slice(0, 16).replace('T', ' ')}  ${Object.values(a.decisions).filter(d => !d.answered && !d.closed).length} open`);
   // Neither key is ever printed.
   return done(rows.join('\n'), all.map(({ agentKey, privateKey, ...rest }) => { void agentKey; void privateKey; return rest; }));
 }

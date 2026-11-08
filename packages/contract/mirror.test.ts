@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { expect, it } from "vitest";
 import { Schema } from "effect";
 import { createHash } from "node:crypto";
-import { AskInput, CLIENT_HEADER, PROTOCOL, QuestionInput, Token, clientVersion, decisionIdOf, readClientVersion } from "./exchange.ts";
+import { AskInput, CLIENT_HEADER, CLOSED_AGENT_FINISHED, Closed, PROTOCOL, QuestionInput, Token, clientVersion, decisionIdOf, readClientVersion } from "./exchange.ts";
 
 // The iPhone app and its UI tests' agent mirror the client header in Swift (METHOD.md › Design in code): the same
 // header, the same protocol, and the app sends it on every request.
@@ -18,6 +18,16 @@ it("the app names the same header and protocol, and sends it on every request", 
   expect(api).toMatch(/func raw\([^]*?r\.setValue\(ClientVersion\.value, forHTTPHeaderField: ClientVersion\.header\)[^]*?URLSession\.shared\.data\(for: r\)/);
   // The app's build is its version and build numbers, which fit the header.
   expect(readClientVersion(`ios/${PROTOCOL} 0.1+1`)).toEqual({ client: "ios", protocol: PROTOCOL, build: "0.1+1" });
+});
+
+// A decision that closed unanswered: the app reads the same field, with the same two fields inside, and knows the one
+// reason by the same name. It reads the reason as text, so a reason added later fails no read.
+it("the app reads a decision's closed record as the contract sends it", () => {
+  const api = swift("AgentPager/Model/API.swift");
+  expect(Object.keys(Closed.fields).sort()).toEqual(["at", "reason"]);
+  expect(api).toMatch(/struct Closed: Codable, Hashable, Sendable \{\n    static let agentFinished = "([A-Za-z]+)"\n    var at: Date\n    var reason: String\n\}/);
+  expect(api.match(/static let agentFinished = "([A-Za-z]+)"/)?.[1]).toBe(CLOSED_AGENT_FINISHED);
+  expect(api).toMatch(/struct SealedDecision: Codable, Hashable, Sendable \{[^}]*\n    var closed: Closed\?\n\}/);
 });
 
 it("the UI tests' agent names the same header and protocol as the command", () => {

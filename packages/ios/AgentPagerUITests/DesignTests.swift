@@ -22,6 +22,8 @@ final class DesignTests: XCTestCase {
     func testChanges() { capture("changes", "Ask for changes: the note sheet with a draft note and the keyboard up.", until: "feedback-text") }
     func testOff() { capture("off", "A decision on the Acme pager while it is off: \"Acme project pager is off · Turn on\" instead of the answer bar.", until: "pager-off-bar") }
     func testAnswered() { capture("answered", "An answered decision: the closed record, the choice, then the agent's confirmation and next steps.", until: "agent-confirmation") }
+    func testClosed() { capture("closed", "A decision that closed unanswered because Claude Code finished first: its brief stays readable, and the bar says so, with nothing to pick or send.", until: "closed-unanswered") }
+    func testClosedList() { capture("closedlist", "A project's answered decisions with the two that closed unanswered when Claude Code finished, newest first.", until: "answered-Which M11 guarantee should we build?") }
     func testUndo() { capture("undo", "The Undo window after Send: \"Sending in …s\" with Undo, over the Work pager.", until: "undo-button") }
     func testNotConfirmed() { capture("notconfirmed", "The \"Answer Not Confirmed\" alert once every retry of an answer failed: Cancel or Retry.", until: "Answer Not Confirmed") }
     func testNotPickedUp() { capture("notpickedup", "An answer no agent read 3 minutes after Send: the warning naming the agent, its computer and its project (I6).", until: "agent-confirmation") }
@@ -44,6 +46,42 @@ final class DesignTests: XCTestCase {
             if marked { XCTAssertTrue(title.label.contains("Work") && title.label.contains("Dev server"), title.label); keep("dev-pager") }
             app.terminate()
         }
+    }
+
+    // B5.17, the phone's side, on the sample data: Claude Code finished before the owner answered two of its decisions.
+    // Each shows with its project's answered ones and says who asked finished first; its brief still reads, with
+    // nothing to pick, send or ask changes on; and neither counts as waiting on the pager. That the service closes them
+    // when the agent finishes is the service's to prove (B25.13).
+    func test_B5_17_aDecisionThatClosedUnansweredOffersNothingToSendAndShowsWithTheAnsweredOnes() {
+        let app = XCUIApplication()
+        app.launchArguments += ["-demo", "closed"]
+        app.launch()
+        let bar = app.descendants(matching: .any)["closed-unanswered"]
+        wait(bar, 15)
+        XCTAssertTrue(bar.label.contains("Claude Code finished before you answered"), bar.label)
+        XCTAssertEqual(app.staticTexts["who-asked"].label, "Claude Code · finished")
+        XCTAssertTrue(app.descendants(matching: .any)["brief-header"].exists, "the question still reads")
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "The service hands the agent job A, but the reply is lost")).firstMatch.exists, "the brief's context still reads")
+        XCTAssertTrue(app.buttons["link-background.md"].exists, "and its background page still opens")
+        for control in ["tile-A", "tile-B", "send-option", "ask-for-changes", "turn-on"] { XCTAssertFalse(app.buttons[control].exists, control) }
+        app.terminate()
+
+        app.launchArguments = ["-demo", "closedlist"]
+        app.launch()
+        let row = app.buttons["answered-Which M11 guarantee should we build?"]
+        wait(row, 15)
+        XCTAssertTrue(row.label.contains("Claude Code finished before you answered"), row.label)
+        XCTAssertFalse(row.label.contains("Sending") || row.label.contains("Waiting"), row.label)
+        XCTAssertTrue(app.buttons["answered-Option detail: bottom sheet or full screen?"].exists)
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        let folded = app.buttons["answered-agentpager"]
+        wait(folded, 5)
+        XCTAssertTrue(folded.label.contains("3 answered, 2 closed"), folded.label)
+        XCTAssertFalse(app.buttons["open-Option detail: bottom sheet or full screen?"].exists, "not among the open ones")
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        let work = app.buttons["pager-Work"]
+        wait(work, 5)
+        XCTAssertTrue(work.label.contains("2 open"), "only Codex's two count as waiting: \(work.label)")
     }
 
     // A screenshot kept in the test result only.

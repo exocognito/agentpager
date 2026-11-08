@@ -26,7 +26,7 @@ test('B33.1 Claude Code and Claude Desktop are named only when identified for ce
   delete process.env.CLAUDECODE;
 });
 
-test('waiting words: Claude Code in the background, a Claude Desktop chat in its turn, and waiting forever outlasts a restart', { timeout: 240_000 }, async () => {
+test('B33.2 B33.3 B32.7 Waiting words: Claude Code in the background, a Claude Desktop chat in its turn, and waiting forever outlasts a restart', { timeout: 240_000 }, async () => {
   const f = await fixture('cli-wait');
   const home = mkdtempSync(path.join(tmpdir(), 'agentpager-cli-'));
   process.env.AGENTPAGER_HOME = home; process.env.AGENTPAGER_SERVER = f.origin; delete process.env.AGENTPAGER_PAGER;

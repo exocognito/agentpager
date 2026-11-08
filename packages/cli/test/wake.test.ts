@@ -83,6 +83,11 @@ const watcherStarts = async (id: string, d: string) => {
   return pid ?? 0;
 };
 const record = (id: string): unknown => JSON.parse(readFileSync(store.waitingPath(id), 'utf8'));
+// Where each of the record's decisions stands, read without a cast.
+const states = (id: string) => {
+  const r = record(id), ds = typeof r === 'object' && r !== null ? Reflect.get(r, 'decisions') : undefined;
+  return Array.isArray(ds) ? ds.map((d: unknown) => typeof d === 'object' && d !== null ? Reflect.get(d, 'state') : undefined) : [];
+};
 
 let f: Awaited<ReturnType<typeof fixture>>;
 before(async () => { f = await fixture('cli-wake'); process.env.AGENTPAGER_SERVER = f.origin; });
@@ -199,7 +204,7 @@ test('B33.4 B33.1 B32.2 A Codex thread that asks over MCP is told a note will co
     try {
       const r = await again.callTool({ name: 'wait', arguments: { agent: id, decision: d }, _meta: meta(thread, { trigger: 'queue' }) });
       assert.match(JSON.stringify(r.content), /launch code 4417/);
-      assert.equal((record(id) as { decisions: { state: string }[] }).decisions[0]?.state, 'answered');
+      assert.deepEqual(states(id), ['answered']);
       await again.callTool({ name: 'ack', arguments: { agent: id, decision: d, nextSteps: 'Blue it is.' }, _meta: meta(thread, { trigger: 'queue' }) });
       assert.deepEqual(record(id), { version: 1, agent: id, decisions: [] });
     } finally { await again.close(); }
@@ -378,9 +383,10 @@ test('B33.1 B25.6 An agent whose AgentPager adapter wakes it is told not to wait
   await f.answer(seen?.agentId ?? '', p.phone, seen?.decisionId ?? '', { kind: 'feedback', text: 'Ship the secret plan' });
   inShell({ CLAUDECODE: '1', AGENTPAGER_WAKE: 'claude-code:sess-1' });
   assert.match((await op.wait(id, d1)).text, /Ship the secret plan/);
-  assert.equal((record(id) as { decisions: { state: string }[] }).decisions[0]?.state, 'answered');
+  assert.deepEqual(states(id), ['answered', 'waiting']);
   const file = store.waitingPath(id), text = readFileSync(file, 'utf8'), agent = readFileSync(path.join(home, 'agents', `${id}.json`), 'utf8');
   assert.equal(statSync(file).mode & 0o777, 0o600, 'only the machine\'s user reads it');
+  assert.equal(statSync(path.join(home, 'agents', `${id}.json`)).mode & 0o777, 0o600, 'nor the agent\'s own file, which keeps its keys');
   assert.equal(statSync(path.dirname(file)).mode & 0o777, 0o700);
   const a = store.loadAgent(id);
   for (const secret of [a?.agentKey, a?.privateKey, a?.pagerKey, a?.agentId, p.number, 'Ship the secret plan', 'With the plugin?']) {

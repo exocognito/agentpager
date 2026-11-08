@@ -525,6 +525,7 @@ final class AppModel {
             defer { background.end(); sendingNow.remove(p.requestId) }
             for delay in Self.retryDelays {
                 if delay > 0 { try? await Task.sleep(for: .seconds(delay)) }
+                guard stillSending(p) else { return }
                 do throws(APIError) {
                     if failSends > 0 { failSends -= 1; throw APIError.transport("simulated failure") }
                     _ = try await client.answer(pager, agentId: p.agentId, decisionId: p.decisionId, requestId: p.requestId, sealed: p.sealed)
@@ -543,9 +544,20 @@ final class AppModel {
                     }
                 }
             }
-            // Unless its pager went while it was trying.
-            if pagers.contains(where: { $0.pagerId == p.pagerId }), !notConfirmed.contains(where: { $0.requestId == p.requestId }) { notConfirmed.append(p) }
+            notReached(p)
         }
+    }
+
+    // Whether a send is still this phone's to make: a read showing its decision answered or closed unanswered (B5.17),
+    // Cancel, a newer send of the same decision, or its pager going from the phone, ends it, between its tries too.
+    func stillSending(_ p: PreparedAnswer) -> Bool {
+        inFlight[p.decisionId]?.requestId == p.requestId && pagers.contains { $0.pagerId == p.pagerId }
+    }
+    // Every try failed to reach the service: the answer shows as not confirmed, with Retry, while it is still the
+    // phone's to send.
+    func notReached(_ p: PreparedAnswer) {
+        guard stillSending(p), !notConfirmed.contains(where: { $0.requestId == p.requestId }) else { return }
+        notConfirmed.append(p)
     }
 
     // Every answer not yet confirmed goes again with the same requestId: those kept from an earlier launch, and those

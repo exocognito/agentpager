@@ -416,4 +416,33 @@ final class SealedTests: XCTestCase {
         XCTAssertTrue(model.inFlight.isEmpty)
         XCTAssertEqual(model.rowState(after), .closed)
     }
+
+    // A send whose tries are under way when its decision closes: the read that says so ends it, so when its last try
+    // fails to reach the service it doesn't come back as not confirmed with Retry. A send still the phone's to make
+    // does, as before.
+    @MainActor
+    func test_B5_17_aSendUnderWayWhenItsDecisionClosesNeverComesBackAsNotConfirmed() throws {
+        let model = AppModel(live: false)
+        let a = pager("A", server: model.server.absoluteString)
+        model.pagers = [a]
+        var read = try read(of: a, title: "Closing?")
+        XCTAssertNil(model.apply(a, .success(read)))
+        let trying = PreparedAnswer(pagerId: a.pagerId, agentId: agentId, decisionId: decisionId, requestId: "r-trying", choice: .option(1), sealed: "sealed", deadline: Date())
+        model.inFlight[decisionId] = trying
+        XCTAssertTrue(model.stillSending(trying))
+        read.agents[0].open[0].closed = Closed(at: Date(), reason: Closed.agentFinished)
+        XCTAssertNil(model.apply(a, .success(read)))
+        XCTAssertFalse(model.stillSending(trying))
+        model.notReached(trying)
+        XCTAssertTrue(model.notConfirmed.isEmpty)
+
+        let other = AppModel(live: false)
+        let b = pager("B", server: other.server.absoluteString)
+        other.pagers = [b]
+        XCTAssertNil(other.apply(b, .success(try self.read(of: b, title: "Still open?"))))
+        let failing = PreparedAnswer(pagerId: b.pagerId, agentId: agentId, decisionId: decisionId, requestId: "r-failing", choice: .option(2), sealed: "sealed", deadline: Date())
+        other.inFlight[decisionId] = failing
+        other.notReached(failing)
+        XCTAssertEqual(other.notConfirmed.map(\.requestId), ["r-failing"])
+    }
 }

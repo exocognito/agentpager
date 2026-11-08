@@ -539,8 +539,11 @@ export async function watch(agent: string, ref: string, opts: { queueTimeoutMs?:
     let failing: number | null = null;
     for (;;) {
       if (Date.now() - started > (opts.forMs ?? WATCH_MS)) return done('Stopped: watched for as long as a watcher may.');
+      const look = Date.now();
       const r = await call(AnswerStatus, a.server, 'GET', `/api/agents/${a.agentId}/cards/${d.id}/answer?wait=${WAIT_SECONDS}`, { key: a.agentKey, timeoutMs: (WAIT_SECONDS + 20) * 1000 });
-      if (r.ok && r.value.status === 'pending') { failing = null; continue; }
+      // The service holds each look up to 50 s; one that comes back pending sooner (a proxy that doesn't hold) waits out
+      // a second, so a watcher never spins.
+      if (r.ok && r.value.status === 'pending') { failing = null; if (Date.now() - look < 1000) await new Promise(res => setTimeout(res, 1000)); continue; }
       if (r.ok) break;
       // An unreachable or restarting server, or a page that isn't its reply (a Wi-Fi sign-in), is tried again.
       if (r.status === 0 || r.status >= 500 || r.error === 'NotUnderstood') {

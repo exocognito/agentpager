@@ -41,7 +41,7 @@ export function raw(url: string, opts: { method?: string; host?: string; body?: 
 }
 async function port() { const s = createServer(); await new Promise<void>(r => s.listen(0, '127.0.0.1', r)); const address = s.address(); if (!address || typeof address === 'string') throw new Error('port'); const p = address.port; await new Promise<void>(r => s.close(() => r())); return p; }
 
-export const ErrorBody = Schema.Struct({ error: Schema.String, message: Schema.String, reason: Schema.optional(Schema.String), limit: Schema.optional(Schema.Number) });
+export const ErrorBody = Schema.Struct({ error: Schema.String, message: Schema.String, reason: Schema.optional(Schema.String), limit: Schema.optional(Schema.Number), closed: Schema.optional(C.Closed) });
 export type ErrorBody = typeof ErrorBody.Type;
 // Every client of the API names itself (C.CLIENT_HEADER); the tests do too.
 export const CLIENT = C.clientVersion('tests', 'local');
@@ -80,6 +80,7 @@ export type ReadDecision = {
   attachments?: { name: string; type: string; bytes: number }[]; answerKey: string; askedAt: string;
   answer?: { answerId: string; decisionId: string; choice?: C.Choice; sentAt: string }; collectedAt?: string; warnedAt?: string;
   acknowledgement?: { decisionId: string; answerId: string; nextSteps: string; acknowledgedAt: string };
+  closed?: C.Closed;
 };
 // An agent as the tests play it, through the command's own sealing (packages/cli/src/seal.ts): its keys and identity.
 export type AgentCreds = { agent: { agentId: string }; agentKey: string; keys: Keys; identity: Who };
@@ -104,6 +105,7 @@ export function openDecision(pagerId: string, d: C.Decision, agentKey?: string):
     ...(d.answer ? { answer: { answerId: d.answer.answerId, decisionId: d.decisionId, ...(choice ? { choice } : {}), sentAt: d.answer.sentAt } } : {}),
     ...(d.collectedAt ? { collectedAt: d.collectedAt } : {}), ...(d.warnedAt ? { warnedAt: d.warnedAt } : {}),
     ...(d.acknowledgement ? { acknowledgement: { decisionId: d.decisionId, answerId: d.acknowledgement.answerId, nextSteps: decodePart('acknowledgement', open(key, 'acknowledgement', at, d.acknowledgement.acknowledgement)).nextSteps, acknowledgedAt: d.acknowledgement.acknowledgedAt } } : {}),
+    ...(d.closed ? { closed: d.closed } : {}),
   };
 }
 // A pager's read as the phone opens it: bound to the pager it asked for, never the id the reply names.

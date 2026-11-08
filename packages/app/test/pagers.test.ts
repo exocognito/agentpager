@@ -75,12 +75,15 @@ test('pagers and agents: the phone makes a pager, every connect is a new agent, 
     await f.answer(busy.agent.agentId, phone, open[0].decisionId);
     await f.ask(busy, 'Eleventh, after an answer');
 
-    // Finishing: the phone sees it; the agent asks nothing more, but still reads and acknowledges.
+    // Finishing: the phone sees it; the agent asks nothing more, but still reads and acknowledges an answer sent before
+    // (finish.test.ts has what finishing does to the decisions it leaves unanswered).
     const late = await f.ask(c, 'Before finishing?');
+    const lateReceipt = await f.answer(c.agent.agentId, phone, late.decisionId, { kind: 'feedback', text: 'Not now.' });
     const finished = await f.ok(C.Finished, `/api/agents/${c.agent.agentId}/finish`, { method: 'POST', agent: c.agentKey });
     assert.deepEqual(await f.ok(C.Finished, `/api/agents/${c.agent.agentId}/finish`, { method: 'POST', agent: c.agentKey }), finished, 'finishing twice is harmless');
     assert.match((await f.refused(409, 'AgentFinished', `/api/agents/${c.agent.agentId}/cards`, { agent: c.agentKey, data: await f.sealed(c, question()) })).message, /connect again/);
-    const lateReceipt = await f.answer(c.agent.agentId, phone, late.decisionId, { kind: 'feedback', text: 'Not now.' });
+    const lateRead = await f.read(c, late.decisionId);
+    assert.equal(lateRead.status === 'answered' && lateRead.answer.answerId, lateReceipt.answerId);
     await f.ack(c, late.decisionId, lateReceipt.answerId, 'Leaving it.');
     assert.equal((await f.pager(keys.pagerId, phone)).agents[2].agent.finishedAt, finished.finishedAt);
     await f.artifact('pager.json', await f.pager(keys.pagerId, phone));

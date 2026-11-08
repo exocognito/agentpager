@@ -14,7 +14,7 @@ The words that mean something specific in this product. They name things; the pr
 | Agent id | The short id the command gives an agent when it connects, such as `ap-7f3k`. It is not a secret: helpers on the same machine pass it to ask as that agent. |
 | Who asked | The app an agent runs in, such as Claude Code or Codex. The command detects it; an app it doesn't recognise can name itself. |
 | Project | What an agent's decisions are grouped under on the phone: the git repository's name, else the working folder's, unless the agent names one. |
-| Decision | One question from an agent, with the owner's answer and the agent's acknowledgement. The app calls it a decision. |
+| Decision | One question from an agent, with the owner's answer and the agent's acknowledgement. The app calls it a decision. It is open until the owner answers it; if its agent finishes first, it closes unanswered and can't be answered. |
 | Card | How a decision looks, and what the agent writes: `card.yaml`. Each of its keys lands in one place on the phone: title, detail, context, options with their stories, tradeoffs, recommendation, next steps and attachments. |
 | Card contract | The command's rules for writing a card the owner can answer on a phone, with the `card.yaml` template and an example. `agentpager rules` prints it. |
 | Detail | A card's one line on what the decision is about, in plain words. The phone's alert shows it under the question. |

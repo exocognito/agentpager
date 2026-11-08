@@ -49,7 +49,7 @@ export const TOOLS = [
   { name: 'ack', description: 'Tell your owner you read their answer and what you\'ll do. They see it with a green tick. Only the first acknowledgement counts.', inputSchema: schema({ agent, decision, nextSteps: text('What happens next, at most 280 characters.') }, ['agent', 'decision', 'nextSteps']) },
   { name: 'status', description: 'The pager\'s state and this agent\'s open decisions.', inputSchema: schema({ agent }, ['agent']) },
   { name: 'history', description: 'Decisions already asked on this pager from this machine, with their answers. Check here if something may already be decided.', inputSchema: schema({ agent, limit: { type: 'integer', minimum: 1, maximum: 200 } }, ['agent']) },
-  { name: 'finish', description: 'You\'re done with this piece of work.', inputSchema: schema({ agent }, ['agent']) },
+  { name: 'finish', description: 'You\'re done with this piece of work: your owner\'s phone shows you as finished, and you can ask nothing more. Every decision your owner hasn\'t answered yet closes unanswered, so they can\'t answer it and a wait for it ends. You can still wait for and acknowledge the answers already sent.', inputSchema: schema({ agent }, ['agent']) },
 ];
 
 const str = (v: unknown) => typeof v === 'string' ? v : undefined;

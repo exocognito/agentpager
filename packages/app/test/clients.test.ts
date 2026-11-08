@@ -36,6 +36,8 @@ test('B25.14 An agent call from an old command is told to update on every route,
       ['acknowledge', `${cards}/${did}/acknowledge`, { agent: a.agentKey, data: f.sealedAck(a, did, receipt.answerId, 'From an old command.') }],
       ['acknowledge readably, as before the switch', `${cards}/${did}/acknowledge`, { agent: a.agentKey, data: { answerId: receipt.answerId, nextSteps: 'From an old command.' } }],
       ['acknowledge with a wrong key and invalid input', `${cards}/${did}/acknowledge`, { agent: token(), data: { nextSteps: '' } }],
+      ['say it received the answer', `${cards}/${did}/received`, { agent: a.agentKey, data: { answerId: receipt.answerId } }],
+      ['say it received the answer with a wrong key and invalid input', `${cards}/${did}/received`, { agent: token(), data: { answerId: 1 } }],
       ['finish', `/api/agents/${aid}/finish`, { method: 'POST', agent: a.agentKey }],
       ['finish with a field', `/api/agents/${aid}/finish`, { agent: a.agentKey, data: { now: true } }],
     ];

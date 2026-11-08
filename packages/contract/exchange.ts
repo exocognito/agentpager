@@ -17,16 +17,21 @@ export const PHONE_AUTH_HEADER = "x-phone-key";
 
 // Every request from an AgentPager client says which client it is and the protocol it speaks, with its build for logs:
 // `<client>/<protocol> <build>`, such as `cli/2 3f9c2ab` from the agentpager command or `ios/2 0.1+1` from the iPhone
-// app (mirrored in Model/API.swift; mirror.test.ts checks it). The service compares only the protocol. It goes up
-// with a change that clients from before it can't follow, and the service then refuses those clients as
-// UpdateRequired, telling them how to update (packages/app/src/contract.ts). 2 is the encryption switch (M5): every
-// card, attachment, identity, answer and acknowledgement travels as an encrypted part.
+// app (mirrored in Model/API.swift; mirror.test.ts checks it). The service compares only the protocol. It refuses a
+// client older than it accepts as UpdateRequired, telling it how to update (packages/app/src/contract.ts), and serves
+// each client it accepts as that client's protocol speaks. 2 is the encryption switch (M5): every card, attachment,
+// identity, answer and acknowledgement travels as an encrypted part. The app speaks 2.
 export const CLIENT_HEADER = "x-agentpager-client";
 export const PROTOCOL = 2;
+// 3, the agentpager command's since M7 (B32.12, blueprint/areas/2-agents.md): the command says when it has received an
+// answer (ReceivedInput), and an answer counts as picked up only then, or once its agent acknowledges it. An agent
+// call at 2, as from the m6.1 command and every one before it, still picks an answer up by reading it.
+export const PICKUP_PROTOCOL = 3;
 const CLIENT_VERSION = /^([a-z][a-z0-9-]{0,19})\/(0|[1-9][0-9]{0,5}) ([A-Za-z0-9._+-]{1,40})$/;
 export type ClientVersion = { client: string; protocol: number; build: string };
-// What a client of this code sends. A build that doesn't fit the header is sent with its other characters as "-".
-export const clientVersion = (client: string, build: string) => `${client}/${PROTOCOL} ${build.replace(/[^A-Za-z0-9._+-]/g, "-").slice(0, 40) || "-"}`;
+// What a client of this code sends: PROTOCOL unless it names another. A build that doesn't fit the header is sent with
+// its other characters as "-".
+export const clientVersion = (client: string, build: string, protocol: number = PROTOCOL) => `${client}/${protocol} ${build.replace(/[^A-Za-z0-9._+-]/g, "-").slice(0, 40) || "-"}`;
 export function readClientVersion(header: string | null): ClientVersion | null {
   const parts = header === null ? null : CLIENT_VERSION.exec(header);
   return parts ? { client: parts[1], protocol: Number(parts[2]), build: parts[3] } : null;
@@ -137,6 +142,12 @@ export const Acknowledgement = Schema.Struct({ decisionId: Token, answerId: Toke
 export type Acknowledgement = typeof Acknowledgement.Type;
 export const Receipt = Schema.Struct({ decisionId: Token, answerId: Token, sentAt: Timestamp });
 export type Receipt = typeof Receipt.Type;
+// The command has received the answer: it read it and opened it (PICKUP_PROTOCOL). Saying so again, as after a lost
+// reply, changes nothing and gets the same reply, with when it was first picked up.
+export const ReceivedInput = Schema.Struct({ answerId: Token }).annotations(strict);
+export type ReceivedInput = typeof ReceivedInput.Type;
+export const Received = Schema.Struct({ decisionId: Token, answerId: Token, collectedAt: Timestamp });
+export type Received = typeof Received.Type;
 
 // Every image or page the brief names must be one of its attachments.
 const briefLinks = (q: { card: BriefCard; attachments?: ReadonlyArray<{ name: string; type: AttachmentInfo["type"] }> }) =>
@@ -186,7 +197,8 @@ export const Decision = Schema.Struct({
   attachments: Schema.Array(AttachmentSize),
   askedAt: Timestamp,
   answer: Schema.optional(Answer),
-  // When an agent first read the answer, and when the owner was told none had (I6: neither means received).
+  // When an agent first picked the answer up (PICKUP_PROTOCOL), and when the owner was told none had. Neither is an
+  // acknowledgement, and the phone shows neither as one (I6).
   collectedAt: Schema.optional(Timestamp),
   warnedAt: Schema.optional(Timestamp),
   acknowledgement: Schema.optional(Acknowledgement),

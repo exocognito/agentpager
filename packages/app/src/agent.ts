@@ -122,8 +122,9 @@ export class Agent {
     // From its pager's store, once it has forgotten the agent or deleted its pager, or from the Registry, for a pager
     // deleted before M6.
     if (action === 'forget') { await this.forget(); return json({ ok: true }); }
-    // Every other call, as the Worker names it (/status, /ask, /read/<decision>, /ack/<decision>, /finish,
-    // /answer/<decision>, /file/<decision>/<slot>), goes on to the agent's pager's store with its keys and its input.
+    // Every other call, as the Worker names it (/status, /ask, /read/<decision>, /ack/<decision>, /received/<decision>,
+    // /finish, /answer/<decision>, /file/<decision>/<slot>), goes on to the agent's pager's store with its keys and its
+    // input.
     const to = this.where();
     if (!to) throw C.refuse.unknownAgent();
     return this.pager(to.pagerId, `/agent/${to.agentId}${url.pathname}${url.search}`, {

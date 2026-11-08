@@ -110,9 +110,16 @@ test('sent, no reply: it may have reached the owner, and waiting forever still t
     if (req.method === 'GET') { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ pagerId, publicKey: pagerKeys.publicKey })); return; }
     req.socket.resetAndDestroy();
   }));
-  // Drops the first request, answers the next.
+  // Drops the first read, answers the next, and takes the command's word that it received the answer.
   let tries = 0;
+  const received: unknown[] = [];
   const flaky = await serve(createHttp((req, res) => {
+    if (req.method === 'POST' && req.url?.endsWith('/received')) {
+      let body = '';
+      req.on('data', chunk => { body += chunk; });
+      req.on('end', () => { received.push(JSON.parse(body)); res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ decisionId, answerId: 'N'.repeat(32), collectedAt: new Date().toISOString() })); });
+      return;
+    }
     if (++tries === 1) { req.socket.resetAndDestroy(); return; }
     res.writeHead(200, { 'content-type': 'application/json' });
     res.end(JSON.stringify({ status: 'answered', answer: { answerId: 'N'.repeat(32), decisionId, requestId: 'R'.repeat(32), answer: answerTo('ap-wait', { kind: 'option', number: 1 }), sentAt: new Date().toISOString() } }));
@@ -133,7 +140,7 @@ test('sent, no reply: it may have reached the owner, and waiting forever still t
 
     agent('ap-wait', flaky.origin);
     const waited = await op.wait('ap-wait', decisionId, { forever: true, seconds: 1 });
-    assert.deepEqual([waited.code, tries], [0, 2]);
+    assert.deepEqual([waited.code, tries, received], [0, 2, [{ answerId: 'N'.repeat(32) }]]);
     assert.match(waited.text, /^Answered at \d{1,2}:\d{2} [AP]M: option A "A"\./);
   } finally { await Promise.all([silent.close(), dropping.close(), keyed.close(), flaky.close()]); }
 });

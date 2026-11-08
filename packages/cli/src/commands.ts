@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { createHash, randomBytes } from 'node:crypto';
 import { Option, Schema } from 'effect';
-import { Acknowledgement, AgentStatus, AnswerStatus, Asked, CLOSED_AGENT_FINISHED, Connected, DecisionClosedRefusal, Finished, PagerKey, acceptsChoice, decisionIdOf, type Closed, type ClosedDecision } from '../../contract/exchange.ts';
+import { Acknowledgement, AgentStatus, AnswerStatus, Asked, CLOSED_AGENT_FINISHED, Connected, DecisionClosedRefusal, Finished, PagerKey, Received, acceptsChoice, decisionIdOf, type Closed, type ClosedDecision } from '../../contract/exchange.ts';
 import { call, type Failure } from './client.ts';
 import { compile, type Source } from './card.ts';
 import { HARNESS_APP, detectApp, detectMachine, detectProject, harness, self, type Harness } from './detect.ts';
@@ -23,6 +23,9 @@ const WAIT_SECONDS = 50;
 export const DESKTOP_WAIT_MS = 2 * 3_600_000;
 // How long `wait --forever` pauses before trying an unreachable server again.
 const RETRY_MS = 10_000;
+// Saying an answer was received: each try's time limit, and how many tries, a moment apart. A few seconds at most, since
+// the agent gets its answer only after.
+const RECEIVED_TIMEOUT_MS = 3_000, RECEIVED_TRIES = 3, RECEIVED_AGAIN_MS = 500;
 // How long an ask whose reply was lost pauses before it is sent once more, and how long a run holds its card while
 // it sends: longer than its two tries can take, so a run that died lets the card go.
 const ASK_AGAIN_MS = 1_000, SENDING_MS = 2 * 60_000;
@@ -310,6 +313,7 @@ export async function wait(agent: string, ref: string, opts: { seconds?: number;
     // Only the phone, which read the card, holds the key the answer is sealed to; an answer that doesn't open, or names
     // an option the card didn't offer, isn't the owner's answer to this card.
     if (!choice || (d.options.length > 0 && !acceptsChoice({ options: d.options.map((_, i) => ({ number: i + 1 })) }, choice))) return refused(unreadableAnswer(d.short));
+    await received(a, d.id, r.value.answer.answerId);
     if (!d.answered) {
       try {
         updateAgent(a.id, x => { if (x.decisions[d.short]) x.decisions[d.short].answered = true; });
@@ -327,6 +331,21 @@ export async function wait(agent: string, ref: string, opts: { seconds?: number;
       'Follow the note. If you still need a decision, ask a new card. Acknowledge this one with',
       `what you'll do: agentpager ack --agent ${a.id} ${d.short} "<next steps>"`,
     ].join('\n'), { status: 'answered', note });
+  }
+}
+
+// This command has the answer, opened: it tells the service so, a step of its own after the read, and only now does the
+// answer count as picked up (B32.12, blueprint/areas/2-agents.md). A wait whose command went away before this never
+// gets here, so the owner is still told no agent picked the answer up (B5.13). Sent before the answer is handed to the
+// agent, while this run is sure to be alive. A try with no reply, or a server that failed, is tried again; a refusal
+// isn't, since another try gets the same. Nothing here keeps the answer from the agent: one that never lands leaves
+// the owner the warning, until the agent's acknowledgement picks the answer up instead. A service from before this
+// (m6.1) refuses the route as NotFound, having picked the answer up when it was read.
+async function received(a: AgentFile, decisionId: string, answerId: string) {
+  for (let tries = 1; tries <= RECEIVED_TRIES; tries++) {
+    const r = await call(Received, a.server, 'POST', `/api/agents/${a.agentId}/cards/${decisionId}/received`, { key: a.agentKey, data: { answerId }, timeoutMs: RECEIVED_TIMEOUT_MS });
+    if (r.ok || (r.status > 0 && r.status < 500)) return;
+    if (tries < RECEIVED_TRIES) await new Promise(res => setTimeout(res, RECEIVED_AGAIN_MS));
   }
 }
 

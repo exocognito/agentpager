@@ -13,6 +13,8 @@ test('a wrong key wins over invalid input', { timeout: 180_000 }, async () => {
       ['ask with an unknown field', `/api/agents/${aid}/cards`, { data: { title: 'Ok?', bogus: 1 } }],
       ['read with a bad wait', `/api/agents/${aid}/cards/${did}/answer?wait=forever`, { method: 'GET' }],
       ['acknowledge without an answer id', `/api/agents/${aid}/cards/${did}/acknowledge`, { data: { nextSteps: 'Go.' } }],
+      ['say it received an answer without its id', `/api/agents/${aid}/cards/${did}/received`, { data: {} }],
+      ['say it received an answer of a malformed decision id', `/api/agents/${aid}/cards/not-a-decision/received`, { data: { answerId: did } }],
       ['finish with a field', `/api/agents/${aid}/finish`, { data: { now: true } }],
       ['read a malformed decision id', `/api/agents/${aid}/cards/not-a-decision/answer`, { method: 'GET' }],
       ['acknowledge a malformed decision id', `/api/agents/${aid}/cards/not-a-decision/acknowledge`, { data: { answerId: did, nextSteps: 'Go.' } }],

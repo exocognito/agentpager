@@ -46,6 +46,12 @@ accepts (`OLDEST_PROTOCOL` in `src/contract.ts`), is refused `UpdateRequired`, b
 to update. Since the encryption switch (protocol 2) the phone's calls need it too: an older app is refused the same way,
 never `UnknownPager`.
 
+An answer counts as picked up (B32.12) once the agent's command says it has received it, with
+`POST /api/agents/<id>/cards/<decisionId>/received {answerId}` after it has read and opened the answer, or once the agent
+acknowledges it. One not picked up 3 minutes after Send brings the owner's warning, once. The command speaks protocol 3
+(`PICKUP_PROTOCOL`) to say so; an agent's call at protocol 2, as from the `m6.1` command and every one before it, picks
+the answer up by reading it, as before.
+
 ## Decision briefs (dogfood)
 
 `card.type: "brief"` carries Markdown sections (the canvas Kit) and 2 to 4 lettered options; `attachments` carry
@@ -62,7 +68,7 @@ acknowledges each answer.
 
 ## Local configuration
 
-`PORT`, `AGENTPAGER_INSPECTOR_PORT`, and `AGENTPAGER_PERSIST` select the local listener, inspector and persistent storage (outside the worktree). `AGENTPAGER_AUTO_OFF_MS` (every auto-off choice), `AGENTPAGER_IDLE_MS` (housekeeping) and `AGENTPAGER_PICKUP_MS` (the warning when no agent collects an answer) are local-only compile-time clocks, so tests cross them in real time; zero or unset is the production value. Local startup builds to a private temporary directory, so concurrent instances never race over a bundle or database. Production builds always compile the production clocks.
+`PORT`, `AGENTPAGER_INSPECTOR_PORT`, and `AGENTPAGER_PERSIST` select the local listener, inspector and persistent storage (outside the worktree). `AGENTPAGER_AUTO_OFF_MS` (every auto-off choice), `AGENTPAGER_IDLE_MS` (housekeeping) and `AGENTPAGER_PICKUP_MS` (the warning when no agent picks an answer up) are local-only compile-time clocks, so tests cross them in real time; zero or unset is the production value. Local startup builds to a private temporary directory, so concurrent instances never race over a bundle or database. Production builds always compile the production clocks.
 
 ## Acceptance proof
 

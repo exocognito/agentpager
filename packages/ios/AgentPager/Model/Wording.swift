@@ -46,6 +46,12 @@ enum Wording {
         "\(agent.app)\(agent.machine.map { " on " + $0 } ?? "") (\(agent.project)) hasn’t picked up your answer. It may be asleep, closed or disconnected: check in with it directly."
     }
 
+    // A decision that closed unanswered (B5.17): that who asked finished first, when that is why; a reason this app
+    // doesn't know isn't named.
+    static func closedUnanswered(_ closed: Closed, _ agent: AgentInfo) -> String {
+        closed.reason == Closed.agentFinished ? "\(agent.app) finished before you answered" : "Closed before you answered"
+    }
+
     static func capitalized(_ text: String) -> String { text.prefix(1).uppercased() + text.dropFirst() }
 
     // A decision, or an agent, whose encrypted parts this phone can't read (I4.9): none of it is shown.

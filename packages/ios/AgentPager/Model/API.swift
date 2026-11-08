@@ -117,6 +117,16 @@ nonisolated struct Acknowledgement: Codable, Hashable, Sendable {
 
 nonisolated enum DecisionStatus: String, Codable, Sendable { case open, answered, feedback, acknowledged }
 
+// A decision that closed unanswered: when, and why (Closed in packages/contract/exchange.ts, which mirror.test.ts
+// checks). Its status stays open on the wire. Its agent finishing first is the only reason the service gives for now; a
+// reason this app doesn't know still closes the decision, in words that don't say why, so the reason is read as text:
+// a fixed list here would fail the whole read on a reason added later, as SealedStatus does on a status.
+nonisolated struct Closed: Codable, Hashable, Sendable {
+    static let agentFinished = "agentFinished"
+    var at: Date
+    var reason: String
+}
+
 // A decision as the phone opened it. answerKey: the agent's key, from inside the card, the only key an answer is
 // sealed to. unreadable: a part of it didn't open or decode, or the phone doesn't hold the answer it sent, so it shows
 // as one the phone can't read, with nothing of it and nothing to answer (I4.9).
@@ -133,6 +143,8 @@ nonisolated struct Decision: Codable, Hashable, Identifiable, Sendable {
     var collectedAt: Date?
     var warnedAt: Date?
     var acknowledgement: Acknowledgement?
+    // Set once it closed unanswered (B5.17): nothing can answer it.
+    var closed: Closed?
     var answerKey: String = ""
     var unreadable: Bool = false
     var id: String { decisionId }
@@ -183,6 +195,7 @@ nonisolated struct SealedDecision: Codable, Hashable, Sendable {
     var collectedAt: Date?
     var warnedAt: Date?
     var acknowledgement: SealedAcknowledgement?
+    var closed: Closed?
 }
 nonisolated struct SealedAgentInbox: Codable, Hashable, Sendable {
     var agent: SealedAgent

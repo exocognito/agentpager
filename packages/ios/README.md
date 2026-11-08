@@ -36,7 +36,8 @@ A **decision** is pushed full screen. Options, background pages and Ask for chan
 handle; images open full screen. Once answered, the bar is the closed record: the choice, then the agent's
 confirmation and next steps. Until it confirms, the bar says the phone is waiting for the agent; if no agent has
 read the answer 3 minutes after Send, it says so instead, naming the agent, its computer and its project, until one
-does (I6).
+does (I6). A decision whose agent finished before it was answered closed unanswered: it shows with its project's
+answered ones, its brief stays readable, and its bar says who asked finished first, with nothing to pick or send.
 
 ## Alerts
 
@@ -105,8 +106,8 @@ frames in order with the action that led to each.
 
 `-failSends N` (launch argument) makes the next N answer attempts fail, to show the "Answer Not Confirmed" alert.
 `-demo <state>` launches on the mocks' sample data with no network: `pagers` (default), `pager`, `detail`, `new`,
-`decision`, `selected`, `options`, `page`, `changes`, `off`, `answered`, `undo`, `notconfirmed`, `notpickedup`,
-`empty`. `DesignTests` has one test per state; add one when you add a state.
+`decision`, `selected`, `options`, `page`, `changes`, `off`, `answered`, `closed`, `closedlist`, `undo`, `notconfirmed`,
+`notpickedup`, `empty`. `DesignTests` has one test per state; add one when you add a state.
 
 ## Design catalogue
 

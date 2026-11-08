@@ -2,7 +2,7 @@ import SwiftUI
 
 // A decision, pushed full screen with a back chevron naming the pager. Options, background pages and Ask for changes
 // open as bottom sheets with a grab handle; images stay full-screen covers. The bar at the bottom answers it, says
-// its pager is off, or is the closed record once answered.
+// its pager is off, or is the closed record once answered, or once it closed unanswered.
 struct DecisionView: View {
     @Environment(AppModel.self) private var model
     var pagerId: String
@@ -31,7 +31,8 @@ struct DecisionView: View {
                 ContentUnavailableView(Wording.unreadableDecision, systemImage: "lock.trianglebadge.exclamationmark", description: Text(Wording.unreadableDetail))
                     .accessibilityIdentifier("unreadable-decision")
             } else if let a = model.asked(pagerId, agentId, decisionId) {
-                let d = a.decision, open = model.choice(d) == nil
+                // Open: nothing chosen for it, and it hasn't closed unanswered (B5.17).
+                let d = a.decision, open = model.choice(d) == nil && d.closed == nil
                 BriefView(agentId: agentId, decision: d, picked: open ? $selection : nil, subtitle: subtitle(d),
                           openPage: { sheet = .page($0) }, openOptions: { sheet = .options }, bottom: AnyView(bar(a, open: open)))
             } else {
@@ -54,11 +55,17 @@ struct DecisionView: View {
             guard !restored else { return }
             restored = true
             if let s = model.demoSheet { model.demoSheet = nil; sheet = s }
+            // A draft is restored only while the decision can still be answered.
+            guard model.asked(pagerId, agentId, decisionId)?.decision.closed == nil else { return }
             switch model.drafts[decisionId] {
             case .option(let n): selection = n
             case .feedback(let text): feedback = text; sheet = .changes
             case nil: break
             }
+        }
+        // Closing unanswered while Ask for changes is open takes the sheet away: nothing can be sent.
+        .onChange(of: model.asked(pagerId, agentId, decisionId)?.decision.closed != nil) { _, closed in
+            if closed, sheet == .changes { sheet = nil }
         }
     }
 
@@ -68,13 +75,15 @@ struct DecisionView: View {
     }
 
     private func subtitle(_ d: Decision) -> String {
-        guard let sent = d.answer?.sentAt else { return Wording.ago(d.askedAt, now: model.now) }
-        let sameDay = Calendar.current.isDate(d.askedAt, inSameDayAs: sent)
-        return "Asked \(Wording.when(d.askedAt)) · Answered \(sameDay ? Wording.time(sent) : Wording.when(sent))"
+        let (verb, at): (String, Date?) = d.answer.map { ("Answered", $0.sentAt) } ?? ("Closed", d.closed?.at)
+        guard let at else { return Wording.ago(d.askedAt, now: model.now) }
+        let sameDay = Calendar.current.isDate(d.askedAt, inSameDayAs: at)
+        return "Asked \(Wording.when(d.askedAt)) · \(verb) \(sameDay ? Wording.time(at) : Wording.when(at))"
     }
 
     @ViewBuilder private func bar(_ a: Asked, open: Bool) -> some View {
-        if !open { ClosedBar(asked: a) }
+        if let closed = a.decision.closed { UnansweredBar(asked: a, closed: closed) }
+        else if !open { ClosedBar(asked: a) }
         else if !model.isOn(pagerId) { OffBar(decision: a.decision, pagerName: model.pager(pagerId)?.name ?? "This") { Task { await model.setOn(pagerId, true) } } }
         else {
             AnswerBar(decision: a.decision, picked: $selection, askForChanges: { sheet = .changes }) {
@@ -275,6 +284,30 @@ struct ClosedBar: View {
         let when = d.answer.map { Wording.capitalized(Wording.when($0.sentAt)) } ?? "Sending"
         if case .feedback? = choice { return "Your note · " + when }
         return when
+    }
+}
+
+// A decision that closed unanswered (B5.17): who asked finished before the owner answered, and when it closed. Nothing
+// to pick or send.
+struct UnansweredBar: View {
+    var asked: Asked
+    var closed: Closed
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Nothing can be sent for this decision.").font(.footnote).foregroundStyle(.secondary).frame(maxWidth: .infinity)
+            HStack(spacing: 12) {
+                ChoiceBadge(decision: asked.decision, choice: nil, size: 40)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(Wording.closedUnanswered(closed, asked.agent)).font(.title3.weight(.semibold)).lineLimit(3)
+                    Text("Closed unanswered · " + Wording.capitalized(Wording.when(closed.at))).font(.subheadline).foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("closed-unanswered")
+        }
+        .barStyle()
     }
 }
 

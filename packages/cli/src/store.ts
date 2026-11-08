@@ -24,10 +24,12 @@ const AgentFile = Schema.mutable(Schema.Struct({
   app: Schema.String, project: Schema.String, machine: Schema.optional(Schema.String), createdAt: Schema.String,
   rulesShownAt: Schema.NullOr(Schema.String), cardsSinceRules: Schema.Number,
   // Short decision ids for the agent (d_2x8w): the server's id, the question and its option labels, and how far it got.
-  // askedAt came later, so a file from before it still loads.
+  // askedAt came later, and closed (it closed unanswered, as the service said) later still, so a file from before
+  // either still loads; a command from before closed keeps it when it writes the file.
   decisions: Schema.mutable(Schema.Record({ key: Schema.String, value: Schema.mutable(Schema.Struct({
     id: Schema.String, title: Schema.String, options: Schema.mutable(Schema.Array(Schema.String)),
     askedAt: Schema.optional(Schema.String), answered: Schema.optional(Schema.Boolean), acknowledged: Schema.optional(Schema.Boolean),
+    closed: Schema.optional(Schema.Boolean),
   })) })),
   // Asks no reply has settled yet, by their card's content: the request id chosen for each, so the same card asked
   // again after a lost reply names the same decision; the run that last took it (run), which alone may change it; and,
@@ -131,7 +133,7 @@ export function agentIds(): string[] {
 // History: per pager, append only, capped at 1,000 lines with the oldest dropped. Never printed unasked.
 export const HISTORY_CAP = 1000;
 const historyPath = (pager: string) => path.join(home(), 'history', `${pager}.jsonl`);
-export type HistoryEvent = { [key: string]: unknown; at: string; event: 'asked' | 'answered' | 'acknowledged'; agent: string; decision: string };
+export type HistoryEvent = { [key: string]: unknown; at: string; event: 'asked' | 'answered' | 'acknowledged' | 'closed'; agent: string; decision: string };
 // Every agent on the pager appends to its one file, each from its own process: the append and the trim take the
 // pager's history lock, so a trim never drops a line another agent appended after reading. The trimmed file is
 // written beside it and renamed over it, so a crash leaves the old file or the new one, never part of one.

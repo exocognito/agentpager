@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { Schema } from "effect";
-import { AskInput, Body, ConnectInput, Decision, ENVELOPE_OVERHEAD_BYTES, PART_MAX_BYTES, QuestionInput, Sealed, sealedBytes } from "./exchange.ts";
+import { AgentStatus, AskInput, Body, CLOSED_AGENT_FINISHED, ConnectInput, DECISION_CLOSED_MESSAGE, Decision, DecisionClosedRefusal, ENVELOPE_OVERHEAD_BYTES, Finished, PART_MAX_BYTES, PagerInbox, QuestionInput, REFUSAL_STATUS, Sealed, sealedBytes } from "./exchange.ts";
 import { keyPair, seal, toBase64url } from "./envelope.ts";
 const token = "a".repeat(32), answerId = "b".repeat(32);
 const when = "2026-09-29T12:00:00.000Z";
@@ -93,4 +93,46 @@ it("connects with the number and the identity sealed, never readable who asked o
     expect(() => Schema.decodeUnknownSync(ConnectInput)({ ...connect, ...readable })).toThrow();
   }
   expect(Schema.is(ConnectInput)({ number: connect.number, identity: "Codex" })).toBe(false);
+});
+
+// A decision that closed unanswered (M6, Sam's answers 2 and 4 in blueprint/milestones/M6-tidy.md): added fields only,
+// so every reply an `m5` client reads decodes as before, and the new fields ride beside a status that doesn't change.
+const closedAt = "2026-11-07T18:00:00.000Z", closed = { at: closedAt, reason: CLOSED_AGENT_FINISHED };
+const agent = { agentId: answerId, identity: part(), createdAt: when, finishedAt: closedAt, lastActivityAt: closedAt, openCount: 0 };
+it("a decision that closed unanswered stays open on the wire, with when and why; only one with no answer closes", () => {
+  const strict = Schema.decodeUnknownEither(Decision, { onExcessProperty: "error" });
+  expect(strict({ ...question, closed })._tag).toBe("Right");
+  expect(Schema.decodeUnknownSync(Decision)({ ...question, closed }).closed).toEqual(closed);
+  // An answered or acknowledged decision never closed unanswered.
+  const ack = { decisionId: token, answerId, acknowledgement: part(), acknowledgedAt: when };
+  expect(Schema.is(Decision)({ ...question, status: "answered", answer, closed })).toBe(false);
+  expect(Schema.is(Decision)({ ...question, status: "acknowledged", answer, acknowledgement: ack, closed })).toBe(false);
+  // A reason is an identifier the client needn't know; a time is a real one.
+  expect(Schema.is(Decision)({ ...question, closed: { at: closedAt, reason: "agentForgotten" } })).toBe(true);
+  for (const bad of [{ at: closedAt }, { reason: CLOSED_AGENT_FINISHED }, { at: "yesterday", reason: CLOSED_AGENT_FINISHED }, { at: closedAt, reason: "" }, { at: closedAt, reason: "agent finished" }, { ...closed, why: "Finished." }]) {
+    expect(strict({ ...question, closed: bad })._tag, JSON.stringify(bad)).toBe("Left");
+  }
+});
+it("the m5 shapes decode as before, and every reply with the new fields decodes", () => {
+  // As the `m5` service sends them: no closed anywhere.
+  const inbox = { pager: { pagerId, on: true, autoOff: "never", offAt: null, offSince: null, createdAt: when }, agents: [{ agent, open: [question], answered: [] }] };
+  expect(Schema.decodeUnknownSync(PagerInbox)(inbox).agents[0].open[0].closed).toBeUndefined();
+  expect(Schema.decodeUnknownSync(AgentStatus)({ agent, pager: { on: true } }).closed).toBeUndefined();
+  expect(Schema.decodeUnknownSync(Finished)({ finishedAt: closedAt }).closed).toBeUndefined();
+  // As the service sends them once finishing closes decisions.
+  const listed = [{ decisionId: token, ...closed }];
+  expect(Schema.decodeUnknownSync(PagerInbox)({ ...inbox, agents: [{ agent, open: [{ ...question, closed }], answered: [] }] }).agents[0].open[0].closed).toEqual(closed);
+  expect(Schema.decodeUnknownSync(AgentStatus)({ agent, pager: { on: true }, closed: listed }).closed).toEqual(listed);
+  expect(Schema.decodeUnknownSync(Finished)({ finishedAt: closedAt, closed: listed }).closed).toEqual(listed);
+  expect(Schema.decodeUnknownSync(Finished)({ finishedAt: closedAt, closed: [] }).closed).toEqual([]);
+  expect(Schema.is(Finished)({ finishedAt: closedAt, closed: [{ decisionId: "d_2x8w", ...closed }] })).toBe(false);
+});
+it("waiting on or answering a decision that closed unanswered is refused as DecisionClosed, with its record and words for the agent", () => {
+  expect(REFUSAL_STATUS.DecisionClosed).toBe(409);
+  const refusal = { error: "DecisionClosed", message: DECISION_CLOSED_MESSAGE, closed };
+  expect(Schema.decodeUnknownSync(DecisionClosedRefusal)(refusal).closed).toEqual(closed);
+  expect(Schema.is(DecisionClosedRefusal)({ ...refusal, closed: undefined })).toBe(false);
+  expect(Schema.is(DecisionClosedRefusal)({ ...refusal, error: "NotAnswered" })).toBe(false);
+  // One plain sentence for what happened, then what to do: an `m5` command prints it as it is.
+  expect(DECISION_CLOSED_MESSAGE).toMatch(/^This decision closed unanswered when this agent finished, .+\. To ask about new work, connect again\.$/);
 });

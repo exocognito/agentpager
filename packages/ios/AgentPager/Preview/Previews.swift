@@ -170,6 +170,18 @@ extension Sample {
             m.inboxes[work]?.agents[0].agent.machine = "air"
             m.inboxes[work]?.agents[0].answered.insert(d, at: 0)
             m.path = [.pager(work), .decision(pagerId: work, agentId: codex, decisionId: d.decisionId)]
+        case "closed", "closedlist":
+            // Claude Code finished yesterday before the owner answered either of its open decisions: both closed
+            // unanswered (B5.17), and its project shows them with its answered ones.
+            let (asked, at) = yesterday, closed = Closed(at: at, reason: Closed.agentFinished)
+            var d = m11Decision("m11shut00000000000000000000001x")
+            d.askedAt = asked
+            d.closed = closed
+            m.inboxes[work]?.agents[1].agent.finishedAt = at
+            let earlier = (m.inboxes[work]?.agents[1].open ?? []).map { var o = $0; o.askedAt = asked; o.closed = closed; return o }
+            m.inboxes[work]?.agents[1].open = [d] + earlier
+            m.files["\(claude)/\(d.decisionId)/background.md"] = Data(background.utf8)
+            m.path = state == "closed" ? [.pager(work), .decision(pagerId: work, agentId: claude, decisionId: d.decisionId)] : [.pager(work), .answered(pagerId: work, project: "agentpager")]
         case "undo": m.path = [.pager(work)]; m.undo = PreparedAnswer(pagerId: work, agentId: codex, decisionId: m11, requestId: "r", choice: .option(1), sealed: "", deadline: .now.addingTimeInterval(3600))
         case "notconfirmed":
             let p = PreparedAnswer(pagerId: work, agentId: codex, decisionId: m11, requestId: "r", choice: .option(1), sealed: "", deadline: .now)
@@ -189,4 +201,5 @@ extension Sample {
 #Preview("Decision · pager off") { RootView().environment(Sample.demo("off") ?? Sample.model()) }
 #Preview("Answered decision") { RootView().environment(Sample.demo("answered") ?? Sample.model()) }
 #Preview("Options") { RootView().environment(Sample.demo("options") ?? Sample.model()) }
+#Preview("Closed unanswered") { RootView().environment(Sample.demo("closed") ?? Sample.model()) }
 #Preview("Undo window") { RootView().environment(Sample.demo("undo") ?? Sample.model()) }

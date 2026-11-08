@@ -1,0 +1,49 @@
+-demo closedlist: A project's answered decisions with the two that closed unanswered when Claude Code finished, newest first.
+
+app "AgentPager" [0,0 390x844]
+ window [0,0 390x844]
+  navbar #agentpager [0,47 390x54]
+   button #BackButton "Work" [16,47 44x44]
+   text "agentpager" [149,58 92x20]
+  collection [0,0 390x844]
+   cell [16,136 358x75]
+    button #answered-Earlier decision 1 "A, Earlier decision 1, Agent confirmed, Claude Code · A. Go ahead" [16,136 358x75] selected
+     text "A, Earlier decision 1, Agent confirmed, Claude Code · A. Go ahead" [36,153 243x41] selected
+      text "A" [43,157 10x18]
+      text "Earlier decision 1" [74,153 127x20]
+      image #checkmark "Agent confirmed" [75,179 12x11] selected
+      text "Claude Code · A. Go ahead" [95,176 184x18]
+     image #chevron.forward [344,167 7x12]
+   cell [16,211 358x117]
+    button #answered-Which M11 guarantee should we build? "Closed, Which M11 guarantee should we build?, Claude Code finished before you answered" [16,211 358x117]
+     text "Closed, Which M11 guarantee should we build?, Claude Code finished before you answered" [36,228 261x83]
+      image #xmark "Closed" [43,236 10x10]
+      text "Which M11 guarantee should we build?" [74,228 223x42]
+      text "Claude Code finished before you answered" [74,273 199x38]
+     image #chevron.forward [344,264 7x12]
+   cell [16,328 358x117]
+    button #answered-Option detail: bottom sheet or full screen? "Closed, Option detail: bottom sheet or full screen?, Claude Code finished before you answered" [16,328 358x117]
+     text "Closed, Option detail: bottom sheet or full screen?, Claude Code finished before you answered" [36,345 270x83]
+      image #xmark "Closed" [43,353 10x10]
+      text "Option detail: bottom sheet or full screen?" [74,345 232x42]
+      text "Claude Code finished before you answered" [74,390 199x38]
+     image #chevron.forward [344,381 7x11]
+   cell [16,446 358x75]
+    button #answered-Earlier decision 2 "A, Earlier decision 2, Agent confirmed, Claude Code · A. Go ahead" [16,446 358x75] selected
+     text "A, Earlier decision 2, Agent confirmed, Claude Code · A. Go ahead" [36,463 243x41] selected
+      text "A" [43,467 10x18]
+      text "Earlier decision 2" [74,463 129x20]
+      image #checkmark "Agent confirmed" [75,489 12x11] selected
+      text "Claude Code · A. Go ahead" [95,486 184x18]
+     image #chevron.forward [344,477 7x12]
+   cell [16,521 358x75]
+    button #answered-Earlier decision 3 "A, Earlier decision 3, Agent confirmed, Claude Code · A. Go ahead" [16,521 358x75] selected
+     text "A, Earlier decision 3, Agent confirmed, Claude Code · A. Go ahead" [36,538 243x41] selected
+      text "A" [43,542 10x18]
+      text "Earlier decision 3" [74,538 130x20]
+      image #checkmark "Agent confirmed" [75,565 12x11] selected
+      text "Claude Code · A. Go ahead" [95,561 184x18]
+     image #chevron.forward [344,553 7x12]
+   other "Vertical scroll bar, 1 page" value="0%" [357,101 30x695]
+   other "Vertical scroll bar, 1 page" value="0%" [357,101 30x695]
+  toolbar #Toolbar "Toolbar" [0,0 390x844]

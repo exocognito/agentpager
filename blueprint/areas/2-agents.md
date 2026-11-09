@@ -44,7 +44,7 @@
 - If no agent picks an answer up 3 minutes after Send, the owner is told once, on the decision (B5) and by an alert (B17).
 - While the pager is off, waiting and acknowledging are refused like every other call, and nothing is queued (I17).
 
-### B33 · @M3 · Each agent app is told how it wakes
+### B33 · @M3 · Each supported agent app wakes its agent
 
 1. The command words its waiting for an agent's app only when it identifies the app for certain. An agent in an app not named below is told, when it connects, that its owner may have to nudge it to read an answer.
 2. Claude Code in a terminal, with AgentPager's plugin, gets the answer as a new turn: within a second once it is idle, or as its next turn when busy. It isn't told to wait. Without the plugin, and where the plugin can't start a turn (`claude -p`, the desktop app's Code tab), it is told to run the wait with no end as a background command, as before.
@@ -84,12 +84,12 @@ Why: [Unblock my agent from my phone](../PRODUCT.md#unblock-my-agent-from-my-pho
 
 ## Limits
 
-### L11 · @M3 · Only Claude agents wake by themselves
+### L11 · @M3 · Apps other than Claude, Codex and pi don't wake by themselves
 
-- What people meet: Codex, Cursor, pi and every other agent are told to call wait again while the answer is pending. One that keeps working in its turn and keeps calling wait gets the answer. One that ends its turn gets it only when something starts its next turn, so the owner has to nudge it. The owner is told when no agent has picked up an answer after 3 minutes (B17).
-- Why it waits: only Claude Code and Claude Desktop were tested for how an answer reaches them, and on 30 Oct Sam chose words for those two and left the rest unchanged.
-- What would fix it: a tested way for each app to wake its agent when the answer arrives, worded for that app as B33 does for Claude.
-- When to revisit: CLIENTS, which settles which agent apps AgentPager supports.
+- What people meet: agents in Cursor, Gemini CLI, OpenCode and every other app are told when they connect that they may need a nudge. One that ends its turn gets the answer only when something starts its next turn, so the owner has to nudge it. The owner is told when no agent has picked up an answer after 3 minutes (B17).
+- Why it waits: on 8 Nov Sam chose to wake Claude Code, Codex and pi first (DEC-2026-11-08-clients).
+- What would fix it: a tested wake for each app, worded for that app as B33 does for Claude Code, Codex and pi.
+- When to revisit: when an owner uses one.
 
 ### L12 · @M3 · A Desktop chat stops waiting after two hours
 

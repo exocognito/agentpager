@@ -67,7 +67,7 @@ async function seen(p: { pagerId: string; phone: string }, title: string) {
   return undefined;
 }
 
-test('B33.2 B32.12 With the plugin, an agent that asks from its shell isn\'t told to wait, and its owner\'s answer comes as a turn within a second, carrying the command\'s reply; the command picked it up, and nothing is left running', { timeout: 120_000 }, async () => {
+test('B33.2 B32.12 With the plugin, an agent that asks from its shell isn\'t told to wait; its owner\'s answer comes as a turn within a second when Claude is idle, as the next turn when busy, and after a restart, carrying the command\'s reply; it counts as picked up only once that turn has started, and nothing is left running', { timeout: 180_000 }, async () => {
   const p = await f.makePager(), session = randomUUID();
   // Claude Code's shell: CLAUDECODE and its own session id; the mod names the session at its start.
   Object.assign(process.env, { CLAUDECODE: '1', CLAUDE_CODE_SESSION_ID: session });
@@ -75,32 +75,55 @@ test('B33.2 B32.12 With the plugin, an agent that asks from its shell isn\'t tol
   await mod.start();
   assert.equal(process.env.AGENTPAGER_WAKE, `claude-code:${session}`);
   const id = field(await op.connect({ number: p.number, project: 'plugin' }), 'agent');
+  const handed = (agent: string, d: string) => existsSync(path.join(home, 'claude-code', `${agent}.${d}`));
+  const answer = async (title: string, number: number) => {
+    const d = await seen(p, title);
+    return (await f.answer(d?.agentId ?? '', p.phone, d?.decisionId ?? '', { kind: 'option', number })).sentAt;
+  };
+
+  // Idle.
   const asked = await op.ask(id, card('Which colour?')), d = field(asked, 'decision');
   assert.ok(asked.text.endsWith(`\nDecision ${d}. Don't wait for it: when your owner answers, the answer comes to you as a new message. Carry on or end your turn.`), asked.text);
   await until(async () => mod.held, held => held.some(x => x.decision === d && x.state === 'holding'));
-  const before = await seen(p, 'Which colour?');
-  // The mod's wait is held; the owner answers.
-  const { sentAt } = await f.answer(before?.agentId ?? '', p.phone, before?.decisionId ?? '', { kind: 'option', number: 2 });
+  const sentAt = await answer('Which colour?', 2);
   const [turn] = await until(async () => cc.turns, t => t.length > 0);
   assert.ok(turn && turn.at - Date.parse(sentAt) < 1_000, `the turn ${turn ? turn.at - Date.parse(sentAt) : '?'} ms after Send`);
   assert.match(turn?.text ?? '', new RegExp(`^AgentPager: your owner answered decision ${d} \\(agent ${id}\\)\\. The agentpager command's reply:\\n\\nAnswered at .+: option B "Green"\\.\\nDo it, then confirm: agentpager ack --agent ${id} ${d} "<what happens next>"$`));
-  assert.ok((await seen(p, 'Which colour?'))?.collectedAt, 'the command\'s wait picked it up (B32.12)');
-  assert.ok(existsSync(path.join(home, 'claude-code', `${id}.${d}`)), 'claimed');
-  // The agent acknowledges: the decision leaves the record, and the claim goes.
+  await until(async () => (await seen(p, 'Which colour?'))?.collectedAt, at => Boolean(at), 5_000);
+  assert.ok(handed(id, d));
+  // The agent acknowledges: the decision leaves the record, and the record of handing it over goes.
   await op.ack(id, d, 'Painting it green.');
-  await until(async () => existsSync(path.join(home, 'claude-code', `${id}.${d}`)), there => !there, 5_000);
-  // A second question, and Claude Code quits before the owner answers: its wait stops with it.
-  const second = field(await op.ask(id, card('Which shade?')), 'decision');
-  await until(async () => mod.held, held => held.some(x => x.decision === second && x.state === 'holding'));
+  await until(async () => handed(id, d), there => !there, 5_000);
+
+  // Busy: the answer is held, and not picked up, until the running turn ends.
+  const busy = field(await op.ask(id, card('Which size?')), 'decision');
+  await until(async () => mod.held, held => held.some(x => x.decision === busy && x.state === 'holding'));
+  await mod.turnStarted();
+  await answer('Which size?', 1);
+  await until(async () => mod.held, held => held.some(x => x.decision === busy && x.state === 'ready'));
+  await new Promise(r => setTimeout(r, 1_500));
+  assert.equal(cc.turns.length, 1, 'no turn while one runs');
+  assert.equal((await seen(p, 'Which size?'))?.collectedAt, undefined, 'not picked up while Claude is busy');
+  const ended = Date.now();
+  await mod.turnEnded();
+  const next = (await until(async () => cc.turns, t => t.length > 1))[1];
+  assert.ok(next && next.at - ended < 1_000 && next.text.includes(`decision ${busy} `), `the next turn ${next ? next.at - ended : '?'} ms after the running one ended`);
+  await until(async () => (await seen(p, 'Which size?'))?.collectedAt, at => Boolean(at), 5_000);
+
+  // Claude Code quits before the owner answers: its wait stops with it, and nothing picks the answer up.
+  const later = field(await op.ask(id, card('Which shade?')), 'decision');
+  await until(async () => mod.held, held => held.some(x => x.decision === later && x.state === 'holding'));
   mod.sessionEnded('prompt_input_exit');
   await until(async () => [...cc.pids].filter(alive), running => running.length === 0, 5_000);
-  const unseen = await seen(p, 'Which shade?');
-  await f.answer(unseen?.agentId ?? '', p.phone, unseen?.decisionId ?? '', { kind: 'option', number: 1 });
+  await answer('Which shade?', 1);
+  await new Promise(r => setTimeout(r, 1_500));
+  assert.equal((await seen(p, 'Which shade?'))?.collectedAt, undefined);
   // Started again on the same session, the mod hands it over as the first turn, once.
   const again = claudeCode(session), restarted = new Mod(again.host, home);
   await restarted.start();
   const [first] = await until(async () => again.turns, t => t.length > 0);
-  assert.match(first?.text ?? '', new RegExp(`decision ${second} .*option A "Blue"`, 's'));
+  assert.match(first?.text ?? '', new RegExp(`decision ${later} .*option A "Blue"`, 's'));
+  await until(async () => (await seen(p, 'Which shade?'))?.collectedAt, at => Boolean(at), 5_000);
   await restarted.turnStarted(); await restarted.turnEnded();
   await new Promise(r => setTimeout(r, 2_500));
   assert.equal(again.turns.length, 1);
@@ -131,7 +154,7 @@ test('B33.2 The record the command writes is the one the plugin reads', () => {
     },
   };
   assert.deepEqual(decodeRecord('ap-7f3k', JSON.stringify(store.waitingOf(a), null, 2)), { agent: 'ap-7f3k', decisions: [
-    { decision: 'd_aaaa', session: 'sess-1' }, { decision: 'd_bbbb', session: 'sess-1' },
-    { decision: 'd_dddd', session: null }, { decision: 'd_eeee', session: null }, { decision: 'd_gggg', session: null },
+    { decision: 'd_aaaa', session: 'sess-1', pickedUp: false }, { decision: 'd_bbbb', session: 'sess-1', pickedUp: true },
+    { decision: 'd_dddd', session: null, pickedUp: false }, { decision: 'd_eeee', session: null, pickedUp: false }, { decision: 'd_gggg', session: null, pickedUp: false },
   ] });
 });

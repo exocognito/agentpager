@@ -8,14 +8,20 @@
 //   agent asks under that session, in the record of what's waiting (packages/cli/src/store.ts › waitingOf), and tells
 //   the agent not to wait. After a /clear or a /resume the session id is another, and so is the variable.
 // - It reads that record, never the command's words, for this session's decisions, and holds the command's own wait
-//   for each, `agentpager wait --agent <agent> <decision> --json`, one 50 s hold after another. The command opens the
-//   answer and says it has it (B32.12); the mod reads only the reply's code and status, and carries its text.
+//   for each, `agentpager wait --agent <agent> <decision> --json --hold`, one 50 s hold after another. The command opens
+//   the answer; a held wait doesn't say it has it, so an answer the mod holds while Claude is busy, or loses when Claude
+//   Code quits, still brings the owner's warning that no agent picked it up (B32.12). The mod reads only the reply's
+//   code and status, and carries its text.
+// - Once the turn carrying the answer has started, it tells the service the agent has it, with
+//   `agentpager pickup --agent <agent> <decision> --json`, and tries again 10 s apart while the decision is listed as
+//   not picked up, across a restart too.
 // - It hands the reply over as a new turn ($.prompt.submit) once Claude is idle: at once when it is, else after the
 //   running turn and a moment more, so a prompt the person queued, or a /clear, goes first. Never in a running turn.
-// - Each answer is handed over once: just before the turn is submitted it is claimed with an exclusive mkdir, under
-//   AgentPager's home, which a restart of Claude Code and a second Claude Code on the same session both find. A claim
-//   goes when its decision leaves the record (acknowledged or closed unanswered); one whose prompt Claude Code didn't
-//   take is given back, and the turn offered again after the person's next turn, or a minute later.
+// - Each answer is handed over once: once its turn has started, a folder under AgentPager's home says so, which a
+//   restart of Claude Code, or a later one on the same session, finds. It goes when its decision leaves the record
+//   (acknowledged or closed unanswered). A turn Claude Code didn't take is offered again after the person's next turn,
+//   or a minute later. Two Claude Codes running one session at the same moment would each hand it over to their own
+//   conversation (not tested).
 // - It stops every wait it holds when the session ends, and a held wait ends by itself within 50 s if Claude Code is
 //   killed, so nothing is left running.
 
@@ -29,7 +35,7 @@ export const LINE_ID = 'agentpager:available';
 // How often the record is looked at; how long after a turn ends a handed-over turn waits, so the person's own prompt
 // goes first; and how long a wait that can't reach the service or the pager pauses before the next.
 export const TICK_MS = 1_000, SETTLE_MS = 500;
-const AGAIN_MS = 1_000, UNREACHABLE_MS = 10_000, OFF_MS = 60_000, GONE_MS = 60_000, NOT_TAKEN_MS = 60_000;
+const AGAIN_MS = 1_000, UNREACHABLE_MS = 10_000, OFF_MS = 60_000, GONE_MS = 60_000, NOT_TAKEN_MS = 60_000, PICKUP_AGAIN_MS = 10_000;
 
 // What register.ts gives the mod of Claude Code.
 export type Entry = { name: string; kind: string; size: number; mtimeMs: number };
@@ -80,7 +86,7 @@ const RECORD_FILE = /^(ap-[a-z0-9]{4})\.json$/, CLAIM = /^(ap-[a-z0-9]{4})\.(d_[
 // The record of what's waiting for one agent, as the command writes it (store.ts › Waiting), decoded: each decision it
 // lists, with the Claude Code session that asked it when one did. Null for a file that isn't a version 1 record of
 // that agent. Fields it doesn't know are ignored.
-export type Listed = { decision: string; session: string | null };
+export type Listed = { decision: string; session: string | null; pickedUp: boolean };
 export type Record = { agent: string; decisions: Listed[] };
 const object = (v: unknown): { [k: string]: unknown } | null => typeof v === 'object' && v !== null && !Array.isArray(v) ? Object.fromEntries(Object.entries(v)) : null;
 export function decodeRecord(agent: string, text: string): Record | null {
@@ -92,7 +98,7 @@ export function decodeRecord(agent: string, text: string): Record | null {
   for (const item of r.decisions) {
     const d = object(item), w = object(d?.wake);
     if (!d || typeof d.decision !== 'string' || !DECISION.test(d.decision) || (d.state !== 'waiting' && d.state !== 'answered')) return null;
-    decisions.push({ decision: d.decision, session: w && w.app === 'claude-code' && typeof w.session === 'string' && SESSION.test(w.session) ? w.session : null });
+    decisions.push({ decision: d.decision, session: w && w.app === 'claude-code' && typeof w.session === 'string' && SESSION.test(w.session) ? w.session : null, pickedUp: d.state === 'answered' });
   }
   return { agent, decisions };
 }
@@ -115,6 +121,14 @@ export function outcomeOf(stdout: string): Outcome {
   return { kind: 'later', ms: UNREACHABLE_MS };
 }
 // The turn: which decision, and the command's reply as it gave it.
+// Whether `agentpager pickup --json` settled it: picked up now or already, or never to be (acknowledged, closed, no
+// such agent). A pager that's off, a service out of reach, or no reply at all is tried again.
+export function pickupDone(stdout: string): boolean {
+  let raw: unknown;
+  try { raw = JSON.parse(stdout.trim().split('\n').pop() ?? ''); } catch { return false; }
+  const r = object(raw);
+  return typeof r?.code === 'number' && r.code !== 4 && r.code !== 5;
+}
 export const turnText = (agent: string, decision: string, o: { answered: boolean; text: string }) => o.answered
   ? `AgentPager: your owner answered decision ${decision} (agent ${agent}). The agentpager command's reply:\n\n${o.text}`
   : `AgentPager: about decision ${decision} (agent ${agent}), the agentpager command replied:\n\n${o.text}`;
@@ -133,6 +147,9 @@ export class Mod {
   private readonly resting = new Map<string, number>();
   // Handed over by this process, so never held again here, even where no claim could be made.
   private readonly handed = new Set<string>();
+  // Pickups: being tried now, done, and when the next try may be made.
+  private readonly picking = new Set<string>(); private readonly picked = new Set<string>();
+  private readonly pickupAt = new Map<string, number>();
   private readonly cache = new Map<string, { mtimeMs: number; size: number; record: Record | null }>();
   private busy = false; private endedAt = 0; private heldUntil = 0;
   private looking: Promise<void> | null = null; private again = false; private handing = false; private ended = false;
@@ -193,12 +210,17 @@ export class Mod {
     // never comes back once it leaves, so a claim whose decision these records don't list is done with.
     const claimed = (await this.host.list(this.claims))?.filter(e => CLAIM.test(e.name)).map(e => e.name) ?? [];
     const records = await this.records();
-    const now = await this.host.now(), mine = new Map<string, { agent: string; decision: string }>();
-    if (records && this.session) for (const [agent, r] of records) for (const d of r?.decisions ?? []) if (d.session === this.session) mine.set(`${agent} ${d.decision}`, { agent, decision: d.decision });
+    const now = await this.host.now(), mine = new Map<string, { agent: string; decision: string; pickedUp: boolean }>();
+    if (records && this.session) for (const [agent, r] of records) for (const d of r?.decisions ?? []) if (d.session === this.session) mine.set(`${agent} ${d.decision}`, { agent, decision: d.decision, pickedUp: d.pickedUp });
     for (const h of [...this.holds.values()]) if (h.state !== 'handing' && !mine.has(h.key)) this.drop(h.key);
-    if (records) for (const key of [...this.handed]) if (!mine.has(key)) this.handed.delete(key);
+    if (records) for (const key of [...this.handed, ...this.picked, ...this.pickupAt.keys()]) if (!mine.has(key)) { this.handed.delete(key); this.picked.delete(key); this.pickupAt.delete(key); }
     const taken = new Set(claimed);
-    for (const [key, m] of mine) if (!this.holds.has(key) && !this.handed.has(key) && !taken.has(`${m.agent}.${m.decision}`) && (this.resting.get(key) ?? 0) <= now) this.hold(key, m.agent, m.decision);
+    for (const [key, m] of mine) {
+      const handed = this.handed.has(key) || taken.has(`${m.agent}.${m.decision}`);
+      if (!handed && !this.holds.has(key) && (this.resting.get(key) ?? 0) <= now) this.hold(key, m.agent, m.decision);
+      // Handed over, and the record still says no agent picked it up: the pickup that didn't land, here or before a restart.
+      if (handed && !m.pickedUp && !this.picked.has(key) && (this.pickupAt.get(key) ?? 0) <= now) void this.pickup(key, m.agent, m.decision);
+    }
     if (records) for (const name of claimed) {
       const [, agent = '', decision = ''] = CLAIM.exec(name) ?? [];
       const r = records.get(agent);
@@ -246,7 +268,7 @@ export class Mod {
     for (;;) {
       if (h.stopped) return;
       const began = await this.host.now();
-      h.child = this.host.spawn([COMMAND, 'wait', '--agent', h.agent, h.decision, '--json']);
+      h.child = this.host.spawn([COMMAND, 'wait', '--agent', h.agent, h.decision, '--json', '--hold']);
       const { stdout } = await h.child.done;
       h.child = undefined;
       if (h.stopped) return;
@@ -267,6 +289,7 @@ export class Mod {
   }
 
   // Hands the first ready reply over, once Claude is idle and has been for SETTLE_MS; the next waits for that turn's end.
+  // A decision another Claude Code on the session has handed over is left to it.
   private async hand() {
     if (this.handing || this.ended) return;
     this.handing = true;
@@ -277,28 +300,43 @@ export class Mod {
         const now = await this.host.now();
         if (now < this.heldUntil) return;
         if (now - this.endedAt < SETTLE_MS) { this.host.after(SETTLE_MS - (now - this.endedAt), () => void this.hand()); return; }
-        if (!(await this.stillMine(h))) { this.drop(h.key); continue; }
-        const claim = await this.claim(h);
-        if (claim === 'taken') { this.drop(h.key); continue; }
+        if (!(await this.stillMine(h)) || await this.host.exists(this.claimOf(h.agent, h.decision)).catch(() => false)) { this.drop(h.key); continue; }
         h.state = 'handing';
         const r = await this.host.submit(h.turn ?? '').catch((e: unknown) => ({ entered: false as const, why: String(e) }));
-        if (r.entered) { this.holds.delete(h.key); this.handed.add(h.key); this.host.debug(`handed ${h.agent} ${h.decision} over`); return; }
-        // Not taken: the claim goes back and the turn waits for the person's next turn, or a minute.
+        if (r.entered) {
+          this.holds.delete(h.key); this.handed.add(h.key);
+          await this.claim(h.agent, h.decision);
+          this.host.debug(`handed ${h.agent} ${h.decision} over`);
+          void this.pickup(h.key, h.agent, h.decision);
+          return;
+        }
+        // Not taken: the turn waits for the person's next turn, or a minute.
         this.host.debug(`turn for ${h.agent} ${h.decision} not taken: ${r.why}`);
-        if (claim === 'mine') await this.host.run(['/bin/rmdir', `${this.claims}/${h.agent}.${h.decision}`]).catch(() => undefined);
         h.state = 'ready'; this.heldUntil = (await this.host.now()) + NOT_TAKEN_MS;
         this.host.after(NOT_TAKEN_MS, () => void this.hand());
         return;
       }
     } finally { this.handing = false; }
   }
-  // The claim on handing a decision's answer over: 'mine' when this mkdir made it, 'taken' when it is there already, and
-  // 'none' when it couldn't be made (a home that can't be written), when the turn goes all the same.
-  private async claim(h: Hold): Promise<'mine' | 'taken' | 'none'> {
-    const dir = `${this.claims}/${h.agent}.${h.decision}`;
+  // The record that a decision's answer was handed over, made once its turn has started: so a restart finds it, and
+  // the turn is never handed over again. Made after, not before, so a Claude Code that quits while the turn waits to
+  // start (behind a slow session-start hook, say) hands it over again when it comes back. A home that can't be
+  // written leaves only this process's memory of it.
+  private claimOf(agent: string, decision: string) { return `${this.claims}/${agent}.${decision}`; }
+  private async claim(agent: string, decision: string) {
     if (!this.claimsReady) this.claimsReady = (await this.host.run(['/bin/mkdir', '-p', '-m', '700', this.claims]).catch(() => ({ exitCode: 1, stdout: '' }))).exitCode === 0;
-    const made = await this.host.run(['/bin/mkdir', dir]).catch(() => ({ exitCode: 1, stdout: '' }));
-    if (made.exitCode === 0) return 'mine';
-    return await this.host.exists(dir).catch(() => false) ? 'taken' : 'none';
+    await this.host.run(['/bin/mkdir', this.claimOf(agent, decision)]).catch(() => undefined);
+  }
+  // Tells the service the agent has the answer, once its turn has started (B32.12). A try that doesn't land is made
+  // again by a later look, PICKUP_AGAIN_MS on, while the record lists the decision as not picked up.
+  private async pickup(key: string, agent: string, decision: string) {
+    if (this.picking.has(key)) return;
+    this.picking.add(key);
+    try {
+      const r = await this.host.run([COMMAND, 'pickup', '--agent', agent, decision, '--json']).catch(() => ({ exitCode: 1, stdout: '' }));
+      const done = pickupDone(r.stdout);
+      this.host.debug(`pickup of ${agent} ${decision}: ${done ? 'done' : 'not yet'}`);
+      if (done) this.picked.add(key); else this.pickupAt.set(key, (await this.host.now()) + PICKUP_AGAIN_MS);
+    } finally { this.picking.delete(key); }
   }
 }

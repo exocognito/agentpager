@@ -52,10 +52,10 @@ Added to earlier entries:
 - [I24 · A restart loses nothing](../areas/1-pagers.md#i24--m3--a-restart-loses-nothing) · 1 Pagers: I24.1
 - [B25 · Connect with a pager number](../areas/2-agents.md#b25--m3--connect-with-a-pager-number) · 2 Agents: B25.2, B25.4, B25.5, B25.6, B25.7, B25.11, B25.13
 - [B32 · Wait for the answer, then acknowledge it](../areas/2-agents.md#b32--m3--wait-for-the-answer-then-acknowledge-it) · 2 Agents: B32.2, B32.5, B32.6, B32.7, B32.8, B32.10
-- [B33 · Each agent app is told how it wakes](../areas/2-agents.md#b33--m3--each-agent-app-is-told-how-it-wakes) · 2 Agents: B33.1, B33.2, B33.3
+- [B33 · Each supported agent app wakes its agent](../areas/2-agents.md#b33--m3--each-supported-agent-app-wakes-its-agent) · 2 Agents: B33.1, B33.2, B33.3
 - [B31 · History on the agent's machine](../areas/2-agents.md#b31--m3--history-on-the-agents-machine) · 2 Agents: B31.1, B31.3, B31.4
 - [I21 · Every connect is a new agent](../areas/2-agents.md#i21--m3--every-connect-is-a-new-agent) · 2 Agents: I21.1, I21.2, I21.3, I21.4
-- [L11 · Only Claude agents wake by themselves](../areas/2-agents.md#l11--m3--only-claude-agents-wake-by-themselves) · 2 Agents
+- [L11 · Apps other than Claude, Codex and pi don't wake by themselves](../areas/2-agents.md#l11--m3--apps-other-than-claude-codex-and-pi-dont-wake-by-themselves) · 2 Agents
 - [L12 · A Desktop chat stops waiting after two hours](../areas/2-agents.md#l12--m3--a-desktop-chat-stops-waiting-after-two-hours) · 2 Agents
 - [L13 · Cloud sessions are untested](../areas/2-agents.md#l13--m3--cloud-sessions-are-untested) · 2 Agents
 - [L14 · An agent id works on one machine only](../areas/2-agents.md#l14--m3--an-agent-id-works-on-one-machine-only) · 2 Agents
@@ -124,5 +124,5 @@ Added to earlier entries:
 Added to earlier entries:
 
 - **B32.12**, in [B32 · Wait for the answer, then acknowledge it](../areas/2-agents.md#b32--m3--wait-for-the-answer-then-acknowledge-it): An answer counts as picked up only once the agent's command confirms it has it. A wait whose agent went away before then doesn't count, so the owner is still told it wasn't picked up (B5.13).
-- **B33.4**, in [B33 · Each agent app is told how it wakes](../areas/2-agents.md#b33--m3--each-agent-app-is-told-how-it-wakes): Codex, in a terminal or the ChatGPT app, gets a note that its answer is in, in the thread that asked: within a second when the thread is idle, as its next turn when busy, and when it is resumed if Codex was closed. The note never holds the answer. A `codex exec` run isn't woken.
-- **B33.5**, in [B33 · Each agent app is told how it wakes](../areas/2-agents.md#b33--m3--each-agent-app-is-told-how-it-wakes): pi, with AgentPager's extension, gets the answer as a follow-up turn once it settles. A run in print or JSON mode isn't woken.
+- **B33.4**, in [B33 · Each supported agent app wakes its agent](../areas/2-agents.md#b33--m3--each-supported-agent-app-wakes-its-agent): Codex, in a terminal or the ChatGPT app, gets a note that its answer is in, in the thread that asked: within a second when the thread is idle, as its next turn when busy, and when it is resumed if Codex was closed. The note never holds the answer. A `codex exec` run isn't woken.
+- **B33.5**, in [B33 · Each supported agent app wakes its agent](../areas/2-agents.md#b33--m3--each-supported-agent-app-wakes-its-agent): pi, with AgentPager's extension, gets the answer as a follow-up turn once it settles. A run in print or JSON mode isn't woken.

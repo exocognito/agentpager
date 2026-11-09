@@ -6,6 +6,8 @@ import type { Entry, Host, Spawned } from '../hooks/wake.ts';
 export type Child = { argv: string[]; stopped: boolean; ended: boolean; exit(stdout: string, code?: number): void };
 export type StandIn = Host & {
   t: number; session: string; wake: (string | undefined)[]; children: Child[]; turns: string[]; logs: string[];
+  // Each `agentpager pickup` the mod ran, with the turns there were at the time, and what the next one replies.
+  pickups: { argv: string[]; turns: number }[]; picking: string;
   files: Map<string, { text: string; mtimeMs: number }>; dirs: Set<string>;
   // What the next submit comes to: entered (and a turn starts, when started is given), or not taken.
   taking: { entered: true } | { entered: false; why: string };
@@ -29,6 +31,7 @@ export function standIn(session = 'session-1'): StandIn {
   let edits = 0;
   const h: StandIn = {
     t: 1_000_000, session, wake: [], children: [], turns: [], logs: [], files: new Map(), dirs: new Set(['/']),
+    pickups: [], picking: JSON.stringify({ code: 0, text: 'Picked up.' }) + '\n',
     taking: { entered: true },
     now: async () => h.t,
     after: (ms, fn) => timer(ms, fn),
@@ -57,6 +60,7 @@ export function standIn(session = 'session-1'): StandIn {
         return { exitCode: 0, stdout: '' };
       }
       if (bin === '/bin/rmdir') return { exitCode: h.dirs.delete(args[0] ?? '') ? 0 : 1, stdout: '' };
+      if (bin === 'agentpager' && args[0] === 'pickup') { h.pickups.push({ argv, turns: h.turns.length }); return { exitCode: 0, stdout: h.picking }; }
       return { exitCode: 127, stdout: '' };
     },
     spawn: (argv): Spawned => {

@@ -64,8 +64,11 @@ function standIn(mode: Context['mode'], sessionId: string, entries: unknown[] = 
     queue: (on: boolean) => { queued = on; },
     bash: () => emit('tool_result', { toolName: 'bash' }),
     shutdown: () => emit('session_shutdown', { reason: 'quit' }),
-    // The owner moves to an earlier point of the session's tree, keeping its first entries.
+    // The owner moves to an earlier point of the session's tree, keeping its first entries, or back to a branch left
+    // earlier.
     navigate: (keep: number) => { branch.splice(keep); emit('session_tree', {}); },
+    branch: () => [...branch],
+    back: (to: unknown[]) => { branch.splice(0, branch.length, ...to); emit('session_tree', {}); },
   };
 }
 
@@ -169,29 +172,71 @@ test('B33.5 B32.12 An answer to a decision this session asked comes in once, as 
   assert.equal(process.env.AGENTPAGER_WAKE, undefined, 'cleared when the session ends');
 });
 
-test('B33.5 After a move to another point of the session\'s tree, a decision still waiting on the agent whose reply only the branch left behind holds is handed over again on this one; once acknowledged, nothing is', { timeout: 60_000 }, async () => {
+test('B33.5 After a move to another point of the session\'s tree, a decision still waiting on the agent whose reply only the branch left behind holds is handed over again on this one, and never twice on a branch; once acknowledged, nothing is', { timeout: 90_000 }, async () => {
   const pi = standIn('tui', 's-tree');
-  pi.start();
+  // This pi can be told not to start the next follow-up it is sent (its run failed to begin).
+  const realSend = pi.pi.sendMessage.bind(pi.pi);
+  let drop = false;
+  pi.pi.sendMessage = (message, options) => { if (drop) { drop = false; pi.sent.push({ content: message.content, details: message.details, options, whileWorking: false }); return; } realSend(message, options); };
+  pi.start({ ...fast, confirmMs: 300 });
   const { agent, d } = await asks('s-tree', 'Tree, blue or red?');
   pi.bash();
   await answer('Tree, blue or red?');
   await until(async () => pi.sent.length, n => n === 1);
   await until(() => seen('Tree, blue or red?'), x => x?.collectedAt !== undefined);
   pi.settle();
-  // Before the agent acknowledges it, the owner goes back to before the reply: the agent there hasn't had it.
+  // The owner goes back to before the reply, and returns to the branch that holds it before the wait held for the other
+  // has ended: that wait's reply isn't handed over, since this branch has it.
+  const withReply = pi.branch();
+  pi.navigate(0);
+  assert.ok(holds(agent, d), 'held again for the branch without the reply');
+  pi.back(withReply);
+  await until(async () => holds(agent, d), held => !held);
+  await new Promise(res => setTimeout(res, 500));
+  pi.settle();
+  assert.equal(pi.sent.length, 1, 'not again on the branch that holds it');
+  assert.equal(holds(agent, d), false);
+  // The same with the follow-up sent and not started by pi when the owner returns: it isn't sent again there.
+  drop = true;
   pi.navigate(0);
   await until(async () => pi.sent.length, n => n === 2);
-  assert.equal(pi.sent[1].content, pi.sent[0].content, 'the same reply, on this branch');
-  assert.deepEqual(decisionsOf(pi.sent[1].details), [{ agent, decision: d, answered: true }]);
+  pi.back(withReply);
+  await new Promise(res => setTimeout(res, 1_500));
+  pi.settle();
+  assert.equal(pi.sent.length, 2, 'a follow-up pi never started isn\'t sent again on the branch that holds the reply');
+  // Before the agent acknowledges it, the owner goes back to before the reply: the agent there hasn't had it.
+  pi.navigate(0);
+  await until(async () => pi.sent.length, n => n === 3);
+  assert.equal(pi.sent[2].content, pi.sent[0].content, 'the same reply, on this branch');
+  assert.deepEqual(decisionsOf(pi.sent[2].details), [{ agent, decision: d, answered: true }]);
   pi.settle();
   // Moving within the branch that holds it hands nothing over.
   pi.navigate(1); pi.settle();
-  assert.equal(pi.sent.length, 2);
+  assert.equal(pi.sent.length, 3);
   assert.equal((await shell('s-tree', ['ack', '--agent', agent, d, 'Blue, then.'])).code, 0);
   pi.navigate(0); pi.settle();
   assert.equal(holds(agent, d), false);
-  assert.equal(pi.sent.length, 2, 'acknowledged: nothing more');
+  assert.equal(pi.sent.length, 3, 'acknowledged: nothing more');
   pi.shutdown();
+
+  // A pickup that hasn't landed and is to run again later (here it never lands) doesn't keep the wait from being held
+  // on a branch without the reply.
+  const unpicked = path.join(bin, 'tree-no-pickup-lands');
+  writeFileSync(unpicked, `#!/bin/sh\nif [ "$1" = pickup ]; then echo 'not JSON'; exit 5; fi\nexec ${command.map(c => `'${c}'`).join(' ')} "$@"\n`);
+  chmodSync(unpicked, 0o755);
+  const owed = standIn('tui', 's-tree-owed');
+  owed.start({ ...fast, command: [unpicked], retryMs: 60_000 });
+  const o = await asks('s-tree-owed', 'Tree, owed a pickup?');
+  owed.bash();
+  await answer('Tree, owed a pickup?');
+  await until(async () => owed.sent.length, n => n === 1);
+  await until(async () => pickups().length, n => n === 0);
+  await new Promise(res => setTimeout(res, 500));
+  owed.settle();
+  owed.navigate(0);
+  await until(async () => owed.sent.length, n => n === 2, 10_000);
+  assert.deepEqual(decisionsOf(owed.sent[1].details), [{ agent: o.agent, decision: o.d, answered: true }]);
+  owed.settle(); owed.shutdown();
 });
 
 test('B33.5 B32.12 While pi works the answer waits, never going into the run and not yet picked up: it goes in once pi has settled with nothing queued; one the agent read and acknowledged by itself meanwhile isn\'t handed over', { timeout: 60_000 }, async () => {

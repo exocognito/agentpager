@@ -13,7 +13,7 @@ AgentPager brings an agent's decisions to Sam's phone. [METHOD.md](METHOD.md) is
 
 ## The board
 
-A pilot from 9 Nov 2026: live work status is on the [AgentPager board](https://app.todoist.com/app/project/6hxGh4F57m9GmG79) in Todoist. These rules live only here; a brief, plan or handoff links to this section and never restates it. In this section a card is a board card, a Todoist task, and what AgentPager sends Sam (TERMS.md › Card) is a page.
+A pilot from 9 Nov 2026: live work status is on the [AgentPager board](https://app.todoist.com/app/project/6hxGh4F57m9GmG79) in Todoist. These rules live only here; a brief, plan or handoff links to this section and never restates it. In this section a card is a board card, a Todoist task, and what AgentPager sends Sam ([TERMS.md](blueprint/TERMS.md) › Card) is a page.
 
 - **One card per outcome,** with its owner, status, next action and evidence kept current. Its section is its status:
 

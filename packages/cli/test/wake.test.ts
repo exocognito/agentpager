@@ -19,7 +19,7 @@ const cli = fileURLToPath(new URL('..', import.meta.url)), main = path.join(cli,
 const work = mkdtempSync(path.join(tmpdir(), 'agentpager-wake-'));
 const home = path.join(work, 'home'), codexHome = path.join(work, 'codex'), bin = path.join(work, 'bin'), calls = path.join(work, 'codex-calls.jsonl');
 mkdirSync(bin); mkdirSync(codexHome);
-const MARKS = ['CLAUDECODE', 'CODEX_SANDBOX', 'CODEX_HOME', 'CODEX_THREAD_ID', 'CURSOR_TRACE_ID', 'PI_CODING_AGENT', 'AGENTPAGER_WAKE', 'AGENTPAGER_PAGER'];
+const MARKS = ['CLAUDECODE', 'CODEX_SANDBOX', 'CODEX_HOME', 'CODEX_THREAD_ID', 'CURSOR_TRACE_ID', 'PI_CODING_AGENT', 'PI_SESSION_ID', 'AGENTPAGER_WAKE', 'AGENTPAGER_PAGER'];
 for (const v of MARKS) delete process.env[v];
 process.env.AGENTPAGER_HOME = home; process.env.CODEX_HOME = codexHome; process.env.FAKE_CODEX_LOG = calls;
 

@@ -212,12 +212,14 @@ export class Mod {
     const records = await this.records();
     const now = await this.host.now(), mine = new Map<string, { agent: string; decision: string; pickedUp: boolean }>();
     if (records && this.session) for (const [agent, r] of records) for (const d of r?.decisions ?? []) if (d.session === this.session) mine.set(`${agent} ${d.decision}`, { agent, decision: d.decision, pickedUp: d.pickedUp });
-    for (const h of [...this.holds.values()]) if (h.state !== 'handing' && !mine.has(h.key)) this.drop(h.key);
+    // A decision no longer this session's, or one a wait of the agent's own has picked up (it followed today's
+    // background-wait words, say), is the agent's already: its hold stops, ready or not.
+    for (const h of [...this.holds.values()]) if (h.state !== 'handing' && (!mine.has(h.key) || mine.get(h.key)?.pickedUp)) this.drop(h.key);
     if (records) for (const key of [...this.handed, ...this.picked, ...this.pickupAt.keys()]) if (!mine.has(key)) { this.handed.delete(key); this.picked.delete(key); this.pickupAt.delete(key); }
     const taken = new Set(claimed);
     for (const [key, m] of mine) {
       const handed = this.handed.has(key) || taken.has(`${m.agent}.${m.decision}`);
-      if (!handed && !this.holds.has(key) && (this.resting.get(key) ?? 0) <= now) this.hold(key, m.agent, m.decision);
+      if (!handed && !m.pickedUp && !this.holds.has(key) && (this.resting.get(key) ?? 0) <= now) this.hold(key, m.agent, m.decision);
       // Handed over, and the record still says no agent picked it up: the pickup that didn't land, here or before a restart.
       if (handed && !m.pickedUp && !this.picked.has(key) && (this.pickupAt.get(key) ?? 0) <= now) void this.pickup(key, m.agent, m.decision);
     }
@@ -247,11 +249,11 @@ export class Mod {
     }
     return out;
   }
-  // Whether a decision is still this session's, read fresh from its record.
+  // Whether a decision is still this session's, and no wait has picked it up, read fresh from its record.
   private async stillMine(h: Hold) {
     if (h.session !== this.session) return false;
     const r = await this.host.read(`${this.waiting}/${h.agent}.json`).then(t => decodeRecord(h.agent, t), () => null);
-    return Boolean(r?.decisions.some(d => d.decision === h.decision && d.session === h.session));
+    return Boolean(r?.decisions.some(d => d.decision === h.decision && d.session === h.session && !d.pickedUp));
   }
 
   private hold(key: string, agent: string, decision: string) {

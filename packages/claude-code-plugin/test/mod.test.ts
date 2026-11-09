@@ -210,19 +210,26 @@ test('B33.2 B32.12 The answer counts as picked up only once the turn carrying it
   fourth.sessionEnded('prompt_input_exit');
 });
 
-test('B33.2 An answer the agent has already acknowledged, having waited for it itself, isn\'t handed over as well', async () => {
-  const h = standIn();
-  h.write(waiting(A), record(A, [{ decision: 'd_2x8w', wake: mine() }]));
-  const mod = await started(h);
-  // The agent ran today's background wait anyway: it woke the agent first, and the mod's wait got the answer too.
-  await mod.turnStarted();
-  h.running()[0]?.exit(reply.answered(ANSWER));
-  await h.advance(0);
-  h.write(waiting(A), record(A, []));
-  await mod.turnEnded();
-  await h.advance(SETTLE_MS + TICK_MS);
-  assert.deepEqual(h.turns, []);
-  assert.deepEqual(mod.held, []);
+test('B33.2 An answer the agent already has, from a wait of its own (today\'s background-wait words followed all the same), isn\'t handed over as well', async () => {
+  for (const after of ['picked up', 'acknowledged'] as const) {
+    const h = standIn();
+    h.write(waiting(A), record(A, [{ decision: 'd_2x8w', wake: mine() }]));
+    const mod = await started(h);
+    // The agent's own background wait woke it first; the mod's wait came back with the answer too.
+    await mod.turnStarted();
+    h.running()[0]?.exit(reply.answered(ANSWER));
+    await h.advance(0);
+    h.write(waiting(A), record(A, after === 'picked up' ? [{ decision: 'd_2x8w', state: 'answered', wake: mine() }] : []));
+    await mod.turnEnded();
+    await h.advance(SETTLE_MS + TICK_MS);
+    assert.deepEqual(h.turns, [], after);
+    assert.deepEqual(mod.held, []);
+    // Nor held again at a restart.
+    mod.sessionEnded('prompt_input_exit');
+    await started(h);
+    await h.advance(TICK_MS * 3);
+    assert.deepEqual([h.running(), h.turns, h.pickups.length], [[], [], 0]);
+  }
 });
 
 test('B33.2 A turn Claude Code didn\'t take is offered again after the person\'s next turn, or a minute later, so it is never lost', async () => {

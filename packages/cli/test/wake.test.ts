@@ -131,10 +131,12 @@ test('B33.1 B33.4 The command names an agent\'s app only for certain: Codex by i
   assert.deepEqual(shell({ CLAUDECODE: '1', AGENTPAGER_WAKE: 'claude-code:sess-1.A_b' }), { app: 'claude-code', wake: { app: 'claude-code', session: 'sess-1.A_b' } });
   assert.deepEqual(shell({ CLAUDECODE: '1', AGENTPAGER_WAKE: 'claude-code' }), { app: 'claude-code', wake: null }, 'the lab\'s value names no session');
   assert.equal(shell({ AGENTPAGER_WAKE: 'claude-code:sess-1' }), null, 'Claude Code\'s adapter, outside Claude Code');
-  assert.deepEqual(shell({ AGENTPAGER_WAKE: 'pi:7f3k-1' }), { app: 'pi', wake: { app: 'pi', session: '7f3k-1' } });
-  for (const bad of ['pi:', 'pi:has space', 'other:x', `pi:${'x'.repeat(129)}`]) assert.equal(shell({ AGENTPAGER_WAKE: bad }), null, bad);
-  assert.equal(shell({ AGENTPAGER_WAKE: 'pi:7f3k-1', CLAUDECODE: '1' }), null, 'pi inside Claude Code, or the other way round');
-  assert.equal(shell({ AGENTPAGER_WAKE: 'pi:7f3k-1', CODEX_THREAD_ID: thread }), null, 'pi inside Codex');
+  assert.deepEqual(shell({ AGENTPAGER_WAKE: 'pi:7f3k-1', PI_SESSION_ID: '7f3k-1' }), { app: 'pi', wake: { app: 'pi', session: '7f3k-1' } });
+  for (const bad of ['pi:', 'pi:has space', 'other:x', `pi:${'x'.repeat(129)}`]) assert.equal(shell({ AGENTPAGER_WAKE: bad, PI_SESSION_ID: bad.slice(3) }), null, bad);
+  assert.equal(shell({ AGENTPAGER_WAKE: 'pi:7f3k-1' }), null, 'pi\'s shell names no session: nothing says which asked');
+  assert.equal(shell({ AGENTPAGER_WAKE: 'pi:7f3k-1', PI_SESSION_ID: 'another' }), null, 'another pi session, inside this one');
+  assert.equal(shell({ AGENTPAGER_WAKE: 'pi:7f3k-1', PI_SESSION_ID: '7f3k-1', CLAUDECODE: '1' }), null, 'pi inside Claude Code, or the other way round');
+  assert.equal(shell({ AGENTPAGER_WAKE: 'pi:7f3k-1', PI_SESSION_ID: '7f3k-1', CODEX_THREAD_ID: thread }), null, 'pi inside Codex');
 
   // Over MCP the client names the app; the call's _meta names Codex's thread.
   inShell({ AGENTPAGER_WAKE: 'claude-code:sess-1' }); process.env.CODEX_HOME = codexHome;
@@ -469,7 +471,7 @@ test('B33.1 B25.6 An agent whose AgentPager adapter wakes it is told not to wait
   const plain = await op.ask(id, card('Without the plugin?')), d2 = field(plain, 'decision');
   assert.match(plain.text, new RegExp(`\\nDecision ${d2}\\. Wait for the answer in the background: run \``));
   // pi, with its extension.
-  inShell({ AGENTPAGER_WAKE: 'pi:p-1' });
+  inShell({ AGENTPAGER_WAKE: 'pi:p-1', PI_SESSION_ID: 'p-1' });
   const pi = await op.connect({ number: p.number, app: 'pi', project: 'wake' });
   assert.ok(!pi.text.includes(NUDGE));
   const pid = field(pi, 'agent'), fromPi = await op.ask(pid, card('From pi?')), d3 = field(fromPi, 'decision');

@@ -113,8 +113,9 @@ export function saveAgent(a: AgentFile) {
 //   1. holds `agentpager wait --agent <agent> <decision> --no-pickup --json`, with `--forever` for a wait with no end,
 //      or without it for one that holds up to 50 s and replies pending, to be held again. It replies as any wait does,
 //      {code, text, result: {status}} with the command's exit codes (0 answered or pending, 2 refused, closed among
-//      them as status closed, 4 pager off, 5 no usable reply, 6 unknown agent), but picks nothing up: the service isn't
-//      told and nothing here changes, so the decision stays waiting and the owner's not-picked-up clock runs;
+//      them as status closed, 4 pager off as pager-off, 5 no usable reply as try-again, the server failing among
+//      them, 6 unknown agent), but picks nothing up: the service isn't told and nothing here changes, so the decision
+//      stays waiting and the owner's not-picked-up clock runs;
 //   2. hands the text of an answered reply to the agent as a new turn;
 //   3. once that turn has started, runs `agentpager pickup --agent <agent> <decision> --json`, which tells the service
 //      this agent's command received the answer (B32.12) and records it here as answered. Its result's status:

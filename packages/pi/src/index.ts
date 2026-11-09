@@ -15,9 +15,9 @@ import path from 'node:path';
 // never in the middle of a run, it hands that wait's reply to the agent as a follow-up turn; and once that turn has
 // started, it runs `agentpager pickup`, again until it lands, so the answer counts as picked up only once the agent has
 // it (B32.12). A wait left running when pi is killed, or a reply pi never takes, picks nothing up, and the owner is
-// warned (B5.13). Each decision's reply goes in once: the turn's message names its decisions in its details, which pi
-// keeps in the session, so a later start of the same session neither hands it over again nor holds its wait; it only
-// runs a pickup that hadn't landed. It reads ids and states from the record and statuses from the command's JSON, never
+// warned (B5.13). Each decision's reply goes in once: the turn's message names its decisions in its details, each with
+// whether it carried the answer, which pi keeps in the session, so a later start of the same session neither hands it
+// over again nor holds its wait; it only runs the pickup of an answer it carried, if that hadn't landed. It reads ids and states from the record and statuses from the command's JSON, never
 // the words of a reply.
 //
 // In print and JSON mode it does nothing but clear an AGENTPAGER_WAKE inherited from a session around it, so the command
@@ -37,8 +37,9 @@ export const TYPE = 'agentpager';
 // How long before a wait or a pickup that ended without landing is run again: the server away or a reply not understood,
 // the command not found; and, while the pager is off, a minute.
 const RETRY_MS = 10_000, OFF_RETRY_MS = 60_000;
-// A follow-up that pi hasn't started this long after it was sent, while idle, is sent again, up to SEND_TRIES times.
-const CONFIRM_MS = 10_000, SEND_TRIES = 3;
+// A follow-up that pi hasn't started this long after it was sent, while idle, is sent again, each time waiting twice as
+// long, up to 5 minutes.
+const CONFIRM_MS = 10_000, CONFIRM_MAX_MS = 300_000;
 const REPLY_MAX_BYTES = 1024 * 1024;
 // The session as AGENTPAGER_WAKE names it, the agent and decision ids as the command makes them.
 const SESSION = /^[A-Za-z0-9._-]{1,128}$/, AGENT = /^ap-[a-z0-9]{4}$/, DECISION = /^d_[a-z0-9]{4}$/;
@@ -231,25 +232,25 @@ export function agentpagerWake(pi: Pi, options: Options = {}) {
   const send = (replies: Reply[], tries: number) => {
     for (const r of replies) done.add(keyOf(r.agent, r.decision));
     running = true;
-    const sent = { replies, tries, timer: setTimeout(() => unconfirmed(sent), confirmMs) };
+    const sent = { replies, tries, timer: setTimeout(() => unconfirmed(sent), Math.min(confirmMs * 2 ** (tries - 1), CONFIRM_MAX_MS)) };
     sent.timer.unref();
     inFlight = sent;
     const content = replies.map(r => `${r.answered ? `AgentPager: your owner answered decision ${r.decision} (agent ${r.agent}).` : `AgentPager: the wait for decision ${r.decision} (agent ${r.agent}) ended without an answer it could give you.`} The agentpager command's reply:\n\n${r.text}`).join('\n\n');
-    pi.sendMessage({ customType: TYPE, content, display: true, details: { decisions: replies.map(r => ({ agent: r.agent, decision: r.decision })) } }, { triggerTurn: true, deliverAs: 'followUp' });
+    pi.sendMessage({ customType: TYPE, content, display: true, details: { decisions: replies.map(r => ({ agent: r.agent, decision: r.decision, answered: r.answered })) } }, { triggerTurn: true, deliverAs: 'followUp' });
   };
-  // A follow-up pi never put in the session (it failed before its run began) is sent again, a few times. After that
-  // nothing is picked up, so the owner is warned, and the session's next start holds its wait again.
+  // A follow-up pi never put in the session (it failed before its run began) is sent again until pi starts it. Until
+  // then nothing is picked up, so the owner is warned after 3 minutes.
   const resend = () => {
     const sent = inFlight;
     if (!sent) return;
     clearTimeout(sent.timer);
     inFlight = null; running = false;
-    if (sent.tries < SEND_TRIES) send(sent.replies, sent.tries + 1);
+    send(sent.replies, sent.tries + 1);
   };
   const unconfirmed = (sent: NonNullable<typeof inFlight>) => {
     if (stopped || inFlight !== sent) return;
     if (idle()) return resend();
-    sent.timer = setTimeout(() => unconfirmed(sent), confirmMs);
+    sent.timer = setTimeout(() => unconfirmed(sent), Math.min(confirmMs * 2 ** (sent.tries - 1), CONFIRM_MAX_MS));
     sent.timer.unref();
   };
 
@@ -260,12 +261,19 @@ export function agentpagerWake(pi: Pi, options: Options = {}) {
     if (id === null || !SESSION.test(id)) { delete process.env.AGENTPAGER_WAKE; return; }
     session = id;
     process.env.AGENTPAGER_WAKE = `pi:${id}`;
-    // The replies already in the session: each turn's message names its decisions.
+    // The replies already in the session: each turn's message names its decisions, and whether it carried the answer,
+    // which alone is owed a pickup.
     let entries: readonly unknown[] = [];
     try { entries = c.sessionManager.getEntries(); } catch { entries = []; }
     for (const entry of entries) {
       const e = fields(entry), handed = e?.type === 'custom_message' && e.customType === TYPE ? fields(e.details)?.decisions : undefined;
-      if (Array.isArray(handed)) for (const d of handed) { const x = ids(d); if (x) { done.add(keyOf(x.agent, x.decision)); owed.add(keyOf(x.agent, x.decision)); } }
+      if (!Array.isArray(handed)) continue;
+      for (const d of handed) {
+        const x = ids(d);
+        if (!x) continue;
+        done.add(keyOf(x.agent, x.decision));
+        if (fields(d)?.answered === true) owed.add(keyOf(x.agent, x.decision));
+      }
     }
     process.off('exit', onExit);
     process.on('exit', onExit);

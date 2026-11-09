@@ -347,7 +347,7 @@ export async function wait(agent: string, ref: string, opts: { seconds?: number;
     if (!r.ok && opts.forever && (r.status === 0 || r.status >= 500)) { await new Promise(res => setTimeout(res, RETRY_MS)); continue; }
     if (!r.ok) {
       const closed = closedOf(r);
-      return closed ? closedUnanswered(a, d, closed, 'Don\'t wait for it again.') : refusal(r, a);
+      return closed ? closedUnanswered(a, d, closed, 'Don\'t wait for it again.') : opts.noPickup ? forAdapter(r, a) : refusal(r, a);
     }
     if (r.value.status !== 'answered') {
       if (opts.forever) continue;
@@ -394,6 +394,12 @@ async function received(a: AgentFile, decisionId: string, answerId: string): Pro
   }
   return last;
 }
+// A failure as an adapter's step (wait --no-pickup, pickup) words it: a server that failed, which another try may not meet,
+// is exit 5 like one that didn't reply, and the JSON says what to do: try-again (5), pager-off (4), refused (2).
+function forAdapter(r: Failure, a: AgentFile): Result {
+  const why: Result = r.status >= 500 ? { code: 5, text: `${a.server} failed (${r.message}). Try again.` } : refusal(r, a);
+  return { ...why, json: { status: why.code === 4 ? 'pager-off' : why.code === 5 ? 'try-again' : 'refused' } };
+}
 // The answer is this machine's agent's now: the decision is recorded as answered, once, with the answer in the history.
 function answeredHere(a: AgentFile, d: { short: string; answered?: boolean }, sentAt: string, choice: NonNullable<ReturnType<typeof openAnswer>>) {
   if (d.answered) return;
@@ -408,7 +414,8 @@ function answeredHere(a: AgentFile, d: { short: string; answered?: boolean }, se
 // Only an adapter runs it, not an agent, so it isn't in HELP; store.ts › Waiting has its contract. It opens the answer
 // first, as a wait does, so an answer this agent can't read is never picked up. Its JSON says what happened: picked-up
 // (0; saying it again gets the same, with when it was first picked up), acknowledged (0; the agent's acknowledgement
-// picked it up already), pending (2; nothing to pick up yet), closed (2), unreadable (2), pager-off (4) or try-again (5).
+// picked it up already), pending (2; nothing to pick up yet), closed (2), unreadable (2), refused (2), pager-off (4) or
+// try-again (5; the server away, failing or not understood).
 export async function pickup(agent: string, ref: string): Promise<Result> {
   const a = agentOf(agent);
   if ('code' in a) return a;
@@ -417,9 +424,7 @@ export async function pickup(agent: string, ref: string): Promise<Result> {
   if (d.acknowledged) return done(`Already acknowledged: ${d.short} was picked up when you acknowledged it.`, { status: 'acknowledged' });
   const failed = (r: Failure): Result => {
     const closed = closedOf(r);
-    if (closed) return closedUnanswered(a, d, closed, 'There is nothing to pick up.');
-    const why = refusal(r, a);
-    return { ...why, json: { status: why.code === 4 ? 'pager-off' : why.code === 5 ? 'try-again' : 'refused' } };
+    return closed ? closedUnanswered(a, d, closed, 'There is nothing to pick up.') : forAdapter(r, a);
   };
   const read = await call(AnswerStatus, a.server, 'GET', `/api/agents/${a.agentId}/cards/${d.id}/answer`, { key: a.agentKey });
   if (!read.ok) return failed(read);

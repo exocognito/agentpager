@@ -75,6 +75,7 @@ const field = (r: { result: unknown }, key: string) => String(typeof r.result ==
 // The waits a process's extensions hold now (this test process's, unless named), as the process list shows them.
 const waits = (parent = process.pid) => execFileSync('ps', ['-A', '-o', 'pid=,ppid=,command='], { encoding: 'utf8' }).split('\n').map(l => /^\s*(\d+)\s+(\d+)\s+(.*)$/.exec(l)).filter(m => m !== null && Number(m[2]) === parent && / wait --agent ap-[a-z0-9]{4} d_[a-z0-9]{4} --no-pickup --json$/.test(m[3])).map(m => ({ pid: Number(m?.[1]), command: m?.[3] ?? '' }));
 const holds = (agent: string, d: string) => waits().some(w => w.command.endsWith(` wait --agent ${agent} ${d} --no-pickup --json`));
+const pickups = () => execFileSync('ps', ['-A', '-o', 'ppid=,command='], { encoding: 'utf8' }).split('\n').map(l => /^\s*(\d+)\s+(.*)$/.exec(l)).filter(m => m !== null && Number(m[1]) === process.pid && / pickup --agent /.test(m[2])).map(m => m?.[2] ?? '');
 const alive = (pid: number) => { try { process.kill(pid, 0); return true; } catch { return false; } };
 const record = (agent: string): unknown => JSON.parse(readFileSync(path.join(home, 'waiting', `${agent}.json`), 'utf8'));
 const decisionsOf = (details: unknown) => { const d = typeof details === 'object' && details !== null ? Reflect.get(details, 'decisions') : undefined; return Array.isArray(d) ? d : []; };
@@ -149,7 +150,7 @@ test('B33.5 B32.12 An answer to a decision this session asked comes in once, as 
   assert.equal(turn.whileWorking, false, 'sent while pi was idle');
   assert.deepEqual(turn.options, { triggerTurn: true, deliverAs: 'followUp' }, 'a follow-up that starts a turn, never a steer into a run');
   assert.match(turn.content, new RegExp(`^AgentPager: your owner answered decision ${d} \\(agent ${agent}\\)\\. The agentpager command's reply:\\n\\nAnswered at .+: option A "Blue"\\.\\nDo it, then confirm: agentpager ack --agent ${agent} ${d} "<what happens next>"$`));
-  assert.deepEqual(decisionsOf(turn.details), [{ agent, decision: d }]);
+  assert.deepEqual(decisionsOf(turn.details), [{ agent, decision: d, answered: true }]);
   const picked = await until(() => seen('Idle, blue or red?'), x => x?.collectedAt !== undefined);
   assert.equal(picked?.warnedAt, undefined, 'picked up once the turn started, so never warned');
   assert.equal(Reflect.get(Object(record(agent)), 'decisions')[0].state, 'answered', 'and recorded here as answered');
@@ -187,7 +188,7 @@ test('B33.5 B32.12 While pi works the answer waits, never going into the run and
   assert.equal(pi.sent.length, 1);
   const [turn] = pi.sent;
   assert.equal(turn.whileWorking, false);
-  assert.deepEqual(decisionsOf(turn.details), [{ agent: first.agent, decision: first.d }], 'only the one the agent hasn\'t read');
+  assert.deepEqual(decisionsOf(turn.details), [{ agent: first.agent, decision: first.d, answered: true }], 'only the one the agent hasn\'t read');
   assert.match(turn.content, /Your owner wrote instead of choosing, at .+:\n {2}"Red, and keep it quiet"/);
   await until(() => seen('Busy, blue or red?'), x => x?.collectedAt !== undefined);
   pi.settle();
@@ -253,13 +254,34 @@ test('B33.5 B32.12 Each answer goes in once across restarts of the same session:
   back.start();
   await until(async () => back.sent.length, n => n === 1);
   assert.match(back.sent[0].content, /option B "Red"/);
-  assert.deepEqual(decisionsOf(back.sent[0].details), [{ agent: b.agent, decision: b.d }]);
+  assert.deepEqual(decisionsOf(back.sent[0].details), [{ agent: b.agent, decision: b.d, answered: true }]);
   await until(() => seen('Stopped, blue or red?'), x => x?.collectedAt !== undefined);
   back.settle(); back.shutdown();
   const third = standIn('tui', 's-stopped', kept);
   third.start(); third.settle();
   assert.equal(third.sent.length, 0, 'once, even then');
   third.shutdown();
+
+  // A wait refused for good (here a stand-in says so, as for an answer that doesn't open): the refusal is handed over,
+  // and nothing is ever picked up for it, then or at the next start, though the owner has answered meanwhile.
+  const refusing = path.join(bin, 'refuses-once'), refusedFlag = path.join(work, 'refuses-once.done');
+  writeFileSync(refusing, `#!/bin/sh\nif [ "$1" = wait ] && [ ! -e ${refusedFlag} ]; then : > ${refusedFlag}; echo '{"code":2,"text":"Refused: not this time."}'; exit 2; fi\nexec ${command.map(c => `'${c}'`).join(' ')} "$@"\n`);
+  chmodSync(refusing, 0o755);
+  const refusedEntries: unknown[] = [];
+  const told = standIn('tui', 's-refused', refusedEntries);
+  told.start({ ...fast, command: [refusing] });
+  const r = await asks('s-refused', 'Refused, then answered?');
+  told.bash();
+  await until(async () => told.sent.length, n => n === 1);
+  assert.match(told.sent[0].content, new RegExp(`^AgentPager: the wait for decision ${r.d} \\(agent ${r.agent}\\) ended without an answer it could give you\\. The agentpager command's reply:\\n\\nRefused: not this time\\.$`));
+  assert.deepEqual(decisionsOf(told.sent[0].details), [{ agent: r.agent, decision: r.d, answered: false }]);
+  told.settle(); told.shutdown();
+  await answer('Refused, then answered?');
+  const after = standIn('tui', 's-refused', refusedEntries);
+  after.start();
+  assert.equal(holds(r.agent, r.d), false);
+  assert.equal(waits().filter(w => w.command.includes(` ${r.d} `)).length + pickups().filter(x => x.endsWith(` pickup --agent ${r.agent} ${r.d} --json`)).length, 0, 'neither held nor picked up');
+  after.settle(); after.shutdown();
 
   // Another pi session's decision, and a Claude Code session's, are never held here.
   const mine = standIn('tui', 's-mine');
@@ -275,7 +297,7 @@ test('B33.5 B32.12 Each answer goes in once across restarts of the same session:
   assert.ok(holds(own.agent, own.d));
   await answer('Another session\'s?'); await answer('Claude Code\'s?'); await answer('Mine, blue or red?');
   await until(async () => mine.sent.length, n => n === 1);
-  assert.deepEqual(decisionsOf(mine.sent[0].details), [{ agent: own.agent, decision: own.d }]);
+  assert.deepEqual(decisionsOf(mine.sent[0].details), [{ agent: own.agent, decision: own.d, answered: true }]);
   await until(() => seen('Mine, blue or red?'), x => x?.collectedAt !== undefined);
   assert.equal((await seen('Another session\'s?'))?.collectedAt, undefined, 'another session\'s answer was never picked up here');
   mine.settle(); mine.shutdown();
@@ -314,21 +336,21 @@ test('B33.5 B32.12 A wait or a pickup that ends without landing, with the pager 
   assert.equal(missing.notes.length, 1);
   missing.settle(); missing.shutdown();
 
-  // pi takes the follow-up but never starts it (its run failed to begin): nothing is picked up until it is sent again
-  // and starts.
+  // pi takes the follow-up but doesn't start it, three times (its run failed to begin): nothing is picked up until it
+  // is sent again, each time a while longer after, and starts.
   const dropping = standIn('tui', 's-dropped');
   const realSend = dropping.pi.sendMessage.bind(dropping.pi);
-  let drop = true;
-  dropping.pi.sendMessage = (message, options) => { if (drop) { drop = false; dropping.sent.push({ content: message.content, details: message.details, options, whileWorking: false }); return; } realSend(message, options); };
-  dropping.start({ ...fast, confirmMs: 1_500 });
+  let drops = 3;
+  dropping.pi.sendMessage = (message, options) => { if (drops > 0) { drops--; dropping.sent.push({ content: message.content, details: message.details, options, whileWorking: false }); return; } realSend(message, options); };
+  dropping.start({ ...fast, confirmMs: 300 });
   const c = await asks('s-dropped', 'Dropped, then sent?');
   dropping.bash();
   await answer('Dropped, then sent?');
   await until(async () => dropping.sent.length, n => n === 1);
   assert.equal((await seen('Dropped, then sent?'))?.collectedAt, undefined, 'not picked up: the turn never started');
-  await until(async () => dropping.sent.length, n => n === 2);
-  assert.equal(dropping.sent[0].content, dropping.sent[1].content);
-  assert.deepEqual(decisionsOf(dropping.sent[1].details), [{ agent: c.agent, decision: c.d }]);
+  await until(async () => dropping.sent.length, n => n === 4);
+  assert.equal(dropping.sent[0].content, dropping.sent[3].content);
+  assert.deepEqual(decisionsOf(dropping.sent[3].details), [{ agent: c.agent, decision: c.d, answered: true }]);
   await until(() => seen('Dropped, then sent?'), x => x?.collectedAt !== undefined);
   dropping.settle(); dropping.shutdown();
 });

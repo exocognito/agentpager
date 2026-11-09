@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import { spawn } from 'node:child_process';
+import { createServer } from 'node:http';
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -97,7 +98,7 @@ test('B32.12 An adapter\'s wait with --no-pickup hands over the answer but picks
   const f = await fixture('cli-pickup-adapter', { autoOffMs: 0, idleMs: 0, pickupMs: PICKUP_MS });
   const home = mkdtempSync(path.join(tmpdir(), 'agentpager-pickup-adapter-'));
   process.env.AGENTPAGER_HOME = home; process.env.AGENTPAGER_SERVER = f.origin;
-  const op = await import('../src/commands.ts');
+  const op = await import('../src/commands.ts'), store = await import('../src/store.ts');
   const main = fileURLToPath(new URL('../src/main.ts', import.meta.url));
   const command = async (...args: string[]) => {
     const r = await run([process.execPath, '--experimental-strip-types', main, ...args, '--json'], { AGENTPAGER_HOME: home, AGENTPAGER_SERVER: f.origin }).done;
@@ -148,7 +149,17 @@ test('B32.12 An adapter\'s wait with --no-pickup hands over the answer but picks
     assert.deepEqual([(await command('pickup', '--agent', id, closed)).exit, (await command('pickup', '--agent', id, closed)).status], [2, 'closed']);
     assert.deepEqual([(await command('wait', '--agent', id, closed, '--no-pickup', '--forever')).exit, (await command('wait', '--agent', id, closed, '--no-pickup')).status], [2, 'closed']);
 
-    // The service away: try again.
+    // The service failing (here a stand-in replies 503 to everything), and then away: try again, from both steps.
+    const failing = createServer((_q, res) => { res.writeHead(503, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: 'Unavailable', message: 'Down for a moment.' })); });
+    await new Promise<void>(res => failing.listen(0, '127.0.0.1', res));
+    const address = failing.address(), real = store.loadAgent(id)?.server ?? '';
+    store.updateAgent(id, x => { x.server = `http://127.0.0.1:${typeof address === 'object' && address ? address.port : 0}`; });
+    try {
+      for (const step of [['pickup', '--agent', id, held], ['wait', '--agent', id, held, '--no-pickup']]) {
+        const r = await command(...step);
+        assert.deepEqual([r.exit, r.status], [5, 'try-again'], `${step[0]} with the server failing`);
+      }
+    } finally { store.updateAgent(id, x => { x.server = real; }); await new Promise(res => failing.close(res)); }
     await f.stop();
     const away = await command('pickup', '--agent', id, held);
     assert.deepEqual([away.exit, away.status], [5, 'try-again']);

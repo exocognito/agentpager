@@ -359,7 +359,7 @@ export async function wait(agent: string, ref: string, opts: { seconds?: number;
     if (!choice || (d.options.length > 0 && !acceptsChoice({ options: d.options.map((_, i) => ({ number: i + 1 })) }, choice))) return refused(unreadableAnswer(d.short));
     if (!opts.noPickup) {
       await received(a, d.id, r.value.answer.answerId);
-      answeredHere(a, d, sentAt, choice);
+      answeredHere(a, d, sentAt, choice, true);
     }
     if (choice.kind === 'option') {
       const n = choice.number, letter = String.fromCharCode(64 + n);
@@ -401,11 +401,13 @@ function forAdapter(r: Failure, a: AgentFile): Result {
   return { ...why, json: { status: why.code === 4 ? 'pager-off' : why.code === 5 ? 'try-again' : 'refused' } };
 }
 // The answer is this machine's agent's now: the decision is recorded as answered, once, with the answer in the history.
-function answeredHere(a: AgentFile, d: { short: string; answered?: boolean }, sentAt: string, choice: NonNullable<ReturnType<typeof openAnswer>>) {
-  if (d.answered) return;
+// read: a wait of the agent's own is handing it the answer, which is counted each time (store.ts › Waiting, reads), so
+// an adapter can tell the agent has read it by itself; an adapter's pickup isn't one.
+function answeredHere(a: AgentFile, d: { short: string; answered?: boolean }, sentAt: string, choice: NonNullable<ReturnType<typeof openAnswer>>, read: boolean) {
+  if (d.answered && !read) return;
   try {
-    updateAgent(a.id, x => { if (x.decisions[d.short]) x.decisions[d.short].answered = true; });
-    appendHistory(a.pager, { at: sentAt, event: 'answered', agent: a.id, decision: d.short, ...(choice.kind === 'option' ? { choice: choice.number } : { note: choice.text }) });
+    updateAgent(a.id, x => { const e = x.decisions[d.short]; if (e) { e.answered = true; if (read) e.reads = (e.reads ?? 0) + 1; } });
+    if (!d.answered) appendHistory(a.pager, { at: sentAt, event: 'answered', agent: a.id, decision: d.short, ...(choice.kind === 'option' ? { choice: choice.number } : { note: choice.text }) });
   } catch { /* not recorded here; the answer is still the server's */ }
 }
 
@@ -434,7 +436,7 @@ export async function pickup(agent: string, ref: string): Promise<Result> {
   const r = await received(a, d.id, answerId);
   // A service from before pickup (m6.1) has no word for it: it picked the answer up when it was read.
   if (r && r.error !== 'NotFound') return failed(r);
-  answeredHere(a, d, sentAt, choice);
+  answeredHere(a, d, sentAt, choice, false);
   return done(`Picked up: the service knows your agent has the answer to ${d.short}.`, { status: 'picked-up' });
 }
 

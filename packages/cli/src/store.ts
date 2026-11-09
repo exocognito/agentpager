@@ -42,12 +42,13 @@ const AgentFile = Schema.mutable(Schema.Struct({
   app: Schema.String, project: Schema.String, machine: Schema.optional(Schema.String), createdAt: Schema.String,
   rulesShownAt: Schema.NullOr(Schema.String), cardsSinceRules: Schema.Number,
   // Short decision ids for the agent (d_2x8w): the server's id, the question and its option labels, and how far it got.
-  // askedAt came later, closed (it closed unanswered, as the service said) later still, and wake (Wake, above) in M7, so
-  // a file from before any of them still loads; a command from before one keeps it when it writes the file.
+  // askedAt came later, closed (it closed unanswered, as the service said) later still, and wake (Wake, above) and reads
+  // (how many times a wait of the agent's own has handed it the answer) in M7, so a file from before any of them still
+  // loads; a command from before one keeps it when it writes the file.
   decisions: Schema.mutable(Schema.Record({ key: Schema.String, value: Schema.mutable(Schema.Struct({
     id: Schema.String, title: Schema.String, options: Schema.mutable(Schema.Array(Schema.String)),
     askedAt: Schema.optional(Schema.String), answered: Schema.optional(Schema.Boolean), acknowledged: Schema.optional(Schema.Boolean),
-    closed: Schema.optional(Schema.Boolean), wake: Schema.optional(Wake),
+    closed: Schema.optional(Schema.Boolean), wake: Schema.optional(Wake), reads: Schema.optional(Schema.Number),
   })) })),
   // Asks no reply has settled yet, by their card's content: the request id chosen for each, so the same card asked
   // again after a lost reply names the same decision; the run that last took it (run), which alone may change it; and,
@@ -106,7 +107,10 @@ export function saveAgent(a: AgentFile) {
 //     { "decision": "d_9k2m", "askedAt": "…", "state": "answered", "wake": { "app": "codex", "thread": "<thread id>", "rung": "queued" } },
 //     { "decision": "d_4hq7", "askedAt": "…", "state": "waiting" } ] }
 // A decision asked from this machine is listed until this machine acknowledges it or learns it closed unanswered:
-// "waiting" until a wait here has its answer, then "answered". "wake" says who wakes the agent for it, when something
+// "waiting" until a wait here has its answer, then "answered". "reads" counts the times a wait of the agent's own (the
+// command line's or the MCP tool's, never an adapter's two steps below) has handed it the answer, and is left out at
+// none: an adapter that sees it grow knows the agent has read the answer by itself since, even where the decision was
+// answered already. "wake" says who wakes the agent for it, when something
 // does: an adapter's session, as AGENTPAGER_WAKE named it when the agent asked (detect.ts), or the Codex thread that
 // asked, with how its ring went once it has rung (RingOutcome). An adapter acts only on the decisions whose wake names
 // its own app and session; it ignores the rest, and a decision that leaves the list is done with. For each, it:
@@ -125,13 +129,13 @@ export function saveAgent(a: AgentFile) {
 // So a wait whose adapter went away, or an answer never handed over, picks nothing up, and the owner is warned (B5.13).
 export type Waiting = {
   version: 1; agent: string;
-  decisions: { decision: string; askedAt?: string; state: 'waiting' | 'answered'; wake?: { app: 'claude-code' | 'pi'; session: string } | { app: 'codex'; thread: string; rung?: RingOutcome } }[];
+  decisions: { decision: string; askedAt?: string; state: 'waiting' | 'answered'; reads?: number; wake?: { app: 'claude-code' | 'pi'; session: string } | { app: 'codex'; thread: string; rung?: RingOutcome } }[];
 };
 export const waitingPath = (id: string) => path.join(home(), 'waiting', `${id}.json`);
 export function waitingOf(a: AgentFile): Waiting {
   const decisions = Object.entries(a.decisions).filter(([, d]) => !d.acknowledged && !d.closed).map(([decision, d]) => {
     const w = d.wake, wake = !w ? undefined : w.app === 'codex' ? { app: w.app, thread: w.thread, ...(w.ring ? { rung: w.ring.outcome } : {}) } : { app: w.app, session: w.session };
-    return { decision, ...(d.askedAt ? { askedAt: d.askedAt } : {}), state: d.answered ? 'answered' as const : 'waiting' as const, ...(wake ? { wake } : {}) };
+    return { decision, ...(d.askedAt ? { askedAt: d.askedAt } : {}), state: d.answered ? 'answered' as const : 'waiting' as const, ...(d.reads ? { reads: d.reads } : {}), ...(wake ? { wake } : {}) };
   });
   return { version: 1, agent: a.id, decisions };
 }

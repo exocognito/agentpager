@@ -204,7 +204,20 @@ test('B33.5 After a move to another point of the session\'s tree, a decision sti
   await new Promise(res => setTimeout(res, 1_500));
   pi.settle();
   assert.equal(pi.sent.length, 2, 'a follow-up pi never started isn\'t sent again on the branch that holds the reply');
-  // Before the agent acknowledges it, the owner goes back to before the reply: the agent there hasn't had it.
+  // The owner goes back and prompts at once, and the agent there reads the answer with a wait of its own before pi
+  // settles: the record counts that read, so the reply held for this branch isn't handed over as well.
+  assert.equal(Reflect.get(Object(record(agent)), 'decisions')[0].reads, undefined, 'the extension\'s own steps aren\'t the agent\'s reads');
+  pi.navigate(0);
+  pi.prompt();
+  assert.match((await shell('s-tree', ['wait', '--agent', agent, d])).text, /^Answered at .+: option A "Blue"/);
+  assert.equal(Reflect.get(Object(record(agent)), 'decisions')[0].reads, 1);
+  await until(async () => holds(agent, d), held => !held);
+  await new Promise(res => setTimeout(res, 500));
+  pi.settle();
+  assert.equal(pi.sent.length, 2, 'the agent on this branch has read it by itself');
+  assert.equal(holds(agent, d), false);
+  // Before the agent acknowledges it, the owner goes back to before the reply again: the agent there hasn't had it,
+  // whatever was read on a branch left behind.
   pi.navigate(0);
   await until(async () => pi.sent.length, n => n === 3);
   assert.equal(pi.sent[2].content, pi.sent[0].content, 'the same reply, on this branch');
@@ -382,7 +395,7 @@ test('B33.5 B32.12 Each answer goes in once across restarts of the same session:
   mine.settle(); mine.shutdown();
 });
 
-test('B33.5 B32.12 A wait or a pickup that ends without landing, with the pager off, the service away or the command not found at first, is run again later, and a follow-up pi didn\'t start is sent again before anything is picked up', { timeout: 60_000 }, async () => {
+test('B33.5 B32.12 A wait or a pickup that ends without landing, with the pager off, the service away or the command not found at first, is run again later, and a follow-up pi didn\'t start is sent again before anything is picked up, without an answer the agent has read by itself since', { timeout: 60_000 }, async () => {
   // The first wait is told the pager is off, and the first pickup gets no usable reply; the next of each is the
   // command's own.
   const flaky = path.join(bin, 'flaky'), offFlag = path.join(work, 'flaky-off.done'), awayFlag = path.join(work, 'flaky-away.done');
@@ -432,6 +445,30 @@ test('B33.5 B32.12 A wait or a pickup that ends without landing, with the pager 
   assert.deepEqual(decisionsOf(dropping.sent[3].details), [{ agent: c.agent, decision: c.d, answered: true }]);
   await until(() => seen('Dropped, then sent?'), x => x?.collectedAt !== undefined);
   dropping.settle(); dropping.shutdown();
+
+  // pi doesn't start the follow-up, the owner starts a turn of their own, and in it the agent reads one answer with a
+  // wait of its own and reads and acknowledges another: when pi settles, neither is sent again, only the one it hasn't read.
+  const unread = standIn('tui', 's-dropped-read');
+  const send = unread.pi.sendMessage.bind(unread.pi);
+  let dropped = 1;
+  unread.pi.sendMessage = (message, options) => { if (dropped > 0) { dropped--; unread.sent.push({ content: message.content, details: message.details, options, whileWorking: false }); return; } send(message, options); };
+  unread.start({ ...fast, confirmMs: 60_000 });
+  const x = await asks('s-dropped-read', 'Dropped, then read?'), y = await asks('s-dropped-read', 'Dropped, then acknowledged?'), z = await asks('s-dropped-read', 'Dropped, and not read?');
+  unread.bash(); unread.prompt();
+  await answer('Dropped, then read?'); await answer('Dropped, then acknowledged?'); await answer('Dropped, and not read?');
+  await until(async () => holds(x.agent, x.d) || holds(y.agent, y.d) || holds(z.agent, z.d), held => !held);
+  unread.settle();
+  assert.equal(unread.sent.length, 1, 'all three in one follow-up, which pi doesn\'t start');
+  assert.equal(decisionsOf(unread.sent[0].details).length, 3);
+  unread.prompt();
+  assert.match((await shell('s-dropped-read', ['wait', '--agent', x.agent, x.d])).text, /^Answered at/);
+  assert.match((await shell('s-dropped-read', ['wait', '--agent', y.agent, y.d])).text, /^Answered at/);
+  assert.equal((await shell('s-dropped-read', ['ack', '--agent', y.agent, y.d, 'Done.'])).code, 0);
+  unread.settle();
+  assert.equal(unread.sent.length, 2);
+  assert.deepEqual(decisionsOf(unread.sent[1].details), [{ agent: z.agent, decision: z.d, answered: true }], 'only the one the agent hasn\'t read');
+  await until(() => seen('Dropped, and not read?'), q => q?.collectedAt !== undefined);
+  unread.settle(); unread.shutdown();
 });
 
 test('B33.5 B32.12 Every wait it holds stops when the session shuts down, and when pi exits without saying so; one left behind when pi is killed picks nothing up, so the owner is warned', { timeout: 90_000 }, async () => {

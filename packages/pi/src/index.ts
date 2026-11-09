@@ -20,8 +20,9 @@ import path from 'node:path';
 // session, or a move to another point of its tree, neither hands over again a reply its branch holds nor holds its
 // wait; it only runs the pickup of an answer it carried, if that hadn't landed. A decision still waiting on the agent
 // whose reply only another branch holds is handed over again on this one, and a reply collected for a branch the owner
-// has since left isn't handed over on one that holds it. It reads ids and states from the record and statuses from the
-// command's JSON, never the words of a reply.
+// has since left isn't handed over on one that holds it. An answer the agent has read by itself, with a wait of its
+// own, isn't handed over as well: the record says so (its state, and its count of such reads). It reads ids, states
+// and counts from the record and statuses from the command's JSON, never the words of a reply.
 //
 // In print and JSON mode it does nothing but clear an AGENTPAGER_WAKE inherited from a session around it, so the command
 // keeps today's words there and nothing is left running when the run ends. Every child is stopped when the session
@@ -83,17 +84,19 @@ const ids = (v: unknown): { agent: string; decision: string } | null => {
   return f && typeof f.agent === 'string' && AGENT.test(f.agent) && typeof f.decision === 'string' && DECISION.test(f.decision) ? { agent: f.agent, decision: f.decision } : null;
 };
 
-// One agent's record of what's waiting, waiting/<agent>.json: this session's decisions in it, with where each stands.
-// Null when the file can't be read as a record, which is not the same as one that lists none.
-function listedIn(file: string, agent: string, session: string): Map<string, 'waiting' | 'answered'> | null {
+// One agent's record of what's waiting, waiting/<agent>.json: this session's decisions in it, with where each stands
+// and how many times a wait of the agent's own has handed it the answer. Null when the file can't be read as a record,
+// which is not the same as one that lists none.
+type Listed = { state: 'waiting' | 'answered'; reads: number };
+function listedIn(file: string, agent: string, session: string): Map<string, Listed> | null {
   let record: { [k: string]: unknown } | null;
   try { record = fields(JSON.parse(readFileSync(file, 'utf8'))); } catch { return null; }
   if (!record || record.version !== 1 || record.agent !== agent || !Array.isArray(record.decisions)) return null;
-  const mine = new Map<string, 'waiting' | 'answered'>();
+  const mine = new Map<string, Listed>();
   for (const entry of record.decisions) {
     const d = fields(entry), wake = fields(d?.wake);
     if (!d || typeof d.decision !== 'string' || !DECISION.test(d.decision) || (d.state !== 'waiting' && d.state !== 'answered')) continue;
-    if (wake?.app === 'pi' && wake.session === session) mine.set(d.decision, d.state);
+    if (wake?.app === 'pi' && wake.session === session) mine.set(d.decision, { state: d.state, reads: typeof d.reads === 'number' ? d.reads : 0 });
   }
   return mine;
 }
@@ -109,12 +112,13 @@ export function agentpagerWake(pi: Pi, options: Options = {}) {
   // later, which never keeps a wait from being held. ready: replies to hand over, in the order they came. inFlight: the
   // follow-up sent and not yet started by pi. done: decisions whose reply this run sent, or left out. here: the replies
   // the session's branch holds, by decision, each with whether it carried the answer; elsewhere: those only another
-  // branch holds. tried: the pickups this run has started.
+  // branch holds. readBefore: each decision's count of the agent's own reads when this branch was first looked at.
+  // tried: the pickups this run has started.
   type Timers = Map<string, ReturnType<typeof setTimeout>>;
   const children = new Set<ChildProcess>(), holding = new Set<string>();
   const again: Timers = new Map(), pickAgain: Timers = new Map();
   const ready = new Map<string, Reply>(), tried = new Set<string>();
-  let done = new Set<string>(), here = new Map<string, boolean>(), elsewhere = new Set<string>();
+  let done = new Set<string>(), here = new Map<string, boolean>(), elsewhere = new Set<string>(), readBefore = new Map<string, number>();
   let inFlight: { replies: Reply[]; tries: number; timer: ReturnType<typeof setTimeout> } | null = null;
   let watcher: FSWatcher | null = null, rescan: ReturnType<typeof setTimeout> | null = null;
 
@@ -166,9 +170,12 @@ export function agentpagerWake(pi: Pi, options: Options = {}) {
     timers.set(key, timer);
   };
 
+  // Whether the agent on this branch is still owed the reply of a decision the record lists: one waiting here is; one
+  // answered here is only where another branch was handed its reply and the agent hasn't read it with a wait of its
+  // own since this branch was first looked at. (An answered one no branch was handed, the agent read by itself.)
+  const owed = (key: string, d: Listed) => d.state === 'waiting' || (elsewhere.has(key) && d.reads === (readBefore.get(key) ?? d.reads));
   // Looks through the record for this session's decisions. One whose answer the branch holds gets its pickup, if it is
-  // still waiting here and this run hasn't run it; one the branch holds no reply for gets its wait held, if it is waiting
-  // here or another branch was handed its reply (an answered one that no branch was handed, the agent read by itself).
+  // still waiting here and this run hasn't run it; one the branch holds no reply for gets its wait held while it is owed.
   const scan = () => {
     if (stopped || session === null) return;
     const dir = waitingDir();
@@ -181,11 +188,12 @@ export function agentpagerWake(pi: Pi, options: Options = {}) {
     for (const name of names) {
       const agent = /^(ap-[a-z0-9]{4})\.json$/.exec(name)?.[1];
       if (!agent) continue;
-      for (const [decision, state] of listedIn(path.join(dir, name), agent, session) ?? []) {
+      for (const [decision, d] of listedIn(path.join(dir, name), agent, session) ?? []) {
         const key = keyOf(agent, decision), held = here.get(key);
-        if (held !== undefined || done.has(key)) { if (held === true && state === 'waiting' && !tried.has(key)) pickup(agent, decision); continue; }
+        if (!readBefore.has(key)) readBefore.set(key, d.reads);
+        if (held !== undefined || done.has(key)) { if (held === true && d.state === 'waiting' && !tried.has(key)) pickup(agent, decision); continue; }
         if (holding.has(key) || again.has(key) || ready.has(key)) continue;
-        if (state === 'waiting' || elsewhere.has(key)) hold(agent, decision);
+        if (owed(key, d)) hold(agent, decision);
       }
     }
     deliver();
@@ -220,23 +228,28 @@ export function agentpagerWake(pi: Pi, options: Options = {}) {
     tried.add(key);
     run(['pickup', '--agent', agent, decision], reply => {
       if (reply?.code === 0 || reply?.code === 2 || reply?.code === 6) return;
-      later(pickAgain, key, reply?.code === 4 ? offRetryMs : retryMs, () => { const l = listed(agent); if (!l || l.get(decision) === 'waiting') pickup(agent, decision); });
+      later(pickAgain, key, reply?.code === 4 ? offRetryMs : retryMs, () => { const l = listed(agent); if (!l || l.get(decision)?.state === 'waiting') pickup(agent, decision); });
     });
   };
 
-  // Hands the replies waiting over as one follow-up turn, once pi has settled with nothing queued: never into a run. A
-  // decision the agent read by itself meanwhile is left out: one acknowledged or closed, which has left the record, and
-  // one a wait of the agent's own has answered here, unless its reply is owed to this branch (only another holds it).
+  // The replies among these the agent is still owed, by the record as it is now: a decision the agent read by itself
+  // meanwhile is left out, whether it has left the record (acknowledged or closed) or a wait of the agent's own has
+  // handed it the answer. A record that can't be read leaves its replies in.
+  const stillOwed = (replies: Iterable<Reply>) => {
+    const out: Reply[] = [], lists = new Map<string, Map<string, Listed> | null>();
+    for (const r of replies) {
+      if (!lists.has(r.agent)) lists.set(r.agent, listed(r.agent));
+      const key = keyOf(r.agent, r.decision), l = lists.get(r.agent), d = l?.get(r.decision);
+      if (l && (!d || !owed(key, d))) { done.add(key); continue; }
+      out.push(r);
+    }
+    return out;
+  };
+  // Hands the replies waiting over as one follow-up turn, once pi has settled with nothing queued: never into a run.
   const deliver = () => {
     if (stopped || session === null || running || inFlight || ready.size === 0 || !idle()) return;
-    const replies: Reply[] = [], lists = new Map<string, Map<string, 'waiting' | 'answered'> | null>();
-    for (const [key, r] of ready) {
-      if (!lists.has(r.agent)) lists.set(r.agent, listed(r.agent));
-      const l = lists.get(r.agent);
-      ready.delete(key);
-      if (l && (!l.has(r.decision) || (l.get(r.decision) === 'answered' && !elsewhere.has(key)))) { done.add(key); continue; }
-      replies.push(r);
-    }
+    const replies = stillOwed([...ready.values()]);
+    ready.clear();
     if (replies.length) send(replies, 1);
   };
   const send = (replies: Reply[], tries: number) => {
@@ -248,14 +261,16 @@ export function agentpagerWake(pi: Pi, options: Options = {}) {
     const content = replies.map(r => `${r.answered ? `AgentPager: your owner answered decision ${r.decision} (agent ${r.agent}).` : `AgentPager: the wait for decision ${r.decision} (agent ${r.agent}) ended without an answer it could give you.`} The agentpager command's reply:\n\n${r.text}`).join('\n\n');
     pi.sendMessage({ customType: TYPE, content, display: true, details: { decisions: replies.map(r => ({ agent: r.agent, decision: r.decision, answered: r.answered })) } }, { triggerTurn: true, deliverAs: 'followUp' });
   };
-  // A follow-up pi never put in the session (it failed before its run began) is sent again until pi starts it. Until
-  // then nothing is picked up, so the owner is warned after 3 minutes.
+  // A follow-up pi never put in the session (it failed before its run began) is sent again until pi starts it, without
+  // any reply the agent has read by itself in a run since. Until then nothing is picked up, so the owner is warned
+  // after 3 minutes.
   const resend = () => {
     const sent = inFlight;
     if (!sent) return;
     clearTimeout(sent.timer);
     inFlight = null; running = false;
-    send(sent.replies, sent.tries + 1);
+    const replies = stillOwed(sent.replies);
+    if (replies.length) send(replies, sent.tries + 1);
   };
   const unconfirmed = (sent: NonNullable<typeof inFlight>) => {
     if (stopped || inFlight !== sent) return;
@@ -280,6 +295,8 @@ export function agentpagerWake(pi: Pi, options: Options = {}) {
     try { all = c.sessionManager.getEntries(); } catch { all = branch; }
     here = handedIn(branch);
     elsewhere = new Set([...handedIn(all).keys()].filter(key => !here.has(key)));
+    // What the agent has read by itself is counted from here on: the scan that follows notes each decision's count.
+    readBefore = new Map();
     // A reply this branch already holds isn't handed over on it again: one waiting to be handed over, or sent and not
     // yet started by pi, was collected for the branch the owner left. (A wait still held for it is dropped when it ends.)
     for (const key of [...ready.keys()]) if (here.has(key)) ready.delete(key);

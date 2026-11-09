@@ -94,7 +94,7 @@ test('B32.12 The command says it received an answer once it has opened it, from 
 
 // The two steps an adapter takes instead of one wait (store.ts › Waiting): a wait that picks nothing up, and pickup once
 // the agent has the answer. Run from source as the adapters run the command, for its flags and its JSON.
-test('B32.12 An adapter\'s wait with --no-pickup hands over the answer but picks nothing up, so the owner is still warned, and pickup picks it up once the agent has it, saying in its JSON what happened', { timeout: 240_000 }, async () => {
+test('B32.12 An adapter\'s wait with --no-pickup hands over the answer but picks nothing up, so the owner is still warned, and pickup picks it up once the agent has it, saying in its JSON what happened; the record counts only the agent\'s own reads', { timeout: 240_000 }, async () => {
   const f = await fixture('cli-pickup-adapter', { autoOffMs: 0, idleMs: 0, pickupMs: PICKUP_MS });
   const home = mkdtempSync(path.join(tmpdir(), 'agentpager-pickup-adapter-'));
   process.env.AGENTPAGER_HOME = home; process.env.AGENTPAGER_SERVER = f.origin;
@@ -111,7 +111,8 @@ test('B32.12 An adapter\'s wait with --no-pickup hands over the answer but picks
     const [held, acked, closed] = [field(await op.ask(id, card('Held, then picked up?')), 'decision'), field(await op.ask(id, card('Acknowledged first?')), 'decision'), field(await op.ask(id, card('Closed first?')), 'decision')];
     const read = async (title: string) => { const x = (await f.pager(p.pagerId, p.phone)).agents[0]; return [...(x?.open ?? []), ...(x?.answered ?? [])].find(y => y.title === title); };
     const agentId = (await f.pager(p.pagerId, p.phone)).agents[0]?.agent.agentId ?? '';
-    const state = (d: string) => JSON.parse(readFileSync(path.join(home, 'waiting', `${id}.json`), 'utf8')).decisions.find((x: { decision: string }) => x.decision === d)?.state;
+    const listed = (d: string) => JSON.parse(readFileSync(path.join(home, 'waiting', `${id}.json`), 'utf8')).decisions.find((x: { decision: string }) => x.decision === d);
+    const state = (d: string) => listed(d)?.state;
     const historyHas = (d: string) => readFileSync(path.join(home, 'history', `${p.pagerId}.jsonl`), 'utf8').split('\n').filter(Boolean).some(l => { const e = JSON.parse(l); return e.event === 'answered' && e.decision === d; });
 
     // Before the answer: a held wait without --forever replies pending, and there is nothing to pick up.
@@ -137,6 +138,14 @@ test('B32.12 An adapter\'s wait with --no-pickup hands over the answer but picks
     assert.equal(historyHas(held), true);
     assert.equal((await command('pickup', '--agent', id, held)).status, 'picked-up');
     assert.equal((await read('Held, then picked up?'))?.collectedAt, picked?.collectedAt, 'when it was first picked up');
+    // The record counts only the agent's own reads: neither step of an adapter is one, and each wait of the agent's is.
+    assert.equal(listed(held).reads, undefined, 'an adapter\'s wait and pickup aren\'t the agent\'s reads');
+    assert.equal((await command('wait', '--agent', id, held, '--no-pickup')).status, 'answered');
+    assert.equal(listed(held).reads, undefined);
+    assert.equal((await command('wait', '--agent', id, held)).status, 'answered');
+    assert.deepEqual([listed(held).state, listed(held).reads], ['answered', 1]);
+    assert.equal((await op.wait(id, held)).code, 0);
+    assert.equal(listed(held).reads, 2);
 
     // Acknowledged first: the acknowledgement picked it up.
     await f.answer(agentId, p.phone, (await read('Acknowledged first?'))?.decisionId ?? '', { kind: 'option', number: 1 });

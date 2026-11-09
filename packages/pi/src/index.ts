@@ -153,7 +153,7 @@ export function agentpagerWake(pi: Pi, options: Options = {}) {
     const key = keyOf(agent, decision), env = { ...process.env };
     delete env.AGENTPAGER_WAKE; delete env.AGENTPAGER_PAGER;
     let child: ChildProcess;
-    try { child = spawn(command[0], [...command.slice(1), 'wait', '--agent', agent, decision, '--forever', '--json'], { stdio: ['ignore', 'pipe', 'ignore'], env, detached: true }); }
+    try { child = spawn(command[0], [...command.slice(1), 'wait', '--agent', agent, decision, '--forever', '--json'], { stdio: ['ignore', 'pipe', 'ignore'], env, detached: true, windowsHide: true }); }
     catch { later(key); return; }
     holding.set(key, child);
     child.unref();

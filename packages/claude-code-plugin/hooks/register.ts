@@ -17,9 +17,7 @@ function hostOf($: EngineInterface): Host {
     sessionId: async () => String(await $.session.id()),
     setWake: async value => !(await $.env.set('AGENTPAGER_WAKE', value)).deny,
     // Looked for first, so a folder not made yet isn't a failure in Claude Code's debug log every second.
-    list: async dir => {
-      try { return await $.fs.exists(dir) ? (await $.fs.list(dir)).map(e => ({ name: e.name, kind: e.kind, size: e.size, mtimeMs: e.mtimeMs })) : null } catch { return null }
-    },
+    list: async dir => await $.fs.exists(dir) ? (await $.fs.list(dir)).map(e => ({ name: e.name, kind: e.kind, size: e.size, mtimeMs: e.mtimeMs })) : null,
     read: file => $.fs.read(file),
     exists: file => $.fs.exists(file),
     run: async argv => {

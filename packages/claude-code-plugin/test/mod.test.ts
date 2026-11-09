@@ -192,10 +192,16 @@ test('B33.2 B32.12 The answer counts as picked up only once the turn carrying it
   assert.equal(h.pickups.length, 1, 'tried again 10 s on, not on every look');
   await h.advance(1_000);
   assert.equal(h.pickups.length, 2);
-  // Claude Code quits again before it lands: the next start tries again, and stops once it is done.
+  // Claude Code quits again before it lands, and comes back while the folder of hand-overs can't be listed: that is
+  // never read as none, so the answer isn't held, or handed over, again.
   back.sessionEnded('prompt_input_exit');
   h.picking = JSON.stringify({ code: 0, text: 'Picked up.', result: { status: 'picked-up' } }) + '\n';
+  h.failing.add(`${HOME}/claude-code`);
   const third = await started(h);
+  await h.advance(TICK_MS * 3);
+  assert.deepEqual([h.running(), h.turns.length, h.pickups.length], [[], 1, 2]);
+  // Once it lists, the next look tries the pickup again, and stops once it is done.
+  h.failing.clear();
   await h.advance(TICK_MS);
   assert.equal(h.pickups.length, 3);
   await h.advance(60_000);

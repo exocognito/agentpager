@@ -49,7 +49,8 @@ export interface Host {
   sessionId(): Promise<string>;
   // Sets or unsets AGENTPAGER_WAKE for every process the session starts from then on; false when Claude Code refused.
   setWake(value: string | undefined): Promise<boolean>;
-  // A folder's entries, or null when it can't be listed (it isn't there, or a failure).
+  // A folder's entries, or null when it isn't there. Any other failure rejects, and the look it was for is made again
+  // a second later: a folder of hand-overs that didn't list must never read as one with none.
   list(dir: string): Promise<Entry[] | null>;
   read(file: string): Promise<string>;
   exists(file: string): Promise<boolean>;
@@ -234,8 +235,8 @@ export class Mod {
     }
     void this.hand();
   }
-  // Every agent's record, by agent: its decoded record, or null for one that didn't read. Null when the folder can't
-  // be listed. A file is read again only when its size or time changed.
+  // Every agent's record, by agent: its decoded record, or null for one that didn't read. Null when there is no folder
+  // of records yet. A file is read again only when its size or time changed.
   private async records(): Promise<Map<string, Record | null> | null> {
     const entries = await this.host.list(this.waiting);
     if (!entries) return null;

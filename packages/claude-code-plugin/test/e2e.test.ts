@@ -34,9 +34,7 @@ function claudeCode(session: string) {
     every: (ms, fn) => { const t = setInterval(fn, ms); return { cancel: () => clearInterval(t) }; },
     sessionId: async () => session,
     setWake: async value => { if (value === undefined) delete process.env.AGENTPAGER_WAKE; else process.env.AGENTPAGER_WAKE = value; return true; },
-    list: async dir => {
-      try { return readdirSync(dir).map(name => { const s = statSync(path.join(dir, name)); return { name, kind: s.isFile() ? 'file' : s.isDirectory() ? 'dir' : 'other', size: s.size, mtimeMs: s.mtimeMs }; }); } catch { return null; }
-    },
+    list: async dir => existsSync(dir) ? readdirSync(dir).map(name => { const s = statSync(path.join(dir, name)); return { name, kind: s.isFile() ? 'file' : s.isDirectory() ? 'dir' : 'other', size: s.size, mtimeMs: s.mtimeMs }; }) : null,
     read: async file => readFileSync(file, 'utf8'),
     exists: async file => existsSync(file),
     run: argv => new Promise(resolve => execFile(...command(argv), (e, stdout) => resolve({ exitCode: e ? Number(e.code ?? 1) : 0, stdout }))),

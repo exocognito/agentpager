@@ -9,6 +9,8 @@ export type StandIn = Host & {
   // Each `agentpager pickup` the mod ran, with the turns there were at the time, and what the next one replies.
   pickups: { argv: string[]; turns: number }[]; picking: string;
   files: Map<string, { text: string; mtimeMs: number }>; dirs: Set<string>;
+  // Folders whose listing fails, as a file system can.
+  failing: Set<string>;
   // What the next submit comes to: entered (and a turn starts, when started is given), or not taken.
   taking: { entered: true } | { entered: false; why: string };
   started?: () => Promise<void>;
@@ -30,7 +32,7 @@ export function standIn(session = 'session-1'): StandIn {
   };
   let edits = 0;
   const h: StandIn = {
-    t: 1_000_000, session, wake: [], children: [], turns: [], logs: [], files: new Map(), dirs: new Set(['/']),
+    t: 1_000_000, session, wake: [], children: [], turns: [], logs: [], files: new Map(), dirs: new Set(['/']), failing: new Set(),
     pickups: [], picking: JSON.stringify({ code: 0, text: 'Picked up.', result: { status: 'picked-up' } }) + '\n',
     taking: { entered: true },
     now: async () => h.t,
@@ -39,6 +41,7 @@ export function standIn(session = 'session-1'): StandIn {
     sessionId: async () => h.session,
     setWake: async value => { h.wake.push(value); return true; },
     list: async dir => {
+      if (h.failing.has(dir)) throw new Error('EIO');
       if (!h.dirs.has(dir)) return null;
       const out: Entry[] = [];
       for (const [file, f] of h.files) if (parent(file) === dir) out.push({ name: file.slice(dir.length + 1), kind: 'file', size: f.text.length, mtimeMs: f.mtimeMs });

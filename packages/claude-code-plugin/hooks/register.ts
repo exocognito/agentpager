@@ -34,7 +34,7 @@ function hostOf($: EngineInterface): Host {
         const end = await child.result
         return { code: end.code, stdout }
       })().catch(() => ({ code: null, stdout: '' }))
-      return { done, stop: () => { void child.return(undefined as never).catch(() => undefined) } }
+      return { done, stop: () => { void child.return({ code: null, signal: 'SIGTERM' }).catch(() => undefined) } }
     },
     submit: async text => {
       const r = await $.prompt.submit({ text })

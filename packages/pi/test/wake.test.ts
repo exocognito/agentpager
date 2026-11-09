@@ -239,21 +239,26 @@ test('B33.5 After a move to another point of the session\'s tree, a decision sti
   owed.settle(); owed.shutdown();
 });
 
-test('B33.5 B32.12 While pi works the answer waits, never going into the run and not yet picked up: it goes in once pi has settled with nothing queued; one the agent read and acknowledged by itself meanwhile isn\'t handed over', { timeout: 60_000 }, async () => {
+test('B33.5 B32.12 While pi works the answer waits, never going into the run and not yet picked up: it goes in once pi has settled with nothing queued; one the agent read by itself meanwhile, acknowledged or not, isn\'t handed over', { timeout: 60_000 }, async () => {
   const pi = standIn('tui', 's-busy');
   pi.start();
-  const first = await asks('s-busy', 'Busy, blue or red?'), second = await asks('s-busy', 'Busy, read by itself?');
+  const first = await asks('s-busy', 'Busy, blue or red?'), second = await asks('s-busy', 'Busy, read by itself?'), third = await asks('s-busy', 'Busy, read and not acknowledged?');
   pi.bash();
   pi.prompt();
   await answer('Busy, blue or red?', { kind: 'feedback', text: 'Red, and keep it quiet' });
   await answer('Busy, read by itself?');
-  // Each wait has its reply and has ended, while pi works; neither is picked up.
-  await until(async () => holds(first.agent, first.d) || holds(second.agent, second.d), held => !held);
+  await answer('Busy, read and not acknowledged?', { kind: 'option', number: 2 });
+  // Each wait has its reply and has ended, while pi works; none is picked up.
+  await until(async () => holds(first.agent, first.d) || holds(second.agent, second.d) || holds(third.agent, third.d), held => !held);
   assert.equal(pi.sent.length, 0, 'nothing goes into a run');
   assert.equal((await seen('Busy, blue or red?'))?.collectedAt, undefined, 'not picked up while it waits for pi');
   // The agent reads the second itself, and acknowledges it.
   assert.match((await shell('s-busy', ['wait', '--agent', second.agent, second.d])).text, /^Answered at/);
   assert.equal((await shell('s-busy', ['ack', '--agent', second.agent, second.d, 'Blue it is.'])).code, 0);
+  // And reads the third with a wait of its own, without acknowledging it yet: it has that answer too.
+  assert.equal((await seen('Busy, read and not acknowledged?'))?.collectedAt, undefined);
+  assert.match((await shell('s-busy', ['wait', '--agent', third.agent, third.d])).text, /^Answered at .+: option B "Red"/);
+  assert.equal(Reflect.get(Object(record(third.agent)), 'decisions')[0].state, 'answered');
   pi.queue(true);
   pi.settle();
   assert.equal(pi.sent.length, 0, 'a message the owner queued goes first');

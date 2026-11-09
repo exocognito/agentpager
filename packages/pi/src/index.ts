@@ -225,7 +225,8 @@ export function agentpagerWake(pi: Pi, options: Options = {}) {
   };
 
   // Hands the replies waiting over as one follow-up turn, once pi has settled with nothing queued: never into a run. A
-  // decision acknowledged or closed meanwhile (the agent read its answer by itself) is left out.
+  // decision the agent read by itself meanwhile is left out: one acknowledged or closed, which has left the record, and
+  // one a wait of the agent's own has answered here, unless its reply is owed to this branch (only another holds it).
   const deliver = () => {
     if (stopped || session === null || running || inFlight || ready.size === 0 || !idle()) return;
     const replies: Reply[] = [], lists = new Map<string, Map<string, 'waiting' | 'answered'> | null>();
@@ -233,7 +234,7 @@ export function agentpagerWake(pi: Pi, options: Options = {}) {
       if (!lists.has(r.agent)) lists.set(r.agent, listed(r.agent));
       const l = lists.get(r.agent);
       ready.delete(key);
-      if (l && !l.has(r.decision)) { done.add(key); continue; }
+      if (l && (!l.has(r.decision) || (l.get(r.decision) === 'answered' && !elsewhere.has(key)))) { done.add(key); continue; }
       replies.push(r);
     }
     if (replies.length) send(replies, 1);

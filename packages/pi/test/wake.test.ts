@@ -37,7 +37,7 @@ function standIn(mode: Context['mode'], sessionId: string, entries: unknown[] = 
   const emit = <E extends keyof Events>(event: E, payload: Events[E]) => { for (const h of handlers[event]) h(payload, ctx); };
   const run = (message?: { role: string; customType: string; content: string; details: unknown }) => {
     working = true;
-    const options = { sections: {} as { [name: string]: string } };
+    const sections: { [name: string]: string } = {}, options = { sections };
     emit('before_agent_start', { systemPromptOptions: options });
     emit('agent_start', {});
     if (message) emit('message_start', { message });

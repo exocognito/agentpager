@@ -25,7 +25,7 @@ const detect = await import('../../cli/src/detect.ts');
 // Claude Code as the mod sees it, on this machine: Node's clock, files and processes, with `agentpager` run from source.
 type Turn = { text: string; at: number };
 function claudeCode(session: string) {
-  const turns: Turn[] = [], pids = new Set<number>();
+  const turns: Turn[] = [], mine = new Set<number>();
   const host: Host = {
     now: async () => Date.now(),
     after: (ms, fn) => { const t = setTimeout(fn, ms); return { cancel: () => clearTimeout(t) }; },
@@ -41,7 +41,7 @@ function claudeCode(session: string) {
     spawn: argv => {
       const [bin, ...args] = argv;
       const child = spawn(bin === COMMAND ? process.execPath : bin ?? '', bin === COMMAND ? ['--experimental-strip-types', '--no-warnings', main, ...args] : args, { stdio: ['ignore', 'pipe', 'ignore'] });
-      if (child.pid) pids.add(child.pid);
+      if (child.pid) { mine.add(child.pid); pids.add(child.pid); }
       let stdout = '';
       child.stdout.on('data', d => { stdout += d; });
       const done = new Promise<{ code: number | null; stdout: string }>(resolve => child.on('close', code => resolve({ code, stdout })));
@@ -50,15 +50,21 @@ function claudeCode(session: string) {
     submit: async text => { turns.push({ text, at: Date.now() }); return { entered: true }; },
     debug: () => undefined,
   };
-  return { host, turns, pids };
+  return { host, turns, pids: mine };
 }
 const alive = (pid: number) => { try { process.kill(pid, 0); return true; } catch { return false; } };
 const card = (title: string) => ({ object: { title, detail: 'A plugin test.', context: { summary: 'Ready.' }, options: [{ label: 'Blue', title: 'Blue', prioritizes: 'calm' }, { label: 'Green', title: 'Green', prioritizes: 'speed' }], recommendation: { option: 'A', why: 'Calm.' } } });
 const field = (r: { json?: unknown }, key: string) => String(typeof r.json === 'object' && r.json !== null ? Reflect.get(r.json, key) : undefined);
 
 let f: Awaited<ReturnType<typeof fixture>>;
+// Every mod a test starts, and every process of the command it started, are stopped at the end, whatever the test came to.
+const mods: Mod[] = [], pids = new Set<number>();
 before(async () => { f = await fixture('claude-code-plugin'); process.env.AGENTPAGER_SERVER = f.origin; });
-after(async () => { await f?.stop(); });
+after(async () => {
+  for (const m of mods) m.sessionEnded('prompt_input_exit');
+  for (const pid of pids) if (alive(pid)) process.kill(pid, 'SIGTERM');
+  await f?.stop();
+});
 async function seen(p: { pagerId: string; phone: string }, title: string) {
   for (const a of (await f.pager(p.pagerId, p.phone)).agents) {
     const d = [...a.open, ...a.answered].find(x => x.title === title);
@@ -72,6 +78,7 @@ test('B33.2 B32.12 With the plugin, an agent that asks from its shell isn\'t tol
   // Claude Code's shell: CLAUDECODE and its own session id; the mod names the session at its start.
   Object.assign(process.env, { CLAUDECODE: '1', CLAUDE_CODE_SESSION_ID: session });
   const cc = claudeCode(session), mod = new Mod(cc.host, home);
+  mods.push(mod);
   await mod.start();
   assert.equal(process.env.AGENTPAGER_WAKE, `claude-code:${session}`);
   const id = field(await op.connect({ number: p.number, project: 'plugin' }), 'agent');
@@ -120,6 +127,7 @@ test('B33.2 B32.12 With the plugin, an agent that asks from its shell isn\'t tol
   assert.equal((await seen(p, 'Which shade?'))?.collectedAt, undefined);
   // Started again on the same session, the mod hands it over as the first turn, once.
   const again = claudeCode(session), restarted = new Mod(again.host, home);
+  mods.push(restarted);
   await restarted.start();
   const [first] = await until(async () => again.turns, t => t.length > 0);
   assert.match(first?.text ?? '', new RegExp(`decision ${later} .*option A "Blue"`, 's'));

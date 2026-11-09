@@ -15,9 +15,11 @@ import path from 'node:path';
 // never in the middle of a run, it hands that wait's reply to the agent as a follow-up turn; and once that turn has
 // started, it runs `agentpager pickup`, again until it lands, so the answer counts as picked up only once the agent has
 // it (B32.12). A wait left running when pi is killed, or a reply pi never takes, picks nothing up, and the owner is
-// warned (B5.13). Each decision's reply goes in once: the turn's message names its decisions in its details, each with
-// whether it carried the answer, which pi keeps in the session, so a later start of the same session neither hands it
-// over again nor holds its wait; it only runs the pickup of an answer it carried, if that hadn't landed. It reads ids and states from the record and statuses from the command's JSON, never
+// warned (B5.13). Each decision's reply goes in once on the session's branch: the turn's message names its decisions in
+// its details, each with whether it carried the answer, which pi keeps in the session. So a later start of the same
+// session, or a move to another point of its tree, neither hands over again a reply its branch holds nor holds its
+// wait; it only runs the pickup of an answer it carried, if that hadn't landed. A decision still waiting on the agent
+// whose reply only another branch holds is handed over again on this one. It reads ids and states from the record and statuses from the command's JSON, never
 // the words of a reply.
 //
 // In print and JSON mode it does nothing but clear an AGENTPAGER_WAKE inherited from a session around it, so the command
@@ -51,12 +53,13 @@ export type Context = {
   hasUI: boolean;
   isIdle(): boolean;
   hasPendingMessages(): boolean;
-  sessionManager: { getSessionId(): string; getEntries(): readonly unknown[] };
+  sessionManager: { getSessionId(): string; getEntries(): readonly unknown[]; getBranch(): readonly unknown[] };
   ui: { notify(message: string, type?: 'info' | 'warning' | 'error'): void };
 };
 export type Events = {
   session_start: unknown;
   session_shutdown: unknown;
+  session_tree: unknown;
   before_agent_start: { systemPromptOptions?: { sections?: { [name: string]: string } } };
   message_start: { message?: unknown };
   agent_start: unknown;
@@ -103,11 +106,13 @@ export function agentpagerWake(pi: Pi, options: Options = {}) {
   let session: string | null = null, ctx: Context | null = null, stopped = false, running = false, told = false;
   // holding: the waits running now. picking: the pickups running now. again: a wait or a pickup to run again later, by
   // decision. ready: replies to hand over, in the order they came. inFlight: the follow-up sent and not yet started by pi.
-  // done: decisions whose reply is in the session, or on its way. owed: those whose reply an earlier run of this session
-  // handed over, whose pickup may not have landed.
+  // done: decisions whose reply this run sent, or left out. here: the replies the session's branch holds, by decision,
+  // each with whether it carried the answer; elsewhere: those only another branch holds. tried: the pickups this run
+  // has started.
   const children = new Set<ChildProcess>(), holding = new Set<string>(), picking = new Set<string>();
   const again = new Map<string, ReturnType<typeof setTimeout>>();
-  const ready = new Map<string, Reply>(), done = new Set<string>(), owed = new Set<string>();
+  const ready = new Map<string, Reply>(), tried = new Set<string>();
+  let done = new Set<string>(), here = new Map<string, boolean>(), elsewhere = new Set<string>();
   let inFlight: { replies: Reply[]; tries: number; timer: ReturnType<typeof setTimeout> } | null = null;
   let watcher: FSWatcher | null = null, rescan: ReturnType<typeof setTimeout> | null = null;
 
@@ -159,8 +164,9 @@ export function agentpagerWake(pi: Pi, options: Options = {}) {
     again.set(key, timer);
   };
 
-  // Looks through the record for this session's decisions: one waiting, whose reply isn't in the session, gets its wait
-  // held; one whose reply an earlier run handed over gets its pickup run, if it is still waiting here.
+  // Looks through the record for this session's decisions. One whose answer the branch holds gets its pickup, if it is
+  // still waiting here and this run hasn't run it; one the branch holds no reply for gets its wait held, if it is waiting
+  // here or another branch was handed its reply (an answered one that no branch was handed, the agent read by itself).
   const scan = () => {
     if (stopped || session === null) return;
     const dir = waitingDir();
@@ -175,9 +181,10 @@ export function agentpagerWake(pi: Pi, options: Options = {}) {
       if (!agent) continue;
       for (const [decision, state] of listedIn(path.join(dir, name), agent, session) ?? []) {
         const key = keyOf(agent, decision);
-        if (state !== 'waiting' || holding.has(key) || picking.has(key) || again.has(key) || ready.has(key)) continue;
-        if (owed.has(key)) { owed.delete(key); pickup(agent, decision); }
-        else if (!done.has(key)) hold(agent, decision);
+        if (holding.has(key) || picking.has(key) || again.has(key) || ready.has(key)) continue;
+        const held = here.get(key);
+        if (held !== undefined || done.has(key)) { if (held === true && state === 'waiting' && !tried.has(key)) pickup(agent, decision); continue; }
+        if (state === 'waiting' || elsewhere.has(key)) hold(agent, decision);
       }
     }
     deliver();
@@ -207,7 +214,7 @@ export function agentpagerWake(pi: Pi, options: Options = {}) {
   // leaves the record (its acknowledgement picked it up), or the command says it can't.
   const pickup = (agent: string, decision: string) => {
     const key = keyOf(agent, decision);
-    picking.add(key);
+    picking.add(key); tried.add(key);
     run(['pickup', '--agent', agent, decision], reply => {
       picking.delete(key);
       if (reply?.code === 0 || reply?.code === 2 || reply?.code === 6) return;
@@ -254,6 +261,24 @@ export function agentpagerWake(pi: Pi, options: Options = {}) {
     sent.timer.unref();
   };
 
+  // The replies the session holds, from its own entries: each turn's message names its decisions and whether it carried
+  // the answer. Only those on the branch count as the agent's; this run's own replies on their way still count.
+  const handedIn = (entries: readonly unknown[]) => {
+    const out = new Map<string, boolean>();
+    for (const entry of entries) {
+      const e = fields(entry), handed = e?.type === 'custom_message' && e.customType === TYPE ? fields(e.details)?.decisions : undefined;
+      if (Array.isArray(handed)) for (const d of handed) { const x = ids(d); if (x) { const key = keyOf(x.agent, x.decision); out.set(key, out.get(key) === true || fields(d)?.answered === true); } }
+    }
+    return out;
+  };
+  const recall = (c: Context) => {
+    let branch: readonly unknown[] = [], all: readonly unknown[] = [];
+    try { branch = c.sessionManager.getBranch(); } catch { branch = []; }
+    try { all = c.sessionManager.getEntries(); } catch { all = branch; }
+    here = handedIn(branch);
+    elsewhere = new Set([...handedIn(all).keys()].filter(key => !here.has(key)));
+    done = new Set(inFlight ? inFlight.replies.map(r => keyOf(r.agent, r.decision)) : []);
+  };
   pi.on('session_start', (_e, c) => {
     ctx = c;
     let id: string | null = null;
@@ -261,22 +286,16 @@ export function agentpagerWake(pi: Pi, options: Options = {}) {
     if (id === null || !SESSION.test(id)) { delete process.env.AGENTPAGER_WAKE; return; }
     session = id;
     process.env.AGENTPAGER_WAKE = `pi:${id}`;
-    // The replies already in the session: each turn's message names its decisions, and whether it carried the answer,
-    // which alone is owed a pickup.
-    let entries: readonly unknown[] = [];
-    try { entries = c.sessionManager.getEntries(); } catch { entries = []; }
-    for (const entry of entries) {
-      const e = fields(entry), handed = e?.type === 'custom_message' && e.customType === TYPE ? fields(e.details)?.decisions : undefined;
-      if (!Array.isArray(handed)) continue;
-      for (const d of handed) {
-        const x = ids(d);
-        if (!x) continue;
-        done.add(keyOf(x.agent, x.decision));
-        if (fields(d)?.answered === true) owed.add(keyOf(x.agent, x.decision));
-      }
-    }
+    recall(c);
     process.off('exit', onExit);
     process.on('exit', onExit);
+    scan();
+  });
+  // The owner moved to another point of the session's tree: what its branch holds is read again.
+  pi.on('session_tree', (_e, c) => {
+    ctx = c;
+    if (session === null) return;
+    recall(c);
     scan();
   });
   pi.on('before_agent_start', (e, c) => {

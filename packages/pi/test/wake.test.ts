@@ -24,16 +24,18 @@ writeFileSync(path.join(work, 'card.yaml'), 'title: Which colour?\ndetail: A pi 
 const fast: Options = { command, retryMs: 300, offRetryMs: 300, confirmMs: 2_000 };
 const PICKUP_MS = 3_000;
 
-// pi as the extension sees it: its events, its two calls, the session's entries and whether it is working.
+// pi as the extension sees it: its events, its two calls, the session's entries, the branch it is on (a session resumes
+// at its last entry), and whether it is working.
 function standIn(mode: Context['mode'], sessionId: string, entries: unknown[] = []) {
-  const handlers: { [E in keyof Events]: ((event: Events[E], ctx: Context) => void)[] } = { session_start: [], session_shutdown: [], before_agent_start: [], message_start: [], agent_start: [], agent_settled: [], tool_result: [] };
+  const handlers: { [E in keyof Events]: ((event: Events[E], ctx: Context) => void)[] } = { session_start: [], session_shutdown: [], session_tree: [], before_agent_start: [], message_start: [], agent_start: [], agent_settled: [], tool_result: [] };
+  const branch = [...entries];
   const sent: { content: string; details: unknown; options: unknown; whileWorking: boolean }[] = [], notes: string[] = [];
   let working = false, queued = false, settling = false;
   const later: (() => void)[] = [];
   const ctx: Context = {
     mode, hasUI: mode === 'tui' || mode === 'rpc',
     isIdle: () => !working, hasPendingMessages: () => queued,
-    sessionManager: { getSessionId: () => sessionId, getEntries: () => entries },
+    sessionManager: { getSessionId: () => sessionId, getEntries: () => entries, getBranch: () => branch },
     ui: { notify: m => { notes.push(m); } },
   };
   const emit = <E extends keyof Events>(event: E, payload: Events[E]) => { for (const h of handlers[event]) h(payload, ctx); };
@@ -49,7 +51,7 @@ function standIn(mode: Context['mode'], sessionId: string, entries: unknown[] = 
     on<E extends keyof Events>(event: E, handler: (event: Events[E], ctx: Context) => void) { handlers[event].push(handler); },
     sendMessage(message: { customType: string; content: string; display: boolean; details?: unknown }, options?: { triggerTurn?: boolean; deliverAs?: string }) {
       sent.push({ content: message.content, details: message.details, options, whileWorking: working });
-      const go = () => { entries.push({ type: 'custom_message', ...message }); run({ role: 'custom', ...message, details: message.details }); };
+      const go = () => { const entry = { type: 'custom_message', ...message }; entries.push(entry); branch.push(entry); run({ role: 'custom', ...message, details: message.details }); };
       if (settling) later.push(go); else if (!working && options?.triggerTurn) go();
     },
   };
@@ -62,6 +64,8 @@ function standIn(mode: Context['mode'], sessionId: string, entries: unknown[] = 
     queue: (on: boolean) => { queued = on; },
     bash: () => emit('tool_result', { toolName: 'bash' }),
     shutdown: () => emit('session_shutdown', { reason: 'quit' }),
+    // The owner moves to an earlier point of the session's tree, keeping its first entries.
+    navigate: (keep: number) => { branch.splice(keep); emit('session_tree', {}); },
   };
 }
 
@@ -163,6 +167,31 @@ test('B33.5 B32.12 An answer to a decision this session asked comes in once, as 
   assert.equal(pi.sent.length, 1);
   pi.shutdown();
   assert.equal(process.env.AGENTPAGER_WAKE, undefined, 'cleared when the session ends');
+});
+
+test('B33.5 After a move to another point of the session\'s tree, a decision still waiting on the agent whose reply only the branch left behind holds is handed over again on this one; once acknowledged, nothing is', { timeout: 60_000 }, async () => {
+  const pi = standIn('tui', 's-tree');
+  pi.start();
+  const { agent, d } = await asks('s-tree', 'Tree, blue or red?');
+  pi.bash();
+  await answer('Tree, blue or red?');
+  await until(async () => pi.sent.length, n => n === 1);
+  await until(() => seen('Tree, blue or red?'), x => x?.collectedAt !== undefined);
+  pi.settle();
+  // Before the agent acknowledges it, the owner goes back to before the reply: the agent there hasn't had it.
+  pi.navigate(0);
+  await until(async () => pi.sent.length, n => n === 2);
+  assert.equal(pi.sent[1].content, pi.sent[0].content, 'the same reply, on this branch');
+  assert.deepEqual(decisionsOf(pi.sent[1].details), [{ agent, decision: d, answered: true }]);
+  pi.settle();
+  // Moving within the branch that holds it hands nothing over.
+  pi.navigate(1); pi.settle();
+  assert.equal(pi.sent.length, 2);
+  assert.equal((await shell('s-tree', ['ack', '--agent', agent, d, 'Blue, then.'])).code, 0);
+  pi.navigate(0); pi.settle();
+  assert.equal(holds(agent, d), false);
+  assert.equal(pi.sent.length, 2, 'acknowledged: nothing more');
+  pi.shutdown();
 });
 
 test('B33.5 B32.12 While pi works the answer waits, never going into the run and not yet picked up: it goes in once pi has settled with nothing queued; one the agent read and acknowledged by itself meanwhile isn\'t handed over', { timeout: 60_000 }, async () => {

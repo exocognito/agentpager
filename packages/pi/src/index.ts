@@ -9,13 +9,16 @@ import path from 'node:path';
 //
 // At each session start, outside print and JSON mode, it sets AGENTPAGER_WAKE=pi:<session> for the commands the agent
 // runs (detect.ts in packages/cli has the scheme), so the command records each decision asked under this session and
-// tells the agent not to wait. It watches the record of what's waiting (store.ts › waitingOf) for this session's
-// decisions and holds the command's own wait for each, `agentpager wait --agent <id> <decision> --forever --json`, in a
-// child process: the command opens the answer and tells the service it has it (B32.12). Once pi has settled, never in
-// the middle of a run, it hands the command's reply to the agent as a follow-up turn. Each decision's reply goes in once:
-// the turn's message names its decisions in its details, which pi keeps in the session, and a reply this collected but
-// hadn't handed over when pi stopped is collected again at the next start of the same session. It reads ids and states
-// from the record and the status from the command's JSON, never the words of a reply.
+// tells the agent not to wait. For each of this session's decisions in the record of what's waiting, it takes the steps
+// of the adapters' contract (store.ts › Waiting): it holds the command's wait that picks nothing up, `agentpager wait
+// --agent <id> <decision> --no-pickup --json`, in a child process, one 50 s wait after another; once pi has settled,
+// never in the middle of a run, it hands that wait's reply to the agent as a follow-up turn; and once that turn has
+// started, it runs `agentpager pickup`, again until it lands, so the answer counts as picked up only once the agent has
+// it (B32.12). A wait left running when pi is killed, or a reply pi never takes, picks nothing up, and the owner is
+// warned (B5.13). Each decision's reply goes in once: the turn's message names its decisions in its details, which pi
+// keeps in the session, so a later start of the same session neither hands it over again nor holds its wait; it only
+// runs a pickup that hadn't landed. It reads ids and states from the record and statuses from the command's JSON, never
+// the words of a reply.
 //
 // In print and JSON mode it does nothing but clear an AGENTPAGER_WAKE inherited from a session around it, so the command
 // keeps today's words there and nothing is left running when the run ends. Every child is stopped when the session
@@ -29,11 +32,11 @@ import path from 'node:path';
 // The one line every session in which it wakes the agent gets, in the system prompt of each run. Fixed: never a number,
 // a key, an id or an answer.
 export const LINE = 'AgentPager is available in this session: to ask your owner for a decision on their phone, run the agentpager command in your shell (start with `agentpager --help`).';
-// What the extension's entries and messages in the session are called.
+// What the extension's messages in the session are called.
 export const TYPE = 'agentpager';
-// How long to wait before holding a decision's wait again, after one that ended without its reply: the pager off, the
-// server unreachable for longer than the command rides out, or the command not found.
-const RETRY_MS = 60_000;
+// How long before a wait or a pickup that ended without landing is run again: the server away or a reply not understood,
+// the command not found; and, while the pager is off, a minute.
+const RETRY_MS = 10_000, OFF_RETRY_MS = 60_000;
 // A follow-up that pi hasn't started this long after it was sent, while idle, is sent again, up to SEND_TRIES times.
 const CONFIRM_MS = 10_000, SEND_TRIES = 3;
 const REPLY_MAX_BYTES = 1024 * 1024;
@@ -62,10 +65,10 @@ export type Events = {
 export type Pi = {
   on<E extends keyof Events>(event: E, handler: (event: Events[E], ctx: Context) => void): unknown;
   sendMessage(message: { customType: string; content: string; display: boolean; details?: unknown }, options?: { triggerTurn?: boolean; deliverAs?: 'steer' | 'followUp' | 'nextTurn' }): void;
-  appendEntry(customType: string, data?: unknown): void;
 };
-// command: how to run agentpager; home: the folder it keeps its files in; retryMs and confirmMs: a test shortens them.
-export type Options = { command?: readonly string[]; home?: string; retryMs?: number; confirmMs?: number };
+// command: how to run agentpager; home: the folder it keeps its files in; retryMs, offRetryMs and confirmMs: a test
+// shortens them.
+export type Options = { command?: readonly string[]; home?: string; retryMs?: number; offRetryMs?: number; confirmMs?: number };
 
 type Reply = { agent: string; decision: string; text: string; answered: boolean };
 const keyOf = (agent: string, decision: string) => `${agent} ${decision}`;
@@ -91,34 +94,72 @@ function listedIn(file: string, agent: string, session: string): Map<string, 'wa
 }
 
 export function agentpagerWake(pi: Pi, options: Options = {}) {
-  const command = options.command ?? ['agentpager'], retryMs = options.retryMs ?? RETRY_MS, confirmMs = options.confirmMs ?? CONFIRM_MS;
+  const command = options.command ?? ['agentpager'], retryMs = options.retryMs ?? RETRY_MS, offRetryMs = options.offRetryMs ?? OFF_RETRY_MS, confirmMs = options.confirmMs ?? CONFIRM_MS;
   const home = () => options.home ?? (process.env.AGENTPAGER_HOME || path.join(homedir(), '.agentpager'));
   const waitingDir = () => path.join(home(), 'waiting');
+  const listed = (agent: string) => session === null ? null : listedIn(path.join(waitingDir(), `${agent}.json`), agent, session);
 
   let session: string | null = null, ctx: Context | null = null, stopped = false, running = false, told = false;
-  // holding: the waits running now. retrying: a decision whose wait ended without its reply, until it is held again.
-  // ready: replies to hand over, in the order they came. inFlight: the follow-up sent and not yet started by pi.
-  // done: decisions whose reply is in the session, or on its way. collected: those this collected, as the session says.
-  const holding = new Map<string, ChildProcess>(), retrying = new Map<string, ReturnType<typeof setTimeout>>();
-  const ready = new Map<string, Reply>(), done = new Set<string>(), collected = new Set<string>();
+  // holding: the waits running now. picking: the pickups running now. again: a wait or a pickup to run again later, by
+  // decision. ready: replies to hand over, in the order they came. inFlight: the follow-up sent and not yet started by pi.
+  // done: decisions whose reply is in the session, or on its way. owed: those whose reply an earlier run of this session
+  // handed over, whose pickup may not have landed.
+  const children = new Set<ChildProcess>(), holding = new Set<string>(), picking = new Set<string>();
+  const again = new Map<string, ReturnType<typeof setTimeout>>();
+  const ready = new Map<string, Reply>(), done = new Set<string>(), owed = new Set<string>();
   let inFlight: { replies: Reply[]; tries: number; timer: ReturnType<typeof setTimeout> } | null = null;
   let watcher: FSWatcher | null = null, rescan: ReturnType<typeof setTimeout> | null = null;
 
   const idle = () => { try { return Boolean(ctx?.isIdle()) && !ctx?.hasPendingMessages(); } catch { return false; } };
   const notify = (message: string) => { try { if (ctx?.hasUI) ctx.ui.notify(message, 'warning'); } catch { /* the session is gone */ } };
 
-  // Stops every wait this started, at once: a wait left running would collect an answer no one hands over.
+  // Stops every child this started, at once, each with its process group.
   const stopChildren = () => {
-    for (const child of holding.values()) {
+    for (const child of children) {
       if (child.pid === undefined) continue;
       try { process.kill(-child.pid, 'SIGKILL'); } catch { try { child.kill('SIGKILL'); } catch { /* it ended */ } }
     }
-    holding.clear();
+    children.clear();
   };
   const onExit = () => stopChildren();
 
-  // Looks through the record for this session's decisions: each one waiting gets a wait held for it, and so does one
-  // this collected before pi stopped and never handed over, whose wait returns the same reply at once.
+  // One run of the command, `<args> --json`, in a process group of its own, with this process's environment without the
+  // session's wake or the pager's number; ended hears its JSON reply, or null for none.
+  const run = (args: string[], ended: (reply: { [k: string]: unknown } | null) => void) => {
+    const env = { ...process.env };
+    delete env.AGENTPAGER_WAKE; delete env.AGENTPAGER_PAGER;
+    let child: ChildProcess;
+    try { child = spawn(command[0], [...command.slice(1), ...args, '--json'], { stdio: ['ignore', 'pipe', 'ignore'], env, detached: true, windowsHide: true }); }
+    catch { ended(null); return; }
+    children.add(child);
+    child.unref();
+    const chunks: Buffer[] = [];
+    let size = 0, over = false;
+    child.stdout?.on('data', (b: Buffer) => { size += b.length; if (size <= REPLY_MAX_BYTES) chunks.push(b); });
+    child.stdout?.on('error', () => { /* the reply is read on close */ });
+    // A socket's unref stops it holding pi open; the pipe still delivers while pi runs.
+    const out: unknown = child.stdout;
+    if (out && typeof out === 'object' && 'unref' in out && typeof out.unref === 'function') out.unref();
+    const end = (reply: { [k: string]: unknown } | null) => { if (over) return; over = true; children.delete(child); if (!stopped) ended(reply); };
+    child.on('error', e => {
+      if (!told) { told = true; notify(`AgentPager couldn't run the agentpager command to wait for your owner's answer (${'code' in e ? String(e.code) : 'error'}). It keeps trying.`); }
+      end(null);
+    });
+    child.on('close', () => {
+      let reply: { [k: string]: unknown } | null = null;
+      try { reply = size <= REPLY_MAX_BYTES ? fields(JSON.parse(Buffer.concat(chunks).toString('utf8'))) : null; } catch { reply = null; }
+      end(reply);
+    });
+  };
+  const later = (key: string, ms: number, then: () => void) => {
+    if (stopped || again.has(key)) return;
+    const timer = setTimeout(() => { again.delete(key); if (!stopped) then(); }, ms);
+    timer.unref();
+    again.set(key, timer);
+  };
+
+  // Looks through the record for this session's decisions: one waiting, whose reply isn't in the session, gets its wait
+  // held; one whose reply an earlier run handed over gets its pickup run, if it is still waiting here.
   const scan = () => {
     if (stopped || session === null) return;
     const dir = waitingDir();
@@ -133,72 +174,44 @@ export function agentpagerWake(pi: Pi, options: Options = {}) {
       if (!agent) continue;
       for (const [decision, state] of listedIn(path.join(dir, name), agent, session) ?? []) {
         const key = keyOf(agent, decision);
-        if (done.has(key) || holding.has(key) || retrying.has(key) || ready.has(key)) continue;
-        if (state === 'waiting' || collected.has(key)) hold(agent, decision);
+        if (state !== 'waiting' || holding.has(key) || picking.has(key) || again.has(key) || ready.has(key)) continue;
+        if (owed.has(key)) { owed.delete(key); pickup(agent, decision); }
+        else if (!done.has(key)) hold(agent, decision);
       }
     }
     deliver();
   };
 
-  const later = (key: string) => {
-    if (stopped || retrying.has(key)) return;
-    const timer = setTimeout(() => { retrying.delete(key); scan(); }, retryMs);
-    timer.unref();
-    retrying.set(key, timer);
-  };
-
-  // The command's own wait for one decision, with no end, in a process group of its own so that all of it stops with
-  // the session. It gets this process's environment without the session's wake or the pager's number.
+  // The command's wait that picks nothing up, for one decision: up to 50 s, then held again while it is pending.
   const hold = (agent: string, decision: string) => {
-    const key = keyOf(agent, decision), env = { ...process.env };
-    delete env.AGENTPAGER_WAKE; delete env.AGENTPAGER_PAGER;
-    let child: ChildProcess;
-    try { child = spawn(command[0], [...command.slice(1), 'wait', '--agent', agent, decision, '--forever', '--json'], { stdio: ['ignore', 'pipe', 'ignore'], env, detached: true, windowsHide: true }); }
-    catch { later(key); return; }
-    holding.set(key, child);
-    child.unref();
-    const chunks: Buffer[] = [];
-    let size = 0;
-    child.stdout?.on('data', (b: Buffer) => { size += b.length; if (size <= REPLY_MAX_BYTES) chunks.push(b); });
-    child.stdout?.on('error', () => { /* the reply is read on close */ });
-    // A socket's unref stops it holding pi open; the pipe still delivers while pi runs.
-    const out: unknown = child.stdout;
-    if (out && typeof out === 'object' && 'unref' in out && typeof out.unref === 'function') out.unref();
-    let ended = false;
-    const end = (reply: unknown) => {
-      if (ended) return;
-      ended = true;
-      if (holding.get(key) === child) holding.delete(key);
-      if (stopped) return;
-      const r = fields(reply), result = fields(r?.result), text = typeof r?.text === 'string' ? r.text : null;
-      // The answer, or a refusal that another wait would only repeat (an answer that doesn't open, an agent file that
-      // can't be read): its reply is handed to the agent. A decision that closed unanswered (the agent finished it) or an
-      // agent that is gone leaves the record and needs nothing. Anything else is tried again later.
-      if (text !== null && r?.code === 0 && result?.status === 'answered') return collect({ agent, decision, text, answered: true });
-      if (text !== null && r?.code === 2 && result?.status === undefined) return collect({ agent, decision, text, answered: false });
-      if ((r?.code === 2 && result?.status === 'closed') || r?.code === 6) return;
-      later(key);
-    };
-    child.on('error', e => {
-      if (!told) { told = true; notify(`AgentPager couldn't run the agentpager command to wait for your owner's answer (${'code' in e ? String(e.code) : 'error'}). It tries again every minute.`); }
-      end(null);
-    });
-    child.on('close', () => {
-      let reply: unknown = null;
-      try { reply = size <= REPLY_MAX_BYTES ? JSON.parse(Buffer.concat(chunks).toString('utf8')) : null; } catch { reply = null; }
-      end(reply);
+    const key = keyOf(agent, decision), started = Date.now();
+    holding.add(key);
+    run(['wait', '--agent', agent, decision, '--no-pickup'], reply => {
+      holding.delete(key);
+      const result = fields(reply?.result), text = typeof reply?.text === 'string' ? reply.text : null;
+      // The answer, or a refusal another wait would only repeat (an answer that doesn't open, an agent file that can't
+      // be read): its reply is handed to the agent. A decision that closed unanswered (the agent finished it) or an agent
+      // that is gone needs nothing more. Pending is held again at once, or after a second when it came back sooner, so
+      // a server that doesn't hold is never spun on; anything else is held again later.
+      if (text !== null && reply?.code === 0 && result?.status === 'answered') return collect({ agent, decision, text, answered: true });
+      if (text !== null && reply?.code === 2 && result?.status === undefined) return collect({ agent, decision, text, answered: false });
+      if ((reply?.code === 2 && result?.status === 'closed') || reply?.code === 6) return;
+      const ms = reply?.code === 0 && result?.status === 'pending' ? (Date.now() - started < 1000 ? 1000 : 0) : reply?.code === 4 ? offRetryMs : retryMs;
+      later(key, ms, scan);
     });
   };
+  const collect = (reply: Reply) => { ready.set(keyOf(reply.agent, reply.decision), reply); deliver(); };
 
-  // A reply is noted in the session as collected before it waits for pi to settle, so a pi that stops in between
-  // collects it again at the session's next start.
-  const collect = (reply: Reply) => {
-    const key = keyOf(reply.agent, reply.decision);
-    if (!collected.has(key)) {
-      try { pi.appendEntry(TYPE, { agent: reply.agent, decision: reply.decision }); collected.add(key); } catch { /* the reply still goes in now */ }
-    }
-    ready.set(key, reply);
-    deliver();
+  // The agent has the answer: the service is told, until it lands (picked up or acknowledged), the decision closes or
+  // leaves the record (its acknowledgement picked it up), or the command says it can't.
+  const pickup = (agent: string, decision: string) => {
+    const key = keyOf(agent, decision);
+    picking.add(key);
+    run(['pickup', '--agent', agent, decision], reply => {
+      picking.delete(key);
+      if (reply?.code === 0 || reply?.code === 2 || reply?.code === 6) return;
+      later(key, reply?.code === 4 ? offRetryMs : retryMs, () => { const l = listed(agent); if (!l || l.get(decision) === 'waiting') pickup(agent, decision); });
+    });
   };
 
   // Hands the replies waiting over as one follow-up turn, once pi has settled with nothing queued: never into a run. A
@@ -207,10 +220,10 @@ export function agentpagerWake(pi: Pi, options: Options = {}) {
     if (stopped || session === null || running || inFlight || ready.size === 0 || !idle()) return;
     const replies: Reply[] = [], lists = new Map<string, Map<string, 'waiting' | 'answered'> | null>();
     for (const [key, r] of ready) {
-      if (!lists.has(r.agent)) lists.set(r.agent, listedIn(path.join(waitingDir(), `${r.agent}.json`), r.agent, session));
-      const listed = lists.get(r.agent);
+      if (!lists.has(r.agent)) lists.set(r.agent, listed(r.agent));
+      const l = lists.get(r.agent);
       ready.delete(key);
-      if (listed && !listed.has(r.decision)) { done.add(key); continue; }
+      if (l && !l.has(r.decision)) { done.add(key); continue; }
       replies.push(r);
     }
     if (replies.length) send(replies, 1);
@@ -224,8 +237,8 @@ export function agentpagerWake(pi: Pi, options: Options = {}) {
     const content = replies.map(r => `${r.answered ? `AgentPager: your owner answered decision ${r.decision} (agent ${r.agent}).` : `AgentPager: the wait for decision ${r.decision} (agent ${r.agent}) ended without an answer it could give you.`} The agentpager command's reply:\n\n${r.text}`).join('\n\n');
     pi.sendMessage({ customType: TYPE, content, display: true, details: { decisions: replies.map(r => ({ agent: r.agent, decision: r.decision })) } }, { triggerTurn: true, deliverAs: 'followUp' });
   };
-  // A follow-up pi never put in the session (it failed before its run began) is sent again, a few times; after that it
-  // waits for the session's next start, where it is collected again.
+  // A follow-up pi never put in the session (it failed before its run began) is sent again, a few times. After that
+  // nothing is picked up, so the owner is warned, and the session's next start holds its wait again.
   const resend = () => {
     const sent = inFlight;
     if (!sent) return;
@@ -247,16 +260,12 @@ export function agentpagerWake(pi: Pi, options: Options = {}) {
     if (id === null || !SESSION.test(id)) { delete process.env.AGENTPAGER_WAKE; return; }
     session = id;
     process.env.AGENTPAGER_WAKE = `pi:${id}`;
-    // What the session already holds: the replies handed over (each turn's message names its decisions) and those
-    // collected.
+    // The replies already in the session: each turn's message names its decisions.
     let entries: readonly unknown[] = [];
     try { entries = c.sessionManager.getEntries(); } catch { entries = []; }
     for (const entry of entries) {
-      const e = fields(entry);
-      if (e?.customType !== TYPE) continue;
-      if (e.type === 'custom') { const x = ids(e.data); if (x) collected.add(keyOf(x.agent, x.decision)); }
-      const listed = e.type === 'custom_message' ? fields(e.details)?.decisions : undefined;
-      if (Array.isArray(listed)) for (const d of listed) { const x = ids(d); if (x) done.add(keyOf(x.agent, x.decision)); }
+      const e = fields(entry), handed = e?.type === 'custom_message' && e.customType === TYPE ? fields(e.details)?.decisions : undefined;
+      if (Array.isArray(handed)) for (const d of handed) { const x = ids(d); if (x) { done.add(keyOf(x.agent, x.decision)); owed.add(keyOf(x.agent, x.decision)); } }
     }
     process.off('exit', onExit);
     process.on('exit', onExit);
@@ -264,18 +273,20 @@ export function agentpagerWake(pi: Pi, options: Options = {}) {
   });
   pi.on('before_agent_start', (e, c) => {
     ctx = c;
-    const options = e.systemPromptOptions;
-    if (session === null || !options) return;
-    options.sections ??= {};
-    options.sections.agentpager = LINE;
+    const prompt = e.systemPromptOptions;
+    if (session === null || !prompt) return;
+    prompt.sections ??= {};
+    prompt.sections.agentpager = LINE;
   });
-  // The follow-up is in the session once pi starts its message, whether it began a run or joined one.
+  // The follow-up is in the session once pi starts its message, whether it began a run or joined one: only now does the
+  // agent have each answer, so only now is it picked up.
   pi.on('message_start', (e, c) => {
     ctx = c;
-    const m = fields(e.message);
-    if (!inFlight || m?.role !== 'custom' || m.customType !== TYPE || !Array.isArray(fields(m.details)?.decisions)) return;
-    clearTimeout(inFlight.timer);
+    const m = fields(e.message), sent = inFlight;
+    if (!sent || m?.role !== 'custom' || m.customType !== TYPE || !Array.isArray(fields(m.details)?.decisions)) return;
+    clearTimeout(sent.timer);
     inFlight = null;
+    for (const r of sent.replies) if (r.answered) pickup(r.agent, r.decision);
   });
   pi.on('agent_start', (_e, c) => { ctx = c; running = true; });
   pi.on('agent_settled', (_e, c) => {
@@ -291,8 +302,8 @@ export function agentpagerWake(pi: Pi, options: Options = {}) {
     stopped = true;
     stopChildren();
     process.off('exit', onExit);
-    for (const t of retrying.values()) clearTimeout(t);
-    retrying.clear();
+    for (const t of again.values()) clearTimeout(t);
+    again.clear();
     if (inFlight) clearTimeout(inFlight.timer);
     if (rescan) clearTimeout(rescan);
     watcher?.close();

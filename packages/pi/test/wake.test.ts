@@ -11,7 +11,8 @@ import { agentpagerWake, LINE, TYPE, type Context, type Events, type Options } f
 // its source, on the suites' local server. The stand-in does what pi 1.4.0 does with the calls the extension makes: a
 // follow-up sent while idle starts a run with its message, one sent from inside agent_settled waits until that has
 // been emitted, and each message is kept in the session's entries. Whether pi itself starts the turn is shown by the
-// real run recorded in the pull request; this shows what the extension does with each event.
+// real run recorded in the pull request; this shows what the extension does with each event, and when the command picks
+// the answer up (B32.12): only once the turn carrying it has started. The service's not-picked-up clock is 3 s here.
 
 const main = fileURLToPath(new URL('../../cli/src/main.ts', import.meta.url));
 const command = [process.execPath, '--experimental-strip-types', main];
@@ -20,7 +21,8 @@ mkdirSync(bin);
 for (const v of ['CLAUDECODE', 'CODEX_SANDBOX', 'CODEX_HOME', 'CODEX_THREAD_ID', 'CURSOR_TRACE_ID', 'PI_CODING_AGENT', 'PI_SESSION_ID', 'AGENTPAGER_WAKE', 'AGENTPAGER_PAGER']) delete process.env[v];
 process.env.AGENTPAGER_HOME = home;
 writeFileSync(path.join(work, 'card.yaml'), 'title: Which colour?\ndetail: A pi wake test.\ncontext:\n  summary: Ready.\noptions:\n  - {label: Blue, title: Blue, prioritizes: calm}\n  - {label: Red, title: Red, prioritizes: speed}\nrecommendation: {option: A, why: Calm.}\n');
-const fast: Options = { command, retryMs: 300, confirmMs: 2_000 };
+const fast: Options = { command, retryMs: 300, offRetryMs: 300, confirmMs: 2_000 };
+const PICKUP_MS = 3_000;
 
 // pi as the extension sees it: its events, its two calls, the session's entries and whether it is working.
 function standIn(mode: Context['mode'], sessionId: string, entries: unknown[] = []) {
@@ -50,7 +52,6 @@ function standIn(mode: Context['mode'], sessionId: string, entries: unknown[] = 
       const go = () => { entries.push({ type: 'custom_message', ...message }); run({ role: 'custom', ...message, details: message.details }); };
       if (settling) later.push(go); else if (!working && options?.triggerTurn) go();
     },
-    appendEntry(customType: string, data?: unknown) { entries.push({ type: 'custom', customType, data }); },
   };
   return {
     pi, ctx, sent, notes, entries, emit,
@@ -71,15 +72,15 @@ function shell(session: string, args: string[], env: NodeJS.ProcessEnv = {}): Pr
   }));
 }
 const field = (r: { result: unknown }, key: string) => String(typeof r.result === 'object' && r.result !== null ? Reflect.get(r.result, key) : undefined);
-// The waits this test process's extensions hold now, as the process list shows them.
-const waits = () => execFileSync('ps', ['-A', '-o', 'pid=,ppid=,command='], { encoding: 'utf8' }).split('\n').map(l => /^\s*(\d+)\s+(\d+)\s+(.*)$/.exec(l)).filter(m => m !== null && Number(m[2]) === process.pid && / wait --agent ap-[a-z0-9]{4} d_[a-z0-9]{4} --forever --json$/.test(m[3])).map(m => ({ pid: Number(m?.[1]), command: m?.[3] ?? '' }));
-const holds = (agent: string, d: string) => waits().some(w => w.command.endsWith(` wait --agent ${agent} ${d} --forever --json`));
+// The waits a process's extensions hold now (this test process's, unless named), as the process list shows them.
+const waits = (parent = process.pid) => execFileSync('ps', ['-A', '-o', 'pid=,ppid=,command='], { encoding: 'utf8' }).split('\n').map(l => /^\s*(\d+)\s+(\d+)\s+(.*)$/.exec(l)).filter(m => m !== null && Number(m[2]) === parent && / wait --agent ap-[a-z0-9]{4} d_[a-z0-9]{4} --no-pickup --json$/.test(m[3])).map(m => ({ pid: Number(m?.[1]), command: m?.[3] ?? '' }));
+const holds = (agent: string, d: string) => waits().some(w => w.command.endsWith(` wait --agent ${agent} ${d} --no-pickup --json`));
 const alive = (pid: number) => { try { process.kill(pid, 0); return true; } catch { return false; } };
 const record = (agent: string): unknown => JSON.parse(readFileSync(path.join(home, 'waiting', `${agent}.json`), 'utf8'));
 const decisionsOf = (details: unknown) => { const d = typeof details === 'object' && details !== null ? Reflect.get(details, 'decisions') : undefined; return Array.isArray(d) ? d : []; };
 
 let f: Awaited<ReturnType<typeof fixture>>, p: Awaited<ReturnType<Awaited<ReturnType<typeof fixture>>['makePager']>>;
-before(async () => { f = await fixture('pi-wake'); process.env.AGENTPAGER_SERVER = f.origin; p = await f.makePager(); });
+before(async () => { f = await fixture('pi-wake', { autoOffMs: 0, idleMs: 0, pickupMs: PICKUP_MS }); process.env.AGENTPAGER_SERVER = f.origin; p = await f.makePager(); });
 after(async () => { for (const w of waits()) process.kill(w.pid, 'SIGKILL'); await f?.stop(); });
 
 // The owner answers the decision of that title on the phone, with option A unless told otherwise.
@@ -128,7 +129,7 @@ test('B33.5 In print or JSON mode the extension does nothing, and an AGENTPAGER_
   assert.deepEqual(Reflect.get(Object(record(inner.agent)), 'decisions')[0].wake, undefined);
 });
 
-test('B33.5 An answer to a decision this session asked comes in once, as one follow-up turn once pi settles, carrying the command\'s reply; the command picked it up, and the session start line names no number, key or id', { timeout: 60_000 }, async () => {
+test('B33.5 B32.12 An answer to a decision this session asked comes in once, as one follow-up turn once pi settles, carrying the command\'s reply, and is picked up once that turn has started; the session start line names no number, key or id', { timeout: 60_000 }, async () => {
   const pi = standIn('tui', 's-idle');
   pi.start();
   assert.equal(process.env.AGENTPAGER_WAKE, 'pi:s-idle', 'set for the commands the agent runs');
@@ -149,7 +150,9 @@ test('B33.5 An answer to a decision this session asked comes in once, as one fol
   assert.deepEqual(turn.options, { triggerTurn: true, deliverAs: 'followUp' }, 'a follow-up that starts a turn, never a steer into a run');
   assert.match(turn.content, new RegExp(`^AgentPager: your owner answered decision ${d} \\(agent ${agent}\\)\\. The agentpager command's reply:\\n\\nAnswered at .+: option A "Blue"\\.\\nDo it, then confirm: agentpager ack --agent ${agent} ${d} "<what happens next>"$`));
   assert.deepEqual(decisionsOf(turn.details), [{ agent, decision: d }]);
-  assert.ok((await seen('Idle, blue or red?'))?.collectedAt, 'the command picked the answer up (B32.12)');
+  const picked = await until(() => seen('Idle, blue or red?'), x => x?.collectedAt !== undefined);
+  assert.equal(picked?.warnedAt, undefined, 'picked up once the turn started, so never warned');
+  assert.equal(Reflect.get(Object(record(agent)), 'decisions')[0].state, 'answered', 'and recorded here as answered');
   assert.equal(holds(agent, d), false, 'the wait has ended');
   // It isn't handed over again, however often pi looks.
   pi.settle(); pi.bash(); pi.settle();
@@ -161,7 +164,7 @@ test('B33.5 An answer to a decision this session asked comes in once, as one fol
   assert.equal(process.env.AGENTPAGER_WAKE, undefined, 'cleared when the session ends');
 });
 
-test('B33.5 While pi works the answer waits, never going into the run: it goes in once pi has settled with nothing queued; one the agent read and acknowledged by itself meanwhile isn\'t handed over', { timeout: 60_000 }, async () => {
+test('B33.5 B32.12 While pi works the answer waits, never going into the run and not yet picked up: it goes in once pi has settled with nothing queued; one the agent read and acknowledged by itself meanwhile isn\'t handed over', { timeout: 60_000 }, async () => {
   const pi = standIn('tui', 's-busy');
   pi.start();
   const first = await asks('s-busy', 'Busy, blue or red?'), second = await asks('s-busy', 'Busy, read by itself?');
@@ -169,9 +172,10 @@ test('B33.5 While pi works the answer waits, never going into the run: it goes i
   pi.prompt();
   await answer('Busy, blue or red?', { kind: 'feedback', text: 'Red, and keep it quiet' });
   await answer('Busy, read by itself?');
-  // Each is collected while pi works, and noted in the session as collected.
-  await until(async () => pi.entries.filter(e => Reflect.get(Object(e), 'type') === 'custom').length, n => n === 2);
+  // Each wait has its reply and has ended, while pi works; neither is picked up.
+  await until(async () => holds(first.agent, first.d) || holds(second.agent, second.d), held => !held);
   assert.equal(pi.sent.length, 0, 'nothing goes into a run');
+  assert.equal((await seen('Busy, blue or red?'))?.collectedAt, undefined, 'not picked up while it waits for pi');
   // The agent reads the second itself, and acknowledges it.
   assert.match((await shell('s-busy', ['wait', '--agent', second.agent, second.d])).text, /^Answered at/);
   assert.equal((await shell('s-busy', ['ack', '--agent', second.agent, second.d, 'Blue it is.'])).code, 0);
@@ -185,12 +189,13 @@ test('B33.5 While pi works the answer waits, never going into the run: it goes i
   assert.equal(turn.whileWorking, false);
   assert.deepEqual(decisionsOf(turn.details), [{ agent: first.agent, decision: first.d }], 'only the one the agent hasn\'t read');
   assert.match(turn.content, /Your owner wrote instead of choosing, at .+:\n {2}"Red, and keep it quiet"/);
+  await until(() => seen('Busy, blue or red?'), x => x?.collectedAt !== undefined);
   pi.settle();
   assert.equal(pi.sent.length, 1);
   pi.shutdown();
 });
 
-test('B33.5 Each answer goes in once across restarts of the same session: one handed over isn\'t again, one collected but not handed over when pi stopped comes at the next start, and another session\'s or app\'s decisions are never held', { timeout: 90_000 }, async () => {
+test('B33.5 B32.12 Each answer goes in once across restarts of the same session: one handed over isn\'t again, and its pickup, if it hadn\'t landed, runs at the next start; one pi stopped before handing over is picked up by nothing and comes at the next start; another session\'s or app\'s decisions are never held', { timeout: 120_000 }, async () => {
   // Handed over, then pi restarts on the same session: nothing again.
   const entries: unknown[] = [];
   const one = standIn('tui', 's-again', entries);
@@ -199,6 +204,7 @@ test('B33.5 Each answer goes in once across restarts of the same session: one ha
   one.bash();
   await answer('Again, blue or red?');
   await until(async () => one.sent.length, n => n === 1);
+  await until(() => seen('Again, blue or red?'), x => x?.collectedAt !== undefined);
   one.settle(); one.shutdown();
   const two = standIn('tui', 's-again', entries);
   two.start();
@@ -207,21 +213,48 @@ test('B33.5 Each answer goes in once across restarts of the same session: one ha
   assert.equal(two.sent.length, 0);
   two.shutdown();
 
-  // Collected while pi worked, and pi stopped before it settled: the next start of the session collects it again.
+  // Handed over, but its pickup can't land (the service is away for it) before pi stops: the next start picks it up,
+  // and hands nothing over again.
+  const unpicked = path.join(bin, 'no-pickup-lands');
+  writeFileSync(unpicked, `#!/bin/sh\nif [ "$1" = pickup ]; then echo 'not JSON'; exit 5; fi\nexec ${command.map(c => `'${c}'`).join(' ')} "$@"\n`);
+  chmodSync(unpicked, 0o755);
+  const owedEntries: unknown[] = [];
+  const handed = standIn('tui', 's-owed', owedEntries);
+  handed.start({ ...fast, command: [unpicked] });
+  const o = await asks('s-owed', 'Owed a pickup?');
+  handed.bash();
+  await answer('Owed a pickup?');
+  await until(async () => handed.sent.length, n => n === 1);
+  handed.settle(); handed.shutdown();
+  assert.equal((await seen('Owed a pickup?'))?.collectedAt, undefined, 'its pickup never landed');
+  const owing = standIn('tui', 's-owed', owedEntries);
+  owing.start();
+  await until(() => seen('Owed a pickup?'), x => x?.collectedAt !== undefined);
+  assert.equal(holds(o.agent, o.d), false);
+  owing.settle();
+  assert.equal(owing.sent.length, 0, 'not handed over again');
+  owing.shutdown();
+
+  // Collected while pi worked, and pi stopped before it settled: nothing picked it up, so the owner is warned, and the
+  // next start of the session holds its wait again and hands it over.
   const kept: unknown[] = [];
   const busy = standIn('tui', 's-stopped', kept);
   busy.start();
   const b = await asks('s-stopped', 'Stopped, blue or red?');
   busy.bash(); busy.prompt();
-  await answer('Stopped, blue or red?', { kind: 'option', number: 2 });
-  await until(async () => kept.length, n => n === 1);
+  const sent = await answer('Stopped, blue or red?', { kind: 'option', number: 2 });
+  await until(async () => holds(b.agent, b.d), held => !held);
   busy.shutdown();
   assert.equal(busy.sent.length, 0);
+  const warned = await until(() => seen('Stopped, blue or red?'), x => x?.warnedAt !== undefined, 20_000);
+  assert.equal(warned?.collectedAt, undefined, 'never picked up');
+  assert.ok(warned?.warnedAt && Date.parse(warned.warnedAt) - Date.parse(sent.sentAt) >= PICKUP_MS);
   const back = standIn('tui', 's-stopped', kept);
   back.start();
   await until(async () => back.sent.length, n => n === 1);
   assert.match(back.sent[0].content, /option B "Red"/);
   assert.deepEqual(decisionsOf(back.sent[0].details), [{ agent: b.agent, decision: b.d }]);
+  await until(() => seen('Stopped, blue or red?'), x => x?.collectedAt !== undefined);
   back.settle(); back.shutdown();
   const third = standIn('tui', 's-stopped', kept);
   third.start(); third.settle();
@@ -243,22 +276,26 @@ test('B33.5 Each answer goes in once across restarts of the same session: one ha
   await answer('Another session\'s?'); await answer('Claude Code\'s?'); await answer('Mine, blue or red?');
   await until(async () => mine.sent.length, n => n === 1);
   assert.deepEqual(decisionsOf(mine.sent[0].details), [{ agent: own.agent, decision: own.d }]);
-  assert.equal((await seen('Another session\'s?'))?.collectedAt, undefined, 'another session\'s answer was never collected here');
+  await until(() => seen('Mine, blue or red?'), x => x?.collectedAt !== undefined);
+  assert.equal((await seen('Another session\'s?'))?.collectedAt, undefined, 'another session\'s answer was never picked up here');
   mine.settle(); mine.shutdown();
 });
 
-test('B33.5 A wait that ends without the answer, with the pager off or the command not found at first, is held again later, and a follow-up pi didn\'t start is sent again', { timeout: 60_000 }, async () => {
-  // The first wait is told the pager is off, as the command says it; the next is the command's own.
-  const offOnce = path.join(bin, 'off-once'), flag = path.join(work, 'off-once.done');
-  writeFileSync(offOnce, `#!/bin/sh\nif [ ! -e ${flag} ]; then : > ${flag}; echo '{"code":4,"text":"Your owner\\u0027s pager is off."}'; exit 4; fi\nexec ${command.map(c => `'${c}'`).join(' ')} "$@"\n`);
-  chmodSync(offOnce, 0o755);
+test('B33.5 B32.12 A wait or a pickup that ends without landing, with the pager off, the service away or the command not found at first, is run again later, and a follow-up pi didn\'t start is sent again before anything is picked up', { timeout: 60_000 }, async () => {
+  // The first wait is told the pager is off, and the first pickup gets no usable reply; the next of each is the
+  // command's own.
+  const flaky = path.join(bin, 'flaky'), offFlag = path.join(work, 'flaky-off.done'), awayFlag = path.join(work, 'flaky-away.done');
+  writeFileSync(flaky, `#!/bin/sh\nif [ "$1" = wait ] && [ ! -e ${offFlag} ]; then : > ${offFlag}; echo '{"code":4,"text":"Your owner\\u0027s pager is off."}'; exit 4; fi\nif [ "$1" = pickup ] && [ ! -e ${awayFlag} ]; then : > ${awayFlag}; echo '{"code":5,"text":"No reply.","result":{"status":"try-again"}}'; exit 5; fi\nexec ${command.map(c => `'${c}'`).join(' ')} "$@"\n`);
+  chmodSync(flaky, 0o755);
   const off = standIn('tui', 's-off');
-  off.start({ ...fast, command: [offOnce] });
+  off.start({ ...fast, command: [flaky] });
   const a = await asks('s-off', 'Off, then on?');
   off.bash();
   await until(async () => holds(a.agent, a.d), held => held, 10_000);
   await answer('Off, then on?');
   await until(async () => off.sent.length, n => n === 1);
+  await until(() => seen('Off, then on?'), x => x?.collectedAt !== undefined);
+  assert.ok(readFileSync(awayFlag, 'utf8') === '', 'its first pickup failed, and the next landed');
   off.settle(); off.shutdown();
 
   // The command isn't there when the session starts: the owner sees one line, and the wait is held once it is.
@@ -268,7 +305,7 @@ test('B33.5 A wait that ends without the answer, with the pager off or the comma
   const b = await asks('s-missing', 'Missing, then found?');
   missing.bash();
   await until(async () => missing.notes.length, n => n === 1);
-  assert.equal(missing.notes[0], 'AgentPager couldn\'t run the agentpager command to wait for your owner\'s answer (ENOENT). It tries again every minute.');
+  assert.equal(missing.notes[0], 'AgentPager couldn\'t run the agentpager command to wait for your owner\'s answer (ENOENT). It keeps trying.');
   writeFileSync(later, `#!/bin/sh\nexec ${command.map(c => `'${c}'`).join(' ')} "$@"\n`);
   chmodSync(later, 0o755);
   await until(async () => holds(b.agent, b.d), held => held, 10_000);
@@ -277,22 +314,26 @@ test('B33.5 A wait that ends without the answer, with the pager off or the comma
   assert.equal(missing.notes.length, 1);
   missing.settle(); missing.shutdown();
 
-  // pi takes the follow-up but never starts it (its run failed to begin): it is sent again once pi is idle.
+  // pi takes the follow-up but never starts it (its run failed to begin): nothing is picked up until it is sent again
+  // and starts.
   const dropping = standIn('tui', 's-dropped');
   const realSend = dropping.pi.sendMessage.bind(dropping.pi);
   let drop = true;
   dropping.pi.sendMessage = (message, options) => { if (drop) { drop = false; dropping.sent.push({ content: message.content, details: message.details, options, whileWorking: false }); return; } realSend(message, options); };
-  dropping.start({ ...fast, confirmMs: 300 });
+  dropping.start({ ...fast, confirmMs: 1_500 });
   const c = await asks('s-dropped', 'Dropped, then sent?');
   dropping.bash();
   await answer('Dropped, then sent?');
+  await until(async () => dropping.sent.length, n => n === 1);
+  assert.equal((await seen('Dropped, then sent?'))?.collectedAt, undefined, 'not picked up: the turn never started');
   await until(async () => dropping.sent.length, n => n === 2);
   assert.equal(dropping.sent[0].content, dropping.sent[1].content);
   assert.deepEqual(decisionsOf(dropping.sent[1].details), [{ agent: c.agent, decision: c.d }]);
+  await until(() => seen('Dropped, then sent?'), x => x?.collectedAt !== undefined);
   dropping.settle(); dropping.shutdown();
 });
 
-test('B33.5 Every wait it holds stops when the session shuts down, and when pi exits without saying so', { timeout: 60_000 }, async () => {
+test('B33.5 B32.12 Every wait it holds stops when the session shuts down, and when pi exits without saying so; one left behind when pi is killed picks nothing up, so the owner is warned', { timeout: 90_000 }, async () => {
   const pi = standIn('tui', 's-down');
   pi.start();
   const a = await asks('s-down', 'Shut down, blue?'), b = await asks('s-down', 'Shut down, red?');
@@ -303,20 +344,36 @@ test('B33.5 Every wait it holds stops when the session shuts down, and when pi e
   for (const w of held) await until(async () => alive(w.pid), up => !up, 5_000);
   pi.bash();
   assert.deepEqual(waits().filter(w => w.command.includes(` ${a.d} `) || w.command.includes(` ${b.d} `)), [], 'none held after');
-  // A pi that exits without its shutdown event, as when its terminal is gone.
-  const exits = path.join(work, 'exits.ts');
-  writeFileSync(exits, `import { agentpagerWake } from ${JSON.stringify(fileURLToPath(new URL('../src/index.ts', import.meta.url)))};
+  // A pi that exits without its shutdown event, as when its terminal is gone; and one killed outright.
+  const script = (session: string, exits: boolean) => {
+    const file = path.join(work, `${session}.ts`);
+    writeFileSync(file, `import { agentpagerWake } from ${JSON.stringify(fileURLToPath(new URL('../src/index.ts', import.meta.url)))};
 const handlers = {};
-const ctx = { mode: 'tui', hasUI: false, isIdle: () => true, hasPendingMessages: () => false, sessionManager: { getSessionId: () => 's-exits', getEntries: () => [] }, ui: { notify() {} } };
-agentpagerWake({ on: (e, h) => { handlers[e] = h; }, sendMessage() {}, appendEntry() {} }, { command: ${JSON.stringify(command)} });
+const ctx = { mode: 'tui', hasUI: false, isIdle: () => true, hasPendingMessages: () => false, sessionManager: { getSessionId: () => ${JSON.stringify(session)}, getEntries: () => [] }, ui: { notify() {} } };
+agentpagerWake({ on: (e, h) => { handlers[e] = h; }, sendMessage() {} }, { command: ${JSON.stringify(command)} });
 handlers.session_start({}, ctx);
 handlers.tool_result({ toolName: 'bash' }, ctx);
-setTimeout(() => process.exit(0), 500);
+${exits ? 'setTimeout(() => process.exit(0), 500);' : 'setInterval(() => {}, 1000);'}
 `);
+    return file;
+  };
+  const theirs = async (parent: number | undefined, agent: string, d: string) => Number((await until(async () => waits(parent).find(w => w.command.endsWith(` wait --agent ${agent} ${d} --no-pickup --json`)), w => w !== undefined, 10_000))?.pid);
   const c = await asks('s-exits', 'Exits, blue?', { AGENTPAGER_WAKE: 'pi:s-exits' });
-  const child = spawn(process.execPath, ['--experimental-strip-types', exits], { stdio: 'ignore', env: process.env });
-  const theirs = await until(async () => execFileSync('ps', ['-A', '-o', 'pid=,ppid=,command='], { encoding: 'utf8' }).split('\n').map(l => /^\s*(\d+)\s+(\d+)\s+(.*)$/.exec(l)).find(m => m !== null && Number(m[2]) === child.pid && m[3].endsWith(` wait --agent ${c.agent} ${c.d} --forever --json`)), m => m !== undefined, 10_000);
-  const pid = Number(theirs?.[1]);
-  await new Promise(res => child.on('exit', res));
+  const exiting = spawn(process.execPath, ['--experimental-strip-types', script('s-exits', true)], { stdio: 'ignore', env: process.env });
+  const pid = await theirs(exiting.pid, c.agent, c.d);
+  await new Promise(res => exiting.on('exit', res));
   await until(async () => alive(pid), up => !up, 5_000);
+
+  // Killed outright, the extension can't stop its wait: the wait has the answer, but picks nothing up.
+  const k = await asks('s-killed', 'Killed, blue?', { AGENTPAGER_WAKE: 'pi:s-killed' });
+  const killed = spawn(process.execPath, ['--experimental-strip-types', script('s-killed', false)], { stdio: 'ignore', env: process.env, detached: true });
+  const orphan = await theirs(killed.pid, k.agent, k.d);
+  killed.kill('SIGKILL');
+  await new Promise(res => killed.on('exit', res));
+  assert.ok(alive(orphan), 'its wait is left running');
+  const sent = await answer('Killed, blue?');
+  await until(async () => alive(orphan), up => !up, 10_000);
+  const warned = await until(() => seen('Killed, blue?'), x => x?.warnedAt !== undefined, 20_000);
+  assert.equal(warned?.collectedAt, undefined, 'it had the answer and picked nothing up');
+  assert.ok(warned?.warnedAt && Date.parse(warned.warnedAt) - Date.parse(sent.sentAt) >= PICKUP_MS, 'so the owner is warned');
 });

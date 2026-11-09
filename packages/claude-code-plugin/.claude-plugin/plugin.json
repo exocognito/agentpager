@@ -1,0 +1,5 @@
+{
+  "name": "agentpager",
+  "version": "0.1.0",
+  "description": "AgentPager for Claude Code: when your owner answers a decision you asked with the agentpager command, the answer comes to you as a new turn."
+}

@@ -31,7 +31,9 @@ const CLIENTS: [RegExp, string][] = [[/claude-code/i, 'Claude Code'], [/^local-a
 // runs (pi 1.4.0), so a pi session's wake counts only where that names the same session: a pi started inside another
 // without the extension, as a run in print mode, inherits the outer session's wake but not its PI_SESSION_ID, and a
 // command with no PI_SESSION_ID (one the owner types into pi with `!`, or a pi from before it) says nothing of which
-// session asked.
+// session asked. Claude Code likewise names its own in CLAUDE_CODE_SESSION_ID (Claude Code 2.1.321, in every command's
+// shell), so a Claude Code session's wake counts only where that, when set, names the same session: a Claude Code
+// started inside another without the plugin inherits the outer session's wake but not its CLAUDE_CODE_SESSION_ID.
 export type Wake = { app: 'claude-code' | 'pi'; session: string };
 export type Caller =
   | { app: 'claude-code'; wake: Wake | null }
@@ -62,7 +64,7 @@ export function identify(mcp?: { client?: string; meta?: unknown }, env: NodeJS.
   }
   const there = SHELL.filter(([, marked]) => marked(env)).map(([app]) => app);
   if (there.length !== 1) return null;
-  if (there[0] === 'claude-code') return env.CLAUDECODE === '1' ? { app: 'claude-code', wake: wake?.app === 'claude-code' ? wake : null } : null;
+  if (there[0] === 'claude-code') return env.CLAUDECODE === '1' ? { app: 'claude-code', wake: wake?.app === 'claude-code' && (!env.CLAUDE_CODE_SESSION_ID || env.CLAUDE_CODE_SESSION_ID === wake.session) ? wake : null } : null;
   if (there[0] === 'codex') return env.CODEX_THREAD_ID ? { app: 'codex', via: 'shell', thread: wakeableThread({ env }) } : null;
   if (there[0] === 'pi') return wake?.app === 'pi' && env.PI_SESSION_ID === wake.session ? { app: 'pi', wake } : null;
   return null;

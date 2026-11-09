@@ -20,5 +20,12 @@
   "include": [
     "packages/**/*.ts",
     "packages/**/*.tsx"
+  ],
+  // The Claude Code plugin's hooks module is typed against Claude Code's own declarations, which Claude Code lays in
+  // the plugin's folder when it loads it (packages/claude-code-plugin/README.md); its logic, wake.ts, is checked here.
+  "exclude": [
+    "**/node_modules",
+    "packages/claude-code-plugin/hooks/register.ts",
+    "packages/claude-code-plugin/.claude-plugin"
   ]
 }

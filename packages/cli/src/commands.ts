@@ -511,15 +511,20 @@ function watching(pid: number, id: string, short: string): boolean {
   catch { return false; }
 }
 // Starts the watcher for a decision a Codex thread asked, when it hasn't rung, nothing here has the answer yet and no
-// watcher runs. True when one runs: the one already there, or the new one once it has put itself in the agent's file,
-// within STARTS_MS, or has rung already; so the agent is told a note will come only when something will ring it. A new
+// watcher runs. True when one runs or a note came or may come: the one already there, the new one once it has put
+// itself in the agent's file within STARTS_MS, or a ring already recorded (noteComes); so the agent is told a note will
+// come only when something rang or will ring it. A new
 // one that hasn't by then is stopped, so it can't ring an agent told to wait for itself, unless it has begun to ring.
 // Its environment and working folder are this process's, without the pager's number.
+// A ring already recorded counts as well when a note came or may come: queued, still ringing, or ended past its time or
+// by a signal. One that failed, a thread Codex didn't know, or no Codex CLI means no note: the agent waits itself.
 const STARTS_MS = 3_000;
+const noteComes = (r: { outcome: RingOutcome } | undefined) => r !== undefined && (r.outcome === 'queued' || r.outcome === 'ringing' || r.outcome === 'timed-out');
 async function watcherFor(id: string, short: string): Promise<boolean> {
   const now = () => { try { return loadAgent(id)?.decisions[short] ?? null; } catch { return null; } };
   const d = now(), w = d?.wake;
-  if (!d || w?.app !== 'codex' || w.ring || d.answered || d.acknowledged || d.closed) return false;
+  if (!d || w?.app !== 'codex' || d.answered || d.acknowledged || d.closed) return false;
+  if (w.ring) return noteComes(w.ring);
   if (w.watcher !== undefined && watching(w.watcher, id, short)) return true;
   const env = { ...process.env };
   delete env.AGENTPAGER_PAGER;
@@ -531,14 +536,15 @@ async function watcherFor(id: string, short: string): Promise<boolean> {
   if (child.pid === undefined) return false;
   for (const until = Date.now() + STARTS_MS; Date.now() < until;) {
     const x = now()?.wake;
-    if (x?.app === 'codex' && (x.ring || x.watcher === child.pid)) return true;
+    if (x?.app === 'codex' && x.ring) return noteComes(x.ring);
+    if (x?.app === 'codex' && x.watcher === child.pid) return true;
     // It ended without watching, as when another watcher started first: that one counts.
     if (ended) return x?.app === 'codex' && x.watcher !== undefined && watching(x.watcher, id, short);
     await new Promise(res => setTimeout(res, 25));
   }
   try { process.kill(child.pid, 'SIGKILL'); } catch { /* it ended */ }
   const x = now()?.wake;
-  return x?.app === 'codex' && x.ring !== undefined;
+  return x?.app === 'codex' && noteComes(x.ring);
 }
 // A change to the agent's file that has to land: tried again while another process holds the file, past the 10 s after
 // which a lock left by a process that died is broken (store.ts), up to about half a minute.

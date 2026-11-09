@@ -71,6 +71,7 @@ const op = await import('../src/commands.ts');
 const store = await import('../src/store.ts');
 const detect = await import('../src/detect.ts');
 const wake = await import('../src/codex.ts');
+type RingOutcome = import('../src/store.ts').RingOutcome;
 const NUDGE = 'AgentPager can\'t wake an agent in this app, so when your owner answers, they may have to nudge you to read it.';
 const codexMcp = (id: string, d: string) => `Don't wait for it: when your owner answers, a note that the answer is in comes to this thread. Carry on or end your turn, and when the note comes, call the agentpager wait tool (agent ${id}, decision ${d}) to read it.`;
 const codexShell = (id: string, d: string) => `Don't wait for it: when your owner answers, a note that the answer is in comes to this thread. Carry on or end your turn, and when the note comes, run agentpager wait --agent ${id} ${d} to read it.`;
@@ -223,7 +224,7 @@ test('B33.4 B33.1 B32.12 A Codex thread that asks over MCP is told a note will c
   } finally { if (!closed) await client.close(); }
 });
 
-test('B33.4 A thread is rung once, recorded before codex queue runs: never again after a timed-out call, a call cut off, or a second watcher, and never by a watcher that started too late; a pager turned off and on again, a lock a dead process left, or a call that fails on its own, still rings, and a call ended by a signal is never made again', { timeout: 120_000 }, async () => {
+test('B33.4 A thread is rung once, recorded before codex queue runs: never again after a timed-out call, a call cut off, or a second watcher, and never by a watcher that started too late; a pager turned off and on again, a lock a dead process left, or a call that fails on its own, still rings, and a call ended by a signal is never made again; a wait from the asking thread is told to wait itself only when no note will come', { timeout: 120_000 }, async () => {
   inShell({});
   const p = await f.makePager(), id = field(await op.connect({ number: p.number, app: 'Codex', project: 'wake' }), 'agent');
   // Decisions asked from a shell no app marks, each then given a Codex thread's wake, as an ask from that thread records it.
@@ -245,14 +246,21 @@ test('B33.4 A thread is rung once, recorded before codex queue runs: never again
   assert.equal((await op.watch(id, slow.d)).text, 'Nothing to watch: it has rung, this machine has the answer, or another watcher runs.');
   assert.equal(ringsFor(slow.thread).length, 1, 'one call, the one that timed out');
 
-  // A watcher stopped during its call leaves the ring recorded as ringing: no later watcher, nor wait, rings again.
-  const cut = await asked('Cut off?', v7());
-  store.updateAgent(id, x => { const w = x.decisions[cut.d].wake; if (w?.app === 'codex') w.ring = { at: new Date().toISOString(), outcome: 'ringing' }; });
-  assert.equal((await op.watch(id, cut.d)).text, 'Nothing to watch: it has rung, this machine has the answer, or another watcher runs.');
-  rollout(cut.thread, terminal); inShell({ CODEX_THREAD_ID: cut.thread });
-  assert.ok((await op.wait(id, cut.d, { seconds: 1 })).text.endsWith(`Keep waiting: agentpager wait --agent ${id} ${cut.d}`), 'a wait from that thread starts no watcher, and isn\'t told a note will come');
-  inShell({});
-  assert.equal(watcherOf(id, cut.d), undefined);
+  // A ring already recorded, as each outcome leaves it. No later watcher or wait rings again. A wait from the asking
+  // thread is told not to wait when a note came or may come (queued, still ringing, or ended past its time or by a
+  // signal), and to wait itself when none will (it failed, Codex didn't know the thread, or there was no Codex CLI).
+  const outcomes: [RingOutcome, boolean][] = [['queued', true], ['ringing', true], ['timed-out', true], ['failed', false], ['unknown-thread', false], ['no-cli', false]];
+  for (const [outcome, comes] of outcomes) {
+    const rung = await asked(`Rung as ${outcome}?`, v7());
+    store.updateAgent(id, x => { const w = x.decisions[rung.d].wake; if (w?.app === 'codex') w.ring = { at: new Date().toISOString(), outcome }; });
+    assert.equal((await op.watch(id, rung.d)).text, 'Nothing to watch: it has rung, this machine has the answer, or another watcher runs.', outcome);
+    rollout(rung.thread, terminal); inShell({ CODEX_THREAD_ID: rung.thread });
+    const words = (await op.wait(id, rung.d, { seconds: 1 })).text;
+    inShell({});
+    assert.ok(words.endsWith(comes ? `Carry on or end your turn, and when the note comes, run agentpager wait --agent ${id} ${rung.d} to read it.` : `Keep waiting: agentpager wait --agent ${id} ${rung.d}`), `${outcome}: ${words}`);
+    assert.equal(watcherOf(id, rung.d), undefined, `${outcome}: no watcher started`);
+    assert.equal(ringsFor(rung.thread).length, 0, `${outcome}: nothing rung`);
+  }
 
   // Codex doesn't know the thread: recorded, and not tried again.
   const gone = await asked('Thread gone?', v7());

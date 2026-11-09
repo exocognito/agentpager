@@ -22,6 +22,8 @@ const op = await import('../../cli/src/commands.ts');
 const store = await import('../../cli/src/store.ts');
 const detect = await import('../../cli/src/detect.ts');
 
+// The command run from this checkout's source, never an agentpager on PATH; anything else as named.
+const command = (argv: string[]): [string, string[]] => argv[0] === COMMAND ? [process.execPath, ['--experimental-strip-types', '--no-warnings', main, ...argv.slice(1)]] : [argv[0] ?? '', argv.slice(1)];
 // Claude Code as the mod sees it, on this machine: Node's clock, files and processes, with `agentpager` run from source.
 type Turn = { text: string; at: number };
 function claudeCode(session: string) {
@@ -37,10 +39,9 @@ function claudeCode(session: string) {
     },
     read: async file => readFileSync(file, 'utf8'),
     exists: async file => existsSync(file),
-    run: argv => new Promise(resolve => execFile(argv[0] ?? '', argv.slice(1), (e, stdout) => resolve({ exitCode: e ? Number(e.code ?? 1) : 0, stdout }))),
+    run: argv => new Promise(resolve => execFile(...command(argv), (e, stdout) => resolve({ exitCode: e ? Number(e.code ?? 1) : 0, stdout }))),
     spawn: argv => {
-      const [bin, ...args] = argv;
-      const child = spawn(bin === COMMAND ? process.execPath : bin ?? '', bin === COMMAND ? ['--experimental-strip-types', '--no-warnings', main, ...args] : args, { stdio: ['ignore', 'pipe', 'ignore'] });
+      const child = spawn(...command(argv), { stdio: ['ignore', 'pipe', 'ignore'] });
       if (child.pid) { mine.add(child.pid); pids.add(child.pid); }
       let stdout = '';
       child.stdout.on('data', d => { stdout += d; });

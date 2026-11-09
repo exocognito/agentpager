@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { COMMAND, LINE, Mod, SETTLE_MS, TICK_MS, decodeRecord, homeOf, isCommand, outcomeOf, pickupDone, turnText, wakesHere } from '../hooks/wake.ts';
+import { COMMAND, LINE, Mod, SETTLE_MS, TICK_MS, decodeRecord, homeOf, isCommand, outcomeOf, pickupAgainIn, turnText, wakesHere } from '../hooks/wake.ts';
 import { record, reply, standIn, type StandIn } from './stand-in.ts';
 
 // The Claude Code plugin's mod (B33.2, blueprint/areas/2-agents.md) with a stand-in for Claude Code (stand-in.ts):
@@ -11,7 +11,7 @@ const HOME = '/home/sam/.agentpager', A = 'ap-7f3k', B = 'ap-9k2m';
 const waiting = (agent: string) => `${HOME}/waiting/${agent}.json`;
 const claim = (agent: string, d: string) => `${HOME}/claude-code/${agent}.${d}`;
 const mine = (session = 'session-1') => ({ app: 'claude-code' as const, session });
-const waitFor = (agent: string, d: string) => [COMMAND, 'wait', '--agent', agent, d, '--json', '--hold'];
+const waitFor = (agent: string, d: string) => [COMMAND, 'wait', '--agent', agent, d, '--no-pickup', '--json'];
 const pickupOf = (agent: string, d: string) => [COMMAND, 'pickup', '--agent', agent, d, '--json'];
 const ANSWER = 'Answered at 11:15 AM: option B "Green".\nDo it, then confirm: agentpager ack --agent ap-7f3k d_2x8w "<what happens next>"';
 
@@ -183,7 +183,7 @@ test('B33.2 B32.12 The answer counts as picked up only once the turn carrying it
   assert.equal(h.pickups.length, 0);
   assert.ok(!h.dirs.has(claim(A, 'd_2x8w')));
   // It comes back: the answer goes as the first turn, and only then is it picked up. The service is out of reach.
-  h.picking = JSON.stringify({ code: 5, text: 'No reply from the server.' }) + '\n';
+  h.picking = JSON.stringify({ code: 5, text: 'No reply from the server.', result: { status: 'try-again' } }) + '\n';
   const back = await started(h);
   h.running()[0]?.exit(reply.answered(ANSWER));
   await h.advance(0);
@@ -194,7 +194,7 @@ test('B33.2 B32.12 The answer counts as picked up only once the turn carrying it
   assert.equal(h.pickups.length, 2);
   // Claude Code quits again before it lands: the next start tries again, and stops once it is done.
   back.sessionEnded('prompt_input_exit');
-  h.picking = JSON.stringify({ code: 0, text: 'Picked up.' }) + '\n';
+  h.picking = JSON.stringify({ code: 0, text: 'Picked up.', result: { status: 'picked-up' } }) + '\n';
   const third = await started(h);
   await h.advance(TICK_MS);
   assert.equal(h.pickups.length, 3);
@@ -271,10 +271,13 @@ test('B33.2 B32.12 The mod holds the command\'s own wait and reads only its code
   assert.deepEqual(outcomeOf(reply.unknown(A)), { kind: 'stop' });
   assert.deepEqual(outcomeOf('Answered at 11:15 AM: option B "Green".'), { kind: 'later', ms: 10_000 }, 'words alone are never read as an answer');
   assert.deepEqual(outcomeOf(''), { kind: 'later', ms: 10_000 }, 'a wait that died');
-  assert.equal(pickupDone(JSON.stringify({ code: 0, text: 'Picked up.' })), true);
-  assert.equal(pickupDone(JSON.stringify({ code: 2, text: 'Closed unanswered.' })), true, 'never to be: not tried again');
-  for (const code of [4, 5]) assert.equal(pickupDone(JSON.stringify({ code, text: '' })), false);
-  assert.equal(pickupDone(''), false);
+  // pickup, as the contract beside waitingOf has it: settled, or tried again later.
+  for (const status of ['picked-up', 'acknowledged']) assert.equal(pickupAgainIn(JSON.stringify({ code: 0, text: '', result: { status } })), null, status);
+  for (const status of ['pending', 'closed', 'unreadable', 'refused']) assert.equal(pickupAgainIn(JSON.stringify({ code: 2, text: '', result: { status } })), null, status);
+  assert.equal(pickupAgainIn(JSON.stringify({ code: 6, text: 'No agent ap-7f3k on this machine.' })), null);
+  assert.equal(pickupAgainIn(JSON.stringify({ code: 4, text: '', result: { status: 'pager-off' } })), 60_000);
+  assert.equal(pickupAgainIn(JSON.stringify({ code: 5, text: '', result: { status: 'try-again' } })), 10_000);
+  assert.equal(pickupAgainIn(''), 10_000, 'no reply at all');
 
   const h = standIn();
   h.write(waiting(A), record(A, [{ decision: 'd_2x8w', wake: mine() }]));

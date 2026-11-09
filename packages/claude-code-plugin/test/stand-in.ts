@@ -31,7 +31,7 @@ export function standIn(session = 'session-1'): StandIn {
   let edits = 0;
   const h: StandIn = {
     t: 1_000_000, session, wake: [], children: [], turns: [], logs: [], files: new Map(), dirs: new Set(['/']),
-    pickups: [], picking: JSON.stringify({ code: 0, text: 'Picked up.' }) + '\n',
+    pickups: [], picking: JSON.stringify({ code: 0, text: 'Picked up.', result: { status: 'picked-up' } }) + '\n',
     taking: { entered: true },
     now: async () => h.t,
     after: (ms, fn) => timer(ms, fn),

@@ -8,13 +8,13 @@
 //   agent asks under that session, in the record of what's waiting (packages/cli/src/store.ts › waitingOf), and tells
 //   the agent not to wait. After a /clear or a /resume the session id is another, and so is the variable.
 // - It reads that record, never the command's words, for this session's decisions, and holds the command's own wait
-//   for each, `agentpager wait --agent <agent> <decision> --json --hold`, one 50 s hold after another. The command opens
-//   the answer; a held wait doesn't say it has it, so an answer the mod holds while Claude is busy, or loses when Claude
-//   Code quits, still brings the owner's warning that no agent picked it up (B32.12). The mod reads only the reply's
-//   code and status, and carries its text.
+//   for each, `agentpager wait --agent <agent> <decision> --no-pickup --json`, one 50 s hold after another, as the
+//   adapters' contract beside waitingOf says. The command opens the answer but picks nothing up, so an answer the mod
+//   holds while Claude is busy, or loses when Claude Code quits, still brings the owner's warning that no agent picked
+//   it up (B32.12). The mod reads only the reply's code and status, and carries its text.
 // - Once the turn carrying the answer has started, it tells the service the agent has it, with
-//   `agentpager pickup --agent <agent> <decision> --json`, and tries again 10 s apart while the decision is listed as
-//   not picked up, across a restart too.
+//   `agentpager pickup --agent <agent> <decision> --json`, and tries again later, while the decision is listed as not
+//   picked up, across a restart too, when the pager is off or the service had no usable reply.
 // - It hands the reply over as a new turn ($.prompt.submit) once Claude is idle: at once when it is, else after the
 //   running turn and a moment more, so a prompt the person queued, or a /clear, goes first. Never in a running turn.
 // - Each answer is handed over once: once its turn has started, a folder under AgentPager's home says so, which a
@@ -35,7 +35,7 @@ export const LINE_ID = 'agentpager:available';
 // How often the record is looked at; how long after a turn ends a handed-over turn waits, so the person's own prompt
 // goes first; and how long a wait that can't reach the service or the pager pauses before the next.
 export const TICK_MS = 1_000, SETTLE_MS = 500;
-const AGAIN_MS = 1_000, UNREACHABLE_MS = 10_000, OFF_MS = 60_000, GONE_MS = 60_000, NOT_TAKEN_MS = 60_000, PICKUP_AGAIN_MS = 10_000;
+const AGAIN_MS = 1_000, UNREACHABLE_MS = 10_000, OFF_MS = 60_000, GONE_MS = 60_000, NOT_TAKEN_MS = 60_000;
 
 // What register.ts gives the mod of Claude Code.
 export type Entry = { name: string; kind: string; size: number; mtimeMs: number };
@@ -121,13 +121,15 @@ export function outcomeOf(stdout: string): Outcome {
   return { kind: 'later', ms: UNREACHABLE_MS };
 }
 // The turn: which decision, and the command's reply as it gave it.
-// Whether `agentpager pickup --json` settled it: picked up now or already, or never to be (acknowledged, closed, no
-// such agent). A pager that's off, a service out of reach, or no reply at all is tried again.
-export function pickupDone(stdout: string): boolean {
+// What `agentpager pickup --json` came to (the contract beside waitingOf): settled, picked up now or before, or never
+// to be (acknowledged, closed, pending, unreadable, refused, no such agent); or to be tried again, a minute on when the
+// pager is off, 10 s on when the service had no usable reply or the command gave no reply at all.
+export function pickupAgainIn(stdout: string): number | null {
   let raw: unknown;
-  try { raw = JSON.parse(stdout.trim().split('\n').pop() ?? ''); } catch { return false; }
+  try { raw = JSON.parse(stdout.trim().split('\n').pop() ?? ''); } catch { return UNREACHABLE_MS; }
   const r = object(raw);
-  return typeof r?.code === 'number' && r.code !== 4 && r.code !== 5;
+  if (typeof r?.code !== 'number') return UNREACHABLE_MS;
+  return r.code === 4 ? OFF_MS : r.code === 5 ? UNREACHABLE_MS : r.code === 0 || r.code === 2 || r.code === 6 ? null : UNREACHABLE_MS;
 }
 export const turnText = (agent: string, decision: string, o: { answered: boolean; text: string }) => o.answered
   ? `AgentPager: your owner answered decision ${decision} (agent ${agent}). The agentpager command's reply:\n\n${o.text}`
@@ -270,7 +272,7 @@ export class Mod {
     for (;;) {
       if (h.stopped) return;
       const began = await this.host.now();
-      h.child = this.host.spawn([COMMAND, 'wait', '--agent', h.agent, h.decision, '--json', '--hold']);
+      h.child = this.host.spawn([COMMAND, 'wait', '--agent', h.agent, h.decision, '--no-pickup', '--json']);
       const { stdout } = await h.child.done;
       h.child = undefined;
       if (h.stopped) return;
@@ -330,15 +332,15 @@ export class Mod {
     await this.host.run(['/bin/mkdir', this.claimOf(agent, decision)]).catch(() => undefined);
   }
   // Tells the service the agent has the answer, once its turn has started (B32.12). A try that doesn't land is made
-  // again by a later look, PICKUP_AGAIN_MS on, while the record lists the decision as not picked up.
+  // again by a later look, after the time pickupAgainIn gives, while the record lists the decision as not picked up.
   private async pickup(key: string, agent: string, decision: string) {
     if (this.picking.has(key)) return;
     this.picking.add(key);
     try {
       const r = await this.host.run([COMMAND, 'pickup', '--agent', agent, decision, '--json']).catch(() => ({ exitCode: 1, stdout: '' }));
-      const done = pickupDone(r.stdout);
-      this.host.debug(`pickup of ${agent} ${decision}: ${done ? 'done' : 'not yet'}`);
-      if (done) this.picked.add(key); else this.pickupAt.set(key, (await this.host.now()) + PICKUP_AGAIN_MS);
+      const again = pickupAgainIn(r.stdout);
+      this.host.debug(`pickup of ${agent} ${decision}: ${again === null ? 'done' : 'not yet'}`);
+      if (again === null) this.picked.add(key); else this.pickupAt.set(key, (await this.host.now()) + again);
     } finally { this.picking.delete(key); }
   }
 }

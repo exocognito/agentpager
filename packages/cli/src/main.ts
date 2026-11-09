@@ -33,7 +33,7 @@ function parse(argv: string[]) {
     else if (a.startsWith('--')) {
       const [k, v] = a.slice(2).split('=', 2);
       if (v !== undefined) flags[k] = v;
-      else if (['json', 'forever', 'print', 'help'].includes(k)) flags[k] = true;
+      else if (['json', 'forever', 'no-pickup', 'print', 'help'].includes(k)) flags[k] = true;
       else flags[k] = argv[++i] ?? '';
     } else rest.push(a);
   }
@@ -60,7 +60,10 @@ async function run(argv: string[]): Promise<op.Result> {
     case 'example': return op.example();
     case 'review': { const c = card(rest[0]); return !c ? { code: 2, text: 'Say which card: agentpager review card.yaml' } : isResult(c) ? c : op.review(c); }
     case 'ask': { const c = card(rest[0]); return needsAgent(() => !c ? { code: 2, text: 'Say which card: agentpager ask --agent <id> card.yaml' } : isResult(c) ? c : op.ask(agent, c)); }
-    case 'wait': return needsAgent(() => op.wait(agent, rest[0] ?? '', { forever: flags.forever === true, seconds: f('seconds') ? Number(f('seconds')) : undefined }));
+    case 'wait': return needsAgent(() => op.wait(agent, rest[0] ?? '', { forever: flags.forever === true, noPickup: flags['no-pickup'] === true, seconds: f('seconds') ? Number(f('seconds')) : undefined }));
+    // An adapter's step once the agent has the answer its `wait --no-pickup` returned (commands.ts › pickup); not for
+    // agents, so not in HELP.
+    case 'pickup': return needsAgent(() => op.pickup(agent, rest[0] ?? ''));
     // Codex's doorbell, which the command starts itself (commands.ts › watch); not for agents, so not in HELP.
     case 'watch': return needsAgent(() => op.watch(agent, rest[0] ?? ''));
     case 'ack': return needsAgent(() => op.ack(agent, rest[0] ?? '', rest.slice(1).join(' ')));

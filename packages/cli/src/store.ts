@@ -109,8 +109,19 @@ export function saveAgent(a: AgentFile) {
 // "waiting" until a wait here has its answer, then "answered". "wake" says who wakes the agent for it, when something
 // does: an adapter's session, as AGENTPAGER_WAKE named it when the agent asked (detect.ts), or the Codex thread that
 // asked, with how its ring went once it has rung (RingOutcome). An adapter acts only on the decisions whose wake names
-// its own app and session, for example by holding `agentpager wait --agent <agent> <decision> --forever` and handing
-// its reply to the agent as a new turn; it ignores the rest, and a decision that leaves the list is done with.
+// its own app and session; it ignores the rest, and a decision that leaves the list is done with. For each, it:
+//   1. holds `agentpager wait --agent <agent> <decision> --no-pickup --json`, with `--forever` for a wait with no end,
+//      or without it for one that holds up to 50 s and replies pending, to be held again. It replies as any wait does,
+//      {code, text, result: {status}} with the command's exit codes (0 answered or pending, 2 refused, closed among
+//      them as status closed, 4 pager off, 5 no usable reply, 6 unknown agent), but picks nothing up: the service isn't
+//      told and nothing here changes, so the decision stays waiting and the owner's not-picked-up clock runs;
+//   2. hands the text of an answered reply to the agent as a new turn;
+//   3. once that turn has started, runs `agentpager pickup --agent <agent> <decision> --json`, which tells the service
+//      this agent's command received the answer (B32.12) and records it here as answered. Its result's status:
+//      picked-up or acknowledged, exit 0, done (saying it again gets picked-up again); pending, closed, unreadable or
+//      refused, exit 2, not to be run again; pager-off, exit 4, or try-again, exit 5, or a reply with no JSON: run it
+//      again later.
+// So a wait whose adapter went away, or an answer never handed over, picks nothing up, and the owner is warned (B5.13).
 export type Waiting = {
   version: 1; agent: string;
   decisions: { decision: string; askedAt?: string; state: 'waiting' | 'answered'; wake?: { app: 'claude-code' | 'pi'; session: string } | { app: 'codex'; thread: string; rung?: RingOutcome } }[];

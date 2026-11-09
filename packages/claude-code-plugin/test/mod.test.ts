@@ -287,7 +287,7 @@ test('B33.2 B32.12 The mod holds the command\'s own wait and reads only its code
 
   const h = standIn();
   h.write(waiting(A), record(A, [{ decision: 'd_2x8w', wake: mine() }]));
-  await started(h);
+  const mod = await started(h);
   const waits = () => h.children.filter(c => c.argv[4] === 'd_2x8w').length;
   h.running()[0]?.exit(reply.pending());
   await h.advance(0);
@@ -315,6 +315,27 @@ test('B33.2 B32.12 The mod holds the command\'s own wait and reads only its code
   h.running()[0]?.exit(reply.refused(text), 2);
   await h.advance(0);
   assert.deepEqual(h.turns, [`AgentPager: about decision d_2x8w (agent ${A}), the agentpager command replied:\n\n${text}`]);
+  // A refusal isn't an answer: handed over once while this Claude Code runs, never recorded as handed over or picked
+  // up, so an answer that reads later still comes, after a restart, and until then the owner is still warned.
+  await h.advance(TICK_MS * 5);
+  assert.deepEqual([h.turns.length, h.running().length, h.pickups.length, h.dirs.has(claim(A, 'd_2x8w'))], [1, 0, 0, false]);
+  mod.sessionEnded('prompt_input_exit');
+  const back = await started(h);
+  h.running()[0]?.exit(reply.answered(ANSWER));
+  await h.advance(0);
+  assert.deepEqual([h.turns.length, h.pickups.length, h.dirs.has(claim(A, 'd_2x8w'))], [2, 1, true]);
+  back.sessionEnded('prompt_input_exit');
+});
+
+test('B33.2 A record that didn\'t read is read again at the next look, so its decisions are still held', async () => {
+  const h = standIn();
+  h.write(waiting(A), record(A, [{ decision: 'd_2x8w', wake: mine() }]));
+  h.failing.add(waiting(A));
+  await started(h);
+  assert.deepEqual(h.running(), []);
+  h.failing.clear();
+  await h.advance(TICK_MS);
+  assert.deepEqual(h.running().map(c => c.argv), [waitFor(A, 'd_2x8w')]);
 });
 
 test('B33.2 When the session ends, every wait the mod holds stops, and it looks no more', async () => {

@@ -21,7 +21,11 @@
 //   restart of Claude Code, or a later one on the same session, finds. It goes when its decision leaves the record
 //   (acknowledged or closed unanswered). A turn Claude Code didn't take is offered again after the person's next turn,
 //   or a minute later. Two Claude Codes running one session at the same moment would each hand it over to their own
-//   conversation (not tested).
+//   conversation (not tested). A refusal in place of an answer (an answer that can't be read, say) is handed over once
+//   while Claude Code runs, and is neither recorded as handed over nor picked up.
+// - The turn carries the answer, as anything the agent reads does: Claude Code keeps it in the session's transcript,
+//   and, run with --debug, logs a plugin prompt's first words in its debug log. The mod's own debug lines hold ids and
+//   states only.
 // - It stops every wait it holds when the session ends, and a held wait ends by itself within 50 s if Claude Code is
 //   killed, so nothing is left running.
 
@@ -139,7 +143,7 @@ export const turnText = (agent: string, decision: string, o: { answered: boolean
 type Hold = {
   key: string; agent: string; decision: string; session: string;
   // holding: its wait runs; ready: the reply waits for Claude to be idle; handing: its turn is being submitted.
-  state: 'holding' | 'ready' | 'handing'; turn?: string;
+  state: 'holding' | 'ready' | 'handing'; turn?: string; answered?: boolean;
   stopped: boolean; child?: Spawned; wake?: () => void;
 };
 
@@ -148,8 +152,9 @@ export class Mod {
   private readonly holds = new Map<string, Hold>();
   // A decision whose wait found no such agent here isn't held again before this.
   private readonly resting = new Map<string, number>();
-  // Handed over by this process, so never held again here, even where no claim could be made.
-  private readonly handed = new Set<string>();
+  // Handed over by this process, so never held again here, even where no claim could be made; and of those, the
+  // answers, which are picked up.
+  private readonly handed = new Set<string>(); private readonly answers = new Set<string>();
   // Pickups: being tried now, done, and when the next try may be made.
   private readonly picking = new Set<string>(); private readonly picked = new Set<string>();
   private readonly pickupAt = new Map<string, number>();
@@ -218,13 +223,14 @@ export class Mod {
     // A decision no longer this session's, or one a wait of the agent's own has picked up (it followed today's
     // background-wait words, say), is the agent's already: its hold stops, ready or not.
     for (const h of [...this.holds.values()]) if (h.state !== 'handing' && (!mine.has(h.key) || mine.get(h.key)?.pickedUp)) this.drop(h.key);
-    if (records) for (const key of [...this.handed, ...this.picked, ...this.pickupAt.keys()]) if (!mine.has(key)) { this.handed.delete(key); this.picked.delete(key); this.pickupAt.delete(key); }
+    if (records) for (const key of [...this.handed, ...this.picked, ...this.pickupAt.keys()]) if (!mine.has(key)) { this.handed.delete(key); this.answers.delete(key); this.picked.delete(key); this.pickupAt.delete(key); }
     const taken = new Set(claimed);
     for (const [key, m] of mine) {
-      const handed = this.handed.has(key) || taken.has(`${m.agent}.${m.decision}`);
+      const answer = this.answers.has(key) || taken.has(`${m.agent}.${m.decision}`), handed = answer || this.handed.has(key);
       if (!handed && !m.pickedUp && !this.holds.has(key) && (this.resting.get(key) ?? 0) <= now) this.hold(key, m.agent, m.decision);
-      // Handed over, and the record still says no agent picked it up: the pickup that didn't land, here or before a restart.
-      if (handed && !m.pickedUp && !this.picked.has(key) && (this.pickupAt.get(key) ?? 0) <= now) void this.pickup(key, m.agent, m.decision);
+      // An answer handed over that the record still says no agent picked up: the pickup that didn't land, here or
+      // before a restart.
+      if (answer && !m.pickedUp && !this.picked.has(key) && (this.pickupAt.get(key) ?? 0) <= now) void this.pickup(key, m.agent, m.decision);
     }
     if (records) for (const name of claimed) {
       const [, agent = '', decision = ''] = CLAIM.exec(name) ?? [];
@@ -246,8 +252,10 @@ export class Mod {
       if (!agent || e.kind !== 'file') continue;
       const known = this.cache.get(agent);
       if (known && known.mtimeMs === e.mtimeMs && known.size === e.size) { out.set(agent, known.record); continue; }
-      const record = await this.host.read(`${this.waiting}/${e.name}`).then(t => decodeRecord(agent, t), () => null);
-      this.cache.set(agent, { mtimeMs: e.mtimeMs, size: e.size, record });
+      // A file that didn't read is read again at the next look; one that read is decoded once for what it holds.
+      const text = await this.host.read(`${this.waiting}/${e.name}`).catch(() => null);
+      const record = text === null ? null : decodeRecord(agent, text);
+      if (text !== null) this.cache.set(agent, { mtimeMs: e.mtimeMs, size: e.size, record });
       out.set(agent, record);
     }
     return out;
@@ -279,7 +287,7 @@ export class Mod {
       if (h.stopped) return;
       const o = outcomeOf(stdout);
       this.host.debug(`wait for ${h.agent} ${h.decision}: ${o.kind}`);
-      if (o.kind === 'deliver') { h.state = 'ready'; h.turn = turnText(h.agent, h.decision, o); void this.hand(); return; }
+      if (o.kind === 'deliver') { h.state = 'ready'; h.turn = turnText(h.agent, h.decision, o); h.answered = o.answered; void this.hand(); return; }
       if (o.kind === 'stop') { this.drop(h.key); this.resting.set(h.key, began + GONE_MS); return; }
       const rest = o.kind === 'again' ? AGAIN_MS - ((await this.host.now()) - began) : o.ms;
       if (rest > 0) await new Promise<void>(resolve => { const t = this.host.after(rest, resolve); h.wake = () => { t.cancel(); resolve(); }; });
@@ -310,9 +318,11 @@ export class Mod {
         const r = await this.host.submit(h.turn ?? '').catch((e: unknown) => ({ entered: false as const, why: String(e) }));
         if (r.entered) {
           this.holds.delete(h.key); this.handed.add(h.key);
-          await this.claim(h.agent, h.decision);
           this.host.debug(`handed ${h.agent} ${h.decision} over`);
-          void this.pickup(h.key, h.agent, h.decision);
+          // Only an answer is recorded as handed over and picked up. A refusal (an answer that can't be read, say) is
+          // handed over once while this process runs and leaves the service as it was, so an answer that comes or reads
+          // later still reaches the agent after a restart, and until then brings the owner's warning.
+          if (h.answered) { this.answers.add(h.key); await this.claim(h.agent, h.decision); void this.pickup(h.key, h.agent, h.decision); }
           return;
         }
         // Not taken: the turn waits for the person's next turn, or a minute.

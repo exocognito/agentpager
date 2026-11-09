@@ -9,7 +9,7 @@ export type StandIn = Host & {
   // Each `agentpager pickup` the mod ran, with the turns there were at the time, and what the next one replies.
   pickups: { argv: string[]; turns: number }[]; picking: string;
   files: Map<string, { text: string; mtimeMs: number }>; dirs: Set<string>;
-  // Folders whose listing fails, as a file system can.
+  // Folders whose listing fails, and files whose reading fails, as a file system's can.
   failing: Set<string>;
   // What the next submit comes to: entered (and a turn starts, when started is given), or not taken.
   taking: { entered: true } | { entered: false; why: string };
@@ -48,7 +48,7 @@ export function standIn(session = 'session-1'): StandIn {
       for (const d of h.dirs) if (d !== dir && parent(d) === dir) out.push({ name: d.slice(dir.length + 1), kind: 'dir', size: 0, mtimeMs: 0 });
       return out;
     },
-    read: async file => { const f = h.files.get(file); if (!f) throw new Error('ENOENT'); return f.text; },
+    read: async file => { const f = h.files.get(file); if (!f || h.failing.has(file)) throw new Error(f ? 'EIO' : 'ENOENT'); return f.text; },
     exists: async file => h.files.has(file) || h.dirs.has(file),
     run: async argv => {
       const [bin, ...args] = argv;

@@ -30,7 +30,7 @@
 17. @M6: A decision that closed unanswered, because its agent finished, offers nothing to pick or send, and says that who asked finished before it was answered. It shows with its project's answered decisions, and its brief stays readable.
 
 - The phone draws the brief that the agentpager command compiled from the agent's `card.yaml` (B27). It never reads `card.yaml` itself.
-- An agent picks an answer up when its wait collects it (B32).
+- An agent picks an answer up when its command confirms it has it, or when it acknowledges it (B32.12).
 - AgentPager carries the answer, and the agent carries out the option chosen. The proof shows that the agent received the exact answer and acknowledged it, not that it did what was chosen.
 
 ### B6 · @M1 · Ask for changes in your own words
@@ -74,7 +74,7 @@ Why: [Sending a decision requires confirmation](../PRODUCT.md#sending-a-decision
 4. @M2: If the pager is turned off inside the Undo window, the answer is refused, nothing is stored and the decision stays open. A pager deleted inside the window takes the answer with it.
 5. The phone's refreshes never reset a draft.
 6. The phone never says the agent received an answer until the agent itself acknowledges it.
-7. An agent reading an answer is not acknowledging it. The service notes the first read only to decide whether the answer was picked up (B5, B17), and the phone never shows that read as received.
+7. An agent reading an answer is not acknowledging it. The service notes when the agent's command confirms it has the answer only to decide whether the answer was picked up (B5, B17), and the phone never shows that as received.
 
 - An acknowledgement shows that the agent read the answer and said what it will do, not that it did the work or is still running.
 - A network capture shows what the app sent, not what a changed app could send. The service takes only a complete answer (I4).

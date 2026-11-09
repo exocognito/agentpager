@@ -1,6 +1,6 @@
 # M7 · The agent apps AgentPager supports
 
-> **Status:** planning · **Started:** 8 Nov 2026 · **Order:** after M6; INSTALL follows; its list anchors INSTALL and SITE · **Word:** CLIENTS
+> **Status:** building: #85 is on dev, and the wakes are in progress · **Started:** 8 Nov 2026 · **Order:** after M6; INSTALL follows; its list anchors INSTALL and SITE · **Word:** CLIENTS
 
 ## Objective
 
@@ -114,11 +114,18 @@ Sam approved these by typing "Lines yes" in the root's Claude Code session on 8 
 
 **Staying unchanged:** L12, a Desktop chat stops waiting after two hours, since Claude Desktop chats still wait in their turn; L13, cloud sessions are untested, since the lab didn't run a cloud session.
 
+**Reworded on 9 Nov, after #85.** #85 made an answer count as picked up only once the agent's command confirms it has it, or the agent acknowledges it. B32.12's word received then clashed with PRODUCT.md and I6.6, where received means the agent acknowledged, and three older lines still said a read picks an answer up, which #85 made untrue. In the root's Claude Code session on 9 Nov 2026, the root proposed five rewordings, and Sam typed "1a? show me all the five verbatim proposals to be sure". The root then showed each line as it stood on `main` and its proposed text, and Sam typed "lgtm", which accepted 1a. PR #NN makes them in place, each keeping its id; B32.12 and TERMS › Not picked up, above, are as approved on 8 Nov.
+- **B32.12** (2 Agents): `An answer counts as picked up only once the agent's command confirms it has it. A wait whose agent went away before then doesn't count, so the owner is still told it wasn't picked up (B5.13).`
+- **TERMS › Not picked up:** `An answer no agent has picked up 3 minutes after Send. An agent picks an answer up when its command confirms it has it, or when it acknowledges it. The owner is told once.`
+- **I6.7** (5 Answering): `An agent reading an answer is not acknowledging it. The service notes when the agent's command confirms it has the answer only to decide whether the answer was picked up (B5, B17), and the phone never shows that as received.`
+- **B5's note** (5 Answering): `An agent picks an answer up when its command confirms it has it, or when it acknowledges it (B32.12).`
+- **B32's note** (2 Agents): `If no agent picks an answer up 3 minutes after Send, the owner is told once, on the decision (B5) and by an alert (B17).`
+
 ## Adds · Changes · Retires
 
 The lines are in Approved lines, each with the pull request that brings it to its area.
 - **Adds:** B32.12, B33.4 and B33.5; the Claude Code plugin with its mod; the pi extension; Codex's wake in the command; the not-picked-up fix; a recorded wake test for each supported app. DEC-2026-11-08-clients, and DEC-2026-11-08-friends-after-cleanup for D2.
-- **Changes:** B33, retitled, with B33.1, B33.2 and its notes; B29.1, widened to the supported apps; TERMS › Not picked up; L11, narrowed to the apps off the list and retitled (2 Agents). B5.13 and B17.8 hold unchanged.
+- **Changes:** B33, retitled, with B33.1, B33.2 and its notes; B29.1, widened to the supported apps; TERMS › Not picked up; L11, narrowed to the apps off the list and retitled (2 Agents). B5.13 and B17.8 hold unchanged. Reworded after #85, keeping their meaning (Approved lines › Reworded on 9 Nov): B32.12, TERMS › Not picked up, I6.7, and the notes under B5 and B32 on picking an answer up.
 - **Retires:** nothing. L11 narrows instead of retiring. L12, a Desktop chat stops waiting after two hours, and L13, cloud sessions are untested, stay.
 
 ## Log
@@ -126,3 +133,4 @@ The lines are in Approved lines, each with the pull request that brings it to it
 - 5 Nov · queued: Sam added CLIENTS, to run after ENCRYPT.
 - 8 Nov · planning: M6 released, and CLIENTS started as M7, led by the root session `AgentPager Clients/Ship Design`, a fork of M6's root, which keeps only M6's follow-ups. Sam answered D1 and D2 in its Claude Code session. PR #82 moves this doc out of `next/`, records the answers, the root's other choices and what stays open until the wake lab reports, adds DEC-2026-11-08-clients and DEC-2026-11-08-friends-after-cleanup, adds the plan, `.agents/plans/2026-11-08-m7-clients.md`, and brings the root handoff up to date. `pnpm check` green (156 clauses, 33 tested), `pnpm test:all` 666 passed (560, 3, 8, Swift 17, 53 and 25).
 - 8 Nov · planning: the wake lab reported, and the root put M7's lines to Sam in its Claude Code session, where Sam typed "Lines yes". PR #84 turns Still open into Approved lines, each line word for word with the pull request that brings it to its area: B33 retitled, with B33.1 and B33.2 changed and B33.4 and B33.5 added; B29.1 widened; B32.12 added; TERMS › Not picked up changed; L11 narrowed and retitled, so nothing retires, and L12 and L13 stay. No area file or TERMS changes yet. `pnpm check` green (156 clauses, 33 tested), `pnpm test:all` 666 passed (560, 3, 8, Swift 17, 53 and 25).
+- 9 Nov · building: #85, the not-picked-up fix, is on dev, which runs 0fecc85, its merge, by its `X-AgentPager-Build` header; the wakes are in progress. Sam approved five rewordings that follow it, in the root's Claude Code session (Approved lines › Reworded on 9 Nov). PR #NN makes them: B32.12 no longer says received, and TERMS › Not picked up, I6.7 and the notes under B5 and B32 no longer say a read picks an answer up. No code changes. `pnpm check` green (CHECK), `pnpm test:all` TESTS.

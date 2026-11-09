@@ -123,4 +123,4 @@ Added to earlier entries:
 
 Added to earlier entries:
 
-- **B32.12**, in [B32 · Wait for the answer, then acknowledge it](../areas/2-agents.md#b32--m3--wait-for-the-answer-then-acknowledge-it): An answer counts as picked up only once the agent's command has received it. A wait whose agent went away before then doesn't count, so the owner is still told it wasn't picked up (B5.13).
+- **B32.12**, in [B32 · Wait for the answer, then acknowledge it](../areas/2-agents.md#b32--m3--wait-for-the-answer-then-acknowledge-it): An answer counts as picked up only once the agent's command confirms it has it. A wait whose agent went away before then doesn't count, so the owner is still told it wasn't picked up (B5.13).

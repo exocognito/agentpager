@@ -38,10 +38,10 @@
 <!-- B32.9 dropped in Sam's review, 6 Nov 2026; ids are never reused -->
 10. A reply the command can't get or can't read is never taken as success. When nothing left the machine, the agent is told so. When the request may have reached the owner, the agent is told to check its status before trying again.
 11. @M6: A wait for a decision that closed unanswered ends, telling the agent so. A wait with no end stops too.
-12. @M7: An answer counts as picked up only once the agent's command has received it. A wait whose agent went away before then doesn't count, so the owner is still told it wasn't picked up (B5.13).
+12. @M7: An answer counts as picked up only once the agent's command confirms it has it. A wait whose agent went away before then doesn't count, so the owner is still told it wasn't picked up (B5.13).
 
 - An acknowledgement is the agent's own words, never AgentPager's. Collecting an answer is not acknowledging it (I6).
-- If no agent collects an answer 3 minutes after Send, the owner is told once, on the decision (B5) and by an alert (B17).
+- If no agent picks an answer up 3 minutes after Send, the owner is told once, on the decision (B5) and by an alert (B17).
 - While the pager is off, waiting and acknowledging are refused like every other call, and nothing is queued (I17).
 
 ### B33 · @M3 · Each agent app is told how it wakes

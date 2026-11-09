@@ -24,8 +24,8 @@ for (const v of MARKS) delete process.env[v];
 process.env.AGENTPAGER_HOME = home; process.env.CODEX_HOME = codexHome; process.env.FAKE_CODEX_LOG = calls;
 
 // The stand-ins, by name: codex-ok queues, codex-slow takes 5 s, codex-gone doesn't know the thread, codex-old is
-// 0.148.0, from before `codex queue`, codex-flaky fails on its own twice for a thread and then queues, and codex-broken
-// always fails on its own. Each records the arguments of every call but --version, and what it was given of the asking
+// 0.148.0, from before `codex queue`, codex-flaky fails on its own twice for a thread and then queues, codex-broken
+// always fails on its own, and codex-killed is ended by a signal once it has the call, as if after queueing it. Each records the arguments of every call but --version, and what it was given of the asking
 // turn's environment.
 const fake = (mode: string) => {
   const file = path.join(bin, `codex-${mode}`);
@@ -36,13 +36,14 @@ fs.appendFileSync(process.env.FAKE_CODEX_LOG, JSON.stringify({ at: Date.now(), m
 const before = fs.readFileSync(process.env.FAKE_CODEX_LOG, 'utf8').split('\\n').filter(l => l.includes(JSON.stringify(args[1]))).length - 1;
 if (mode === 'slow') setTimeout(() => process.exit(0), 5000);
 else if (mode === 'gone') { console.error('Error: no rollout found for thread id ' + args[1].slice(9)); process.exit(1); }
+else if (mode === 'killed') process.kill(process.pid, 'SIGTERM');
 else if (mode === 'broken' || (mode === 'flaky' && before < 2)) { console.error('Error: failed to connect to the app server'); process.exit(1); }
 else console.log('Queued message 01a1bc92-4382-7a62-8528-471b87561f05 for thread ' + args[1].slice(9) + '.');
 `);
   chmodSync(file, 0o755);
   return file;
 };
-const codex = { ok: fake('ok'), slow: fake('slow'), gone: fake('gone'), old: fake('old'), flaky: fake('flaky'), broken: fake('broken') };
+const codex = { ok: fake('ok'), slow: fake('slow'), gone: fake('gone'), old: fake('old'), flaky: fake('flaky'), broken: fake('broken'), killed: fake('killed') };
 process.env.AGENTPAGER_CODEX = codex.ok;
 type Call = { at: number; mode: string; args: string[]; thread: string | null; number: string | null };
 const rang = (): Call[] => existsSync(calls) ? readFileSync(calls, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l)) : [];
@@ -222,7 +223,7 @@ test('B33.4 B33.1 B32.12 A Codex thread that asks over MCP is told a note will c
   } finally { if (!closed) await client.close(); }
 });
 
-test('B33.4 A thread is rung once, recorded before codex queue runs: never again after a timed-out call, a call cut off, or a second watcher, and never by a watcher that started too late; a pager turned off and on again, a lock a dead process left, or a call that fails on its own, still rings', { timeout: 120_000 }, async () => {
+test('B33.4 A thread is rung once, recorded before codex queue runs: never again after a timed-out call, a call cut off, or a second watcher, and never by a watcher that started too late; a pager turned off and on again, a lock a dead process left, or a call that fails on its own, still rings, and a call ended by a signal is never made again', { timeout: 120_000 }, async () => {
   inShell({});
   const p = await f.makePager(), id = field(await op.connect({ number: p.number, app: 'Codex', project: 'wake' }), 'agent');
   // Decisions asked from a shell no app marks, each then given a Codex thread's wake, as an ask from that thread records it.
@@ -279,6 +280,16 @@ test('B33.4 A thread is rung once, recorded before codex queue runs: never again
   assert.equal(ringsFor(broken.thread).length, 4, 'one call and three more, then no more');
   assert.equal((await op.watch(id, broken.d)).text, 'Nothing to watch: it has rung, this machine has the answer, or another watcher runs.');
   assert.equal(ringsFor(broken.thread).length, 4);
+  // A call ended by a signal may have queued first: final, like a timeout, and never made again.
+  const killed = await asked('Codex killed mid-call?', v7());
+  process.env.AGENTPAGER_CODEX = codex.killed;
+  const killedWatch = op.watch(id, killed.d, { ringAgainMs: 50 });
+  await until(async () => watcherOf(id, killed.d), pid => pid === process.pid);
+  await answer(killed);
+  assert.equal((await killedWatch).text, `Rang thread ${killed.thread}: timed-out.`);
+  assert.equal(ringsFor(killed.thread).length, 1, 'one call, no retry');
+  assert.equal((await op.watch(id, killed.d)).text, 'Nothing to watch: it has rung, this machine has the answer, or another watcher runs.');
+  assert.equal(ringsFor(killed.thread).length, 1);
   process.env.AGENTPAGER_CODEX = codex.ok;
 
   // Two watchers started for one decision, as two processes: one watches, the other ends at once; one ring.

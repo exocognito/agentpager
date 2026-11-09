@@ -133,8 +133,9 @@ function ringEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
 export const note = (agent: string, short: string, via: 'mcp' | 'shell') => `AgentPager: your owner answered decision ${short}. ${via === 'mcp'
   ? `Call the agentpager wait tool (agent ${agent}, decision ${short})` : `Run agentpager wait --agent ${agent} ${short}`} to read the answer, then acknowledge it.`;
 
-// One `codex queue`. 'queued' when it exits 0; 'timed-out' when it ran past its time, when it may or may not have
-// queued; 'unknown-thread' when Codex has no such thread (exit 1, "no rollout found" in 0.163.0); 'failed' otherwise.
+// One `codex queue`. 'queued' when it exits 0; 'timed-out' when it ran past its time or was ended by a signal from
+// anywhere, so it may or may not have queued; 'unknown-thread' when Codex has no such thread (exit 1, "no rollout found"
+// in 0.163.0); 'failed' when it exited with an error of its own, having queued nothing. Only 'failed' is tried again.
 export type Rang = 'queued' | 'timed-out' | 'unknown-thread' | 'failed';
 export const QUEUE_TIMEOUT_MS = 30_000;
 export function ring(cli: string, thread: string, text: string, timeoutMs = QUEUE_TIMEOUT_MS, env: NodeJS.ProcessEnv = process.env): Promise<Rang> {
@@ -143,7 +144,7 @@ export function ring(cli: string, thread: string, text: string, timeoutMs = QUEU
     // `--name=value`, so neither value is ever read as a flag.
     execFile(cli, ['queue', `--thread=${thread}`, `--message=${text}`], { timeout: timeoutMs, killSignal: 'SIGKILL', env: ringEnv(env), maxBuffer: 64 * 1024 }, (e, stdout, stderr) => {
       if (!e) return done('queued');
-      if ('killed' in e && e.killed) return done('timed-out');
+      if (('killed' in e && e.killed) || e.signal) return done('timed-out');
       done(e.code === 1 && /no rollout found|no active session|thread not found/i.test(`${stdout}\n${stderr}`) ? 'unknown-thread' : 'failed');
     });
   });

@@ -490,13 +490,16 @@ export async function finish(agent: string): Promise<Result> {
 // outlives that call and Codex itself, which stops its MCP servers when it quits. It waits as a wait does, but never
 // receives the answer: it doesn't open it, and never tells the service it has it, so an answer only it saw still
 // brings the owner's warning that no agent picked it up (B32.12). The ring is recorded in the agent's file before
-// `codex queue` runs, so the thread is never rung twice, whatever happens to the call or this process. It stops on the
+// `codex queue` runs, so the thread is never rung twice, whatever happens to the call or this process. A call that ends
+// with an error of its own queued nothing, so it is made again, up to three times 30 s apart, while the ring stays
+// recorded as ringing so nothing else starts one; a call that ran out of time may have queued, and Codex not knowing the
+// thread won't change, so both are final. It stops on the
 // answer, rung or not; when this machine already has the answer; when the decision closes, the pager is deleted, or the
 // agent is gone; when the server has been unreachable for a day; 30 days after it started; and at once when another
 // watcher runs for the decision. While the pager is off it looks again a minute apart, since its decisions open again
 // when it is turned on, by the owner or as auto-off ends, and an answer then must still ring. It prints nothing anyone
 // reads.
-const UNREACHABLE_MS = 24 * 3_600_000, WATCH_MS = 30 * 24 * 3_600_000, OFF_RETRY_MS = 60_000;
+const UNREACHABLE_MS = 24 * 3_600_000, WATCH_MS = 30 * 24 * 3_600_000, OFF_RETRY_MS = 60_000, RING_AGAIN = 3, RING_AGAIN_MS = 30_000;
 // This program, run again as the watcher: the compiled binary itself (Bun's, whose sources are under /$bunfs/), or Node
 // with this source.
 const program = import.meta.url.startsWith('file:///$bunfs/') ? [process.execPath] : [process.execPath, '--experimental-strip-types', fileURLToPath(new URL('./main.ts', import.meta.url))];
@@ -545,8 +548,8 @@ function persist(id: string, change: (x: AgentFile) => void) {
     catch (e) { if (!(e instanceof Error && 'code' in e && e.code === 'EBUSY') || tries >= 6) throw e; }
   }
 }
-// queueTimeoutMs, retryMs, offRetryMs and forMs: a test shortens them.
-export async function watch(agent: string, ref: string, opts: { queueTimeoutMs?: number; retryMs?: number; offRetryMs?: number; forMs?: number } = {}): Promise<Result> {
+// queueTimeoutMs, retryMs, offRetryMs, ringAgainMs and forMs: a test shortens them.
+export async function watch(agent: string, ref: string, opts: { queueTimeoutMs?: number; retryMs?: number; offRetryMs?: number; ringAgainMs?: number; forMs?: number } = {}): Promise<Result> {
   const a = agentOf(agent);
   if ('code' in a) return a;
   const d = a.decisions[ref] ? { short: ref, ...a.decisions[ref] } : null;
@@ -602,7 +605,15 @@ export async function watch(agent: string, ref: string, opts: { queueTimeoutMs?:
       claimed = claiming;
     } catch { /* not recorded, so not rung */ }
     if (!cli || !claimed) return done(cli ? 'Not rung: this machine has the answer, or it rang already.' : 'Not rung: no Codex CLI here can ring it.');
-    const outcome: RingOutcome = await ring(cli, thread, note(a.id, short, via), opts.queueTimeoutMs ?? QUEUE_TIMEOUT_MS);
+    const text = note(a.id, short, via), ringOnce = () => ring(cli, thread, text, opts.queueTimeoutMs ?? QUEUE_TIMEOUT_MS);
+    let outcome: RingOutcome = await ringOnce();
+    // Tried again only while the agent still lacks the answer here: one that read it meanwhile needs no note.
+    const lacks = () => { try { const e = loadAgent(a.id)?.decisions[short]; return Boolean(e && !e.answered && !e.acknowledged); } catch { return false; } };
+    for (let tries = 1; outcome === 'failed' && tries <= RING_AGAIN; tries++) {
+      await new Promise(res => setTimeout(res, opts.ringAgainMs ?? RING_AGAIN_MS));
+      if (!lacks()) break;
+      outcome = await ringOnce();
+    }
     try { persist(a.id, x => { const w = x.decisions[short]?.wake; if (w?.app === 'codex' && w.ring) w.ring = { at: w.ring.at, outcome }; }); } catch { /* left as ringing: never rung again */ }
     return done(`Rang thread ${thread}: ${outcome}.`);
   } finally {

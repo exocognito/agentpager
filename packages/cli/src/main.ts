@@ -22,7 +22,8 @@ const HELP = `agentpager: send your owner decisions on their phone, and get thei
   agentpager agents | share --agent <id> | setup [--print] | mcp | version | update
 
 Every command takes --json. Exit codes: 0 done, 2 refused, 4 pager off, 5 no usable reply from the server (unreachable, no reply, or a reply not understood), 6 unknown agent id.
-The number can come from AGENTPAGER_PAGER; AGENTPAGER_SERVER and AGENTPAGER_HOME move the server and ~/.agentpager.`;
+The number can come from AGENTPAGER_PAGER; AGENTPAGER_SERVER and AGENTPAGER_HOME move the server and ~/.agentpager.
+AGENTPAGER_CODEX names the Codex CLI that tells a Codex thread its answer is in, in place of the one on PATH or the ChatGPT app's.`;
 
 function parse(argv: string[]) {
   const flags: { [k: string]: string | true } = {}, rest: string[] = [];
@@ -60,6 +61,8 @@ async function run(argv: string[]): Promise<op.Result> {
     case 'review': { const c = card(rest[0]); return !c ? { code: 2, text: 'Say which card: agentpager review card.yaml' } : isResult(c) ? c : op.review(c); }
     case 'ask': { const c = card(rest[0]); return needsAgent(() => !c ? { code: 2, text: 'Say which card: agentpager ask --agent <id> card.yaml' } : isResult(c) ? c : op.ask(agent, c)); }
     case 'wait': return needsAgent(() => op.wait(agent, rest[0] ?? '', { forever: flags.forever === true, seconds: f('seconds') ? Number(f('seconds')) : undefined }));
+    // Codex's doorbell, which the command starts itself (commands.ts › watch); not for agents, so not in HELP.
+    case 'watch': return needsAgent(() => op.watch(agent, rest[0] ?? ''));
     case 'ack': return needsAgent(() => op.ack(agent, rest[0] ?? '', rest.slice(1).join(' ')));
     case 'status': return needsAgent(() => op.status(agent));
     case 'history': return needsAgent(() => op.history(agent, f('limit') ? Number(f('limit')) : undefined));

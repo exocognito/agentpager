@@ -45,7 +45,7 @@ export const TOOLS = [
   { name: 'rules', description: 'The card contract: how to write a decision your owner can answer on a phone. Read it before your first `ask`.', inputSchema: schema({ agent }, []) },
   { name: 'review', description: 'Returns your card with what a good card looks like. Give the result to a subagent to grade each point ok, good to fix or must fix; fix the must-fixes, use your judgement on the rest, then `ask`. One round.', inputSchema: schema({ card }, ['card']) },
   { name: 'ask', description: `Ask your owner one decision. Review it once first (see \`review\`). Only broken cards are refused here, with one line per problem. Then:\n\n${CONTRACT}`, inputSchema: schema({ agent, card }, ['agent', 'card']) },
-  { name: 'wait', description: 'Wait for the answer. Replies pending, or the option chosen, or your owner\'s note. Keep calling until answered; the answer waits for you.', inputSchema: schema({ agent, decision, seconds: { type: 'integer', minimum: 1, maximum: 50, description: 'How long to hold, at most 50.' } }, ['agent', 'decision']) },
+  { name: 'wait', description: 'Wait for the answer. Replies pending, or the option chosen, or your owner\'s note. Keep calling until answered, unless ask said a note will come when it is; the answer waits for you.', inputSchema: schema({ agent, decision, seconds: { type: 'integer', minimum: 1, maximum: 50, description: 'How long to hold, at most 50.' } }, ['agent', 'decision']) },
   { name: 'ack', description: 'Tell your owner you read their answer and what you\'ll do. They see it with a green tick. Only the first acknowledgement counts.', inputSchema: schema({ agent, decision, nextSteps: text('What happens next, at most 280 characters.') }, ['agent', 'decision', 'nextSteps']) },
   { name: 'status', description: 'The pager\'s state and this agent\'s open decisions.', inputSchema: schema({ agent }, ['agent']) },
   { name: 'history', description: 'Decisions already asked on this pager from this machine, with their answers. Check here if something may already be decided.', inputSchema: schema({ agent, limit: { type: 'integer', minimum: 1, maximum: 200 } }, ['agent']) },
@@ -54,14 +54,15 @@ export const TOOLS = [
 
 const str = (v: unknown) => typeof v === 'string' ? v : undefined;
 const num = (v: unknown) => typeof v === 'number' ? v : undefined;
-export async function runTool(name: string, args: { [key: string]: unknown }, client?: string): Promise<op.Result> {
-  const a = str(args.agent) ?? '', d = str(args.decision) ?? '';
+// client: the MCP client's name; meta: the call's `_meta`, where Codex names its thread (codex.ts).
+export async function runTool(name: string, args: { [key: string]: unknown }, client?: string, meta?: unknown): Promise<op.Result> {
+  const a = str(args.agent) ?? '', d = str(args.decision) ?? '', via = { client, meta };
   switch (name) {
-    case 'connect': return op.connect({ number: str(args.number), app: str(args.app), project: str(args.project), server: str(args.server), mcpClient: client });
+    case 'connect': return op.connect({ number: str(args.number), app: str(args.app), project: str(args.project), server: str(args.server), mcpClient: client, meta });
     case 'rules': return op.rules(str(args.agent));
     case 'review': return op.review({ object: args.card });
-    case 'ask': return op.ask(a, { object: args.card }, client);
-    case 'wait': return op.wait(a, d, { seconds: num(args.seconds), client });
+    case 'ask': return op.ask(a, { object: args.card }, via);
+    case 'wait': return op.wait(a, d, { seconds: num(args.seconds), via });
     case 'ack': return op.ack(a, d, str(args.nextSteps) ?? '');
     case 'status': return op.status(a);
     case 'history': return op.history(a, num(args.limit));
@@ -76,7 +77,7 @@ export async function serve() {
   server.setRequestHandler(CallToolRequestSchema, async request => {
     // Any failure is a one-line refusal, never a protocol error.
     let result: op.Result;
-    try { result = await runTool(request.params.name, request.params.arguments ?? {}, server.getClientVersion()?.name); }
+    try { result = await runTool(request.params.name, request.params.arguments ?? {}, server.getClientVersion()?.name, request.params._meta); }
     catch (e) { result = { code: 2, text: `Refused: ${e instanceof Error ? e.message : 'the tool failed'}` }; }
     return { ...(result.code === 0 ? {} : { isError: true }), content: [{ type: 'text', text: result.text }] };
   });

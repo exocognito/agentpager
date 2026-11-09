@@ -10,8 +10,26 @@ import { Token } from '../../contract/exchange.ts';
 //   agents/<id>.json       one file per agent, mode 600: its server key, its own private key, its pager's public key
 //                          as checked at connect, and its reminder clock
 //   history/<pager>.jsonl  every decision asked from this machine on that pager, with its answer
+//   waiting/<id>.json      mode 600: the record of what's waiting, each of the agent's decisions with its ids and
+//                          where it stands, for the adapters that wake an agent (below)
 export const DEFAULT_SERVER = 'https://agentpager.me';
 export const home = () => process.env.AGENTPAGER_HOME || path.join(homedir(), '.agentpager');
+
+// Who wakes the agent for a decision, when something does (B33, blueprint/areas/2-agents.md): an adapter, under the
+// session AGENTPAGER_WAKE named when it was asked (detect.ts), or Codex's thread, which the command's watcher rings
+// (codex.ts). For Codex, via says how the thread asked, MCP or its shell, for the note's words; watcher is the process
+// id of the watcher waiting to ring it, while one runs; ring is set before `codex queue` runs, so the thread is never
+// rung twice, and says how the call went ('ringing' until it ends, or for good if the watcher stopped mid-call).
+const RING = ['ringing', 'queued', 'timed-out', 'unknown-thread', 'failed', 'no-cli'] as const;
+export type RingOutcome = typeof RING[number];
+const AdapterWake = Schema.Struct({ app: Schema.Literal('claude-code', 'pi'), session: Schema.String });
+const CodexWake = Schema.mutable(Schema.Struct({
+  app: Schema.Literal('codex'), thread: Schema.String, via: Schema.Literal('mcp', 'shell'), watcher: Schema.optional(Schema.Number),
+  ring: Schema.optional(Schema.Struct({ at: Schema.String, outcome: Schema.Literal(...RING) })),
+}));
+export type CodexWake = typeof CodexWake.Type;
+const Wake = Schema.Union(AdapterWake, CodexWake);
+export type DecisionWake = typeof Wake.Type;
 
 // A key as the agent file keeps it: 32 bytes, base64url.
 const Key = Schema.String.pipe(Schema.pattern(/^[A-Za-z0-9_-]{43}$/));
@@ -24,12 +42,12 @@ const AgentFile = Schema.mutable(Schema.Struct({
   app: Schema.String, project: Schema.String, machine: Schema.optional(Schema.String), createdAt: Schema.String,
   rulesShownAt: Schema.NullOr(Schema.String), cardsSinceRules: Schema.Number,
   // Short decision ids for the agent (d_2x8w): the server's id, the question and its option labels, and how far it got.
-  // askedAt came later, and closed (it closed unanswered, as the service said) later still, so a file from before
-  // either still loads; a command from before closed keeps it when it writes the file.
+  // askedAt came later, closed (it closed unanswered, as the service said) later still, and wake (Wake, above) in M7, so
+  // a file from before any of them still loads; a command from before one keeps it when it writes the file.
   decisions: Schema.mutable(Schema.Record({ key: Schema.String, value: Schema.mutable(Schema.Struct({
     id: Schema.String, title: Schema.String, options: Schema.mutable(Schema.Array(Schema.String)),
     askedAt: Schema.optional(Schema.String), answered: Schema.optional(Schema.Boolean), acknowledged: Schema.optional(Schema.Boolean),
-    closed: Schema.optional(Schema.Boolean),
+    closed: Schema.optional(Schema.Boolean), wake: Schema.optional(Wake),
   })) })),
   // Asks no reply has settled yet, by their card's content: the request id chosen for each, so the same card asked
   // again after a lost reply names the same decision; the run that last took it (run), which alone may change it; and,
@@ -58,12 +76,52 @@ export function shortId(prefix: string, taken: (id: string) => boolean): string 
 
 const agentsDir = () => path.join(home(), 'agents');
 const agentPath = (id: string) => path.join(agentsDir(), `${id}.json`);
+// Each file is written beside itself and renamed over itself, so a reader never sees part of one. Both are written
+// before either is renamed, so a write that fails (a full disk, a folder it can't write) changes neither, and the
+// record never names a decision the agent's file doesn't, or the other way round.
+function staged(file: string, text: string) {
+  mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
+  const temp = `${file}.${process.pid}.tmp`;
+  try { writeFileSync(temp, text, { mode: 0o600 }); chmodSync(temp, 0o600); }
+  catch (e) { rmSync(temp, { force: true }); throw e; }
+  return { temp, file };
+}
 export function saveAgent(a: AgentFile) {
-  mkdirSync(agentsDir(), { recursive: true, mode: 0o700 });
-  const file = agentPath(a.id), temp = `${file}.${process.pid}.tmp`;
-  writeFileSync(temp, JSON.stringify(a, null, 2) + '\n', { mode: 0o600 });
-  chmodSync(temp, 0o600);
-  renameSync(temp, file);
+  const agent = staged(agentPath(a.id), JSON.stringify(a, null, 2) + '\n');
+  let record: { temp: string; file: string };
+  try { record = staged(waitingPath(a.id), JSON.stringify(waitingOf(a), null, 2) + '\n'); }
+  catch (e) { rmSync(agent.temp, { force: true }); throw e; }
+  renameSync(agent.temp, agent.file);
+  renameSync(record.temp, record.file);
+}
+
+// The record of what's waiting, waiting/<agent id>.json: the contract with the adapters that wake an agent, the Claude
+// Code plugin's mod and the pi extension, which read it instead of the words of the command's replies, and the
+// command's own Codex watcher. It is written with the agent's file, every time, so it says what that file says, and
+// is private to the machine's user like it (mode 600, in a folder of mode 700). It holds ids and where each decision
+// stands: never a key, a pager number, a card's words or an answer.
+//   { "version": 1, "agent": "ap-7f3k", "decisions": [
+//     { "decision": "d_2x8w", "askedAt": "2026-11-08T19:11:02.461Z", "state": "waiting",
+//       "wake": { "app": "claude-code", "session": "<the session AGENTPAGER_WAKE named>" } },
+//     { "decision": "d_9k2m", "askedAt": "…", "state": "answered", "wake": { "app": "codex", "thread": "<thread id>", "rung": "queued" } },
+//     { "decision": "d_4hq7", "askedAt": "…", "state": "waiting" } ] }
+// A decision asked from this machine is listed until this machine acknowledges it or learns it closed unanswered:
+// "waiting" until a wait here has its answer, then "answered". "wake" says who wakes the agent for it, when something
+// does: an adapter's session, as AGENTPAGER_WAKE named it when the agent asked (detect.ts), or the Codex thread that
+// asked, with how its ring went once it has rung (RingOutcome). An adapter acts only on the decisions whose wake names
+// its own app and session, for example by holding `agentpager wait --agent <agent> <decision> --forever` and handing
+// its reply to the agent as a new turn; it ignores the rest, and a decision that leaves the list is done with.
+export type Waiting = {
+  version: 1; agent: string;
+  decisions: { decision: string; askedAt?: string; state: 'waiting' | 'answered'; wake?: { app: 'claude-code' | 'pi'; session: string } | { app: 'codex'; thread: string; rung?: RingOutcome } }[];
+};
+export const waitingPath = (id: string) => path.join(home(), 'waiting', `${id}.json`);
+export function waitingOf(a: AgentFile): Waiting {
+  const decisions = Object.entries(a.decisions).filter(([, d]) => !d.acknowledged && !d.closed).map(([decision, d]) => {
+    const w = d.wake, wake = !w ? undefined : w.app === 'codex' ? { app: w.app, thread: w.thread, ...(w.ring ? { rung: w.ring.outcome } : {}) } : { app: w.app, session: w.session };
+    return { decision, ...(d.askedAt ? { askedAt: d.askedAt } : {}), state: d.answered ? 'answered' as const : 'waiting' as const, ...(wake ? { wake } : {}) };
+  });
+  return { version: 1, agent: a.id, decisions };
 }
 // Several agents (a coordinator and its helpers, each its own process) may share one id: each change takes the
 // agent's lock, re-reads the file and is applied to what is there now, so one's write never drops another's

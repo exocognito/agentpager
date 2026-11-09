@@ -3,7 +3,7 @@
 > **Definition:** The agent's side of an exchange, through the agentpager command: connecting with a pager number as a new agent, waiting for the answer in its own app, acknowledging it, and the history kept on its machine. Writing and checking a card belongs to 3 Cards, and installing and setting up the command to 7 Getting started.
 > **Serves:** [Unblock my agent from my phone](../PRODUCT.md#unblock-my-agent-from-my-phone) · [Reach the agents owners actually use](../PRODUCT.md#reach-the-agents-owners-actually-use) · [An acknowledgement always comes from the agent](../PRODUCT.md#an-acknowledgement-always-comes-from-the-agent) · [Pinned design decisions](../PRODUCT.md#pinned-design-decisions)
 > **Relies on:** the agent apps owners already use, such as Claude Code, Claude Desktop, Codex, Cursor and pi, which the owner installs and signs in to. Each runs the command from its shell, or starts it as a local MCP server that setup adds without an agent's key or a pager number (B29.6), and says who it is. How an answer reaches a waiting agent depends on the app (B33).
-> **Code:** `packages/cli/src/commands.ts`, `detect.ts`, `mcp.ts`, `store.ts`, `client.ts`, `main.ts`; `packages/app/src/pager.ts` (connecting, and every call an agent makes, in its pager's store), `wake.ts` (the waits it holds, each woken by what it waits for), `agent.ts` (each agent's way to its pager's store), `worker.ts` (which client each call names)
+> **Code:** `packages/cli/src/commands.ts`, `detect.ts`, `codex.ts`, `mcp.ts`, `store.ts`, `client.ts`, `main.ts`; `packages/app/src/pager.ts` (connecting, and every call an agent makes, in its pager's store), `wake.ts` (the waits it holds, each woken by what it waits for), `agent.ts` (each agent's way to its pager's store), `worker.ts` (which client each call names)
 > **Screens:** [journeys/pager](../generated/screens/journeys/pager/README.md) · [phone/answered.png](../generated/screens/phone/answered.png) · [phone/notpickedup.png](../generated/screens/phone/notpickedup.png)
 > **Walked by:** J3, J4, J5
 
@@ -46,12 +46,14 @@
 
 ### B33 · @M3 · Each agent app is told how it wakes
 
-1. The command words its waiting for an agent's app only when it identifies the app for certain. Every other agent, Codex, Cursor and pi among them, is told to wait with the command.
+1. The command words its waiting for an agent's app only when it identifies the app for certain. An agent in an app not named below is told, when it connects, that its owner may have to nudge it to read an answer.
 2. Claude Code is told to run the wait with no end as a background command, by the command's full path, then carry on or end its turn: the command ends when the owner answers, and Claude Code wakes the agent with the answer. A pending wait says the same.
 3. A Claude Desktop chat is told not to end its turn until the answer comes, because the answer reaches it only while it works. It checks briefly between steps of other work, holds the wait again and again once its work runs out, and when the link to the computer drops, pauses and tries again. Two hours after it asked, it is told to stop waiting and tell its owner, and the answer stays on the service for its next wait.
+4. @M7: Codex, in a terminal or the ChatGPT app, gets a note that its answer is in, in the thread that asked: within a second when the thread is idle, as its next turn when busy, and when it is resumed if Codex was closed. The note never holds the answer. A `codex exec` run isn't woken.
 
 - Verified on 30 Oct 2026, in the wake lab and then on the deployed product with Sam's iPhone ([docs/research/2026-10-30-agent-wake-lab.md](../../docs/research/2026-10-30-agent-wake-lab.md)). Claude Code, in a terminal and in the Claude desktop app's Code tab, woke when its background wait ended, including after a 40-minute wait. Claude Desktop chats waited from the ask reply's words alone, collected answers within 2 seconds of their being sent, and rode out a dropped link and a 75-second freeze of the app.
-- Codex, Cursor and pi were not tested for waking, and nothing wakes them when the answer arrives (L11). For them, setup and who asked follow each app's documented or observed behaviour.
+- Codex: verified in the 8 Nov 2026 wake lab ([docs/research/2026-11-08-clients-wake-lab.md](../../docs/research/2026-11-08-clients-wake-lab.md)), with Codex CLI 0.163.0, its shared background server 0.167.0 and the ChatGPT app's bundled `codex-cli` 0.167.0-alpha.3.2, and again on 8 Nov with the command's own watcher, on the same versions. The command rings the thread with `codex queue`, which Codex 0.149 and later have, and the note names only the agent and the decision, since the process list shows it while it is queued. Re-tested at every release.
+- Nothing wakes Cursor or pi when the answer arrives (L11). For them, setup and who asked follow each app's documented or observed behaviour.
 
 ### B31 · @M3 · History on the agent's machine
 

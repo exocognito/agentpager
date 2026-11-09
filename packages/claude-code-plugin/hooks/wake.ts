@@ -142,10 +142,11 @@ export class Mod {
   private get waiting() { return `${this.home}/waiting`; }
   private get claims() { return `${this.home}/claude-code`; }
 
-  // Names the session, looks at the record once, then every second. Never hands a turn over inside the caller's hook.
+  // Names the session and looks at the record, now and every second after, so a look that fails is tried again.
+  // Never hands a turn over inside the caller's hook.
   async start() {
-    await this.look();
-    if (!this.ended) this.ticker = this.host.every(TICK_MS, () => void this.look().catch(e => this.host.debug(`look failed: ${String(e)}`)));
+    this.ticker = this.host.every(TICK_MS, () => void this.look().catch(e => this.host.debug(`look failed: ${String(e)}`)));
+    await this.look().catch(e => this.host.debug(`look failed: ${String(e)}`));
   }
   // The main loop's turns: a turn started keeps every handed-over turn waiting, and names the session again first, so
   // the first command after a /clear names the new one.

@@ -56,6 +56,14 @@ test('B33.2 The session is named to the command in AGENTPAGER_WAKE, and named ag
   await h.advance(TICK_MS);
   assert.deepEqual(h.wake.at(-1), undefined);
   assert.equal(mod.named, null);
+  // Where Claude Code refuses the variable (an organization's settings), the mod holds nothing, and the command, not
+  // seeing it, words the background wait.
+  const refused = standIn('session-1');
+  refused.setWake = async value => { refused.wake.push(value); return value === undefined; };
+  refused.write(waiting(A), record(A, [{ decision: 'd_2x8w', wake: mine('session-1') }]));
+  const off = await started(refused);
+  assert.equal(off.named, null);
+  assert.deepEqual(refused.running(), []);
 });
 
 test('B33.2 An answer comes as a new turn as soon as Claude is idle, carrying the command\'s reply, found from the record alone', async () => {

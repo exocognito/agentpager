@@ -12,6 +12,8 @@ import { Token } from '../../contract/exchange.ts';
 //   history/<pager>.jsonl  every decision asked from this machine on that pager, with its answer
 //   waiting/<id>.json      mode 600: the record of what's waiting, each of the agent's decisions with its ids and
 //                          where it stands, for the adapters that wake an agent (below)
+//   claude-code/<id>.<decision>/   the Claude Code plugin's claim on handing one answer over, an empty folder, kept
+//                          until the decision leaves the record (packages/claude-code-plugin/hooks/wake.ts)
 export const DEFAULT_SERVER = 'https://agentpager.me';
 export const home = () => process.env.AGENTPAGER_HOME || path.join(homedir(), '.agentpager');
 

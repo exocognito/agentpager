@@ -128,7 +128,8 @@ test('B33.1 B33.4 The command names an agent\'s app only for certain: Codex by i
   assert.deepEqual(shell({ CODEX_THREAD_ID: helper }), { app: 'codex', via: 'shell', thread: null }, 'a thread Codex started as a helper');
   assert.deepEqual(shell({ CODEX_THREAD_ID: unknown }), { app: 'codex', via: 'shell', thread: null }, 'no rollout: nothing says how its turn started');
   assert.equal(shell({ CODEX_THREAD_ID: thread, CLAUDECODE: '1' }), null, 'Codex inside Claude Code, or the other way round');
-  assert.deepEqual(shell({ CLAUDECODE: '1', AGENTPAGER_WAKE: 'claude-code:sess-1.A_b' }), { app: 'claude-code', wake: { app: 'claude-code', session: 'sess-1.A_b' } });
+  assert.deepEqual(shell({ CLAUDECODE: '1', AGENTPAGER_WAKE: 'claude-code:sess-1.A_b', CLAUDE_CODE_SESSION_ID: 'sess-1.A_b' }), { app: 'claude-code', wake: { app: 'claude-code', session: 'sess-1.A_b' } });
+  assert.deepEqual(shell({ CLAUDECODE: '1', AGENTPAGER_WAKE: 'claude-code:sess-1.A_b' }), { app: 'claude-code', wake: null }, 'a shell in which Claude Code names no session says nothing of which asked');
   assert.deepEqual(shell({ CLAUDECODE: '1', AGENTPAGER_WAKE: 'claude-code' }), { app: 'claude-code', wake: null }, 'the lab\'s value names no session');
   assert.equal(shell({ AGENTPAGER_WAKE: 'claude-code:sess-1' }), null, 'Claude Code\'s adapter, outside Claude Code');
   assert.deepEqual(shell({ AGENTPAGER_WAKE: 'pi:7f3k-1', PI_SESSION_ID: '7f3k-1' }), { app: 'pi', wake: { app: 'pi', session: '7f3k-1' } });
@@ -449,7 +450,7 @@ test('B33.4 B33.1 A codex exec run, a Codex thread with no Codex CLI that can ri
 
 test('B33.1 B25.6 An agent whose AgentPager adapter wakes it is told not to wait, and the record of what\'s waiting names its session; it holds ids and states only, private to the machine\'s user', { timeout: 120_000 }, async () => {
   const p = await f.makePager();
-  inShell({ CLAUDECODE: '1', AGENTPAGER_WAKE: 'claude-code:sess-1' });
+  inShell({ CLAUDECODE: '1', AGENTPAGER_WAKE: 'claude-code:sess-1', CLAUDE_CODE_SESSION_ID: 'sess-1' });
   const c = await op.connect({ number: p.number, project: 'wake' });
   assert.ok(!c.text.includes(NUDGE), 'Claude Code is named');
   const id = field(c, 'agent');
@@ -457,9 +458,9 @@ test('B33.1 B25.6 An agent whose AgentPager adapter wakes it is told not to wait
   assert.ok(adapted.text.endsWith(`\nDecision ${d1}. Don't wait for it: when your owner answers, the answer comes to you as a new message. Carry on or end your turn.`), adapted.text);
   assert.equal((await op.wait(id, d1, { seconds: 1 })).text, 'Pending. Your owner hasn\'t answered "With the plugin?" yet.\nDon\'t wait for it: the answer comes to you as a new message when your owner answers. Carry on or end your turn.');
   // Another session, or Claude Code without the plugin, waits in the background as before.
-  process.env.AGENTPAGER_WAKE = 'claude-code:sess-2';
+  Object.assign(process.env, { AGENTPAGER_WAKE: 'claude-code:sess-2', CLAUDE_CODE_SESSION_ID: 'sess-2' });
   assert.match((await op.wait(id, d1, { seconds: 1 })).text, /\nKeep waiting in the background: run `.+ wait --agent ap-[a-z0-9]{4} d_[a-z0-9]{4} --forever` as a background command/);
-  process.env.AGENTPAGER_WAKE = 'claude-code:sess-1';
+  Object.assign(process.env, { AGENTPAGER_WAKE: 'claude-code:sess-1', CLAUDE_CODE_SESSION_ID: 'sess-1' });
   // A decision the record can't hold (here its folder is read-only) is never sent, so nothing can be left for the plugin
   // to miss: the agent's file and the record are written together or not at all.
   chmodSync(path.join(home, 'waiting'), 0o500);
@@ -486,7 +487,7 @@ test('B33.1 B25.6 An agent whose AgentPager adapter wakes it is told not to wait
   assert.deepEqual(record(pid), { version: 1, agent: pid, decisions: [{ decision: d3, askedAt: askedAt(pid, d3), state: 'waiting', wake: { app: 'pi', session: 'p-1' } }] });
   const seen = await decisionId(p, 'With the plugin?');
   await f.answer(seen?.agentId ?? '', p.phone, seen?.decisionId ?? '', { kind: 'feedback', text: 'Ship the secret plan' });
-  inShell({ CLAUDECODE: '1', AGENTPAGER_WAKE: 'claude-code:sess-1' });
+  inShell({ CLAUDECODE: '1', AGENTPAGER_WAKE: 'claude-code:sess-1', CLAUDE_CODE_SESSION_ID: 'sess-1' });
   assert.match((await op.wait(id, d1)).text, /Ship the secret plan/);
   assert.deepEqual(states(id), ['answered', 'waiting']);
   const file = store.waitingPath(id), text = readFileSync(file, 'utf8'), agent = readFileSync(path.join(home, 'agents', `${id}.json`), 'utf8');

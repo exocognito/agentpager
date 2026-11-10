@@ -154,7 +154,7 @@ test('B33.2 Another Claude Code session started inside one with the plugin, with
   const shell = (env: Record<string, string>) => detect.identify(undefined, env);
   assert.deepEqual(shell({ CLAUDECODE: '1', AGENTPAGER_WAKE: 'claude-code:s-1', CLAUDE_CODE_SESSION_ID: 's-1' }), { app: 'claude-code', wake: { app: 'claude-code', session: 's-1' } });
   assert.deepEqual(shell({ CLAUDECODE: '1', AGENTPAGER_WAKE: 'claude-code:s-1', CLAUDE_CODE_SESSION_ID: 's-2' }), { app: 'claude-code', wake: null }, 'the variable came from the session it was started in');
-  assert.deepEqual(shell({ CLAUDECODE: '1', AGENTPAGER_WAKE: 'claude-code:s-1' }), { app: 'claude-code', wake: { app: 'claude-code', session: 's-1' } }, 'a Claude Code that names no session');
+  assert.deepEqual(shell({ CLAUDECODE: '1', AGENTPAGER_WAKE: 'claude-code:s-1' }), { app: 'claude-code', wake: null }, 'a shell in which Claude Code names no session says nothing of which asked');
 });
 
 test('B33.2 The record the command writes is the one the plugin reads', () => {

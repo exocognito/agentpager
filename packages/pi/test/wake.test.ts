@@ -438,7 +438,7 @@ test('B33.5 B32.12 Each answer goes in once across restarts of the same session:
   const mine = standIn('tui', 's-mine');
   mine.start();
   const other = await asks('s-other', 'Another session\'s?', { AGENTPAGER_WAKE: 'pi:s-other' });
-  const claude = await asks('s-mine', 'Claude Code\'s?', { AGENTPAGER_WAKE: 'claude-code:s-mine', CLAUDECODE: '1', PI_CODING_AGENT: '', PI_SESSION_ID: '' });
+  const claude = await asks('s-mine', 'Claude Code\'s?', { AGENTPAGER_WAKE: 'claude-code:s-mine', CLAUDECODE: '1', CLAUDE_CODE_SESSION_ID: 's-mine', PI_CODING_AGENT: '', PI_SESSION_ID: '' });
   assert.equal(Reflect.get(Object(record(other.agent)), 'decisions')[0].wake.session, 's-other');
   mine.bash();
   assert.equal(holds(other.agent, other.d), false);

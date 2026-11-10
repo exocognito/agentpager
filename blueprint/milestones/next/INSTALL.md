@@ -1,6 +1,6 @@
 # INSTALL · AgentPager installs in a minute
 
-> **Status:** queued · **Order:** after CLIENTS, whose list says which agent apps setup covers; SITE follows · numbered when it starts
+> **Order:** after CLIENTS, whose list says which agent apps setup covers; SITE follows · numbered when it starts
 
 ## Objective
 

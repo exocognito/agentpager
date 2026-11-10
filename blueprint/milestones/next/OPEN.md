@@ -1,6 +1,6 @@
 # OPEN · AgentPager in the open
 
-> **Status:** queued · **Order:** after SITE; its cleanup touches the same code as ENCRYPT, which is done by then; FRIENDS follows · **Publishing needs Sam's own go** · numbered when it starts
+> **Order:** after SITE; its cleanup touches the same code as ENCRYPT, which is done by then; FRIENDS follows · **Publishing needs Sam's own go** · numbered when it starts
 
 ## Objective
 

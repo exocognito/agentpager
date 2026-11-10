@@ -206,3 +206,9 @@ This file is append only. A reversed or narrowed decision gets a new entry, and 
   - The order after M6 is CLIENTS, INSTALL, SITE, OPEN, FRIENDS, one at a time.
 - **Why:** Sam most wants the site and the repository cleaned up before friends are introduced.
 - **Serves:** README.md › Milestones; `milestones/next/FRIENDS.md`, `milestones/next/SITE.md` and `milestones/next/OPEN.md`.
+
+## DEC-2026-11-10-board · Todoist owns live AgentPager work status
+
+- **Decided by:** Sam, on 10 Nov 2026, asking AgentPager to adopt the [Soccer Routines workflow](https://github.com/exocognito/soccer-routines/pull/5) where it fits.
+- **Decision:** Use independent cards with subtasks, record work as it happens, close out one milestone before the next starts, and open each milestone with an approval-gated design review. The existing Blueprint milestone table mirrors Todoist.
+- **Serves:** [METHOD.md](../METHOD.md#the-milestone-loop), [AGENTS.md](../AGENTS.md#the-board) and [the milestone table](README.md#milestones).

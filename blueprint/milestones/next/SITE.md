@@ -1,6 +1,6 @@
 # SITE · A front page for AgentPager as it is now
 
-> **Status:** queued · **Order:** after INSTALL, so the page can give the install line, and after CLIENTS, so it can say plainly which agent apps work; OPEN follows · numbered when it starts
+> **Order:** after INSTALL, so the page can give the install line, and after CLIENTS, so it can say plainly which agent apps work; OPEN follows · numbered when it starts
 
 ## Objective
 

@@ -1,6 +1,6 @@
 # M7 · The agent apps AgentPager supports
 
-> **Status:** released, with no walk on dev (Sam's pager answer of 9 Nov; Log); air has the command, and setup hasn't run there (Log, 10 Nov) · **Started:** 8 Nov 2026 · **On dev:** 9 Nov 2026, at 5511193 · **Released:** 9 Nov 2026 · **Tag:** `m7`, on 5511193 · **Order:** after M6; INSTALL follows; its list anchors INSTALL and SITE · **Word:** CLIENTS
+> **Started:** 8 Nov 2026 · **On dev:** 9 Nov 2026, at 5511193 · **Released:** 9 Nov 2026 · **Tag:** `m7`, on 5511193 · **Order:** after M6; INSTALL follows; its list anchors INSTALL and SITE · **Word:** CLIENTS
 
 ## Objective
 

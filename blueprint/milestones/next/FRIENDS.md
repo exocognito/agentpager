@@ -1,6 +1,6 @@
 # FRIENDS · AgentPager for people I invite
 
-> **Status:** queued · **Order:** last, after SITE and OPEN (DEC-2026-11-08-friends-after-cleanup): Sam invites owners once they can install AgentPager, read what it is, inspect its code, and know the service can't read their decisions · numbered when it starts
+> **Order:** last, after SITE and OPEN (DEC-2026-11-08-friends-after-cleanup): Sam invites owners once they can install AgentPager, read what it is, inspect its code, and know the service can't read their decisions · numbered when it starts
 
 ## Objective
 

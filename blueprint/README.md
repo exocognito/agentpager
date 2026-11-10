@@ -20,7 +20,7 @@ Start here. [PRODUCT.md](PRODUCT.md) says what AgentPager is for, as Sam approve
 | ⏳ | [OPEN](milestones/next/OPEN.md) | AgentPager in the open |
 | ⏳ | [FRIENDS](milestones/next/FRIENDS.md) | AgentPager for people I invite |
 
-✅ shipped · 🔨 building · ⏳ queued. One at a time, in this order. Prod runs the `m7` release (5511193) since 9 Nov.
+✅ complete · 🔨 started · ⏳ queued. This table mirrors the milestones on the [AgentPager board](https://app.todoist.com/app/project/6hxGh4F57m9GmG79). Follow [the milestone start gate](../METHOD.md#when-things-get-written).
 
 ## Areas
 

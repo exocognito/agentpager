@@ -6,6 +6,7 @@ How a product is built here: one owner, agents doing the work, one milestone at 
 
 - **Write down only what the owner would reject.** A fact belongs in the Blueprint when the owner would reject a fresh agent choosing differently. Everything else, agents choose.
 - **One home per fact.** Each fact lives in one place, and everything else links to it.
+- **Status lives on the board.** The project board named in AGENTS.md owns live work status. The milestone table is its repo mirror. Milestone docs keep approved designs, decisions and history.
 - **Higher wins.** PRODUCT.md outranks the Blueprint's lines, which outrank the design in code, which outranks tests and `generated/`. When two disagree, the higher one is right and the lower one is fixed. Ask the owner only when two at the same level disagree, or the higher one is silent.
 - **A fresh agent has enough.** The repo is enough to build and judge the product. An agent never invents intent the owner didn't give: it states its assumption, carries on, and reports the gap.
 - **Hold each promise as early as the stack allows**: a type the compiler checks, then a schema, constraint or machine that refuses at run time, then a test.
@@ -17,13 +18,13 @@ The Blueprint is a folder; AGENTS.md says where.
 
 | Path | Holds | Lifetime |
 | --- | --- | --- |
-| `README.md` | Start here: the milestone table (✅ shipped, 🔨 running, ⏳ queued) and the areas | Living |
+| `README.md` | Start here with the areas and one row per committed milestone, in board order. Mirror milestone starts and finishes | Living |
 | `PRODUCT.md` | Vision, principles, pinned design decisions, stack and the unnumbered roadmap, as the owner approved it | Living |
 | `TERMS.md` | Words with a specific meaning in this product; short | Always true |
 | `areas/<n>-<name>.md` | One product area: its behaviors `Bx`, invariants `Ix`, metrics `Kx` and limits `Lx` | Always true |
 | `JOURNEYS.md` | Journeys `Jx`: end-to-end walks across areas | Always true |
 | `DECISIONS.md` | Decisions that bind beyond one milestone, with the owner's words as their basis | Append only |
-| `milestones/M<n>-<word>.md` | A started milestone: what it adds, changes and retires, its answers and its log; a folder when it holds more, such as agreed artboards in `ui/` | History once done |
+| `milestones/M<n>-<word>.md` | A started milestone with its design review, what it adds, changes and retires, its answers and its log. Use a folder for extra material such as agreed artboards in `ui/`. Track steps as board subtasks | History once done |
 | `milestones/next/<WORD>.md` | A queued milestone, under its word: its objective, questions and notes | Until it starts |
 | `generated/` | The screens catalogue, what each milestone added, and the untested list; never edited by hand | Always true; the check fails if stale |
 
@@ -67,8 +68,9 @@ The Blueprint is a folder; AGENTS.md says where.
 
 ## When things get written
 
-- A roadmap item becomes a milestone when the owner commits to it: it gets a row in the milestone table and a doc in `milestones/next/`. Until then it is one roadmap line.
-- Milestones run one at a time, always. When one starts, its doc moves out of `next/`.
+- When the owner commits to a milestone, remove `later` from its card and add a row to the milestone table and a doc in `milestones/next/`.
+- Start the next milestone only when the previous card and its subtasks are complete. A check that must wait can move to a card of its own with a date, evidence and an owner. The owner can approve parallel milestones. Record that exception on both cards.
+- At the start, move the milestone doc out of `next/`, mark its row 🔨, and move the card to Design Review.
 - Lines are written only by the running milestone, and cite only milestones in the table. A line reaches its area file with the code that makes it true; until then it waits in the milestone doc.
 
 ## Changing intent
@@ -150,7 +152,7 @@ Never fix a miss the owner cares about with a test alone. A test follows from a 
 
 ## The milestone loop
 
-1. **Plan.** Walk the owner through what the milestone's row commits to, the decisions and limits that bind it, and its open questions. Write its doc with status planning:
+1. **Plan.** Walk the owner through what the milestone's row commits to, the decisions and limits that bind it, and its open questions. Write its doc:
    - its objective, as the owner approved it;
    - its slice: a table of what it delivers in each layer;
    - what's out of scope, only where a builder would wrongly assume it's in;
@@ -158,12 +160,19 @@ Never fix a miss the owner cares about with a test alone. A test follows from a 
    - the ids it adds, changes and retires.
 
    Shape it so it delivers at least one new piece of value through every layer it touches, and takes on at most one new kind of complexity.
-2. **Design.** Agree lines and terms with the owner. New UI goes on the canvas first. Machines, schemas, storage and tests go in code.
-3. **Build until green.** Set the status to building. When something fails, decide whether the design or the code is wrong. If it's the design, fix the design first and note it in the log.
+2. **Design review.** Put the review in one draft PR and link it from the card. Page the owner for approval and record the reply in the milestone doc. Include each part or mark it as inapplicable.
+   - **UI:** before and after, using the current screens and the proposed canvas artboards.
+   - **Technical design:** affected statecharts, schemas and storage. For architectural choices show the current and proposed topology and a traffic-light table of alternatives.
+   - **Blueprint changes:** write out the proposed lines, terms and limits to add, change or retire.
+   - **Acceptance checks:** how each promise will be verified.
+   - **Owner decisions:** the numbered questions and recommendations.
+
+   Wait for approval before implementation. Machines, schemas, storage and tests then go in code.
+3. **Build until green.** Move the card to Building. When something fails, decide whether the design or the code is wrong. If it's the design, fix the design first and note it in the log.
 4. **Green on dev.** Deploy to dev and run the smoke run there, including the upgrade check from the last release.
 5. **Review.** Regenerate `generated/`. The reviewer checks.
 6. **Walk.** The owner uses it on dev, and reads the Blueprint and `generated/` in their markdown viewer.
-7. **Release.** Tag the commit that was green on dev, deploy prod and the client builds from that tag, and run the smoke run on prod. Open one real thing that existed before the release. Mark the milestone done and log it. Record this release's upgrade baseline before the next milestone's code reaches dev.
+7. **Close out.** For a production release, tag the commit that was green on dev, deploy prod and the client builds from that tag, and run the smoke run on prod. Open one real thing that existed before the release. Record this release's upgrade baseline before the next milestone's code reaches dev. For a milestone without a production release, verify and link its passing acceptance checks. In either case, reconcile and complete its card, mark the milestone row ✅, and log the outcome.
 
 ## Sessions
 

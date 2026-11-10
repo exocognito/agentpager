@@ -13,24 +13,27 @@ AgentPager brings an agent's decisions to Sam's phone. [METHOD.md](METHOD.md) is
 
 ## The board
 
-A pilot from 9 Nov 2026: live work status is on the [AgentPager board](https://app.todoist.com/app/project/6hxGh4F57m9GmG79) in Todoist. These rules live only here; a brief, plan or handoff links to this section and never restates it. In this section a card is a board card, a Todoist task, and what AgentPager sends Sam ([TERMS.md](blueprint/TERMS.md) › Card) is a page.
+The [AgentPager board](https://app.todoist.com/app/project/6hxGh4F57m9GmG79) in Todoist is the source of truth for live work status. Briefs, plans and handoffs link here. A card is a Todoist task. A page is what AgentPager sends Sam.
 
-- **One card per outcome,** with its owner, status, next action and evidence kept current. Its section is its status:
+- **One card per independent outcome.** A milestone, bug fix or investigation gets a card. Its steps, pull requests, checks and questions are subtasks. Complete each when its evidence is recorded. Promote a subtask when it gains an independent outcome.
+- **A card's section shows its status.** Keep its outcome, owner, status, next step, evidence and completion criteria current.
 
   | Section | A card is here when |
   | --- | --- |
-  | Intake | a milestone, bug or tweak is captured and being assessed |
-  | Design Review | a proposal is ready for Sam to review |
+  | Intake | it is captured and being assessed, or queued for Sam's go |
+  | Design Review | the review is being prepared or is with Sam for approval |
   | Ready | the approach and checks are clear and the work is queued |
-  | Building | it is being implemented, verified and code reviewed, through merge |
-  | Merged | it is integrated and awaiting release |
-  | Shipped | it is verified in production: link the release evidence and complete the card |
+  | Building | implementation, verification or code review is under way |
+  | Merged | the change is integrated and release or verification is pending |
+  | Shipped | the release is verified in production and the evidence is linked |
 
-  Work with no production release is completed when its acceptance checks pass.
-- **Design Review is a gate** for a UI change, a meaningful new technical design, or a change where Sam needs to agree what done means or how to verify it. The card shows before-and-after UI mocks or the affected statechart or schema, as applicable, with the proposed acceptance checks. Wait for Sam's approval before implementing. A simple change with a clear approach and success check goes straight to Building. If an approved design needs to change, the same card goes back through Design Review.
-- **A blocking decision for Sam** keeps the card in its stage and adds the label `waiting-on-sam`. Page Sam with a decision that stands on its own on a phone: the question, context, options and their consequences, the recommendation, and any relevant UI mocks labelled by option. Todoist links go in agent handoffs, never in the page. Record what became of the answer once on the card, and clear the label when the decision is resolved.
-- **Agents** reread their card when they start or resume, and update it before they hand off. An agent that can't read or update the board says so in its handoff. **The milestone lead** gives each agent its card's link, and reconciles the card against the pull request and deploy evidence at merge and at release.
-- **What lives where.** Todoist owns live work status. AgentPager carries decisions and replies. The Blueprint holds approved product intent and milestone checkpoints. The repo and deploy checks hold implementation and release evidence.
+  Close out the subtasks before completing their card. For a shipped card, link production verification. For work without a production release, link the passing acceptance checks.
+- **One milestone at a time.** The next card stays in Intake until the previous milestone's card and subtasks are complete, subject to the [exceptions in METHOD.md](METHOD.md#when-things-get-written). For earlier milestones that predate subtasks, complete their remaining closeout cards or apply the same exceptions before starting the next one. Report the open items when the gate is blocked.
+- **Every milestone opens with [Design Review](METHOD.md#the-milestone-loop).** Link one draft PR from the card. Add a subtask for each review part and link its evidence or mark it as inapplicable. Get Sam's approval before implementation. Outside milestones, use the same gate for UI changes, meaningful technical design, or changes where Sam needs to agree what done means. A small fix with clear acceptance checks can go straight to Building. Return to Design Review if an approved design needs to change.
+- **Later ideas wait for Sam.** Keep uncommitted ideas in Intake with the `later` label. When Sam commits to one, remove the label, add its milestone row and queued doc, then assess it.
+- **A blocking decision for Sam** gets `waiting-on-sam` on the subtask once the question is ready for Sam, and on its card while the card cannot move. Page Sam with a question that stands on its own, its options and consequences, a recommendation, and any relevant UI mocks. Keep Todoist links out of pages and include them in handoffs. Record the answer once on the card and clear the labels when resolved.
+- **Keep the board current as work happens.** Read the card, its subtasks and recent comments at start and resume, and check for new owner replies before reporting a blocker or handing off. Update the board in the same piece of work as a PR open, merge, deploy or owner decision. Link the PR and card to each other. The milestone lead gives each agent its task link and records who reconciled the card, when, and against which PR or deploy evidence. An agent that lacks board access says so in its handoff.
+- **Keep evidence where it belongs.** The [Blueprint milestone table](blueprint/README.md#milestones) mirrors the milestone cards. Update a row when the milestone starts or finishes. Milestone docs hold designs, answers and history. GitHub and deploy results settle factual disagreements about what merged or shipped. Fix the board from that evidence, then fix the mirror from the board.
 
 ## Stages
 

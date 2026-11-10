@@ -43,7 +43,7 @@ agentpager ack --agent ap-7f3k d_2x8w "Building the smaller fix today."
 Files: `~/.agentpager/agents/<id>.json` (mode 600: the agent's server key, its own private key, made at connect, the
 pager's public key as checked against the number at connect, its reminder clock, and the request id of each ask no
 reply has settled yet, so asking the same card again after a lost reply reaches the owner once; the agent only ever
-passes the id, and neither key is printed), `~/.agentpager/history/<pager>.jsonl` (capped at 1,000 lines), `~/.agentpager/waiting/<id>.json` (mode 600: the record of what's waiting, which the plugin and the extension read; no key, number, card or answer), `~/.agentpager/claude-code/` (the plugin's record of each answer it handed over) and `~/.agentpager/adapters/` (above). `src/store.ts` lists them all. `AGENTPAGER_HOME` moves the folder;
+passes the id, and neither key is printed), `~/.agentpager/history/<pager>.jsonl` (capped at 1,000 lines), `~/.agentpager/waiting/<id>.json` (mode 600: the record of what's waiting, which the plugin and the extension read; no key, number, card or answer), `~/.agentpager/claude-code/<id>.<decision>/` (an empty folder, the plugin's claim on handing that answer over, kept until the decision leaves the record of what's waiting) and `~/.agentpager/adapters/` (above). `src/store.ts` lists them all. `AGENTPAGER_HOME` moves the folder;
 `AGENTPAGER_SERVER` or `config.json` `{"server": …}` picks the server (default `https://agentpager.me`).
 
 End to end (B30, I19.6): connect reads the pager's public key, checks it against the number's fingerprint and pins it,

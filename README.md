@@ -8,9 +8,11 @@ Bring an agent's decisions to the owner's phone. The [Blueprint](blueprint/READM
 | --- | --- |
 | `package.json`, `pnpm-workspace.yaml`, `pnpm-lock.yaml`, `tsconfig.json` | The pnpm workspace. Root scripts only delegate to the packages. |
 | `blueprint/` | The Blueprint: the product contract, its milestones and, in `generated/screens/`, the design catalogue written by `pnpm designs`. |
-| `docs/research/` | Findings that outlive a milestone, such as the [30 Oct wake lab](docs/research/2026-10-30-agent-wake-lab.md). |
+| `docs/research/` | Findings that outlive a milestone, such as the wake labs of [30 Oct](docs/research/2026-10-30-agent-wake-lab.md) and [8 Nov](docs/research/2026-11-08-clients-wake-lab.md). |
 | `packages/contract/` | The wire contract: the schemas the server, the binary and the phone exchange, with their unit tests. |
 | `packages/ios/` | The SwiftUI iPhone app, its UI tests and the Xcode project. |
+| `packages/cli/` | The agentpager command: a command line and a local MCP server, with setup for agent apps. |
+| `packages/claude-code-plugin/`, `packages/pi/` | AgentPager's Claude Code plugin and pi extension, which wake an agent with its answer. Setup installs them from the files the built command carries. |
 | `packages/app/` | Created by a run: the Worker, the front page (`src/site/`), deploy and dogfood scripts and acceptance tests. The root scripts delegate to it by name. |
 
 ## See the design
@@ -27,7 +29,7 @@ pnpm test
 
 `pnpm designs` regenerates the catalogue on a Mac with Xcode and the iPhone 17e Simulator: it starts a local server, runs the iPhone UI tests against it and renders the front page in headless Chromium. If Chromium is missing, run `pnpm --filter @agentpager/app exec playwright install chromium`. `pnpm check` fails when anything the catalogue is drawn from (the iPhone app, its UI tests, the brief fixtures, the wire contract or the front page) changed since it was made; run `pnpm designs` and commit the result.
 
-`pnpm test` (or `pnpm test:unit`) runs the unit tests of the wire contract (`packages/contract`, with its encrypted-part vectors under Node and a Bun-compiled binary) and the front page (`packages/app/src/site`), and `swift test` for the phone's side of the encrypted-part format (`packages/ios/AgentPagerCrypto`), so it needs Bun and Swift. `pnpm test:app` runs the server's acceptance tests against local workerd, `pnpm test:cli` builds and tests the binary, and `pnpm test:all` every suite. The app implements real effects and transport; its acceptance tests prove runtime integration.
+`pnpm test` (or `pnpm test:unit`) runs the unit tests of the wire contract (`packages/contract`, with its encrypted-part vectors under Node and a Bun-compiled binary) and the front page (`packages/app/src/site`), and `swift test` for the phone's side of the encrypted-part format (`packages/ios/AgentPagerCrypto`), so it needs Bun and Swift. `pnpm test:app` runs the server's acceptance tests against local workerd, `pnpm test:cli` builds and tests the binary, `pnpm test:pi` and `pnpm test:plugin` test the pi extension and the Claude Code plugin, and `pnpm test:all` runs every suite. The app implements real effects and transport; its acceptance tests prove runtime integration.
 
 ## Build the product
 

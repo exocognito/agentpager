@@ -42,7 +42,7 @@ answered ones, its brief stays readable, and its bar says who asked finished fir
 ## Alerts
 
 When an agent asks, the phone alerts with who asked and the question, even with the app closed; tapping the alert
-opens that decision (C17). If no agent reads an answer within 3 minutes of Send, one more alert says so, naming the
+opens that decision (B17). If no agent picks up an answer within 3 minutes of Send, one more alert says so, naming the
 agent and its computer (`kind` `warning`). The app asks to send alerts once there is a pager, and gives its device token to each
 pager. Only the deployed server (`https://agentpager.me`) sends alerts: a server on the Mac cannot reach Apple's push
 service. Builds from Xcode use Apple's sandbox service.

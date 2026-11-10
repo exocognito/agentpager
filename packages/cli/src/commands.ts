@@ -330,7 +330,10 @@ export async function ask(agent: string, card: Source, via?: Via, holdMs = SENDI
   return done(lines.join('\n'), { decision: short });
 }
 
-export async function wait(agent: string, ref: string, opts: { seconds?: number; forever?: boolean; via?: Via } = {}): Promise<Result> {
+// noPickup: a wait for an adapter, which hands the answer to the agent itself and runs pickup once the agent has it
+// (below; store.ts › Waiting has the contract). It opens the answer and replies as any wait does, but tells the service
+// nothing and records nothing here, so a wait whose adapter went away, or an answer never handed over, picks nothing up.
+export async function wait(agent: string, ref: string, opts: { seconds?: number; forever?: boolean; via?: Via; noPickup?: boolean } = {}): Promise<Result> {
   const a = agentOf(agent);
   if ('code' in a) return a;
   const d = decisionOf(a, ref);
@@ -344,7 +347,7 @@ export async function wait(agent: string, ref: string, opts: { seconds?: number;
     if (!r.ok && opts.forever && (r.status === 0 || r.status >= 500)) { await new Promise(res => setTimeout(res, RETRY_MS)); continue; }
     if (!r.ok) {
       const closed = closedOf(r);
-      return closed ? closedUnanswered(a, d, closed, 'Don\'t wait for it again.') : refusal(r, a);
+      return closed ? closedUnanswered(a, d, closed, 'Don\'t wait for it again.') : opts.noPickup ? forAdapter(r, a) : refusal(r, a);
     }
     if (r.value.status !== 'answered') {
       if (opts.forever) continue;
@@ -354,12 +357,9 @@ export async function wait(agent: string, ref: string, opts: { seconds?: number;
     // Only the phone, which read the card, holds the key the answer is sealed to; an answer that doesn't open, or names
     // an option the card didn't offer, isn't the owner's answer to this card.
     if (!choice || (d.options.length > 0 && !acceptsChoice({ options: d.options.map((_, i) => ({ number: i + 1 })) }, choice))) return refused(unreadableAnswer(d.short));
-    await received(a, d.id, r.value.answer.answerId);
-    if (!d.answered) {
-      try {
-        updateAgent(a.id, x => { if (x.decisions[d.short]) x.decisions[d.short].answered = true; });
-        appendHistory(a.pager, { at: sentAt, event: 'answered', agent: a.id, decision: d.short, ...(choice.kind === 'option' ? { choice: choice.number } : { note: choice.text }) });
-      } catch { /* not recorded here; the answer is still the server's */ }
+    if (!opts.noPickup) {
+      await received(a, d.id, r.value.answer.answerId);
+      answeredHere(a, d, sentAt, choice, true);
     }
     if (choice.kind === 'option') {
       const n = choice.number, letter = String.fromCharCode(64 + n);
@@ -382,12 +382,62 @@ export async function wait(agent: string, ref: string, opts: { seconds?: number;
 // isn't, since another try gets the same. Nothing here keeps the answer from the agent: one that never lands leaves
 // the owner the warning, until the agent's acknowledgement picks the answer up instead. A service from before this
 // (m6.1) refuses the route as NotFound, having picked the answer up when it was read.
-async function received(a: AgentFile, decisionId: string, answerId: string) {
+// Null once the service has it; otherwise the last try's failure, which a wait doesn't act on and pickup reports.
+async function received(a: AgentFile, decisionId: string, answerId: string): Promise<Failure | null> {
+  let last: Failure | null = null;
   for (let tries = 1; tries <= RECEIVED_TRIES; tries++) {
     const r = await call(Received, a.server, 'POST', `/api/agents/${a.agentId}/cards/${decisionId}/received`, { key: a.agentKey, data: { answerId }, timeoutMs: RECEIVED_TIMEOUT_MS });
-    if (r.ok || (r.status > 0 && r.status < 500)) return;
+    if (r.ok) return null;
+    last = r;
+    if (r.status > 0 && r.status < 500) return r;
     if (tries < RECEIVED_TRIES) await new Promise(res => setTimeout(res, RECEIVED_AGAIN_MS));
   }
+  return last;
+}
+// A failure as an adapter's step (wait --no-pickup, pickup) words it: a server that failed, which another try may not meet,
+// is exit 5 like one that didn't reply, and the JSON says what to do: try-again (5), pager-off (4), refused (2).
+function forAdapter(r: Failure, a: AgentFile): Result {
+  const why: Result = r.status >= 500 ? { code: 5, text: `${a.server} failed (${r.message}). Try again.` } : refusal(r, a);
+  return { ...why, json: { status: why.code === 4 ? 'pager-off' : why.code === 5 ? 'try-again' : 'refused' } };
+}
+// The answer is this machine's agent's now: the decision is recorded as answered, once, with the answer in the history.
+// read: a wait of the agent's own is handing it the answer, which is counted each time (store.ts › Waiting, reads), so
+// an adapter can tell the agent has read it by itself; an adapter's pickup isn't one.
+function answeredHere(a: AgentFile, d: { short: string; answered?: boolean }, sentAt: string, choice: NonNullable<ReturnType<typeof openAnswer>>, read: boolean) {
+  if (d.answered && !read) return;
+  try {
+    updateAgent(a.id, x => { const e = x.decisions[d.short]; if (e) { e.answered = true; if (read) e.reads = (e.reads ?? 0) + 1; } });
+    if (!d.answered) appendHistory(a.pager, { at: sentAt, event: 'answered', agent: a.id, decision: d.short, ...(choice.kind === 'option' ? { choice: choice.number } : { note: choice.text }) });
+  } catch { /* not recorded here; the answer is still the server's */ }
+}
+
+// An adapter's agent has the answer: the turn carrying the reply of its `wait --no-pickup` has started, so the service is
+// told this agent's command received it (B32.12, blueprint/areas/2-agents.md), and it is recorded here as answered.
+// Only an adapter runs it, not an agent, so it isn't in HELP; store.ts › Waiting has its contract. It opens the answer
+// first, as a wait does, so an answer this agent can't read is never picked up. Its JSON says what happened: picked-up
+// (0; saying it again gets the same, with when it was first picked up), acknowledged (0; the agent's acknowledgement
+// picked it up already), pending (2; nothing to pick up yet), closed (2), unreadable (2), refused (2), pager-off (4) or
+// try-again (5; the server away, failing or not understood).
+export async function pickup(agent: string, ref: string): Promise<Result> {
+  const a = agentOf(agent);
+  if ('code' in a) return a;
+  const d = decisionOf(a, ref);
+  if (!d) return refused(`Agent ${a.id} has no decision ${ref}. Its decisions: ${Object.keys(a.decisions).join(', ') || 'none yet'}.`);
+  if (d.acknowledged) return done(`Already acknowledged: ${d.short} was picked up when you acknowledged it.`, { status: 'acknowledged' });
+  const failed = (r: Failure): Result => {
+    const closed = closedOf(r);
+    return closed ? closedUnanswered(a, d, closed, 'There is nothing to pick up.') : forAdapter(r, a);
+  };
+  const read = await call(AnswerStatus, a.server, 'GET', `/api/agents/${a.agentId}/cards/${d.id}/answer`, { key: a.agentKey });
+  if (!read.ok) return failed(read);
+  if (read.value.status !== 'answered') return { code: 2, text: `Nothing to pick up: your owner hasn't answered "${d.title}" yet.`, json: { status: 'pending' } };
+  const { answerId, sentAt } = read.value.answer, choice = openAnswer(keysOf(a), d.id, read.value.answer.answer);
+  if (!choice || (d.options.length > 0 && !acceptsChoice({ options: d.options.map((_, i) => ({ number: i + 1 })) }, choice))) return { code: 2, text: unreadableAnswer(d.short), json: { status: 'unreadable' } };
+  const r = await received(a, d.id, answerId);
+  // A service from before pickup (m6.1) has no word for it: it picked the answer up when it was read.
+  if (r && r.error !== 'NotFound') return failed(r);
+  answeredHere(a, d, sentAt, choice, false);
+  return done(`Picked up: the service knows your agent has the answer to ${d.short}.`, { status: 'picked-up' });
 }
 
 export function pending(a: AgentFile, d: { short: string; title: string; askedAt?: string }, quick: boolean, h: How): Result {

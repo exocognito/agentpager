@@ -27,7 +27,11 @@ const CLIENTS: [RegExp, string][] = [[/claude-code/i, 'Claude Code'], [/^local-a
 // The command records each decision asked under it (the record of what's waiting, store.ts), and tells the agent not
 // to wait. It counts only from a shell: an MCP server keeps the variables it started with, which may name an earlier
 // session. An adapter that won't wake a session, such as in `claude -p`, clears it for that session, since a session
-// started inside another inherits its variables.
+// started inside another inherits its variables. pi names its own session in PI_SESSION_ID for every command its agent
+// runs (pi 1.4.0), so a pi session's wake counts only where that names the same session: a pi started inside another
+// without the extension, as a run in print mode, inherits the outer session's wake but not its PI_SESSION_ID, and a
+// command with no PI_SESSION_ID (one the owner types into pi with `!`, or a pi from before it) says nothing of which
+// session asked.
 export type Wake = { app: 'claude-code' | 'pi'; session: string };
 export type Caller =
   | { app: 'claude-code'; wake: Wake | null }
@@ -60,7 +64,7 @@ export function identify(mcp?: { client?: string; meta?: unknown }, env: NodeJS.
   if (there.length !== 1) return null;
   if (there[0] === 'claude-code') return env.CLAUDECODE === '1' ? { app: 'claude-code', wake: wake?.app === 'claude-code' ? wake : null } : null;
   if (there[0] === 'codex') return env.CODEX_THREAD_ID ? { app: 'codex', via: 'shell', thread: wakeableThread({ env }) } : null;
-  if (there[0] === 'pi') return wake?.app === 'pi' ? { app: 'pi', wake } : null;
+  if (there[0] === 'pi') return wake?.app === 'pi' && env.PI_SESSION_ID === wake.session ? { app: 'pi', wake } : null;
   return null;
 }
 export function detectApp(mcpClient?: string): string {

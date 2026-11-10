@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import { spawn } from 'node:child_process';
+import { createServer } from 'node:http';
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -91,6 +92,90 @@ test('B32.12 The command says it received an answer once it has opened it, from 
   } finally { await client.close().catch(() => {}); await f.stop(); }
 });
 
+// The two steps an adapter takes instead of one wait (store.ts › Waiting): a wait that picks nothing up, and pickup once
+// the agent has the answer. Run from source as the adapters run the command, for its flags and its JSON.
+test('B32.12 An adapter\'s wait with --no-pickup hands over the answer but picks nothing up, so the owner is still warned, and pickup picks it up once the agent has it, saying in its JSON what happened; the record counts only the agent\'s own reads', { timeout: 240_000 }, async () => {
+  const f = await fixture('cli-pickup-adapter', { autoOffMs: 0, idleMs: 0, pickupMs: PICKUP_MS });
+  const home = mkdtempSync(path.join(tmpdir(), 'agentpager-pickup-adapter-'));
+  process.env.AGENTPAGER_HOME = home; process.env.AGENTPAGER_SERVER = f.origin;
+  const op = await import('../src/commands.ts'), store = await import('../src/store.ts');
+  const main = fileURLToPath(new URL('../src/main.ts', import.meta.url));
+  const command = async (...args: string[]) => {
+    const r = await run([process.execPath, '--experimental-strip-types', main, ...args, '--json'], { AGENTPAGER_HOME: home, AGENTPAGER_SERVER: f.origin }).done;
+    const reply = JSON.parse(r.out);
+    return { exit: r.code, code: reply.code, text: String(reply.text), status: typeof reply.result === 'object' && reply.result !== null ? Reflect.get(reply.result, 'status') : undefined };
+  };
+  try {
+    const p = await f.makePager();
+    const id = field(await op.connect({ number: p.number, app: 'pi', project: 'adapter' }), 'agent');
+    const [held, acked, closed] = [field(await op.ask(id, card('Held, then picked up?')), 'decision'), field(await op.ask(id, card('Acknowledged first?')), 'decision'), field(await op.ask(id, card('Closed first?')), 'decision')];
+    const read = async (title: string) => { const x = (await f.pager(p.pagerId, p.phone)).agents[0]; return [...(x?.open ?? []), ...(x?.answered ?? [])].find(y => y.title === title); };
+    const agentId = (await f.pager(p.pagerId, p.phone)).agents[0]?.agent.agentId ?? '';
+    const listed = (d: string) => JSON.parse(readFileSync(path.join(home, 'waiting', `${id}.json`), 'utf8')).decisions.find((x: { decision: string }) => x.decision === d);
+    const state = (d: string) => listed(d)?.state;
+    const historyHas = (d: string) => readFileSync(path.join(home, 'history', `${p.pagerId}.jsonl`), 'utf8').split('\n').filter(Boolean).some(l => { const e = JSON.parse(l); return e.event === 'answered' && e.decision === d; });
+
+    // Before the answer: a held wait without --forever replies pending, and there is nothing to pick up.
+    assert.deepEqual(await command('wait', '--agent', id, '--no-pickup', held, '--seconds', '1'), { exit: 0, code: 0, text: `Pending. Your owner hasn't answered "Held, then picked up?" yet.\nKeep waiting: agentpager wait --agent ${id} ${held}`, status: 'pending' });
+    assert.deepEqual(await command('pickup', '--agent', id, held), { exit: 2, code: 2, text: 'Nothing to pick up: your owner hasn\'t answered "Held, then picked up?" yet.', status: 'pending' });
+
+    // Answered: the held wait has it, word for word as any wait, and picks nothing up, here or on the service.
+    const sent = await f.answer(agentId, p.phone, (await read('Held, then picked up?'))?.decisionId ?? '', { kind: 'option', number: 2 });
+    const got = await command('wait', '--agent', id, held, '--no-pickup');
+    assert.deepEqual([got.exit, got.status], [0, 'answered']);
+    assert.match(got.text, new RegExp(`^Answered at .*: option B "Later"\\.\\nDo it, then confirm: agentpager ack --agent ${id} ${held} "<what happens next>"$`));
+    assert.equal(state(held), 'waiting', 'still waiting here');
+    assert.equal(historyHas(held), false, 'and not in the history');
+    const warned = await until(() => read('Held, then picked up?'), d => d?.warnedAt !== undefined, 30_000);
+    assert.equal(warned?.collectedAt, undefined, 'never picked up, so the owner is warned');
+    assert.ok(warned?.warnedAt && Date.parse(warned.warnedAt) - Date.parse(sent.sentAt) >= PICKUP_MS);
+
+    // Once the agent has it, pickup: the service and this machine count it as received; saying it again is the same.
+    assert.deepEqual(await command('pickup', '--agent', id, held), { exit: 0, code: 0, text: `Picked up: the service knows your agent has the answer to ${held}.`, status: 'picked-up' });
+    const picked = await read('Held, then picked up?');
+    assert.ok(picked?.collectedAt && Date.parse(picked.collectedAt) >= Date.parse(warned?.warnedAt ?? ''));
+    assert.equal(state(held), 'answered');
+    assert.equal(historyHas(held), true);
+    assert.equal((await command('pickup', '--agent', id, held)).status, 'picked-up');
+    assert.equal((await read('Held, then picked up?'))?.collectedAt, picked?.collectedAt, 'when it was first picked up');
+    // The record counts only the agent's own reads: neither step of an adapter is one, and each wait of the agent's is.
+    assert.equal(listed(held).reads, undefined, 'an adapter\'s wait and pickup aren\'t the agent\'s reads');
+    assert.equal((await command('wait', '--agent', id, held, '--no-pickup')).status, 'answered');
+    assert.equal(listed(held).reads, undefined);
+    assert.equal((await command('wait', '--agent', id, held)).status, 'answered');
+    assert.deepEqual([listed(held).state, listed(held).reads], ['answered', 1]);
+    assert.equal((await op.wait(id, held)).code, 0);
+    assert.equal(listed(held).reads, 2);
+
+    // Acknowledged first: the acknowledgement picked it up.
+    await f.answer(agentId, p.phone, (await read('Acknowledged first?'))?.decisionId ?? '', { kind: 'option', number: 1 });
+    assert.equal((await command('wait', '--agent', id, acked, '--no-pickup')).status, 'answered');
+    assert.equal((await op.ack(id, acked, 'Going now.')).code, 0);
+    assert.deepEqual(await command('pickup', '--agent', id, acked), { exit: 0, code: 0, text: `Already acknowledged: ${acked} was picked up when you acknowledged it.`, status: 'acknowledged' });
+
+    // Closed unanswered, as the agent finishes: nothing to pick up, and the held wait says so too.
+    assert.equal((await op.finish(id)).code, 0);
+    assert.deepEqual([(await command('pickup', '--agent', id, closed)).exit, (await command('pickup', '--agent', id, closed)).status], [2, 'closed']);
+    assert.deepEqual([(await command('wait', '--agent', id, closed, '--no-pickup', '--forever')).exit, (await command('wait', '--agent', id, closed, '--no-pickup')).status], [2, 'closed']);
+
+    // The service failing (here a stand-in replies 503 to everything), and then away: try again, from both steps.
+    const failing = createServer((_q, res) => { res.writeHead(503, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: 'Unavailable', message: 'Down for a moment.' })); });
+    await new Promise<void>(res => failing.listen(0, '127.0.0.1', res));
+    const address = failing.address(), real = store.loadAgent(id)?.server ?? '';
+    store.updateAgent(id, x => { x.server = `http://127.0.0.1:${typeof address === 'object' && address ? address.port : 0}`; });
+    try {
+      for (const step of [['pickup', '--agent', id, held], ['wait', '--agent', id, held, '--no-pickup']]) {
+        const r = await command(...step);
+        assert.deepEqual([r.exit, r.status], [5, 'try-again'], `${step[0]} with the server failing`);
+      }
+    } finally { store.updateAgent(id, x => { x.server = real; }); await new Promise(res => failing.close(res)); }
+    await f.stop();
+    const away = await command('pickup', '--agent', id, held);
+    assert.deepEqual([away.exit, away.status], [5, 'try-again']);
+    assert.equal((await command('pickup', '--agent', 'ap-zzzz', held)).exit, 6);
+  } finally { await f.stop(); }
+});
+
 // The m6.1 command, built from its tag, as Sam's machines run it until they update, and the m6.1 contract, which its
 // command and app read with.
 test('B32.12 The m6.1 command on this service still picks an answer up when its wait reads it, so its owner is never warned; the pager reads with the m6.1 contract as before', { timeout: 600_000 }, async () => {
@@ -152,5 +237,11 @@ test('B32.12 This command on the m6.1 service: its wait hands the agent the answ
     assert.match(waited.text, /^Answered at .*: option A "Now"\./);
     assert.ok((await f.pager(p.pagerId, p.phone)).agents[0]?.answered[0]?.collectedAt, 'the old service picked it up when it was read');
     assert.equal((await op.ack(id, short, 'Carrying on.')).code, 0);
+    // An adapter's two steps there: the old service picked it up when the held wait read it, and pickup says so.
+    const adapted = field(await op.ask(id, card('An adapter on the old service?')), 'decision');
+    const open = (await f.pager(p.pagerId, p.phone)).agents[0]?.open[0];
+    await f.answer(inbox.agents[0]?.agent.agentId ?? '', p.phone, open?.decisionId ?? '', { kind: 'option', number: 2 });
+    assert.match((await op.wait(id, adapted, { noPickup: true })).text, /^Answered at .*: option B "Later"\./);
+    assert.equal(field(await op.pickup(id, adapted), 'status'), 'picked-up');
   } finally { await f.stop(); }
 });

@@ -6,7 +6,7 @@ import path from 'node:path';
 // $STAND_IN/claude.json, as Claude Code keeps its settings, and every call it got in $STAND_IN/claude.calls. A test
 // makes a subcommand fail by naming it in $STAND_IN/claude.fail, one per line, with the message to fail with after a
 // tab. Like Claude Code, it reads the marketplace's and the plugin's manifests in the folder it is given, so a folder
-// setup registered before writing it is refused.
+// setup registered before writing it is refused; and its install enables a plugin that was disabled.
 type Entry = { scope: 'user' | 'local'; type: string; command: string; args: string[]; env: { [k: string]: string } };
 type State = { marketplaces: { [name: string]: string }; plugins: { [id: string]: { enabled: boolean } }; mcp: { [name: string]: Entry } };
 const dir = process.env.STAND_IN ?? '', file = path.join(dir, 'claude.json'), argv = process.argv.slice(2), said = argv.join(' ');

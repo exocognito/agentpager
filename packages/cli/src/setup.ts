@@ -82,13 +82,14 @@ function adapter(which: Adapter, app: string, what: string, print: boolean): { d
   catch (e) { return `${app}: couldn't write ${what} to ${adapterDir(which)} (${code(e)}), so it wasn't installed. Once that folder can be written, run agentpager setup again`; }
 }
 
-// Whether Claude Code has AgentPager's plugin installed and enabled for the user, and its marketplace at this folder;
-// null when Claude Code's own lists can't be read.
-function claudeState(dir: string): { plugin: boolean; market: boolean } | null {
+// Whether Claude Code has AgentPager's plugin installed for the user, and whether the person has disabled it there;
+// and whether its marketplace is this folder. null when Claude Code's own lists can't be read.
+function claudeState(dir: string): { plugin: 'enabled' | 'disabled' | 'absent'; market: boolean } | null {
   const plugins = json(run('claude', ['plugin', 'list', '--json'])), markets = json(run('claude', ['plugin', 'marketplace', 'list', '--json']));
   if (!Array.isArray(plugins) || !Array.isArray(markets)) return null;
+  const plugin = plugins.find(p => isObject(p) && p.id === PLUGIN && p.scope === 'user');
   return {
-    plugin: plugins.some(p => isObject(p) && p.id === PLUGIN && p.scope === 'user' && p.enabled === true),
+    plugin: !isObject(plugin) ? 'absent' : plugin.enabled === false ? 'disabled' : 'enabled',
     market: markets.some(m => isObject(m) && m.name === MARKETPLACE && typeof m.path === 'string' && same(m.path, dir)),
   };
 }
@@ -116,7 +117,9 @@ function claudeCode(print: boolean, named: boolean): string[] {
     const { dir, changed } = files, byHand = `claude plugin marketplace add ${quote(dir)} && claude plugin install ${PLUGIN}`;
     const before = claudeState(dir);
     if (before === null) lines.push(`Claude Code: couldn't read its plugins (claude plugin list --json), so AgentPager's plugin wasn't installed. By hand: ${byHand}`);
-    else if (before.plugin && before.market) {
+    // Claude Code's install would enable a plugin the person disabled (2.1.322), so a disabled one is left as it is.
+    else if (before.plugin === 'disabled') lines.push(`Claude Code: AgentPager's plugin is installed and disabled, so setup left it so. To enable it: claude plugin enable ${PLUGIN}`);
+    else if (before.plugin === 'enabled' && before.market) {
       installed = true;
       lines.push(!changed ? 'Claude Code: already set up' : print ? `Claude Code: would bring AgentPager's plugin in ${dir} up to date` : "Claude Code: brought AgentPager's plugin up to date (restart Claude Code)");
     } else if (print) {
@@ -126,7 +129,7 @@ function claudeCode(print: boolean, named: boolean): string[] {
       const add = exec('claude', ['plugin', 'marketplace', 'add', dir, '--json']);
       const install = add.ok ? exec('claude', ['plugin', 'install', PLUGIN, '--json']) : add;
       const after = install.ok ? claudeState(dir) : null;
-      installed = after !== null && after.plugin && after.market;
+      installed = after !== null && after.plugin === 'enabled' && after.market;
       lines.push(installed ? "Claude Code: installed AgentPager's plugin (restart Claude Code)"
         : `Claude Code: couldn't install AgentPager's plugin${install.ok ? ": Claude Code doesn't list it as installed and enabled" : why(install)}. By hand: ${byHand}`);
     }
@@ -135,7 +138,7 @@ function claudeCode(print: boolean, named: boolean): string[] {
   if (entry === null) return lines;
   const remove = 'claude mcp remove agentpager -s user';
   if (!ownEntry(entry)) lines.push(`Claude Code: left its agentpager MCP server alone, since it isn't the one setup adds (${ENTRY.command} mcp, in the user's config). With the plugin, agents use the agentpager command, not the MCP server`);
-  else if (!installed) lines.push("Claude Code: kept its agentpager MCP server, since AgentPager's plugin isn't installed");
+  else if (!installed) lines.push("Claude Code: kept its agentpager MCP server, since AgentPager's plugin isn't installed and enabled");
   else if (!named) lines.push("Claude Code: kept its agentpager MCP server, since the plugin can't run agentpager by name yet");
   else if (print) lines.push(`Claude Code: would remove its agentpager MCP server, which setup added: with the plugin, agents use the agentpager command (${remove})`);
   else lines.push(run('claude', ['mcp', 'remove', 'agentpager', '-s', 'user']) === null ? `Claude Code: couldn't remove its agentpager MCP server, which setup added. By hand: ${remove}`

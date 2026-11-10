@@ -133,8 +133,17 @@ test("B29.1 setup removes Claude Code's agentpager MCP entry only when it is the
   const failed = machine(['claude']);
   entry(failed);
   failed.write('claude.fail', 'plugin install\tFailed to update settings\n');
-  assert.equal(failed.setup(), `Claude Code: couldn't install AgentPager's plugin: Failed to update settings. By hand: claude plugin marketplace add '${failed.plugin}' && claude plugin install agentpager@agentpager-local\nClaude Code: kept its agentpager MCP server, since AgentPager's plugin isn't installed\n`);
+  assert.equal(failed.setup(), `Claude Code: couldn't install AgentPager's plugin: Failed to update settings. By hand: claude plugin marketplace add '${failed.plugin}' && claude plugin install agentpager@agentpager-local\nClaude Code: kept its agentpager MCP server, since AgentPager's plugin isn't installed and enabled\n`);
   assert.ok(failed.claude().mcp.agentpager);
+  // The person disabled the plugin in Claude Code: setup doesn't enable it, as Claude Code's install would, and the entry stays.
+  const disabled = machine(['claude']);
+  disabled.setup();
+  const off = { ...disabled.claude(), plugins: { 'agentpager@agentpager-local': { enabled: false } }, mcp: { agentpager: { scope: 'user', type: 'stdio', command: disabled.self, args: ['mcp'], env: {} } } };
+  disabled.write('claude.json', JSON.stringify(off));
+  disabled.forget();
+  for (const args of [['--print'], []]) assert.equal(disabled.setup(args), "Claude Code: AgentPager's plugin is installed and disabled, so setup left it so. To enable it: claude plugin enable agentpager@agentpager-local\nClaude Code: kept its agentpager MCP server, since AgentPager's plugin isn't installed and enabled\n");
+  assert.deepEqual(disabled.claude(), off);
+  assert.deepEqual(disabled.calls('claude'), [...READS, ...READS]);
   // The removal itself fails: said, with the command.
   const stuck = machine(['claude']);
   entry(stuck);

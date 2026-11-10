@@ -11,6 +11,8 @@ const packages: string[] = existsSync(file) ? JSON.parse(readFileSync(file, 'utf
 const mode = existsSync(path.join(dir, 'pi.mode')) ? readFileSync(path.join(dir, 'pi.mode'), 'utf8').trim() : '';
 const out = (text: string) => process.stdout.write(text + '\n');
 appendFileSync(path.join(dir, 'pi.calls'), JSON.stringify(argv) + '\n');
+// What it was handed in its environment that names a pager, if anything: setup hands an app none.
+if (process.env.AGENTPAGER_PAGER !== undefined) appendFileSync(path.join(dir, 'pi.environment'), `AGENTPAGER_PAGER=${process.env.AGENTPAGER_PAGER}\n`);
 process.stderr.write('Warning: No models match pattern "stand-in/none"\n');
 
 if (said === 'list --no-approve') {

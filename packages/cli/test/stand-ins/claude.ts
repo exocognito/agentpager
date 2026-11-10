@@ -15,6 +15,8 @@ const save = () => writeFileSync(file, JSON.stringify(state, null, 2) + '\n');
 const out = (text: string) => process.stdout.write(text + '\n');
 const end = (code: number): never => process.exit(code);
 appendFileSync(path.join(dir, 'claude.calls'), JSON.stringify(argv) + '\n');
+// What it was handed in its environment that names a pager, if anything: setup hands an app none.
+if (process.env.AGENTPAGER_PAGER !== undefined) appendFileSync(path.join(dir, 'claude.environment'), `AGENTPAGER_PAGER=${process.env.AGENTPAGER_PAGER}\n`);
 
 const failing = existsSync(path.join(dir, 'claude.fail')) ? readFileSync(path.join(dir, 'claude.fail'), 'utf8').split('\n').filter(Boolean).map(l => l.split('\t')) : [];
 const fail = failing.find(([prefix]) => said.startsWith(prefix));

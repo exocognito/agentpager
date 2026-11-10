@@ -197,10 +197,13 @@ test('B29.6 nothing setup writes, or passes to an app, holds a key, an agent id 
   entry(m);
   const desktop = path.join(m.home, 'Library', 'Application Support', 'Claude', 'claude_desktop_config.json'), cursor = path.join(m.home, '.cursor', 'mcp.json');
   mkdirSync(path.dirname(desktop), { recursive: true }); mkdirSync(path.dirname(cursor));
-  const said = m.setup([], { AGENTPAGER_PAGER: secrets.number });
+  const said = m.setup(['--print'], { AGENTPAGER_PAGER: secrets.number }) + m.setup([], { AGENTPAGER_PAGER: secrets.number });
   assert.match(said, /Claude Code: installed[\s\S]*Claude Code: removed[\s\S]*pi: installed[\s\S]*Claude Desktop: .* added[\s\S]*Cursor: .* added/);
-  // All it wrote: the adapters and the two configs; all it passed: the stand-ins' calls and what they kept; and its reply.
+  // All it wrote: the adapters and the two configs. All it passed: the stand-ins' calls, what they kept, and the number
+  // in their environment, which each stand-in notes if it is handed one. And its replies.
   const everything = [said, ...Object.values(filesUnder(path.join(m.agentpager, 'adapters'))), readFileSync(desktop, 'utf8'), readFileSync(cursor, 'utf8'), m.told()].join('\n');
+  assert.deepEqual([existsSync(path.join(m.standIn, 'claude.environment')), existsSync(path.join(m.standIn, 'pi.environment'))], [false, false], 'neither app was handed the number in its environment');
+  assert.ok(m.calls('claude').length >= 10 && m.calls('pi').length >= 4, 'both apps were run, with --print and without');
   for (const [what, secret] of Object.entries(secrets)) assert.ok(!everything.includes(secret), what);
   assert.ok(!/ap1_|\bap-[a-z0-9]{4}\b/.test(everything), 'no pager number and no agent id of any kind');
   assert.deepEqual(JSON.parse(readFileSync(cursor, 'utf8')), { mcpServers: { agentpager: { command: m.self, args: ['mcp'] } } }, 'only where the command is');

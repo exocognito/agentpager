@@ -14,11 +14,13 @@ import { self } from './detect.ts';
 const has = (bin: string) => { try { execFileSync('which', [bin], { stdio: 'ignore' }); return true; } catch { return false; } };
 // The entry names this binary by its absolute path: GUI apps (Claude Desktop, Cursor) don't get the shell's PATH.
 const ENTRY = { command: self(), args: ['mcp'] };
-// An app's own command, run with no shell and no input, so every argument reaches it as written. One that hangs is
-// stopped, so the apps after it are still set up.
+// An app's own command, run with no shell and no input, so every argument reaches it as written, and without the
+// pager number an agent's shell may hold in AGENTPAGER_PAGER: no app is handed it, in a file, an argument or its
+// environment (B29.6). One that hangs is stopped, so the apps after it are still set up.
 type Ran = { ok: boolean; out: string; err: string };
 function exec(bin: string, args: string[]): Ran {
-  try { return { ok: true, out: execFileSync(bin, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 120_000 }), err: '' }; }
+  const { AGENTPAGER_PAGER: _number, ...env } = process.env;
+  try { return { ok: true, out: execFileSync(bin, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 120_000, env }), err: '' }; }
   catch (e) {
     const text = (v: unknown) => typeof v === 'string' ? v : '';
     return isObject(e) ? { ok: false, out: text(e.stdout), err: text(e.stderr) } : { ok: false, out: '', err: '' };

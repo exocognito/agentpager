@@ -18,7 +18,7 @@ const cli = fileURLToPath(new URL('..', import.meta.url));
 const png = path.join(cli, '..', 'app', 'fixtures', 'briefs', 'D1-pricing', 'a-cards.png');
 const home = mkdtempSync(path.join(tmpdir(), 'agentpager-decode-')), work = mkdtempSync(path.join(tmpdir(), 'agentpager-card-'));
 process.env.AGENTPAGER_HOME = home; delete process.env.AGENTPAGER_SERVER; delete process.env.AGENTPAGER_PAGER;
-for (const v of ['CLAUDECODE', 'CODEX_SANDBOX', 'CODEX_HOME', 'CURSOR_TRACE_ID', 'PI_CODING_AGENT']) delete process.env[v];
+for (const v of ['CLAUDECODE', 'CODEX_SANDBOX', 'CODEX_THREAD_ID', 'CURSOR_TRACE_ID', 'PI_CODING_AGENT']) delete process.env[v];
 const op = await import('../src/commands.ts');
 const store = await import('../src/store.ts');
 const { compile } = await import('../src/card.ts');

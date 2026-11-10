@@ -19,7 +19,9 @@ const cli = fileURLToPath(new URL('..', import.meta.url)), main = path.join(cli,
 const work = mkdtempSync(path.join(tmpdir(), 'agentpager-wake-'));
 const home = path.join(work, 'home'), codexHome = path.join(work, 'codex'), bin = path.join(work, 'bin'), calls = path.join(work, 'codex-calls.jsonl');
 mkdirSync(bin); mkdirSync(codexHome);
-const MARKS = ['CLAUDECODE', 'CLAUDE_CODE_SESSION_ID', 'CODEX_SANDBOX', 'CODEX_HOME', 'CODEX_THREAD_ID', 'CURSOR_TRACE_ID', 'PI_CODING_AGENT', 'PI_SESSION_ID', 'AGENTPAGER_WAKE', 'AGENTPAGER_PAGER'];
+// What Codex sets in the shell of each command it runs, by name (Codex 0.163.0, real runs of 9 Nov 2026).
+const CODEX_SETS = ['CODEX_THREAD_ID', 'CODEX_SESSION_ID', 'CODEX_SANDBOX', 'CODEX_SANDBOX_NETWORK_DISABLED', 'CODEX_CI', 'CODEX_TOOL_CALL_ID', 'CODEX_VERSION', 'CODEX_APPLY_PATCH_PRESERVE_LINE_ENDINGS'];
+const MARKS = ['CLAUDECODE', 'CLAUDE_CODE_SESSION_ID', 'CODEX_HOME', ...CODEX_SETS, 'CURSOR_TRACE_ID', 'PI_CODING_AGENT', 'PI_SESSION_ID', 'AGENTPAGER_WAKE', 'AGENTPAGER_PAGER'];
 for (const v of MARKS) delete process.env[v];
 process.env.AGENTPAGER_HOME = home; process.env.CODEX_HOME = codexHome; process.env.FAKE_CODEX_LOG = calls;
 
@@ -54,9 +56,9 @@ const v7 = () => {
   const t = Date.now().toString(16).padStart(12, '0'), r = randomBytes(10).toString('hex');
   return `${t.slice(0, 8)}-${t.slice(8, 12)}-7${r.slice(0, 3)}-${(8 + (parseInt(r[3], 16) & 3)).toString(16)}${r.slice(4, 7)}-${r.slice(7, 19)}`;
 };
-function rollout(thread: string, payload: { source: unknown; originator: string; thread_source?: string }) {
+function rollout(thread: string, payload: { source: unknown; originator: string; thread_source?: string }, under = codexHome) {
   const day = new Date(parseInt(thread.replace(/-/g, '').slice(0, 12), 16)), pad = (n: number) => String(n).padStart(2, '0');
-  const dir = path.join(codexHome, 'sessions', String(day.getFullYear()), pad(day.getMonth() + 1), pad(day.getDate()));
+  const dir = path.join(under, 'sessions', String(day.getFullYear()), pad(day.getMonth() + 1), pad(day.getDate()));
   mkdirSync(dir, { recursive: true });
   const meta = { timestamp: day.toISOString(), type: 'session_meta', payload: { id: thread, ...payload, cwd: work, base_instructions: { text: 'x'.repeat(20_000) } } };
   writeFileSync(path.join(dir, `rollout-2026-11-08T19-11-02-${thread}.jsonl`), JSON.stringify(meta) + '\n' + JSON.stringify({ type: 'turn_context' }) + '\n');
@@ -118,6 +120,11 @@ async function decisionId(p: { pagerId: string; phone: string }, title: string) 
   }
   return undefined;
 }
+// Who asked a decision, as the phone shows it.
+async function whoAsked(p: { pagerId: string; phone: string }, title: string) {
+  const d = await decisionId(p, title);
+  return (await f.pager(p.pagerId, p.phone)).agents.find(a => a.agent.agentId === d?.agentId)?.agent.app;
+}
 
 test('B33.1 B33.4 The command names an agent\'s app only for certain: Codex by its thread, never a codex exec turn or a thread Codex started itself, and an adapter\'s session by AGENTPAGER_WAKE', () => {
   const thread = v7(), execThread = v7(), helper = v7(), unknown = v7();
@@ -153,6 +160,85 @@ test('B33.1 B33.4 The command names an agent\'s app only for certain: Codex by i
   assert.deepEqual(mcp('codex-mcp-client'), { app: 'codex', via: 'mcp', thread: null }, 'no _meta');
   assert.equal(mcp('cursor-vscode', meta(thread)), null, 'another client\'s _meta names nothing');
   for (const v of MARKS) delete process.env[v];
+});
+
+// CODEX_HOME is the person's own setting, for where Codex keeps its files: once they export it, it is in every shell on
+// their machine, in Claude Code's and pi's as much as in Codex's, so it says nothing of which app is asking. What Codex
+// itself sets in the shells it runs commands in was recorded from real runs of Codex 0.163.0 on 9 Nov 2026 (`codex exec`,
+// read-only and workspace-write, started from a shell that had none of these): CODEX_SETS, with CODEX_THREAD_ID the
+// thread's id, CODEX_SANDBOX=seatbelt, CODEX_SANDBOX_NETWORK_DISABLED=1 and CODEX_CI=1, and CODEX_HOME only when the
+// shell that started Codex had it. The other four were recorded by name, and their values here stand in.
+const codexSets = (thread: string): Record<string, string> => ({ CODEX_THREAD_ID: thread, CODEX_SESSION_ID: thread, CODEX_SANDBOX: 'seatbelt', CODEX_SANDBOX_NETWORK_DISABLED: '1', CODEX_CI: '1', CODEX_TOOL_CALL_ID: 'call_7f3k', CODEX_VERSION: '0.163.0', CODEX_APPLY_PATCH_PRESERVE_LINE_ENDINGS: '1' });
+const claudeCode = { CLAUDECODE: '1', CLAUDE_CODE_SESSION_ID: 'sess-h', AGENTPAGER_WAKE: 'claude-code:sess-h' }, pi = { PI_CODING_AGENT: 'true', PI_SESSION_ID: 'p-h', AGENTPAGER_WAKE: 'pi:p-h' };
+test('B33.1 B33.2 B33.5 A person\'s own CODEX_HOME names no app: with it set, a Claude Code session and a pi session are each still named, and told their answer will come to them, with their wake recorded', { timeout: 120_000 }, async () => {
+  const theirs = path.join(work, 'codex-elsewhere');
+  const shell = (env: Record<string, string>) => { inShell(env); return detect.identify(); };
+  try {
+    assert.deepEqual(shell({ ...claudeCode, CODEX_HOME: theirs }), { app: 'claude-code', wake: { app: 'claude-code', session: 'sess-h' } }, 'a Claude Code session');
+    assert.deepEqual(shell({ ...pi, CODEX_HOME: theirs }), { app: 'pi', wake: { app: 'pi', session: 'p-h' } }, 'a pi session');
+    assert.equal(shell({ CODEX_HOME: theirs }), null, 'their own terminal: no app');
+    assert.notEqual(detect.detectApp(), 'Codex', 'nor is it shown as Codex on the phone');
+    assert.equal(shell({ CURSOR_TRACE_ID: 't-1', CODEX_HOME: theirs }), null);
+    assert.equal(detect.detectApp(), 'Cursor');
+
+    // The same through the command: each is named when it connects, and told its answer will come to it.
+    const p = await f.makePager(), told = 'Don\'t wait for it: when your owner answers, the answer comes to you as a new message. Carry on or end your turn.';
+    for (const [env, app, wake] of [[claudeCode, 'Claude Code', { app: 'claude-code', session: 'sess-h' }], [pi, 'pi', { app: 'pi', session: 'p-h' }]] as const) {
+      inShell({ ...env, CODEX_HOME: theirs });
+      const c = await op.connect({ number: p.number, project: 'wake' }), id = field(c, 'agent');
+      assert.ok(!c.text.includes(NUDGE), `${app} is named, so it isn't told it may need a nudge`);
+      assert.equal(store.loadAgent(id)?.app, app);
+      const asked = await op.ask(id, card(`From ${app}, CODEX_HOME set?`)), d = field(asked, 'decision');
+      assert.equal(await whoAsked(p, `From ${app}, CODEX_HOME set?`), app, 'who asked, on the phone');
+      assert.ok(asked.text.endsWith(`\nDecision ${d}. ${told}`), asked.text);
+      assert.deepEqual(store.loadAgent(id)?.decisions[d]?.wake, wake, 'its wake is recorded');
+      assert.deepEqual(record(id), { version: 1, agent: id, decisions: [{ decision: d, askedAt: store.loadAgent(id)?.decisions[d]?.askedAt, state: 'waiting', wake }] }, 'where its adapter reads it');
+    }
+  } finally { inShell({}); }
+});
+
+test('B33.1 B33.4 Codex is named by what it sets in the shells it runs, with its thread, whether or not the person set CODEX_HOME; inside another app, neither is named', { timeout: 120_000 }, async () => {
+  const thread = v7(), unset = v7(), person = path.join(work, 'person'), realHome = process.env.HOME;
+  rollout(thread, terminal);
+  const shell = (env: Record<string, string>) => { inShell(env); return detect.identify(); };
+  try {
+    assert.deepEqual(shell({ ...codexSets(thread), CODEX_HOME: codexHome }), { app: 'codex', via: 'shell', thread }, 'Codex, CODEX_HOME exported');
+    assert.equal(detect.detectApp(), 'Codex');
+    // With CODEX_HOME unset, as in the real runs, Codex's files are in the home folder's .codex: here a home of the test's own.
+    mkdirSync(path.join(person, '.codex'), { recursive: true });
+    rollout(unset, terminal, path.join(person, '.codex'));
+    try {
+      process.env.HOME = person;
+      inShell({}); Object.assign(process.env, codexSets(unset));
+      assert.equal(process.env.CODEX_HOME, undefined);
+      assert.deepEqual(detect.identify(), { app: 'codex', via: 'shell', thread: unset }, 'Codex, CODEX_HOME not exported');
+      assert.equal(detect.detectApp(), 'Codex');
+      // With no sandbox, Codex's source sets no CODEX_SANDBOX (not run): its thread still names it.
+      for (const v of ['CODEX_SANDBOX', 'CODEX_SANDBOX_NETWORK_DISABLED']) delete process.env[v];
+      assert.deepEqual(detect.identify(), { app: 'codex', via: 'shell', thread: unset }, 'Codex with no sandbox');
+      assert.equal(detect.detectApp(), 'Codex');
+    } finally { if (realHome === undefined) delete process.env.HOME; else process.env.HOME = realHome; }
+    // One app inside the other still names neither, by what each sets: Codex started in a Claude Code session, or a pi
+    // session, with or without the person's CODEX_HOME.
+    const exported: Record<string, string>[] = [{}, { CODEX_HOME: codexHome }];
+    for (const home of exported) for (const outer of [claudeCode, pi]) {
+      assert.equal(shell({ ...outer, ...codexSets(thread), ...home }), null, 'Codex inside another app');
+      assert.equal(shell({ ...outer, CODEX_SANDBOX: 'seatbelt', ...home }), null, 'a sandboxed Codex shell that names no thread, inside another app');
+    }
+
+    // The same through the command: Codex is named when it connects, and told a note will come to its thread.
+    const p = await f.makePager();
+    inShell({ ...codexSets(thread), CODEX_HOME: codexHome }); process.env.AGENTPAGER_CODEX = codex.ok;
+    const c = await op.connect({ number: p.number, project: 'wake' }), id = field(c, 'agent');
+    assert.ok(!c.text.includes(NUDGE));
+    const asked = await op.ask(id, card('From Codex, as it marks its shells?')), d = field(asked, 'decision');
+    assert.equal(await whoAsked(p, 'From Codex, as it marks its shells?'), 'Codex');
+    assert.ok(asked.text.endsWith(`\nDecision ${d}. ${codexShell(id, d)}`), asked.text);
+    const pid = await watcherStarts(id, d), w = store.loadAgent(id)?.decisions[d]?.wake;
+    assert.deepEqual(w?.app === 'codex' ? [w.thread, w.via] : w, [thread, 'shell'], 'its thread is the one a note will come to');
+    assert.ok((await op.finish(id)).text.startsWith('Finished.'));
+    await until(async () => alive(pid), up => !up);
+  } finally { inShell({}); process.env.AGENTPAGER_CODEX = codex.ok; }
 });
 
 test('B33.4 The Codex CLI that rings is 0.149 or later, AGENTPAGER_CODEX\'s when set, else the one on PATH', () => {

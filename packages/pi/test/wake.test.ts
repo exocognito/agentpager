@@ -10,7 +10,7 @@ import { agentpagerWake, LINE, TYPE, type Context, type Events, type Options } f
 // AgentPager's pi extension (B33.5, blueprint/areas/2-agents.md) against a stand-in for pi and the real command, run from
 // its source, on the suites' local server. The stand-in does what pi 1.4.0 does with the calls the extension makes: a
 // follow-up sent while idle starts a run with its message, one sent from inside agent_settled waits until that has
-// been emitted, and each message is kept in the session's entries. Whether pi itself starts the turn is shown by the
+// been emitted, and each message, and each entry the extension appends, is kept in the session's entries. Whether pi itself starts the turn is shown by the
 // real run recorded in the pull request; this shows what the extension does with each event, and when the command picks
 // the answer up (B32.12): only once the turn carrying it has started. The service's not-picked-up clock is 3 s here.
 
@@ -24,11 +24,11 @@ writeFileSync(path.join(work, 'card.yaml'), 'title: Which colour?\ndetail: A pi 
 const fast: Options = { command, retryMs: 300, offRetryMs: 300, confirmMs: 2_000 };
 const PICKUP_MS = 3_000;
 
-// pi as the extension sees it: its events, its two calls, the session's entries, the branch it is on (a session resumes
-// at its last entry), and whether it is working.
-function standIn(mode: Context['mode'], sessionId: string, entries: unknown[] = []) {
+// pi as the extension sees it: its events, its calls, the session's entries, the branch it is on (a session resumes at
+// its last entry, or on the branch given), and whether it is working.
+function standIn(mode: Context['mode'], sessionId: string, entries: unknown[] = [], at?: unknown[]) {
   const handlers: { [E in keyof Events]: ((event: Events[E], ctx: Context) => void)[] } = { session_start: [], session_shutdown: [], session_tree: [], before_agent_start: [], message_start: [], agent_start: [], agent_settled: [], tool_result: [] };
-  const branch = [...entries];
+  const branch = [...(at ?? entries)];
   const sent: { content: string; details: unknown; options: unknown; whileWorking: boolean }[] = [], notes: string[] = [];
   let working = false, queued = false, settling = false;
   const later: (() => void)[] = [];
@@ -54,6 +54,7 @@ function standIn(mode: Context['mode'], sessionId: string, entries: unknown[] = 
       const go = () => { const entry = { type: 'custom_message', ...message }; entries.push(entry); branch.push(entry); run({ role: 'custom', ...message, details: message.details }); };
       if (settling) later.push(go); else if (!working && options?.triggerTurn) go();
     },
+    appendEntry(customType: string, data?: unknown) { const entry = { type: 'custom', customType, data }; entries.push(entry); branch.push(entry); },
   };
   return {
     pi, ctx, sent, notes, entries, emit,
@@ -216,6 +217,19 @@ test('B33.5 After a move to another point of the session\'s tree, a decision sti
   pi.settle();
   assert.equal(pi.sent.length, 2, 'the agent on this branch has read it by itself');
   assert.equal(holds(agent, d), false);
+  // The read is noted in the session, on this branch, so the reply isn't handed over there later either: not when the
+  // owner leaves and returns, and not when pi starts again on it.
+  const readThere = pi.branch();
+  assert.deepEqual(readThere.at(-1), { type: 'custom', customType: TYPE, data: { read: [{ agent, decision: d }] } });
+  pi.back(withReply); pi.settle();
+  pi.back(readThere);
+  assert.equal(holds(agent, d), false, 'no wait held on the return');
+  pi.settle();
+  const resumed = standIn('tui', 's-tree', pi.entries, readThere);
+  resumed.start();
+  assert.equal(holds(agent, d), false, 'nor at the next start on that branch');
+  resumed.settle(); resumed.shutdown();
+  assert.equal(pi.sent.length + resumed.sent.length, 2);
   // Before the agent acknowledges it, the owner goes back to before the reply again: the agent there hasn't had it,
   // whatever was read on a branch left behind.
   pi.navigate(0);
@@ -488,7 +502,7 @@ test('B33.5 B32.12 Every wait it holds stops when the session shuts down, and wh
     writeFileSync(file, `import { agentpagerWake } from ${JSON.stringify(fileURLToPath(new URL('../src/index.ts', import.meta.url)))};
 const handlers = {};
 const ctx = { mode: 'tui', hasUI: false, isIdle: () => true, hasPendingMessages: () => false, sessionManager: { getSessionId: () => ${JSON.stringify(session)}, getEntries: () => [] }, ui: { notify() {} } };
-agentpagerWake({ on: (e, h) => { handlers[e] = h; }, sendMessage() {} }, { command: ${JSON.stringify(command)} });
+agentpagerWake({ on: (e, h) => { handlers[e] = h; }, sendMessage() {}, appendEntry() {} }, { command: ${JSON.stringify(command)} });
 handlers.session_start({}, ctx);
 handlers.tool_result({ toolName: 'bash' }, ctx);
 ${exits ? 'setTimeout(() => process.exit(0), 500);' : 'setInterval(() => {}, 1000);'}

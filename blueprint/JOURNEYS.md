@@ -32,7 +32,7 @@ End-to-end walks across the areas. Each numbered step is a promise, tested by it
 5. Opening the alert opens that decision. The owner answers and sends (B5).
 6. The agent's wait returns the owner's answer (B32).
 7. The owner leaves the app again. The agent acknowledges, and the acknowledgement arrives as an alert with the agent's words (B17).
-8. The app icon's badge clears.
+8. The app icon's badge is clear: it cleared when the owner sent the answer (B17.7).
 
 - Areas: 1 Pagers (step 1), 2 Agents (2, 6, 7), 3 Cards (3), 4 Getting paged (1, 3, 4, 5, 7, 8), 5 Answering (5).
 - Where: on the deployed product, with the app on a real iPhone, installed from Xcode (L24).

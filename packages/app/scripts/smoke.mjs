@@ -15,7 +15,7 @@ import { decodePart, encodePart } from '../../contract/parts.ts';
 // suites stay local. A failed step is tried once more; a second failure fails the run.
 //   --stage local --server <url>   the same against a local server, without the checks only a deployed stage has
 //                                  (HTTPS, the deploy's own verification), and with a local upgrade baseline
-//   --baseline-tag <tag>           the release whose upgrade baseline it checks, m6 unless named
+//   --baseline-tag <tag>           the release whose upgrade baseline it checks, m7 unless named
 // The upgrade check (METHOD.md › The milestone loop, step 4) reads back the baseline baseline.mjs recorded on this
 // stage (~/.agentpager-baselines/<stage>/<tag>, or under AGENTPAGER_BASELINES), whose keys are secrets: nothing of them
 // is printed. It never changes the record.
@@ -167,10 +167,11 @@ await step('The binary built from this commit checks a pager\'s key, asks it a c
 // attachments byte for byte, every part opened with the record's keys; and the release's own command reading its
 // agent's status. It connects nothing to the baseline's pager, answers and acknowledges nothing, counts as no activity
 // and writes nothing in the record's folder, so every smoke run can repeat it and the next release finds the baseline
-// as recorded. The baseline is picked by name, the last release's (m6), and moved on here once the next release's is
-// recorded (step 7). M6's check against m5, which proved its move to one store per pager, ended with M6, as M5's
-// checks against m4 ended with M5; the m4 and m5 folders stay on disk as they were, and nothing reads them.
-const upgrade = stage.name !== 'prod', tag = flag('--baseline-tag') ?? 'm6';
+// as recorded. The baseline is picked by name, the last release's (m7), and moved on here once the next release's is
+// recorded (step 7). M7's check against m6 ended once M7 was released and its own baseline recorded, as M6's check
+// against m5, which proved its move to one store per pager, ended with M6, and M5's checks against m4 with M5; the m4,
+// m5 and m6 folders stay on disk as they were, and nothing reads them.
+const upgrade = stage.name !== 'prod', tag = flag('--baseline-tag') ?? 'm7';
 if (upgrade) await step(`The ${tag} upgrade baseline still opens, only read: its pager with its key and number, both decisions with their parts and attachments, the answer and acknowledgement, and the ${tag} command's status for its agent`, async () => {
   const args = ['--experimental-strip-types', 'scripts/baseline.mjs', '--stage', stage.name, ...(local ? ['--server', origin] : []), '--tag', tag, '--verify'];
   const r = spawnSync(process.execPath, args, { cwd: app, encoding: 'utf8', timeout: 240_000 });

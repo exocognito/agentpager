@@ -45,6 +45,9 @@ export const COMMAND = 'agentpager';
 export const LINE = 'AgentPager is available on this computer: when a decision only your owner can make comes up, ask them with the agentpager command (run agentpager help to start).';
 export const LINE_ID = 'agentpager:available';
 
+// Why Claude Code 2.1.321 doesn't take a plugin's prompt, in its words: removed before it ran (the person pressed Esc
+// while it waited), or held back after the person stopped the session, until they type.
+const REASONS = ['the prompt was removed from the queue before it ran', 'the session was stopped and nobody has sent input since'];
 // How often the record is looked at; how long after a turn ends a handed-over turn waits, so the person's own prompt
 // goes first; and how long a wait that can't reach the service or the pager pauses before the next.
 export const TICK_MS = 1_000, SETTLE_MS = 500;
@@ -76,7 +79,8 @@ export interface Host {
   // entered as that turn starts, a moment before the mod hears the turn start; Claude Code's declarations also let it
   // resolve once the prompt is queued behind a running turn, so entered alone never counts as started. Not entered:
   // Claude Code removed the prompt before it ran (the person pressed Esc), holds a plugin's prompts (after the person
-  // stopped the session, until they type), or refused it.
+  // stopped the session, until they type), or refused it. The call resolves once: 2.1.321 says of a prompt either that
+  // it was removed or, as its turn starts, that it entered.
   submit(text: string): Promise<{ entered: true } | { entered: false; why: string }>;
   // A line in Claude Code's debug log: ids and states only, never an answer.
   debug(line: string): void;
@@ -229,6 +233,8 @@ export class Mod {
     if (id === this.session) return;
     const set = SESSION.test(id) && await this.host.setWake(`claude-code:${id}`);
     if (!set) await this.host.setWake(undefined);
+    // The session may have ended while Claude Code set the variable: its id is then the one being left.
+    if (id === this.left) return;
     this.session = set ? id : null;
     for (const h of [...this.holds.values()]) if (h.session !== this.session) this.drop(h.key);
     this.host.debug(`names session ${this.session ?? 'none'}`);
@@ -323,8 +329,9 @@ export class Mod {
   }
   private async watch(h: Hold) {
     for (;;) {
-      if (h.stopped) return;
       const began = await this.host.now();
+      // Looked at after the clock answered, so a hold stopped meanwhile starts no wait that nothing would stop.
+      if (h.stopped) return;
       h.child = this.host.spawn([COMMAND, 'wait', '--agent', h.agent, h.decision, '--no-pickup', '--json']);
       const { stdout } = await h.child.done;
       h.child = undefined;
@@ -367,8 +374,9 @@ export class Mod {
         // Its turn has started already, or its hold stopped while the call was out (the session ended, say).
         if (this.holds.get(h.key) !== h) return;
         if (r.entered) { h.entered = true; this.host.debug(`turn for ${h.agent} ${h.decision} entered`); return; }
-        // Not taken: the turn waits for the person's next turn, or a minute.
-        this.host.debug(`turn for ${h.agent} ${h.decision} not taken: ${r.why}`);
+        // Not taken: the turn waits for the person's next turn, or a minute. Only Claude Code's own two reasons are
+        // logged as given; any other may be a hook's words.
+        this.host.debug(`turn for ${h.agent} ${h.decision} not taken: ${REASONS.includes(r.why) ? r.why : 'refused'}`);
         h.state = 'ready'; this.heldUntil = (await this.host.now()) + NOT_TAKEN_MS;
         this.host.after(NOT_TAKEN_MS, () => void this.hand());
         return;

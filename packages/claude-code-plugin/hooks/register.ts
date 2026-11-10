@@ -80,8 +80,9 @@ export const register: Register = on => {
     return done
   })
 
+  // The session ends whatever the mod makes of it.
   on('session.end', async ($, e, next) => {
-    mod?.sessionEnded(e.reason, e.sessionId)
+    try { mod?.sessionEnded(e.reason, e.sessionId) } catch { /* its waits end with the process, or by themselves */ }
     if (e.reason !== 'clear' && e.reason !== 'resume') mod = null
     return next(e)
   })

@@ -76,6 +76,23 @@ test('B33.2 The session is named to the command in AGENTPAGER_WAKE, and named ag
   await h.finish();
   await h.advance(TICK_MS);
   assert.deepEqual(h.running().map(c => c.argv), [waitFor(A, 'd_2x8w')]);
+  // The session ends while Claude Code is still setting the variable for it: it isn't named after all.
+  let set: () => void = () => undefined;
+  const late = standIn('session-1');
+  late.write(waiting(A), record(A, [{ decision: 'd_2x8w', wake: mine('session-2') }]));
+  const there = await started(late);
+  await late.leave('clear', 'session-2').arrive();
+  late.slowWake = new Promise<void>(r => { set = () => r(); });
+  await late.advance(TICK_MS);
+  assert.deepEqual([late.wake.at(-1), there.named], ['claude-code:session-2', null], 'the look is naming session-2');
+  const gone = late.leave('resume', 'session-3');
+  late.slowWake = null; set();
+  await late.advance(TICK_MS * 2);
+  assert.deepEqual([there.named, late.running()], [null, []], 'session-2 ended meanwhile: not named, and its decision not held');
+  await gone.arrive();
+  await late.advance(TICK_MS);
+  assert.equal(there.named, 'session-3');
+  late.quit();
   // A session id the command wouldn't take unsets the variable, and nothing is held.
   h.session = 'not a session';
   await h.advance(TICK_MS);
@@ -505,6 +522,27 @@ test('B33.2 A record that didn\'t read is read again at the next look, so its de
   h.failing.clear();
   await h.advance(TICK_MS);
   assert.deepEqual(h.running().map(c => c.argv), [waitFor(A, 'd_2x8w')]);
+});
+
+test('B33.2 A hold that stops while the mod is about to start its next wait starts none, so no wait is left that nothing would stop', async () => {
+  const h = standIn('session-1');
+  h.write(waiting(A), record(A, [{ decision: 'd_2x8w', wake: mine('session-1') }]));
+  await started(h);
+  h.running()[0]?.exit(reply.pending());
+  await h.advance(0);
+  // A second after it began, the mod asks the clock before holding again; the /clear lands while it waits for the answer.
+  let answer: () => void = () => undefined;
+  h.slowClock = new Promise<void>(r => { answer = () => r(); });
+  await h.advance(TICK_MS);
+  assert.equal(h.children.length, 1);
+  const cleared = h.leave('clear', 'session-2');
+  h.slowClock = null; answer();
+  await h.advance(0);
+  assert.deepEqual([h.children.length, h.running()], [1, []], 'no wait started for the session that ended');
+  await cleared.arrive();
+  await h.advance(TICK_MS * 3);
+  assert.deepEqual([h.children.length, h.running()], [1, []]);
+  h.quit();
 });
 
 test('B33.2 When the session ends, every wait the mod holds stops, and it looks no more', async () => {

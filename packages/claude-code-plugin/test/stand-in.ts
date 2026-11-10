@@ -33,6 +33,9 @@ export type StandIn = Host & {
   files: Map<string, { text: string; mtimeMs: number }>; dirs: Set<string>;
   // Folders whose listing fails, and files whose reading fails, as a file system's can.
   failing: Set<string>;
+  // While set, the clock's answer, or the setting of AGENTPAGER_WAKE, waits for it: a call to Claude Code takes time,
+  // in which anything else may happen.
+  slowClock: Promise<void> | null; slowWake: Promise<void> | null;
   advance(ms: number): Promise<void>;
   write(file: string, text: string): void;
   remove(file: string): void;
@@ -79,11 +82,12 @@ export function standIn(session = 'session-1'): StandIn {
     t: 1_000_000, session, wake: [], children: [], logs: [], files: new Map(), dirs: new Set(['/']), failing: new Set(),
     doing: null, stopped: false, submitted: [], turns: [], turnsIn: [], entersWhenQueued: false, startsBeforeEntered: false,
     pickups: [], picking: JSON.stringify({ code: 0, text: 'Picked up.', result: { status: 'picked-up' } }) + '\n',
-    now: async () => h.t,
+    slowClock: null, slowWake: null,
+    now: async () => { if (h.slowClock) await h.slowClock; return h.t; },
     after: (ms, fn) => timer(ms, fn),
     every: (ms, fn) => timer(ms, fn, ms),
     sessionId: async () => h.session,
-    setWake: async value => { h.wake.push(value); return true; },
+    setWake: async value => { h.wake.push(value); if (h.slowWake) await h.slowWake; return true; },
     list: async dir => {
       if (h.failing.has(dir)) throw new Error('EIO');
       if (!h.dirs.has(dir)) return null;

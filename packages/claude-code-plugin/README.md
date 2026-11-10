@@ -1,10 +1,10 @@
 # AgentPager for Claude Code (the plugin)
 
-A Claude Code plugin whose mod hands the owner's answer to the agent as a new turn (B33.2, [2 Agents](../../blueprint/areas/2-agents.md)). The agentpager command still does everything else: it keeps the keys, asks, waits, opens the answer and acknowledges. The mod names the Claude Code session to the command in `AGENTPAGER_WAKE`, reads the command's record of what's waiting (`~/.agentpager/waiting/`, [store.ts](../cli/src/store.ts)), holds the command's own wait for each of the session's decisions (`--no-pickup`), which picks nothing up, submits the command's reply as a turn once Claude is idle, and tells the service the agent has the answer (`agentpager pickup`) once that turn has started. It does nothing in `claude -p`, an SDK run or on Windows, where the command gives today's background-wait words.
+A Claude Code plugin whose mod hands the owner's answer to the agent as a new turn (B33.2, [2 Agents](../../blueprint/areas/2-agents.md)). The agentpager command still does everything else: it keeps the keys, asks, waits, opens the answer and acknowledges. The mod names the Claude Code session to the command in `AGENTPAGER_WAKE`, reads the command's record of what's waiting (`~/.agentpager/waiting/`, [store.ts](../cli/src/store.ts)), holds the command's own wait for each of the session's decisions (`--no-pickup`), which picks nothing up, submits the command's reply as a turn once Claude is idle, and, once that turn has started in the session that asked, records the hand-over and tells the service the agent has the answer (`agentpager pickup`). It does nothing in `claude -p`, an SDK run or on Windows, where the command gives today's background-wait words.
 
 - `hooks/wake.ts`: the logic, with Claude Code behind one interface, `Host`.
 - `hooks/register.ts`: Claude Code's side, every call on `$`.
-- `test/`: `mod.test.ts` with a stand-in for Claude Code, `e2e.test.ts` against the real command and the local service.
+- `test/`: `mod.test.ts` with a stand-in for Claude Code (`stand-in.ts`, which handles a plugin's prompt as Claude Code 2.1.321 did in the real run), `e2e.test.ts` against the real command and the local service.
 
 ## Run it
 

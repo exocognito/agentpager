@@ -25,7 +25,7 @@
 
 ### B29 · @M3 · Set up the command in agent apps
 
-1. `agentpager setup` adds the command's local MCP server to each agent app it finds on the machine: Claude Code, Codex, Claude Desktop and Cursor.
+1. `agentpager setup` adds the command to each agent app it finds on the machine: Claude Code and pi with AgentPager's plugin and extension, Codex, Claude Desktop and Cursor.
 <!-- B29.2 and B29.3 dropped in Sam's review, 6 Nov 2026; ids are never reused -->
 4. A config file that setup can't read whole is left alone, and setup says what to add to it by hand.
 <!-- B29.5 dropped in Sam's review, 6 Nov 2026; ids are never reused -->

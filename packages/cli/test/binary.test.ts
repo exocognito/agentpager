@@ -7,6 +7,8 @@ import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { fixture, assert } from '../../app/test/support.ts';
+import { fromSource } from '../src/adapters.ts';
+import { filesUnder, machine } from './stand-ins/machine.ts';
 
 // The compiled binary (pnpm build), not the source: CLI and MCP against a local server. Skipped until it is built.
 const bin = fileURLToPath(new URL('../dist/agentpager', import.meta.url)), cli = fileURLToPath(new URL('..', import.meta.url));
@@ -47,4 +49,16 @@ test('the compiled binary connects, asks, waits, acknowledges, reports status an
     execFileSync(bin, ['setup'], { env: { HOME: home, PATH: '/usr/bin:/bin' }, encoding: 'utf8' });
     assert.deepEqual(JSON.parse(readFileSync(path.join(home, '.cursor', 'mcp.json'), 'utf8')).mcpServers.agentpager, { command: realpathSync(bin), args: ['mcp'] });
   } finally { await client.close(); await f.stop(); }
+});
+
+// The copy runs in a folder of its own, with no repository beside it and neither Bun nor Node on its PATH; the
+// stand-ins for Claude Code and pi are the tests' own.
+test("B29.8 the built command carries AgentPager's plugin and extension: a copy with no repository beside it sets up Claude Code and pi with the repository's files", { skip: !existsSync(bin) && 'build it first: pnpm --filter @agentpager/cli build' }, () => {
+  const m = machine(['claude', 'pi'], { command: bin });
+  assert.equal(m.setup(), "Claude Code: installed AgentPager's plugin (restart Claude Code)\npi: installed AgentPager's extension (restart pi)\n");
+  const { 'claude-code/.claude-plugin/marketplace.json': market, ...adapters } = filesUnder(path.join(m.agentpager, 'adapters'));
+  assert.deepEqual(adapters, fromSource());
+  assert.equal(JSON.parse(market).name, 'agentpager-local');
+  assert.deepEqual([m.claude().marketplaces, Object.keys(m.claude().plugins), m.pi()], [{ 'agentpager-local': m.plugin }, ['agentpager@agentpager-local'], [m.extension]]);
+  assert.equal(m.setup(), 'Claude Code: already set up\npi: already set up\n');
 });

@@ -24,7 +24,7 @@ If \`agentpager\` isn't installed, there is no download yet: build it from the A
     git clone https://github.com/exocognito/agentpager ~/agentpager
     cd ~/agentpager && pnpm install --frozen-lockfile && pnpm --filter @agentpager/cli build
     mkdir -p ~/.local/bin && ln -sf ~/agentpager/packages/cli/dist/agentpager ~/.local/bin/agentpager
-    ~/.local/bin/agentpager version && ~/.local/bin/agentpager setup    # setup adds its MCP server to Claude, Codex, Cursor
+    ~/.local/bin/agentpager version && ~/.local/bin/agentpager setup    # setup adds it to Claude Code, pi, Codex, Claude Desktop and Cursor
 
 If \`~/.local/bin\` isn't on your PATH, call it as \`~/.local/bin/agentpager\` wherever these steps and its replies say \`agentpager\`. If you can't install or run it here (no access to the repository, no Bun, or a sandbox that blocks it), stop and tell your owner that the agentpager command needs installing on this machine. Don't work around it.
 

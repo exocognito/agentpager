@@ -19,8 +19,10 @@ test('B33.1 Claude Code and Claude Desktop are named only when identified for ce
   process.env.CLAUDECODE = '1';
   assert.equal(app(), 'claude-code', 'Claude Code\'s shell');
   process.env.CODEX_HOME = '/tmp/codex';
+  assert.equal(app(), 'claude-code', 'a person\'s own CODEX_HOME, in every shell on their machine, names no app');
+  process.env.CODEX_SANDBOX = 'seatbelt';
   assert.equal(app(), null, 'Codex started from a Claude Code shell');
-  delete process.env.CODEX_HOME;
+  delete process.env.CODEX_SANDBOX; delete process.env.CODEX_HOME;
   const clients: [string, string | null][] = [['claude-code', 'claude-code'], ['local-agent-mode-agentpager', 'claude-desktop'], ['claude-ai', null], ['codex-mcp-client', 'codex'], ['cursor-vscode', null], ['pi', null], ['', null]];
   for (const [client, h] of clients) assert.equal(app(client), h, `MCP client "${client}", whatever the environment`);
   delete process.env.CLAUDECODE;
@@ -54,9 +56,9 @@ test('B33.2 B33.3 B32.7 Waiting words: Claude Code in the background, a Claude D
     assert.equal((await op.wait(id, d1, { seconds: 1 })).text, `Pending. Your owner hasn't answered "From Claude Code?" yet.\nKeep waiting in the background: ${background}`);
     // The same agent seen through Codex, by its environment or its MCP client, gets everyone's words.
     const everyone = `Pending. Your owner hasn't answered "From Claude Code?" yet.\nKeep waiting: agentpager wait --agent ${id} ${d1}`;
-    process.env.CODEX_HOME = '/tmp/codex';
+    process.env.CODEX_SANDBOX = 'seatbelt';
     assert.equal((await op.wait(id, d1, { seconds: 1 })).text, everyone);
-    delete process.env.CODEX_HOME;
+    delete process.env.CODEX_SANDBOX;
     assert.equal((await op.wait(id, d1, { seconds: 1, via: { client: 'codex-mcp-client' } })).text, everyone);
     delete process.env.CLAUDECODE;
 

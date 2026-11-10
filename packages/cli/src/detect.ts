@@ -5,10 +5,17 @@ import path from 'node:path';
 import { CODEX_CLIENT, wakeableThread } from './codex.ts';
 
 // Who asked ("Codex") and the project its decisions are grouped under on the phone (B25, blueprint/areas/2-agents.md).
-// A harness is known by a marker in its environment, else by its process name. Verified: CLAUDECODE (Claude Code,
-// 29 Oct 2026). The others are each harness's documented or observed variable and are checked again when the binary
-// is built; an agent can always pass --app.
-const MARKERS: [string, string][] = [['CLAUDECODE', 'Claude Code'], ['CODEX_SANDBOX', 'Codex'], ['CODEX_HOME', 'Codex'], ['CURSOR_TRACE_ID', 'Cursor'], ['PI_CODING_AGENT', 'pi']];
+// A harness is known by a marker in its environment, else by its process name. A marker is a variable the app itself
+// sets for the commands it runs, never one a person sets for the app: CODEX_HOME, where a person tells Codex to keep its
+// files, is in every shell on their machine once they export it, in Claude Code's and pi's as much as in Codex's, and
+// Codex doesn't set it in its own (below). Verified: CLAUDECODE (Claude Code, 29 Oct 2026); CODEX_THREAD_ID and
+// CODEX_SANDBOX (Codex 0.163.0, 9 Nov 2026: `codex exec`, read-only and workspace-write, set CODEX_THREAD_ID,
+// CODEX_SANDBOX=seatbelt and CODEX_SANDBOX_NETWORK_DISABLED=1 in the shell of each command, and CODEX_HOME only when the
+// shell that started Codex had it; its source sets the thread for every command since February 2026, whatever the
+// sandbox, and CODEX_SANDBOX only under macOS's sandbox); PI_CODING_AGENT (pi 1.4.0 sets it for itself as it starts, so
+// every command it runs has it). CURSOR_TRACE_ID is Cursor's as others report it, not yet checked against a real
+// Cursor. An agent can always pass --app.
+const MARKERS: [string, string][] = [['CLAUDECODE', 'Claude Code'], ['CODEX_THREAD_ID', 'Codex'], ['CODEX_SANDBOX', 'Codex'], ['CURSOR_TRACE_ID', 'Cursor'], ['PI_CODING_AGENT', 'pi']];
 const NAMES: [RegExp, string][] = [[/^claude$/i, 'Claude Code'], [/^Claude$/, 'Claude'], [/codex/i, 'Codex'], [/^pi$/, 'pi'], [/cursor/i, 'Cursor']];
 // MCP clients name themselves when they connect. A Claude Desktop chat calls tools as local-agent-mode-<server>
 // (verified 30 Oct 2026: every tool call of 145 in the lab); its claude-ai client only lists them.
@@ -47,11 +54,11 @@ export function wakeOf(value: string | undefined): Wake | null {
   const m = value === undefined ? null : /^(claude-code|pi):([A-Za-z0-9._-]{1,128})$/.exec(value);
   return m ? { app: m[1] === 'pi' ? 'pi' : 'claude-code', session: m[2] } : null;
 }
-// The markers each app sets in the shells it runs commands in. Codex's own CODEX_HOME and CODEX_SANDBOX count as
-// Codex being there, but only CODEX_THREAD_ID says which thread it is.
+// The markers each app sets in the shells it runs commands in. Codex's CODEX_SANDBOX counts as Codex being there, but
+// only CODEX_THREAD_ID says which thread it is. A person's own CODEX_HOME counts for nothing (MARKERS, above).
 const SHELL: [string, (env: NodeJS.ProcessEnv) => boolean][] = [
   ['claude-code', env => env.CLAUDECODE === '1' || wakeOf(env.AGENTPAGER_WAKE)?.app === 'claude-code'],
-  ['codex', env => Boolean(env.CODEX_THREAD_ID || env.CODEX_SANDBOX || env.CODEX_HOME)],
+  ['codex', env => Boolean(env.CODEX_THREAD_ID || env.CODEX_SANDBOX)],
   ['pi', env => Boolean(env.PI_CODING_AGENT) || wakeOf(env.AGENTPAGER_WAKE)?.app === 'pi'],
   ['cursor', env => Boolean(env.CURSOR_TRACE_ID)],
 ];

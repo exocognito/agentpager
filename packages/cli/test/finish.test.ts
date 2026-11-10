@@ -15,7 +15,7 @@ import { AgentStatus, DECISION_CLOSED_MESSAGE, Finished, PagerInbox } from '../.
 const cli = fileURLToPath(new URL('..', import.meta.url)), main = path.join(cli, 'src', 'main.ts');
 const field = (r: { json?: unknown }, key: string) => String(typeof r.json === 'object' && r.json !== null ? Reflect.get(r.json, key) : undefined);
 const card = (title: string) => `title: ${title}\ndetail: Before the release.\ncontext:\n  summary: Both are ready.\noptions:\n  - {label: Now, title: Now, prioritizes: speed}\n  - {label: Later, title: Later, prioritizes: safety}\nrecommendation: {option: A, why: Ready.}\n`;
-for (const v of ['CLAUDECODE', 'CODEX_SANDBOX', 'CODEX_HOME', 'CURSOR_TRACE_ID', 'PI_CODING_AGENT', 'AGENTPAGER_PAGER']) delete process.env[v];
+for (const v of ['CLAUDECODE', 'CODEX_SANDBOX', 'CODEX_THREAD_ID', 'CURSOR_TRACE_ID', 'PI_CODING_AGENT', 'AGENTPAGER_PAGER']) delete process.env[v];
 
 // A command run to its end, or killed at its time limit: its exit code, everything it printed, and when it ended.
 function run(argv: string[], env: Record<string, string>, limitMs = 90_000): { done: Promise<{ code: number | null; out: string; at: number }>; ended: () => boolean } {

@@ -20,7 +20,7 @@ const bin = fileURLToPath(new URL('../dist/agentpager', import.meta.url));
 const field = (r: { json?: unknown }, key: string) => String(typeof r.json === 'object' && r.json !== null ? Reflect.get(r.json, key) : undefined);
 const card = (title: string) => ({ object: { title, detail: 'A test.', context: { summary: 'Ready.' }, options: [{ label: 'Now', title: 'Now', prioritizes: 'speed' }, { label: 'Later', title: 'Later', prioritizes: 'rest' }], recommendation: { option: 'A', why: 'Ready.' } } });
 const yaml = (title: string) => `title: ${title}\ndetail: A test.\ncontext:\n  summary: Ready.\noptions:\n  - {label: Now, title: Now, prioritizes: speed}\n  - {label: Later, title: Later, prioritizes: rest}\nrecommendation: {option: A, why: Ready.}\n`;
-for (const v of ['CLAUDECODE', 'CODEX_SANDBOX', 'CODEX_HOME', 'CURSOR_TRACE_ID', 'PI_CODING_AGENT', 'AGENTPAGER_PAGER']) delete process.env[v];
+for (const v of ['CLAUDECODE', 'CODEX_SANDBOX', 'CODEX_THREAD_ID', 'CURSOR_TRACE_ID', 'PI_CODING_AGENT', 'AGENTPAGER_PAGER']) delete process.env[v];
 // A command run to its end, or killed at its time limit, or by `kill`: its exit code, everything it printed.
 function run(argv: string[], env: Record<string, string>, limitMs = 90_000) {
   const [command = '', ...args] = argv;

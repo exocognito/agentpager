@@ -12,19 +12,20 @@ import path from 'node:path';
 // tells the agent not to wait. For each of this session's decisions in the record of what's waiting, it takes the steps
 // of the adapters' contract (store.ts › Waiting): it holds the command's wait that picks nothing up, `agentpager wait
 // --agent <id> <decision> --no-pickup --json`, in a child process, one 50 s wait after another; once pi has settled,
-// never in the middle of a run, it hands that wait's reply to the agent as a follow-up turn; and once that turn has
-// started, it runs `agentpager pickup`, again until it lands, so the answer counts as picked up only once the agent has
-// it (B32.12). A wait left running when pi is killed, or a reply pi never takes, picks nothing up, and the owner is
-// warned (B5.13). Each decision's reply goes in once on the session's branch: the turn's message names its decisions in
-// its details, each with whether it carried the answer, which pi keeps in the session. So a later start of the same
-// session, or a move to another point of its tree, neither hands over again a reply its branch holds nor holds its
-// wait; it only runs the pickup of an answer it carried, if that hadn't landed. A decision still waiting on the agent
-// whose reply only another branch holds is handed over again on this one, and a reply collected for a branch the owner
-// has since left isn't handed over on one that holds it. An answer the agent has read by itself, with a wait of its
-// own, isn't handed over as well: the record says so (its state, and its count of such reads), and where the reply was
-// owed to this branch the extension notes the read in the session, on the branch, so a later start or a return there
-// doesn't hand it over either. It reads ids, states and counts from the record and statuses from the command's JSON,
-// never the words of a reply.
+// never in the middle of a run, it hands that wait's reply to the agent as a follow-up turn (where pi is busy with no
+// run going, compacting or moving within its tree, it looks again each second, since no event says when that ends);
+// and once that turn has started, it runs `agentpager pickup`, again until it lands, so the answer counts as picked up
+// only once the agent has it (B32.12). A wait left running when pi is killed, or a reply pi never takes, picks nothing
+// up, and the owner is warned (B5.13). Each decision's reply goes in once on the session's branch: the turn's message
+// names its decisions in its details, each with whether it carried the answer, which pi keeps in the session. So a
+// later start of the same session, or a move to another point of its tree, neither hands over again a reply its
+// branch holds nor holds its wait; it only runs the pickup of an answer it carried, if that hadn't landed. A decision
+// still waiting on the agent whose reply only another branch holds is handed over again on this one, and a reply
+// collected for a branch the owner has since left isn't handed over on one that holds it. An answer the agent has read
+// by itself, with a wait of its own, isn't handed over as well: the record says so (its state, and its count of such
+// reads), and where the reply was owed to this branch the extension notes the read in the session, on the branch, so a
+// later start or a return there doesn't hand it over either. It reads ids, states and counts from the record and
+// statuses from the command's JSON, never the words of a reply.
 //
 // In print and JSON mode it does nothing but clear an AGENTPAGER_WAKE inherited from a session around it, so the command
 // keeps today's words there and nothing is left running when the run ends. Every child is stopped when the session
@@ -46,6 +47,8 @@ const RETRY_MS = 10_000, OFF_RETRY_MS = 60_000;
 // A follow-up that pi hasn't started this long after it was sent, while idle, is sent again, each time waiting twice as
 // long, up to 5 minutes.
 const CONFIRM_MS = 10_000, CONFIRM_MAX_MS = 300_000;
+// How long before it looks again whether pi is idle, while a reply waits and pi is busy with no run going.
+const IDLE_MS = 1_000;
 const REPLY_MAX_BYTES = 1024 * 1024;
 // The session as AGENTPAGER_WAKE names it, the agent and decision ids as the command makes them.
 const SESSION = /^[A-Za-z0-9._-]{1,128}$/, AGENT = /^ap-[a-z0-9]{4}$/, DECISION = /^d_[a-z0-9]{4}$/;
@@ -75,9 +78,9 @@ export type Pi = {
   sendMessage(message: { customType: string; content: string; display: boolean; details?: unknown }, options?: { triggerTurn?: boolean; deliverAs?: 'steer' | 'followUp' | 'nextTurn' }): void;
   appendEntry(customType: string, data?: unknown): void;
 };
-// command: how to run agentpager; home: the folder it keeps its files in; retryMs, offRetryMs and confirmMs: a test
+// command: how to run agentpager; home: the folder it keeps its files in; retryMs, offRetryMs, confirmMs and idleMs: a test
 // shortens them.
-export type Options = { command?: readonly string[]; home?: string; retryMs?: number; offRetryMs?: number; confirmMs?: number };
+export type Options = { command?: readonly string[]; home?: string; retryMs?: number; offRetryMs?: number; confirmMs?: number; idleMs?: number };
 
 type Reply = { agent: string; decision: string; text: string; answered: boolean };
 const keyOf = (agent: string, decision: string) => `${agent} ${decision}`;
@@ -105,7 +108,7 @@ function listedIn(file: string, agent: string, session: string): Map<string, Lis
 }
 
 export function agentpagerWake(pi: Pi, options: Options = {}) {
-  const command = options.command ?? ['agentpager'], retryMs = options.retryMs ?? RETRY_MS, offRetryMs = options.offRetryMs ?? OFF_RETRY_MS, confirmMs = options.confirmMs ?? CONFIRM_MS;
+  const command = options.command ?? ['agentpager'], retryMs = options.retryMs ?? RETRY_MS, offRetryMs = options.offRetryMs ?? OFF_RETRY_MS, confirmMs = options.confirmMs ?? CONFIRM_MS, idleMs = options.idleMs ?? IDLE_MS;
   const home = () => options.home ?? (process.env.AGENTPAGER_HOME || path.join(homedir(), '.agentpager'));
   const waitingDir = () => path.join(home(), 'waiting');
   const listed = (agent: string) => session === null ? null : listedIn(path.join(waitingDir(), `${agent}.json`), agent, session);
@@ -124,7 +127,7 @@ export function agentpagerWake(pi: Pi, options: Options = {}) {
   const ready = new Map<string, Reply>(), tried = new Set<string>();
   let done = new Set<string>(), here = new Map<string, boolean>(), elsewhere = new Set<string>(), readBefore = new Map<string, number>();
   let inFlight: { replies: Reply[]; tries: number; timer: ReturnType<typeof setTimeout> } | null = null;
-  let watcher: FSWatcher | null = null, rescan: ReturnType<typeof setTimeout> | null = null;
+  let watcher: FSWatcher | null = null, rescan: ReturnType<typeof setTimeout> | null = null, idleCheck: ReturnType<typeof setTimeout> | null = null;
 
   const idle = () => { try { return Boolean(ctx?.isIdle()) && !ctx?.hasPendingMessages(); } catch { return false; } };
   const notify = (message: string) => { try { if (ctx?.hasUI) ctx.ui.notify(message, 'warning'); } catch { /* the session is gone */ } };
@@ -263,8 +266,14 @@ export function agentpagerWake(pi: Pi, options: Options = {}) {
     return out;
   };
   // Hands the replies waiting over as one follow-up turn, once pi has settled with nothing queued: never into a run.
+  // With no run going, pi can still be busy (it is compacting, or moving within its tree) or have a message queued,
+  // and no event says when that ends: it looks again shortly, by the same rule, until the replies have gone in.
   const deliver = () => {
-    if (stopped || session === null || running || inFlight || ready.size === 0 || !idle()) return;
+    if (stopped || session === null || running || inFlight || ready.size === 0) return;
+    if (!idle()) {
+      if (!idleCheck) { idleCheck = setTimeout(() => { idleCheck = null; deliver(); }, idleMs); idleCheck.unref(); }
+      return;
+    }
     const replies = stillOwed([...ready.values()]);
     ready.clear();
     if (replies.length) send(replies, 1);
@@ -380,6 +389,7 @@ export function agentpagerWake(pi: Pi, options: Options = {}) {
     for (const timers of [again, pickAgain]) { for (const t of timers.values()) clearTimeout(t); timers.clear(); }
     if (inFlight) clearTimeout(inFlight.timer);
     if (rescan) clearTimeout(rescan);
+    if (idleCheck) clearTimeout(idleCheck);
     watcher?.close();
     watcher = null;
     if (session !== null && process.env.AGENTPAGER_WAKE === `pi:${session}`) delete process.env.AGENTPAGER_WAKE;

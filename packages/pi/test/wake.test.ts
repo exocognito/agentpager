@@ -10,7 +10,9 @@ import { agentpagerWake, LINE, TYPE, type Context, type Events, type Options } f
 // AgentPager's pi extension (B33.5, blueprint/areas/2-agents.md) against a stand-in for pi and the real command, run from
 // its source, on the suites' local server. The stand-in does what pi 1.4.0 does with the calls the extension makes: a
 // follow-up sent while idle starts a run with its message, one sent from inside agent_settled waits until that has
-// been emitted, and each message, and each entry the extension appends, is kept in the session's entries. Whether pi itself starts the turn is shown by the
+// been emitted, each message, and each entry the extension appends, is kept in the session's entries, and pi isn't
+// idle while it compacts or moves within its tree (the event of a move comes before it is idle again, and nothing says
+// when it is). Whether pi itself starts the turn is shown by the
 // real run recorded in the pull request; this shows what the extension does with each event, and when the command picks
 // the answer up (B32.12): only once the turn carrying it has started. The service's not-picked-up clock is 3 s here.
 
@@ -21,7 +23,7 @@ mkdirSync(bin);
 for (const v of ['CLAUDECODE', 'CODEX_SANDBOX', 'CODEX_HOME', 'CODEX_THREAD_ID', 'CURSOR_TRACE_ID', 'PI_CODING_AGENT', 'PI_SESSION_ID', 'AGENTPAGER_WAKE', 'AGENTPAGER_PAGER']) delete process.env[v];
 process.env.AGENTPAGER_HOME = home;
 writeFileSync(path.join(work, 'card.yaml'), 'title: Which colour?\ndetail: A pi wake test.\ncontext:\n  summary: Ready.\noptions:\n  - {label: Blue, title: Blue, prioritizes: calm}\n  - {label: Red, title: Red, prioritizes: speed}\nrecommendation: {option: A, why: Calm.}\n');
-const fast: Options = { command, retryMs: 300, offRetryMs: 300, confirmMs: 2_000 };
+const fast: Options = { command, retryMs: 300, offRetryMs: 300, confirmMs: 2_000, idleMs: 200 };
 const PICKUP_MS = 3_000;
 
 // pi as the extension sees it: its events, its calls, the session's entries, the branch it is on (a session resumes at
@@ -30,11 +32,11 @@ function standIn(mode: Context['mode'], sessionId: string, entries: unknown[] = 
   const handlers: { [E in keyof Events]: ((event: Events[E], ctx: Context) => void)[] } = { session_start: [], session_shutdown: [], session_tree: [], before_agent_start: [], message_start: [], agent_start: [], agent_settled: [], tool_result: [] };
   const branch = [...(at ?? entries)];
   const sent: { content: string; details: unknown; options: unknown; whileWorking: boolean }[] = [], notes: string[] = [];
-  let working = false, queued = false, settling = false;
+  let working = false, queued = false, settling = false, compacting = false;
   const later: (() => void)[] = [];
   const ctx: Context = {
     mode, hasUI: mode === 'tui' || mode === 'rpc',
-    isIdle: () => !working, hasPendingMessages: () => queued,
+    isIdle: () => !working && !compacting, hasPendingMessages: () => queued,
     sessionManager: { getSessionId: () => sessionId, getEntries: () => entries, getBranch: () => branch },
     ui: { notify: m => { notes.push(m); } },
   };
@@ -65,11 +67,13 @@ function standIn(mode: Context['mode'], sessionId: string, entries: unknown[] = 
     queue: (on: boolean) => { queued = on; },
     bash: () => emit('tool_result', { toolName: 'bash' }),
     shutdown: () => emit('session_shutdown', { reason: 'quit' }),
+    // pi compacts, or summarizes the branch a move leaves: it isn't idle meanwhile, and no event says when it ends.
+    compacting: (on: boolean) => { compacting = on; },
     // The owner moves to an earlier point of the session's tree, keeping its first entries, or back to a branch left
-    // earlier.
-    navigate: (keep: number) => { branch.splice(keep); emit('session_tree', {}); },
+    // earlier. pi isn't idle until after the event.
+    navigate: (keep: number) => { const was = compacting; compacting = true; branch.splice(keep); emit('session_tree', {}); compacting = was; },
     branch: () => [...branch],
-    back: (to: unknown[]) => { branch.splice(0, branch.length, ...to); emit('session_tree', {}); },
+    back: (to: unknown[]) => { const was = compacting; compacting = true; branch.splice(0, branch.length, ...to); emit('session_tree', {}); compacting = was; },
   };
 }
 
@@ -299,6 +303,47 @@ test('B33.5 B32.12 While pi works the answer waits, never going into the run and
   await until(() => seen('Busy, blue or red?'), x => x?.collectedAt !== undefined);
   pi.settle();
   assert.equal(pi.sent.length, 1);
+  pi.shutdown();
+});
+
+test('B33.5 B32.12 An answer that comes while pi is busy with no run going, compacting or moving within its tree, is handed over once pi is idle again, though no event says so, and once only', { timeout: 60_000 }, async () => {
+  const pi = standIn('tui', 's-compacting');
+  pi.start();
+  const first = await asks('s-compacting', 'Compacting, blue or red?');
+  pi.bash();
+  // The owner compacts the session, and answers while pi is at it.
+  pi.compacting(true);
+  await answer('Compacting, blue or red?');
+  await until(async () => holds(first.agent, first.d), held => !held);
+  await new Promise(res => setTimeout(res, 700));
+  assert.equal(pi.sent.length, 0, 'nothing while pi compacts');
+  assert.equal((await seen('Compacting, blue or red?'))?.collectedAt, undefined, 'and not picked up');
+  // The compaction ends. pi says nothing to the extension, which finds pi idle when it next looks.
+  pi.compacting(false);
+  await until(async () => pi.sent.length, n => n === 1, 5_000);
+  assert.equal(pi.sent[0].whileWorking, false);
+  assert.deepEqual(pi.sent[0].options, { triggerTurn: true, deliverAs: 'followUp' });
+  assert.deepEqual(decisionsOf(pi.sent[0].details), [{ agent: first.agent, decision: first.d, answered: true }]);
+  await until(() => seen('Compacting, blue or red?'), x => x?.collectedAt !== undefined);
+  pi.settle();
+  // The same during a move within the tree: the answer comes while pi summarizes the branch it leaves, and the move's
+  // event comes before pi is idle again.
+  const second = await asks('s-compacting', 'Moving, blue or red?');
+  pi.bash();
+  pi.compacting(true);
+  await answer('Moving, blue or red?', { kind: 'option', number: 2 });
+  await until(async () => holds(second.agent, second.d), held => !held);
+  pi.navigate(pi.branch().length);
+  await new Promise(res => setTimeout(res, 700));
+  assert.equal(pi.sent.length, 1, 'nothing while pi isn\'t idle');
+  pi.compacting(false);
+  await until(async () => pi.sent.length, n => n === 2, 5_000);
+  assert.deepEqual(decisionsOf(pi.sent[1].details), [{ agent: second.agent, decision: second.d, answered: true }]);
+  assert.match(pi.sent[1].content, /option B "Red"/);
+  await until(() => seen('Moving, blue or red?'), x => x?.collectedAt !== undefined);
+  await new Promise(res => setTimeout(res, 700));
+  pi.settle(); pi.bash(); pi.settle();
+  assert.equal(pi.sent.length, 2, 'each once');
   pi.shutdown();
 });
 

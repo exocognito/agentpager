@@ -17,12 +17,21 @@
 //   picked up, across a restart too, when the pager is off or the service had no usable reply.
 // - It hands the reply over as a new turn ($.prompt.submit) once Claude is idle: at once when it is, else after the
 //   running turn and a moment more, so a prompt the person queued, or a /clear, goes first. Never in a running turn.
+//   Claude Code holds a plugin's prompt itself while something the mod isn't told of runs (a /compact, its own start),
+//   and the call stays unresolved until that prompt's turn starts (Host › submit).
+// - An answer counts as handed over only once its turn has started in the session that asked: Claude Code said the
+//   prompt entered and then a turn of the main loop started there, or one started carrying the reply. Only then is it
+//   recorded and picked up. A prompt Claude Code removed before it ran (the person pressed Esc), or didn't take (it
+//   holds a plugin's prompts after the person stopped the session, until they type), is offered again after the
+//   person's next turn, or a minute later. One still waiting when the person's /clear takes effect starts in the new
+//   conversation (Claude Code 2.1.321 keeps it across the /clear): it isn't recorded or picked up, and the session
+//   that asked gets it when it is resumed.
 // - Each answer is handed over once: once its turn has started, a folder under AgentPager's home says so, which a
 //   restart of Claude Code, or a later one on the same session, finds. It goes when its decision leaves the record
-//   (acknowledged or closed unanswered). A turn Claude Code didn't take is offered again after the person's next turn,
-//   or a minute later. Two Claude Codes running one session at the same moment would each hand it over to their own
-//   conversation (not tested). A refusal in place of an answer (an answer that can't be read, say) is handed over once
-//   while Claude Code runs, and is neither recorded as handed over nor picked up.
+//   (acknowledged or closed unanswered). Two Claude Codes running one session at the same moment each hand it over to
+//   their own conversation (seen with Claude Code 2.1.321, 9 Nov). A refusal in place of an answer (an answer that
+//   can't be read, say) is handed over once while Claude Code runs, and is neither recorded as handed over nor picked
+//   up.
 // - The turn carries the answer, as anything the agent reads does: Claude Code keeps it in the session's transcript,
 //   and, run with --debug, logs a plugin prompt's first words in its debug log. The mod's own debug lines hold ids and
 //   states only.
@@ -49,7 +58,8 @@ export interface Host {
   now(): Promise<number>;
   after(ms: number, fn: () => void): Timer;
   every(ms: number, fn: () => void): Timer;
-  // `$.session.id()`: the transcript's name, which a /clear or a /resume changes.
+  // `$.session.id()`: the transcript's name, which a /clear or a /resume changes, some time after the session it
+  // left has ended: Claude Code 2.1.321 goes on giving the old one until its own session-start hooks are done.
   sessionId(): Promise<string>;
   // Sets or unsets AGENTPAGER_WAKE for every process the session starts from then on; false when Claude Code refused.
   setWake(value: string | undefined): Promise<boolean>;
@@ -61,8 +71,12 @@ export interface Host {
   run(argv: string[]): Promise<{ exitCode: number; stdout: string }>;
   // A child for as long as it runs: its exit code (null when a signal ended it) and all it wrote to stdout.
   spawn(argv: string[]): Spawned;
-  // A turn of its own once Claude is idle, resolved as that turn starts; not entered when Claude Code holds a plugin's
-  // prompts (after the person stopped the session, until they type) or refused it.
+  // `$.prompt.submit`: a turn of its own once Claude Code is idle. Claude Code keeps the prompt waiting behind a running
+  // turn, a compaction or its own start, and the call stays unresolved meanwhile. With Claude Code 2.1.321 it resolves
+  // entered as that turn starts, a moment before the mod hears the turn start; Claude Code's declarations also let it
+  // resolve once the prompt is queued behind a running turn, so entered alone never counts as started. Not entered:
+  // Claude Code removed the prompt before it ran (the person pressed Esc), holds a plugin's prompts (after the person
+  // stopped the session, until they type), or refused it.
   submit(text: string): Promise<{ entered: true } | { entered: false; why: string }>;
   // A line in Claude Code's debug log: ids and states only, never an answer.
   debug(line: string): void;
@@ -136,19 +150,24 @@ export function pickupAgainIn(stdout: string): number | null {
   if (typeof r?.code !== 'number') return UNREACHABLE_MS;
   return r.code === 4 ? OFF_MS : r.code === 5 ? UNREACHABLE_MS : r.code === 0 || r.code === 2 || r.code === 6 ? null : UNREACHABLE_MS;
 }
-export const turnText = (agent: string, decision: string, o: { answered: boolean; text: string }) => o.answered
-  ? `AgentPager: your owner answered decision ${decision} (agent ${agent}). The agentpager command's reply:\n\n${o.text}`
-  : `AgentPager: about decision ${decision} (agent ${agent}), the agentpager command replied:\n\n${o.text}`;
+// Its first line names the decision and the agent, and is what a turn carrying it is known by when it starts.
+export const turnOpening = (agent: string, decision: string, answered: boolean) => answered
+  ? `AgentPager: your owner answered decision ${decision} (agent ${agent}). The agentpager command's reply:`
+  : `AgentPager: about decision ${decision} (agent ${agent}), the agentpager command replied:`;
+export const turnText = (agent: string, decision: string, o: { answered: boolean; text: string }) => `${turnOpening(agent, decision, o.answered)}\n\n${o.text}`;
 
 type Hold = {
   key: string; agent: string; decision: string; session: string;
-  // holding: its wait runs; ready: the reply waits for Claude to be idle; handing: its turn is being submitted.
-  state: 'holding' | 'ready' | 'handing'; turn?: string; answered?: boolean;
+  // holding: its wait runs; ready: the reply waits for Claude to be idle; handing: Claude Code has been asked for its
+  // turn, which hasn't started yet as far as the mod has heard (entered: Claude Code said the prompt entered).
+  state: 'holding' | 'ready' | 'handing'; turn?: string; answered?: boolean; entered?: boolean;
   stopped: boolean; child?: Spawned; wake?: () => void;
 };
 
 export class Mod {
   private session: string | null = null;
+  // The session a /clear or a /resume ended, while Claude Code still gives its id as the session's.
+  private left: string | null = null;
   private readonly holds = new Map<string, Hold>();
   // A decision whose wait found no such agent here isn't held again before this.
   private readonly resting = new Map<string, number>();
@@ -173,18 +192,25 @@ export class Mod {
     this.ticker = this.host.every(TICK_MS, () => void this.look().catch(e => this.host.debug(`look failed: ${String(e)}`)));
     await this.look().catch(e => this.host.debug(`look failed: ${String(e)}`));
   }
-  // The main loop's turns: a turn started keeps every handed-over turn waiting, and names the session again first, so
-  // the first command after a /clear names the new one.
-  async turnStarted() { this.busy = true; await this.name(); }
+  // The main loop's turns: a turn started keeps every hand-over waiting, and names the session again first, so the
+  // first command after a /clear names the new one. It is also where an answer is known to be handed over: a turn
+  // has started, in the session that asked, after Claude Code said the answer's prompt entered, or carrying its reply.
+  async turnStarted(text = '') {
+    this.busy = true;
+    await this.name(true).catch(e => this.host.debug(`naming failed: ${String(e)}`));
+    for (const h of [...this.holds.values()]) {
+      if (h.state === 'handing' && h.session === this.session && (h.entered || text.includes(turnOpening(h.agent, h.decision, h.answered === true)))) this.handedOver(h);
+    }
+  }
   async turnEnded() {
     this.busy = false; this.heldUntil = 0; this.endedAt = await this.host.now();
     this.host.after(SETTLE_MS, () => void this.hand());
   }
   // The session ended. Its waits stop. After a /clear or a /resume Claude Code goes on under another session, which
-  // the next look names; any other end is the process's.
-  sessionEnded(reason: string) {
+  // a later look names once Claude Code gives its id, or the next turn's start; any other end is the process's.
+  sessionEnded(reason: string, id?: string) {
     for (const key of [...this.holds.keys()]) this.drop(key);
-    if (reason === 'clear' || reason === 'resume') return;
+    if (reason === 'clear' || reason === 'resume') { this.left = id ?? this.session; this.session = null; return; }
     this.ended = true;
     this.ticker?.cancel();
   }
@@ -193,14 +219,18 @@ export class Mod {
   get named() { return this.session; }
 
   // AGENTPAGER_WAKE follows the session's id. A new id ends the waits for the old one's decisions; they are held again
-  // when that session is resumed.
-  private async name() {
+  // when that session is resumed. The id of a session that has just ended isn't taken for the session's until a turn
+  // starts under it: Claude Code goes on giving it for a while (Host › sessionId), and an answer handed over then
+  // would start its turn in the conversation that comes next.
+  private async name(atTurn = false) {
     const id = await this.host.sessionId();
+    if (id === this.left && !atTurn) return;
+    this.left = null;
     if (id === this.session) return;
     const set = SESSION.test(id) && await this.host.setWake(`claude-code:${id}`);
     if (!set) await this.host.setWake(undefined);
     this.session = set ? id : null;
-    for (const h of [...this.holds.values()]) if (h.session !== this.session && h.state !== 'handing') this.drop(h.key);
+    for (const h of [...this.holds.values()]) if (h.session !== this.session) this.drop(h.key);
     this.host.debug(`names session ${this.session ?? 'none'}`);
   }
 
@@ -219,11 +249,25 @@ export class Mod {
     const claimed = (await this.host.list(this.claims))?.filter(e => CLAIM.test(e.name)).map(e => e.name) ?? [];
     const records = await this.records();
     const now = await this.host.now(), mine = new Map<string, { agent: string; decision: string; pickedUp: boolean }>();
-    if (records && this.session) for (const [agent, r] of records) for (const d of r?.decisions ?? []) if (d.session === this.session) mine.set(`${agent} ${d.decision}`, { agent, decision: d.decision, pickedUp: d.pickedUp });
+    // Every decision the records list, whoever wakes its agent, and the agents whose record didn't read this time:
+    // nothing is concluded about a decision from a record that didn't read.
+    const listed = new Set<string>(), unread = new Set<string>();
+    for (const [agent, r] of records ?? []) {
+      if (r === null) { unread.add(agent); continue; }
+      for (const d of r.decisions) {
+        listed.add(`${agent} ${d.decision}`);
+        if (this.session && d.session === this.session) mine.set(`${agent} ${d.decision}`, { agent, decision: d.decision, pickedUp: d.pickedUp });
+      }
+    }
     // A decision no longer this session's, or one a wait of the agent's own has picked up (it followed today's
     // background-wait words, say), is the agent's already: its hold stops, ready or not.
-    for (const h of [...this.holds.values()]) if (h.state !== 'handing' && (!mine.has(h.key) || mine.get(h.key)?.pickedUp)) this.drop(h.key);
-    if (records) for (const key of [...this.handed, ...this.picked, ...this.pickupAt.keys()]) if (!mine.has(key)) { this.handed.delete(key); this.answers.delete(key); this.picked.delete(key); this.pickupAt.delete(key); }
+    for (const h of [...this.holds.values()]) if (h.state !== 'handing' && !unread.has(h.agent) && (!mine.has(h.key) || mine.get(h.key)?.pickedUp)) this.drop(h.key);
+    // What this process remembers of a decision goes when the decision leaves the record, not when the session changes:
+    // back in a session after a /resume, what was handed over there isn't handed over again.
+    for (const key of [...this.handed, ...this.picked, ...this.pickupAt.keys(), ...this.resting.keys()]) {
+      if (listed.has(key) || unread.has(key.slice(0, key.indexOf(' ')))) continue;
+      this.handed.delete(key); this.answers.delete(key); this.picked.delete(key); this.pickupAt.delete(key); this.resting.delete(key);
+    }
     const taken = new Set(claimed);
     for (const [key, m] of mine) {
       const answer = this.answers.has(key) || taken.has(`${m.agent}.${m.decision}`), handed = answer || this.handed.has(key);
@@ -301,30 +345,28 @@ export class Mod {
     this.holds.delete(key);
   }
 
-  // Hands the first ready reply over, once Claude is idle and has been for SETTLE_MS; the next waits for that turn's end.
-  // A decision another Claude Code on the session has handed over is left to it.
+  // Asks Claude Code for the first ready reply's turn, once Claude is idle and has been for SETTLE_MS; the next waits
+  // for that turn's end. A decision another Claude Code on the session has handed over is left to it. One call to
+  // Claude Code is out at a time, and what comes of it is the turn's start (turnStarted), not the call's reply alone.
   private async hand() {
-    if (this.handing || this.ended) return;
+    if (this.handing) return;
     this.handing = true;
     try {
       for (;;) {
+        if (this.ended || this.busy) return;
         const h = [...this.holds.values()].find(x => x.state === 'ready');
-        if (!h || this.busy) return;
+        if (!h) return;
         const now = await this.host.now();
         if (now < this.heldUntil) return;
         if (now - this.endedAt < SETTLE_MS) { this.host.after(SETTLE_MS - (now - this.endedAt), () => void this.hand()); return; }
         if (!(await this.stillMine(h)) || await this.host.exists(this.claimOf(h.agent, h.decision)).catch(() => false)) { this.drop(h.key); continue; }
+        // Those reads took time: a turn may have started, or the session ended or changed, since.
+        if (this.busy || this.ended || this.holds.get(h.key) !== h || h.session !== this.session) continue;
         h.state = 'handing';
         const r = await this.host.submit(h.turn ?? '').catch((e: unknown) => ({ entered: false as const, why: String(e) }));
-        if (r.entered) {
-          this.holds.delete(h.key); this.handed.add(h.key);
-          this.host.debug(`handed ${h.agent} ${h.decision} over`);
-          // Only an answer is recorded as handed over and picked up. A refusal (an answer that can't be read, say) is
-          // handed over once while this process runs and leaves the service as it was, so an answer that comes or reads
-          // later still reaches the agent after a restart, and until then brings the owner's warning.
-          if (h.answered) { this.answers.add(h.key); await this.claim(h.agent, h.decision); void this.pickup(h.key, h.agent, h.decision); }
-          return;
-        }
+        // Its turn has started already, or its hold stopped while the call was out (the session ended, say).
+        if (this.holds.get(h.key) !== h) return;
+        if (r.entered) { h.entered = true; this.host.debug(`turn for ${h.agent} ${h.decision} entered`); return; }
         // Not taken: the turn waits for the person's next turn, or a minute.
         this.host.debug(`turn for ${h.agent} ${h.decision} not taken: ${r.why}`);
         h.state = 'ready'; this.heldUntil = (await this.host.now()) + NOT_TAKEN_MS;
@@ -332,6 +374,17 @@ export class Mod {
         return;
       }
     } finally { this.handing = false; }
+  }
+  // The turn carrying a reply has started: it is handed over, and its hold is done. Only an answer is recorded as
+  // handed over and picked up. A refusal (an answer that can't be read, say) is handed over once while this process
+  // runs and leaves the service as it was, so an answer that comes or reads later still reaches the agent after a
+  // restart, and until then brings the owner's warning.
+  private handedOver(h: Hold) {
+    this.holds.delete(h.key); this.handed.add(h.key);
+    this.host.debug(`handed ${h.agent} ${h.decision} over`);
+    if (!h.answered) return;
+    this.answers.add(h.key);
+    void this.claim(h.agent, h.decision).then(() => this.pickup(h.key, h.agent, h.decision)).catch(e => this.host.debug(`pickup of ${h.agent} ${h.decision} failed: ${String(e)}`));
   }
   // The record that a decision's answer was handed over, made once its turn has started: so a restart finds it, and
   // the turn is never handed over again. Made after, not before, so a Claude Code that quits while the turn waits to

@@ -7,11 +7,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { fixture, assert, until } from '../../app/test/support.ts';
 import { COMMAND, Mod, decodeRecord, type Host } from '../hooks/wake.ts';
+import { framed } from './stand-in.ts';
 
 // The Claude Code plugin's mod against the real agentpager command, run from source, and the real service, on the
 // suites' local fixture (B33.2, blueprint/areas/2-agents.md). Claude Code alone is a stand-in: its environment is this
-// process's, its turns are recorded, and the mod's children are real processes of the command. The real run with
-// Claude Code itself is in the pull request.
+// process's, its turns are recorded, each starting as Claude Code 2.1.321 starts a plugin's (the call resolves, then
+// the mod hears the turn start), and the mod's children are real processes of the command. The real run with Claude
+// Code itself is in the pull request.
 
 const main = fileURLToPath(new URL('../../cli/src/main.ts', import.meta.url));
 const home = mkdtempSync(path.join(tmpdir(), 'agentpager-plugin-'));
@@ -28,6 +30,8 @@ const command = (argv: string[]): [string, string[]] => argv[0] === COMMAND ? [p
 type Turn = { text: string; at: number };
 function claudeCode(session: string) {
   const turns: Turn[] = [], mine = new Set<number>();
+  // The mod that hears this Claude Code's turns start.
+  const hears: { mod?: Mod } = {};
   const host: Host = {
     now: async () => Date.now(),
     after: (ms, fn) => { const t = setTimeout(fn, ms); return { cancel: () => clearTimeout(t) }; },
@@ -46,10 +50,16 @@ function claudeCode(session: string) {
       const done = new Promise<{ code: number | null; stdout: string }>(resolve => child.on('close', code => resolve({ code, stdout })));
       return { done, stop: () => { child.kill('SIGTERM'); } };
     },
-    submit: async text => { turns.push({ text, at: Date.now() }); return { entered: true }; },
+    submit: async text => {
+      turns.push({ text, at: Date.now() });
+      setImmediate(() => void hears.mod?.turnStarted(framed(text)));
+      return { entered: true };
+    },
     debug: () => undefined,
   };
-  return { host, turns, pids: mine };
+  const mod = new Mod(host, home);
+  hears.mod = mod;
+  return { host, mod, turns, pids: mine };
 }
 const alive = (pid: number) => { try { process.kill(pid, 0); return true; } catch { return false; } };
 const card = (title: string) => ({ object: { title, detail: 'A plugin test.', context: { summary: 'Ready.' }, options: [{ label: 'Blue', title: 'Blue', prioritizes: 'calm' }, { label: 'Green', title: 'Green', prioritizes: 'speed' }], recommendation: { option: 'A', why: 'Calm.' } } });
@@ -76,7 +86,7 @@ test('B33.2 B32.12 With the plugin, an agent that asks from its shell isn\'t tol
   const p = await f.makePager(), session = randomUUID();
   // Claude Code's shell: CLAUDECODE and its own session id; the mod names the session at its start.
   Object.assign(process.env, { CLAUDECODE: '1', CLAUDE_CODE_SESSION_ID: session });
-  const cc = claudeCode(session), mod = new Mod(cc.host, home);
+  const cc = claudeCode(session), mod = cc.mod;
   mods.push(mod);
   await mod.start();
   assert.equal(process.env.AGENTPAGER_WAKE, `claude-code:${session}`);
@@ -100,6 +110,7 @@ test('B33.2 B32.12 With the plugin, an agent that asks from its shell isn\'t tol
   // The agent acknowledges: the decision leaves the record, and the record of handing it over goes.
   await op.ack(id, d, 'Painting it green.');
   await until(async () => handed(id, d), there => !there, 5_000);
+  await mod.turnEnded();
 
   // Busy: the answer is held, and not picked up, until the running turn ends.
   const busy = field(await op.ask(id, card('Which size?')), 'decision');
@@ -125,7 +136,7 @@ test('B33.2 B32.12 With the plugin, an agent that asks from its shell isn\'t tol
   await new Promise(r => setTimeout(r, 1_500));
   assert.equal((await seen(p, 'Which shade?'))?.collectedAt, undefined);
   // Started again on the same session, the mod hands it over as the first turn, once.
-  const again = claudeCode(session), restarted = new Mod(again.host, home);
+  const again = claudeCode(session), restarted = again.mod;
   mods.push(restarted);
   await restarted.start();
   const [first] = await until(async () => again.turns, t => t.length > 0);

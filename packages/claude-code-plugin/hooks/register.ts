@@ -45,34 +45,43 @@ function hostOf($: EngineInterface): Host {
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const started = await next(e)
-    mod?.sessionEnded('reload')
-    mod = null
-    available = isCommand(await $.process.run([COMMAND, 'version'], { timeoutMs: 10_000 }).catch(() => ({ exitCode: 1, stdout: '' })))
-    const home = homeOf(await $.env.get('AGENTPAGER_HOME'), await $.env.get('HOME'))
-    const hasShell = await $.fs.exists('/bin/sh').catch(() => false)
-    if (!wakesHere({ isInteractive: e.isInteractive, hasShell, command: available, home }) || home === null) {
-      // A variable a session this one was started from set doesn't speak for this one.
-      await $.env.set('AGENTPAGER_WAKE', undefined)
-      return started
+    // Whatever fails here, the session starts as it would without the plugin.
+    try {
+      mod?.sessionEnded('reload')
+      mod = null
+      available = isCommand(await $.process.run([COMMAND, 'version'], { timeoutMs: 3_000 }).catch(() => ({ exitCode: 1, stdout: '' })))
+      const home = homeOf(await $.env.get('AGENTPAGER_HOME'), await $.env.get('HOME'))
+      const hasShell = await $.fs.exists('/bin/sh').catch(() => false)
+      if (!wakesHere({ isInteractive: e.isInteractive, hasShell, command: available, home }) || home === null) {
+        // A variable a session this one was started from set doesn't speak for this one.
+        await $.env.set('AGENTPAGER_WAKE', undefined)
+        return started
+      }
+      mod = new Mod(hostOf($), home)
+      await mod.start()
+    } catch (err) {
+      // No mod, so no name for the session either: the command words the background wait.
+      mod?.sessionEnded('failed')
+      mod = null
+      await $.env.set('AGENTPAGER_WAKE', undefined).catch(() => undefined)
+      $.ui.log(`agentpager: session start failed: ${String(err)}`, { to: 'debug' })
     }
-    mod = new Mod(hostOf($), home)
-    await mod.start()
     return started
   })
 
-  // The main loop's turns; a subagent's are its own.
+  // The main loop's turns; a subagent's are its own. A turn starts whatever the mod makes of it.
   on('turn.start', async ($, e, next) => {
-    if (e.agentId === undefined) await mod?.turnStarted()
+    if (e.agentId === undefined) await mod?.turnStarted(e.text).catch(() => undefined)
     return next(e)
   })
   on('turn.complete', async ($, e, next) => {
     const done = await next(e)
-    if (e.agentId === undefined) void mod?.turnEnded()
+    if (e.agentId === undefined) void mod?.turnEnded().catch(() => undefined)
     return done
   })
 
   on('session.end', async ($, e, next) => {
-    mod?.sessionEnded(e.reason)
+    mod?.sessionEnded(e.reason, e.sessionId)
     if (e.reason !== 'clear' && e.reason !== 'resume') mod = null
     return next(e)
   })

@@ -3,9 +3,10 @@ import assert from 'node:assert/strict';
 import { COMMAND, LINE, Mod, SETTLE_MS, TICK_MS, decodeRecord, homeOf, isCommand, outcomeOf, pickupAgainIn, turnText, wakesHere } from '../hooks/wake.ts';
 import { record, reply, standIn, type StandIn } from './stand-in.ts';
 
-// The Claude Code plugin's mod (B33.2, blueprint/areas/2-agents.md) with a stand-in for Claude Code (stand-in.ts):
-// whether it names the session, which decisions it holds the command's wait for, and when and how often it hands an
-// answer over as a turn. e2e.test.ts runs it against the real command and service.
+// The Claude Code plugin's mod (B33.2, blueprint/areas/2-agents.md) with a stand-in for Claude Code (stand-in.ts),
+// which handles a plugin's prompt as Claude Code 2.1.321 did in the real run: whether the mod names the session, which
+// decisions it holds the command's wait for, and when and how often it hands an answer over as a turn. e2e.test.ts
+// runs it against the real command and service.
 
 const HOME = '/home/sam/.agentpager', A = 'ap-7f3k', B = 'ap-9k2m';
 const waiting = (agent: string) => `${HOME}/waiting/${agent}.json`;
@@ -15,10 +16,10 @@ const waitFor = (agent: string, d: string) => [COMMAND, 'wait', '--agent', agent
 const pickupOf = (agent: string, d: string) => [COMMAND, 'pickup', '--agent', agent, d, '--json'];
 const ANSWER = 'Answered at 11:15 AM: option B "Green".\nDo it, then confirm: agentpager ack --agent ap-7f3k d_2x8w "<what happens next>"';
 
+// Claude Code starts, with the mod: it hears each turn of the stand-in start and end.
 async function started(h: StandIn) {
   const mod = new Mod(h, HOME);
-  // A turn the mod submits starts as Claude Code starts one: the main loop is busy until the test ends it.
-  h.started = async () => { await mod.turnStarted(); };
+  h.mod = mod;
   await mod.start();
   return mod;
 }
@@ -38,25 +39,49 @@ test('B33.2 The plugin names the session to the command only where it can start 
   assert.equal(isCommand({ exitCode: 127, stdout: '' }), false);
 });
 
-test('B33.2 The session is named to the command in AGENTPAGER_WAKE, and named again before the first turn after a /clear', async () => {
+test('B33.2 The session is named to the command in AGENTPAGER_WAKE, and named again before the first turn after a /clear; the id of a session that has ended isn\'t taken for the next one\'s while Claude Code still gives it', async () => {
   const h = standIn('session-1');
   h.write(waiting(A), record(A, [{ decision: 'd_2x8w', wake: mine('session-1') }]));
   const mod = await started(h);
   assert.deepEqual(h.wake, ['claude-code:session-1']);
   assert.deepEqual(h.running().map(c => c.argv), [waitFor(A, 'd_2x8w')]);
-  // A /clear: the conversation goes on under another session, and its first turn names it before any command runs.
-  mod.sessionEnded('clear');
+  // A /clear: the session ends, and Claude Code goes on giving its id while its own session-start hooks run (2 to
+  // 2.6 s in the real run). The mod holds nothing under it meanwhile.
+  const held = h.children.length, cleared = h.leave('clear', 'session-2');
   assert.deepEqual(h.running(), [], 'the old session\'s waits stop');
-  h.session = 'session-2';
-  await mod.turnStarted();
+  await h.advance(TICK_MS * 3);
+  assert.equal(h.children.length, held, 'and aren\'t held again while Claude Code still gives the old id');
+  assert.equal(mod.named, null);
+  // The conversation goes on under another session, and its first turn names it before any command runs.
+  await cleared.arrive();
+  await h.type();
   assert.deepEqual(h.wake, ['claude-code:session-1', 'claude-code:session-2']);
+  await h.finish();
   await h.advance(TICK_MS * 3);
   assert.deepEqual(h.running(), [], 'the old session\'s decisions wait for it to be resumed');
+  // A /resume back: named at the next look once Claude Code gives the id, and its decision is held again.
+  const back = h.leave('resume', 'session-1');
+  await h.advance(TICK_MS * 2);
+  assert.equal(h.children.length, held);
+  await back.arrive();
+  await h.advance(TICK_MS);
+  assert.deepEqual([h.wake.at(-1), h.running().map(c => c.argv)], ['claude-code:session-1', [waitFor(A, 'd_2x8w')]]);
+  // A /resume into the session it is already in: the id never changes, so the session is named when its next turn starts.
+  const same = h.leave('resume', 'session-1');
+  await same.arrive();
+  await h.advance(TICK_MS * 3);
+  assert.equal(mod.named, null);
+  await h.type();
+  assert.equal(mod.named, 'session-1');
+  await h.finish();
+  await h.advance(TICK_MS);
+  assert.deepEqual(h.running().map(c => c.argv), [waitFor(A, 'd_2x8w')]);
   // A session id the command wouldn't take unsets the variable, and nothing is held.
   h.session = 'not a session';
   await h.advance(TICK_MS);
   assert.deepEqual(h.wake.at(-1), undefined);
   assert.equal(mod.named, null);
+  assert.deepEqual(h.running(), []);
   // Where Claude Code refuses the variable (an organization's settings), the mod holds nothing, and the command, not
   // seeing it, words the background wait.
   const refused = standIn('session-1');
@@ -84,32 +109,46 @@ test('B33.2 An answer comes as a new turn as soon as Claude is idle, carrying th
   assert.ok(h.dirs.has(claim(A, 'd_2x8w')), 'recorded as handed over');
   assert.deepEqual(h.pickups, [{ argv: pickupOf(A, 'd_2x8w'), turns: 1 }], 'picked up once its turn had started');
   assert.ok(!h.logs.some(l => l.includes('Green')), 'the answer is in no log line');
-  await mod.turnEnded();
+  assert.deepEqual(mod.held, []);
+  await h.finish();
   await h.advance(TICK_MS * 5);
-  assert.equal(h.turns.length, 1, 'once');
+  assert.deepEqual([h.turns.length, h.submitted.length], [1, 1], 'once');
   assert.deepEqual(h.running(), [], 'and no wait is held for it again');
 });
 
 test('B33.2 When Claude is busy the answer waits for the running turn to end, and a prompt the person queued goes first; never into a running turn', async () => {
   const h = standIn();
   h.write(waiting(A), record(A, [{ decision: 'd_2x8w', wake: mine() }]));
-  const mod = await started(h);
-  await mod.turnStarted();
+  await started(h);
+  await h.type();
   h.running()[0]?.exit(reply.answered(ANSWER));
   await h.advance(40_000);
-  assert.deepEqual(h.turns, [], 'not while the turn runs');
-  await mod.turnEnded();
+  assert.deepEqual(h.submitted, [], 'not while the turn runs');
+  await h.finish();
   await h.advance(SETTLE_MS - 1);
-  assert.deepEqual(h.turns, [], 'a moment for a prompt the person queued');
+  assert.deepEqual(h.submitted, [], 'a moment for a prompt the person queued');
   // The person's queued prompt starts the next turn: the answer waits for that one too.
-  await mod.turnStarted();
+  await h.type();
   await h.advance(10_000);
-  assert.deepEqual(h.turns, []);
-  await mod.turnEnded();
+  assert.deepEqual(h.submitted, []);
+  await h.finish();
   const ended = h.t;
   await h.advance(SETTLE_MS);
   assert.equal(h.turns.length, 1, 'the next turn');
   assert.equal(h.t - ended, SETTLE_MS);
+  // A turn that starts while the mod makes its last checks keeps the answer waiting too.
+  const k = standIn();
+  k.write(waiting(A), record(A, [{ decision: 'd_2x8w', wake: mine() }]));
+  await started(k);
+  const exists = k.exists;
+  let typed = false;
+  k.exists = async file => { if (!typed && file === claim(A, 'd_2x8w')) { typed = true; await k.type(); } return exists(file); };
+  k.running()[0]?.exit(reply.answered(ANSWER));
+  await k.advance(TICK_MS * 3);
+  assert.deepEqual([typed, k.submitted], [true, []], 'not submitted behind a turn that started meanwhile');
+  await k.finish();
+  await k.advance(SETTLE_MS);
+  assert.equal(k.turns.length, 1);
 });
 
 test('B33.2 Only this session\'s decisions are held: never another session\'s, another app\'s, one asked without the plugin, or one in a file that isn\'t a record', async () => {
@@ -145,19 +184,20 @@ test('B33.2 Each answer is handed over once, across restarts of Claude Code, and
   // Claude Code quits before the owner answers the other, and comes back: the first isn't handed over again, and the
   // other is held again.
   h.write(waiting(A), record(A, [{ decision: 'd_2x8w', state: 'answered', wake: mine() }, { decision: 'd_9k2m', wake: mine() }]));
-  one.sessionEnded('prompt_input_exit');
+  assert.deepEqual(one.held, [{ agent: A, decision: 'd_9k2m', state: 'holding' }]);
+  h.quit();
   assert.deepEqual(h.running(), [], 'quitting stops every wait');
-  const again = await started(h);
+  await started(h);
   assert.deepEqual(h.running().map(c => c.argv), [waitFor(A, 'd_9k2m')]);
   // Answered while Claude Code was closed: the wait comes back with it at once, and it goes as the first turn.
   h.running()[0]?.exit(reply.answered('Answered at 11:20 AM: option A "Blue".'));
   await h.advance(0);
   assert.equal(h.turns.length, 2);
   assert.match(h.turns[1] ?? '', /decision d_9k2m .*\n\nAnswered at 11:20 AM: option A "Blue"\./s);
-  await again.turnEnded();
+  await h.finish();
   // And once more: a third start holds neither.
-  again.sessionEnded('prompt_input_exit');
-  const third = await started(h);
+  h.quit();
+  await started(h);
   await h.advance(TICK_MS * 3);
   assert.deepEqual(h.running(), []);
   assert.equal(h.turns.length, 2);
@@ -166,25 +206,25 @@ test('B33.2 Each answer is handed over once, across restarts of Claude Code, and
   await h.advance(TICK_MS);
   assert.ok(!h.dirs.has(claim(A, 'd_2x8w')) && !h.dirs.has(claim(A, 'd_9k2m')));
   await h.advance(TICK_MS * 5);
-  assert.equal(h.turns.length, 2);
-  third.sessionEnded('prompt_input_exit');
+  assert.deepEqual([h.turns.length, h.submitted.length], [2, 2]);
+  h.quit();
 });
 
 test('B33.2 B32.12 The answer counts as picked up only once the turn carrying it has started: not while Claude is busy, not when Claude Code quits first, and a pickup that didn\'t land is tried again, across a restart too', async () => {
   const h = standIn();
   h.write(waiting(A), record(A, [{ decision: 'd_2x8w', wake: mine() }]));
-  const mod = await started(h);
-  await mod.turnStarted();
+  await started(h);
+  await h.type();
   h.running()[0]?.exit(reply.answered(ANSWER));
   await h.advance(30_000);
   assert.equal(h.pickups.length, 0, 'held while Claude is busy, and not picked up');
   // Claude Code quits before the turn: nothing was picked up, so the owner is still warned, and nothing was handed over.
-  mod.sessionEnded('prompt_input_exit');
+  h.quit();
   assert.equal(h.pickups.length, 0);
   assert.ok(!h.dirs.has(claim(A, 'd_2x8w')));
   // It comes back: the answer goes as the first turn, and only then is it picked up. The service is out of reach.
   h.picking = JSON.stringify({ code: 5, text: 'No reply from the server.', result: { status: 'try-again' } }) + '\n';
-  const back = await started(h);
+  await started(h);
   h.running()[0]?.exit(reply.answered(ANSWER));
   await h.advance(0);
   assert.deepEqual([h.turns.length, h.pickups.map(p => p.turns)], [1, [1]]);
@@ -194,10 +234,10 @@ test('B33.2 B32.12 The answer counts as picked up only once the turn carrying it
   assert.equal(h.pickups.length, 2);
   // Claude Code quits again before it lands, and comes back while the folder of hand-overs can't be listed: that is
   // never read as none, so the answer isn't held, or handed over, again.
-  back.sessionEnded('prompt_input_exit');
+  h.quit();
   h.picking = JSON.stringify({ code: 0, text: 'Picked up.', result: { status: 'picked-up' } }) + '\n';
   h.failing.add(`${HOME}/claude-code`);
-  const third = await started(h);
+  await started(h);
   await h.advance(TICK_MS * 3);
   assert.deepEqual([h.running(), h.turns.length, h.pickups.length], [[], 1, 2]);
   // Once it lists, the next look tries the pickup again, and stops once it is done.
@@ -208,12 +248,105 @@ test('B33.2 B32.12 The answer counts as picked up only once the turn carrying it
   assert.equal(h.pickups.length, 3, 'done');
   assert.equal(h.turns.length, 1, 'and the turn went once');
   // A record that says it's picked up needs no pickup.
-  third.sessionEnded('prompt_input_exit');
+  h.quit();
   h.write(waiting(A), record(A, [{ decision: 'd_2x8w', state: 'answered', wake: mine() }]));
-  const fourth = await started(h);
+  await started(h);
   await h.advance(TICK_MS * 30);
   assert.equal(h.pickups.length, 3);
-  fourth.sessionEnded('prompt_input_exit');
+  h.quit();
+});
+
+test('B33.2 B32.12 A prompt Claude Code keeps waiting isn\'t handed over yet: during a /compact, which is no turn to the mod, the answer is recorded and picked up only once its turn has started, and if Claude Code quits first it comes at the next start', async () => {
+  const h = standIn();
+  h.write(waiting(A), record(A, [{ decision: 'd_2x8w', wake: mine() }]));
+  const mod = await started(h);
+  h.compact();
+  h.running()[0]?.exit(reply.answered(ANSWER));
+  await h.advance(8_000);
+  assert.deepEqual([h.submitted.length, h.turns.length, h.pickups.length, h.dirs.has(claim(A, 'd_2x8w'))], [1, 0, 0, false], 'Claude Code holds the prompt, and nothing is recorded or picked up');
+  assert.deepEqual(mod.held, [{ agent: A, decision: 'd_2x8w', state: 'handing' }]);
+  // Claude Code quits during the compaction: the prompt is gone with it, and the answer comes at the next start.
+  h.quit();
+  await started(h);
+  h.compact();
+  h.running()[0]?.exit(reply.answered(ANSWER));
+  await h.advance(8_000);
+  assert.deepEqual([h.submitted.length, h.turns.length, h.pickups.length], [2, 0, 0]);
+  // The compaction ends: the turn starts, and only then is the answer recorded and picked up.
+  await h.idle();
+  assert.deepEqual([h.turns.length, h.pickups.map(p => p.turns), h.dirs.has(claim(A, 'd_2x8w'))], [1, [1], true]);
+  await h.finish();
+  await h.advance(TICK_MS * 5);
+  assert.deepEqual([h.turns.length, h.submitted.length], [1, 2], 'once');
+  h.quit();
+});
+
+test('B33.2 B32.12 Claude Code saying a prompt entered isn\'t its turn starting: one queued behind a running turn is recorded and picked up only when the mod hears a turn start after it, whichever of the two the mod hears first', async () => {
+  // The mod is loaded while a turn runs (a reload), so it knows of no turn; Claude Code queues the prompt behind it
+  // and, as its declarations allow, says at once that it entered.
+  const h = standIn();
+  h.entersWhenQueued = true;
+  h.write(waiting(A), record(A, [{ decision: 'd_2x8w', wake: mine() }]));
+  h.doing = 'turn';
+  const mod = await started(h);
+  h.running()[0]?.exit(reply.answered(ANSWER));
+  await h.advance(20_000);
+  assert.deepEqual([h.submitted.length, h.turns.length, h.pickups.length, h.dirs.has(claim(A, 'd_2x8w'))], [1, 0, 0, false], 'entered, and its turn hasn\'t started');
+  assert.deepEqual(mod.held, [{ agent: A, decision: 'd_2x8w', state: 'handing' }]);
+  assert.equal(h.submitted.length, 1, 'and it isn\'t submitted again meanwhile');
+  await h.finish();
+  assert.deepEqual([h.turns.length, h.pickups.map(p => p.turns), h.dirs.has(claim(A, 'd_2x8w'))], [1, [1], true]);
+  h.quit();
+  // Several prompts waiting start as one turn, whose start names only the last: the mod's own, not being it, still
+  // counts, since Claude Code said it entered before the turn started.
+  const merged = standIn();
+  merged.write(waiting(A), record(A, [{ decision: 'd_2x8w', wake: mine() }]));
+  await started(merged);
+  merged.compact();
+  merged.running()[0]?.exit(reply.answered(ANSWER));
+  await merged.advance(2_000);
+  merged.other('Another plugin\'s prompt.');
+  await merged.idle();
+  assert.deepEqual([merged.turns.length, merged.pickups.map(p => p.turns), merged.dirs.has(claim(A, 'd_2x8w'))], [2, [2], true]);
+  merged.quit();
+  // The other order: the mod hears the turn start, carrying its reply, before the call resolves.
+  const early = standIn();
+  early.startsBeforeEntered = true;
+  early.write(waiting(A), record(A, [{ decision: 'd_2x8w', wake: mine() }]));
+  await started(early);
+  early.running()[0]?.exit(reply.answered(ANSWER));
+  await early.advance(0);
+  assert.deepEqual([early.turns.length, early.pickups.map(p => p.turns), early.dirs.has(claim(A, 'd_2x8w'))], [1, [1], true]);
+  await early.finish();
+  await early.advance(TICK_MS * 5);
+  assert.deepEqual([early.turns.length, early.submitted.length, early.pickups.length], [1, 1, 1], 'once');
+  early.quit();
+});
+
+test('B33.2 B32.12 A prompt still waiting when a /clear takes effect starts in the new conversation, as Claude Code 2.1.321 has it: it is neither recorded nor picked up there, and the session that asked gets its answer when it is resumed', async () => {
+  const h = standIn('session-1');
+  h.write(waiting(A), record(A, [{ decision: 'd_2x8w', wake: mine('session-1') }]));
+  await started(h);
+  h.compact();
+  h.running()[0]?.exit(reply.answered(ANSWER));
+  await h.advance(2_000);
+  assert.equal(h.submitted.length, 1);
+  // The compaction ends and the /clear the person queued during it takes effect, before the prompt runs.
+  const cleared = h.leave('clear', 'session-2');
+  await cleared.arrive();
+  assert.deepEqual([h.turns.length, h.turnsIn], [1, ['session-2']], 'Claude Code started it in the new conversation');
+  assert.deepEqual([h.pickups.length, h.dirs.has(claim(A, 'd_2x8w'))], [0, false], 'which isn\'t the one that asked');
+  await h.finish();
+  await h.advance(TICK_MS * 5);
+  assert.deepEqual([h.submitted.length, h.running()], [1, []], 'and nothing more is offered there');
+  // Back in the session that asked: held again, and handed over there.
+  const back = h.leave('resume', 'session-1');
+  await back.arrive();
+  await h.advance(TICK_MS);
+  h.running()[0]?.exit(reply.answered(ANSWER));
+  await h.advance(SETTLE_MS);
+  assert.deepEqual([h.turnsIn, h.pickups.map(p => p.turns), h.dirs.has(claim(A, 'd_2x8w'))], [['session-2', 'session-1'], [2], true]);
+  h.quit();
 });
 
 test('B33.2 An answer the agent already has, from a wait of its own (today\'s background-wait words followed all the same), isn\'t handed over as well', async () => {
@@ -222,51 +355,72 @@ test('B33.2 An answer the agent already has, from a wait of its own (today\'s ba
     h.write(waiting(A), record(A, [{ decision: 'd_2x8w', wake: mine() }]));
     const mod = await started(h);
     // The agent's own background wait woke it first; the mod's wait came back with the answer too.
-    await mod.turnStarted();
+    await h.type();
     h.running()[0]?.exit(reply.answered(ANSWER));
     await h.advance(0);
-    h.write(waiting(A), record(A, after === 'picked up' ? [{ decision: 'd_2x8w', state: 'answered', wake: mine() }] : []));
-    await mod.turnEnded();
+    h.write(waiting(A), record(A, after === 'picked up' ? [{ decision: 'd_2x8w', state: 'answered', reads: 1, wake: mine() }] : []));
+    await h.finish();
     await h.advance(SETTLE_MS + TICK_MS);
-    assert.deepEqual(h.turns, [], after);
+    assert.deepEqual(h.submitted, [], after);
     assert.deepEqual(mod.held, []);
     // Nor held again at a restart.
-    mod.sessionEnded('prompt_input_exit');
+    h.quit();
     await started(h);
     await h.advance(TICK_MS * 3);
-    assert.deepEqual([h.running(), h.turns, h.pickups.length], [[], [], 0]);
+    assert.deepEqual([h.running(), h.submitted, h.pickups.length], [[], [], 0]);
+    h.quit();
   }
 });
 
-test('B33.2 A turn Claude Code didn\'t take is offered again after the person\'s next turn, or a minute later, so it is never lost', async () => {
+test('B33.2 A turn Claude Code didn\'t take, or removed before it ran, is offered again after the person\'s next turn, or a minute later, so it is never lost', async () => {
   const h = standIn();
   h.write(waiting(A), record(A, [{ decision: 'd_2x8w', wake: mine() }]));
-  const mod = await started(h);
-  // The person stopped the session with Esc: Claude Code holds a plugin's prompts until they type.
-  h.taking = { entered: false, why: 'the session was stopped and nobody has sent input since' };
+  await started(h);
+  // The person stopped the session with Esc: Claude Code refuses a plugin's prompts until they type.
+  await h.type(); await h.esc();
   h.running()[0]?.exit(reply.answered(ANSWER));
-  await h.advance(0);
-  assert.equal(h.turns.length, 1);
+  await h.advance(SETTLE_MS);
+  assert.deepEqual([h.submitted.length, h.turns.length], [1, 0]);
   assert.ok(!h.dirs.has(claim(A, 'd_2x8w')), 'not recorded as handed over');
   assert.equal(h.pickups.length, 0, 'nor picked up');
   await h.advance(TICK_MS * 10);
-  assert.equal(h.turns.length, 1, 'not offered again on every look');
-  h.taking = { entered: true };
-  await mod.turnStarted(); await mod.turnEnded();
+  assert.equal(h.submitted.length, 1, 'not offered again on every look');
+  await h.type(); await h.finish();
   await h.advance(SETTLE_MS);
-  assert.equal(h.turns.length, 2);
+  assert.deepEqual([h.submitted.length, h.turns.length], [2, 1]);
   assert.ok(h.dirs.has(claim(A, 'd_2x8w')));
-  assert.equal(h.pickups.length, 1);
+  assert.deepEqual(h.pickups.map(p => p.turns), [1]);
+  h.quit();
   // Nor is one lost when no one types: it is offered again a minute later.
   const k = standIn();
   k.write(waiting(A), record(A, [{ decision: 'd_2x8w', wake: mine() }]));
   await started(k);
-  k.taking = { entered: false, why: 'held' };
+  k.stopped = true;
   k.running()[0]?.exit(reply.answered(ANSWER));
   await k.advance(0);
-  k.taking = { entered: true };
+  assert.deepEqual([k.submitted.length, k.turns.length], [1, 0]);
+  k.stopped = false;
   await k.advance(60_000);
-  assert.equal(k.turns.length, 2);
+  assert.deepEqual([k.submitted.length, k.turns.length, k.pickups.length], [2, 1, 1]);
+  k.quit();
+  // A prompt waiting behind a turn the person then stops with Esc is removed by Claude Code, which says so: it is
+  // neither recorded nor picked up, and is offered again after the person's next turn. (The mod was loaded while
+  // that turn ran, so it knew of no turn.)
+  const r = standIn();
+  r.write(waiting(A), record(A, [{ decision: 'd_2x8w', wake: mine() }]));
+  r.doing = 'turn';
+  await started(r);
+  r.running()[0]?.exit(reply.answered(ANSWER));
+  await r.advance(5_000);
+  assert.deepEqual([r.submitted.length, r.turns.length], [1, 0]);
+  await r.esc();
+  await r.advance(TICK_MS * 5);
+  assert.deepEqual([r.submitted.length, r.turns.length, r.pickups.length, r.dirs.has(claim(A, 'd_2x8w'))], [2, 0, 0, false], 'removed, and refused while the session stays stopped');
+  assert.ok(r.logs.some(l => l.includes('removed from the queue')), r.logs.join('\n'));
+  await r.type(); await r.finish();
+  await r.advance(SETTLE_MS);
+  assert.deepEqual([r.submitted.length, r.turns.length, r.pickups.map(p => p.turns), r.dirs.has(claim(A, 'd_2x8w'))], [3, 1, [1], true]);
+  r.quit();
 });
 
 test('B33.2 B32.12 The mod holds the command\'s own wait and reads only its code and status: pending holds again, the pager off or the service out of reach tries later, no such agent stops, and a refusal is handed over', async () => {
@@ -317,14 +471,29 @@ test('B33.2 B32.12 The mod holds the command\'s own wait and reads only its code
   assert.deepEqual(h.turns, [`AgentPager: about decision d_2x8w (agent ${A}), the agentpager command replied:\n\n${text}`]);
   // A refusal isn't an answer: handed over once while this Claude Code runs, never recorded as handed over or picked
   // up, so an answer that reads later still comes, after a restart, and until then the owner is still warned.
+  await h.finish();
   await h.advance(TICK_MS * 5);
-  assert.deepEqual([h.turns.length, h.running().length, h.pickups.length, h.dirs.has(claim(A, 'd_2x8w'))], [1, 0, 0, false]);
-  mod.sessionEnded('prompt_input_exit');
-  const back = await started(h);
+  assert.deepEqual([h.turns.length, h.submitted.length, h.running().length, h.pickups.length, h.dirs.has(claim(A, 'd_2x8w'))], [1, 1, 0, 0, false]);
+  assert.deepEqual(mod.held, []);
+  // Nor is it handed over again while Claude Code runs: not after its record didn't read for a while, and not after
+  // a /resume away and back.
+  h.failing.add(waiting(A));
+  h.write(waiting(A), record(A, [{ decision: 'd_2x8w', wake: mine() }]));
+  await h.advance(TICK_MS * 2);
+  h.failing.clear();
+  await h.advance(TICK_MS * 3);
+  assert.deepEqual([h.submitted.length, h.running().length], [1, 0], 'its record didn\'t read for a while');
+  await h.leave('resume', 'session-2').arrive();
+  await h.advance(TICK_MS * 2);
+  await h.leave('resume', 'session-1').arrive();
+  await h.advance(TICK_MS * 3);
+  assert.deepEqual([mod.named, h.submitted.length, h.running().length], ['session-1', 1, 0], 'a /resume away and back');
+  h.quit();
+  await started(h);
   h.running()[0]?.exit(reply.answered(ANSWER));
   await h.advance(0);
   assert.deepEqual([h.turns.length, h.pickups.length, h.dirs.has(claim(A, 'd_2x8w'))], [2, 1, true]);
-  back.sessionEnded('prompt_input_exit');
+  h.quit();
 });
 
 test('B33.2 A record that didn\'t read is read again at the next look, so its decisions are still held', async () => {
@@ -342,9 +511,9 @@ test('B33.2 When the session ends, every wait the mod holds stops, and it looks 
   const h = standIn();
   h.write(waiting(A), record(A, [{ decision: 'd_2x8w', wake: mine() }]));
   h.write(waiting(B), record(B, [{ decision: 'd_9k2m', wake: mine() }]));
-  const mod = await started(h);
+  await started(h);
   assert.equal(h.running().length, 2);
-  mod.sessionEnded('prompt_input_exit');
+  h.quit();
   assert.deepEqual(h.running(), []);
   h.write(waiting(A), record(A, [{ decision: 'd_2x8w', wake: mine() }, { decision: 'd_4hq7', wake: mine() }]));
   const before = h.children.length;

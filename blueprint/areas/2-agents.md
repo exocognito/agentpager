@@ -2,7 +2,7 @@
 
 > **Definition:** The agent's side of an exchange, through the agentpager command: connecting with a pager number as a new agent, waiting for the answer in its own app, acknowledging it, and the history kept on its machine. Writing and checking a card belongs to 3 Cards, and installing and setting up the command to 7 Getting started.
 > **Serves:** [Unblock my agent from my phone](../PRODUCT.md#unblock-my-agent-from-my-phone) · [Reach the agents owners actually use](../PRODUCT.md#reach-the-agents-owners-actually-use) · [An acknowledgement always comes from the agent](../PRODUCT.md#an-acknowledgement-always-comes-from-the-agent) · [Pinned design decisions](../PRODUCT.md#pinned-design-decisions)
-> **Relies on:** the agent apps owners already use, such as Claude Code, Claude Desktop, Codex, Cursor and pi, which the owner installs and signs in to. Each runs the command from its shell, or starts it as a local MCP server that setup adds without an agent's key or a pager number (B29.6), and says who it is. How an answer reaches a waiting agent depends on the app (B33).
+> **Relies on:** the agent apps owners already use, such as Claude Code, Claude Desktop, Codex, Cursor and pi, which the owner installs and signs in to. Each runs the command from its shell, or starts it as a local MCP server that setup adds without an agent's key or a pager number (B29.6), and says who it is. Claude Code and pi also load AgentPager's plugin and extension, which setup installs through each app's own install (B29.1). How an answer reaches a waiting agent depends on the app (B33).
 > **Code:** `packages/cli/src/commands.ts`, `detect.ts`, `codex.ts`, `mcp.ts`, `store.ts`, `client.ts`, `main.ts`; `packages/pi/src/index.ts` (pi's extension); `packages/claude-code-plugin/hooks/` (Claude Code's plugin: `wake.ts`, `register.ts`); `packages/app/src/pager.ts` (connecting, and every call an agent makes, in its pager's store), `wake.ts` (the waits it holds, each woken by what it waits for), `agent.ts` (each agent's way to its pager's store), `worker.ts` (which client each call names)
 > **Screens:** [journeys/pager](../generated/screens/journeys/pager/README.md) · [phone/answered.png](../generated/screens/phone/answered.png) · [phone/notpickedup.png](../generated/screens/phone/notpickedup.png)
 > **Walked by:** J3, J4, J5
@@ -42,6 +42,7 @@
 
 - An acknowledgement is the agent's own words, never AgentPager's. Collecting an answer is not acknowledging it (I6).
 - If no agent picks an answer up 3 minutes after Send, the owner is told once, on the decision (B5) and by an alert (B17).
+- A command from before M7, such as the `m6.1` one, never confirms that it has an answer, so its read of the answer still picks it up, as it did before B32.12.
 - While the pager is off, waiting and acknowledging are refused like every other call, and nothing is queued (I17).
 
 ### B33 · @M3 · Each supported agent app wakes its agent

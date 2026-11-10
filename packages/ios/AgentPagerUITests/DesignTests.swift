@@ -26,7 +26,7 @@ final class DesignTests: XCTestCase {
     func testClosedList() { capture("closedlist", "A project's answered decisions with the two that closed unanswered when Claude Code finished, newest first.", until: "answered-Which M11 guarantee should we build?") }
     func testUndo() { capture("undo", "The Undo window after Send: \"Sending in …s\" with Undo, over the Work pager.", until: "undo-button") }
     func testNotConfirmed() { capture("notconfirmed", "The \"Answer Not Confirmed\" alert once every retry of an answer failed: Cancel or Retry.", until: "Answer Not Confirmed") }
-    func testNotPickedUp() { capture("notpickedup", "An answer no agent read 3 minutes after Send: the warning naming the agent, its computer and its project (I6).", until: "agent-confirmation") }
+    func testNotPickedUp() { capture("notpickedup", "An answer no agent picked up 3 minutes after Send: the warning naming the agent, its computer and its project (I6).", until: "agent-confirmation") }
 
     // Draws no catalogue screen. With the sample pagers made on dev.agentpager.me, each shows the dev mark on Pagers and
     // beside its name on its screen; made on agentpager.me or a local server, as in the catalogue, none does.

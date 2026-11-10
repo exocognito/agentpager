@@ -56,7 +56,7 @@ The root put three questions, D1 to D3, to Sam on 8 Nov 2026, on its [canvas](ht
 
 ## What's known
 
-Verified on 8 Nov 2026 against `main` at 49d36bd, which dev runs; prod runs `m6.1`, 9fbb490 (`X-AgentPager-Build`). Assumptions are marked.
+As M7 started: verified on 8 Nov 2026 against `main` at 49d36bd, which dev then ran; prod ran `m6.1`, 9fbb490 (`X-AgentPager-Build`), and still does. Assumptions are marked. Today's words, Setup today and The not-picked-up gap describe the product before M7's code; what M7 built since is in the Log.
 
 - **Today's words** (B33; `packages/cli/src/detect.ts`, `commands.ts`): the command gives waking words only to Claude Code and to Claude Desktop chats, and only when it identifies the app for certain. Every other app gets the plain words (B32) and must call wait again itself. One that has ended its turn sees the answer only when it next calls wait, so the owner has to nudge it (L11). That is why Codex doesn't get the reply.
 - **Setup today** (B29.1; `packages/cli/src/setup.ts`): it adds the command's MCP server to Claude Code, Codex, Claude Desktop and Cursor, and doesn't set up pi.

@@ -21,7 +21,7 @@ The [AgentPager board](https://app.todoist.com/app/project/6hxGh4F57m9GmG79) in 
   | Section | A card is here when |
   | --- | --- |
   | Intake | it is captured and being assessed, or queued for Sam's go |
-  | Design Review | the proposal is ready for Sam and implementation waits for approval |
+  | Design Review | the review is being prepared or is with Sam for approval |
   | Ready | the approach and checks are clear and the work is queued |
   | Building | implementation, verification or code review is under way |
   | Merged | the change is integrated and release or verification is pending |
@@ -31,7 +31,7 @@ The [AgentPager board](https://app.todoist.com/app/project/6hxGh4F57m9GmG79) in 
 - **One milestone at a time.** The next card stays in Intake until the previous milestone's card and subtasks are complete, subject to the [exceptions in METHOD.md](METHOD.md#when-things-get-written). For earlier milestones that predate subtasks, complete their remaining closeout cards or apply the same exceptions before starting the next one. Report the open items when the gate is blocked.
 - **Every milestone opens with [Design Review](METHOD.md#the-milestone-loop).** Link one draft PR from the card. Add a subtask for each review part and link its evidence or mark it as inapplicable. Get Sam's approval before implementation. Outside milestones, use the same gate for UI changes, meaningful technical design, or changes where Sam needs to agree what done means. A small fix with clear acceptance checks can go straight to Building. Return to Design Review if an approved design needs to change.
 - **Later ideas wait for Sam.** Keep uncommitted ideas in Intake with the `later` label. When Sam commits to one, remove the label, add its milestone row and queued doc, then assess it.
-- **A blocking decision for Sam** gets `waiting-on-sam` on the subtask and on its card while the card cannot move. Page Sam with a question that stands on its own, its options and consequences, a recommendation, and any relevant UI mocks. Keep Todoist links out of pages and include them in handoffs. Record the answer once on the card and clear the labels when resolved.
+- **A blocking decision for Sam** gets `waiting-on-sam` on the subtask once the question is ready for Sam, and on its card while the card cannot move. Page Sam with a question that stands on its own, its options and consequences, a recommendation, and any relevant UI mocks. Keep Todoist links out of pages and include them in handoffs. Record the answer once on the card and clear the labels when resolved.
 - **Keep the board current as work happens.** Read the card, its subtasks and recent comments at start and resume, and check for new owner replies before reporting a blocker or handing off. Update the board in the same piece of work as a PR open, merge, deploy or owner decision. Link the PR and card to each other. The milestone lead gives each agent its task link and records who reconciled the card, when, and against which PR or deploy evidence. An agent that lacks board access says so in its handoff.
 - **Keep evidence where it belongs.** The [Blueprint milestone table](blueprint/README.md#milestones) mirrors the milestone cards. Update a row when the milestone starts or finishes. Milestone docs hold designs, answers and history. GitHub and deploy results settle factual disagreements about what merged or shipped. Fix the board from that evidence, then fix the mirror from the board.
 

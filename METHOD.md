@@ -172,7 +172,7 @@ Never fix a miss the owner cares about with a test alone. A test follows from a 
 4. **Green on dev.** Deploy to dev and run the smoke run there, including the upgrade check from the last release.
 5. **Review.** Regenerate `generated/`. The reviewer checks.
 6. **Walk.** The owner uses it on dev, and reads the Blueprint and `generated/` in their markdown viewer.
-7. **Release.** Tag the commit that was green on dev, deploy prod and the client builds from that tag, and run the smoke run on prod. Open one real thing that existed before the release. Reconcile and complete its card, mark the milestone row ✅, and log the release. Record this release's upgrade baseline before the next milestone's code reaches dev.
+7. **Close out.** For a production release, tag the commit that was green on dev, deploy prod and the client builds from that tag, and run the smoke run on prod. Open one real thing that existed before the release. Record this release's upgrade baseline before the next milestone's code reaches dev. For a milestone without a production release, verify and link its passing acceptance checks. In either case, reconcile and complete its card, mark the milestone row ✅, and log the outcome.
 
 ## Sessions
 

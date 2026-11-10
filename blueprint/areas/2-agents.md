@@ -38,7 +38,7 @@
 <!-- B32.9 dropped in Sam's review, 6 Nov 2026; ids are never reused -->
 10. A reply the command can't get or can't read is never taken as success. When nothing left the machine, the agent is told so. When the request may have reached the owner, the agent is told to check its status before trying again.
 11. @M6: A wait for a decision that closed unanswered ends, telling the agent so. A wait with no end stops too.
-12. @M7: An answer counts as picked up only once the agent's command confirms it has it. A wait whose agent went away before then doesn't count, so the owner is still told it wasn't picked up (B5.13).
+12. @M7: An answer counts as picked up only once the agent's command confirms it has it, or the agent acknowledges it. A wait whose agent went away before then doesn't count, so the owner is still told it wasn't picked up (B5.13).
 
 - An acknowledgement is the agent's own words, never AgentPager's. Collecting an answer is not acknowledging it (I6).
 - If no agent picks an answer up 3 minutes after Send, the owner is told once, on the decision (B5) and by an alert (B17).
@@ -52,6 +52,7 @@
 3. A Claude Desktop chat is told not to end its turn until the answer comes, because the answer reaches it only while it works. It checks briefly between steps of other work, holds the wait again and again once its work runs out, and when the link to the computer drops, pauses and tries again. Two hours after it asked, it is told to stop waiting and tell its owner, and the answer stays on the service for its next wait.
 4. @M7: Codex, in a terminal or the ChatGPT app, gets a note that its answer is in, in the thread that asked: within a second when the thread is idle, as its next turn when busy, and when it is resumed if Codex was closed. The note never holds the answer. A `codex exec` run isn't woken.
 5. @M7: pi, with AgentPager's extension, gets the answer as a follow-up turn once it settles. A run in print or JSON mode isn't woken.
+6. @M7: Only the agentpager command holds an agent's keys and opens what is encrypted. AgentPager's plugin and extension hand on the command's reply and hold no key.
 
 - Verified on 30 Oct 2026, in the wake lab and then on the deployed product with Sam's iPhone ([docs/research/2026-10-30-agent-wake-lab.md](../../docs/research/2026-10-30-agent-wake-lab.md)). Claude Code, in a terminal and in the Claude desktop app's Code tab, woke when its background wait ended, including after a 40-minute wait. Claude Desktop chats waited from the ask reply's words alone, collected answers within 2 seconds of their being sent, and rode out a dropped link and a 75-second freeze of the app.
 - Claude Code with the plugin: verified on 9 Nov 2026 with Claude Code 2.1.321 in a terminal, in real runs against a local server. Idle, the turn came 15 to 40 ms after Send; busy, as the next turn, half a second after the running turn ended, and so too with a permission prompt or a question to the person open, and while Claude Code compacted the conversation by itself; during a `/compact`, right after the compaction; a decision answered while Claude Code was closed, or after it was killed, came as the first turn after `claude --continue`, once, and not again after another restart, and the killed one's owner was warned meanwhile; after a `/clear` or a `/resume`, each session's answers came to it and to no other, as they did with two sessions open in one folder. Each counted as picked up only once its turn had started. `claude -p` was told to wait in the background, as was a `claude -p` started inside another session, with the plugin or without it. The plugin's mod names the session to the command in `AGENTPAGER_WAKE`, which the command takes only when it is the session Claude Code itself names to the shell; it reads the record of what's waiting, holds the command's wait without picking the answer up, hands its reply over, then picks it up. Two things the runs showed that it doesn't prevent: with one session open in two Claude Code windows at once, both got the turn; and a `/clear` typed while Claude Code still held an answer's turn back, during a `/compact`, sent that turn to the new conversation. The 8 Nov lab's prototype woke Claude Code 2.1.319 the same way. Not run: the desktop app's Code tab, which the plugin leaves to the background wait as a session no one is at, as the lab read Claude Code's plugin types. Re-tested at every release.
@@ -101,14 +102,14 @@ Why: [Unblock my agent from my phone](../PRODUCT.md#unblock-my-agent-from-my-pho
 - What people meet: a Claude Desktop chat whose decision is still unanswered two hours after it asked ends its turn and tells its owner. An answer after that reaches it only when the owner next works in that chat.
 - Why it waits: a Desktop chat is reached only while its turn lasts, and nothing from outside starts a new turn when the answer arrives.
 - What would fix it: a way to wake a Desktop chat when its answer arrives. The 30 Oct lab ruled out a waiting card in the chat and the chat's scheduled check-ins.
-- When to revisit: CLIENTS.
+- When to revisit: when Claude Desktop offers a way to start a turn from outside, or an owner meets it.
 
 ### L13 · @M3 · Cloud sessions are untested
 
 - What people meet: an agent in a cloud session with a shell, such as one the Claude mobile app starts in a cloud VM, may work, but nothing promises it.
 - Why it waits: cloud sessions with a shell should work too, but none has been tried.
 - What would fix it: a recorded run of the command in one, including whether its network reaches agentpager.me and whether a long wait keeps the session from pausing. The 30 Oct lab saw a Claude Desktop chat's own cloud VM blocked from agentpager.me until the owner allowed it, and pause a few minutes after its turn ended.
-- When to revisit: CLIENTS.
+- When to revisit: when an owner runs an agent in a cloud session.
 
 ### L14 · @M3 · An agent id works on one machine only
 

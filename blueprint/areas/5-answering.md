@@ -70,7 +70,7 @@ Why: [Sending a decision requires confirmation](../PRODUCT.md#sending-a-decision
 
 1. Choosing an option or writing a note never sends. Only Send sends, and the agent receives exactly the answer as it stood when Send was pressed.
 2. The Undo window lasts five seconds. Undo cancels the send and reopens the decision with the choice kept.
-3. Leaving the app during the Undo window sends the answer at once.
+3. Leaving the app during the Undo window, or sending another answer, sends the answer at once.
 4. @M2: If the pager is turned off inside the Undo window, the answer is refused, nothing is stored and the decision stays open. A pager deleted inside the window takes the answer with it.
 5. The phone's refreshes never reset a draft.
 6. The phone never says the agent received an answer until the agent itself acknowledges it.

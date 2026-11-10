@@ -41,7 +41,7 @@
 ### L21 · @M2 · The front page still describes the first version
 
 - What people meet: agentpager.me in a browser shows the first version of AgentPager: pairing by QR code, link and emoji, sessions that end, agents that need nothing installed, and a planned Pro plan. None of that is how AgentPager works now. Its Download buttons lead nowhere, because the app isn't on the App Store. The step that still works is the line it offers to copy for an agent, which sends the agent to /start (B18).
-- Why it waits: Sam workshops the new page before anything is built, and the page needs the agent apps AgentPager supports and the one-line install, which CLIENTS and INSTALL settle first.
+- Why it waits: Sam workshops the new page before anything is built. CLIENTS settled which agent apps AgentPager supports. The page still needs the one-line install from INSTALL.
 - What would fix it: a front page for AgentPager as it is now, which says what it does, how to get the app and the command, and what the service stores and for how long.
 - When to revisit: SITE.
 

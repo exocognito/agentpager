@@ -80,7 +80,7 @@ Use the platform's own components and conventions (lists, sheets, menus, alerts 
 
 ### Letters tell options apart; ✶ marks the recommendation
 
-For every card, the agent chooses the question and two to four options. They are lettered A to D in the order the agent gives them, and the letter tells them apart, so I can refer to them when I ask for changes, such as "do A, then B". I choose one option, never several, and the phone marks my choice the platform's usual way. The agent may mark the option it recommends; the phone marks it ✶, and nothing is chosen for me.
+For every card, the agent chooses the question and two to four options. They are lettered A to D in the order the agent gives them, and the letter tells them apart, so I can refer to them when I ask for changes, such as "do A, then B". I choose one option, never several, and the phone marks my choice the platform's usual way. The agent marks the option it recommends; the phone marks it ✶, and nothing is chosen for me.
 
 ### Lead with the decision; keep the rest one tap away
 

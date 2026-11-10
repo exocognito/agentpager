@@ -10,9 +10,17 @@ and nowhere else ([3 Cards](../../blueprint/areas/3-cards.md), B27).
 ```sh
 pnpm --filter @agentpager/cli build          # bun build --compile → packages/cli/dist/agentpager
 ln -sf "$PWD/packages/cli/dist/agentpager" ~/.local/bin/agentpager
-agentpager setup --print                     # what it would add to Claude Code, Codex, Claude Desktop, Cursor
+agentpager setup --print                     # what it would add to Claude Code, pi, Codex, Claude Desktop, Cursor
 agentpager setup
 ```
+
+`setup` gives Claude Code AgentPager's plugin and pi its extension, which wake the agent with the answer
+([packages/claude-code-plugin](../claude-code-plugin/README.md), [packages/pi](../pi/src/index.ts)); their agents use the
+command line, so neither gets the MCP server, and the entry an earlier setup added to Claude Code is removed. The
+binary carries both adapters' files (`src/adapters.ts`): setup writes them to `~/.agentpager/adapters/` and registers
+that folder through each app's own install (`claude plugin marketplace add` and `claude plugin install`; `pi install`).
+Run it again after each new build, so the adapters match the command. Codex, Claude Desktop and Cursor get the MCP
+server.
 
 No releases, install script or self-update until MINSTALL.
 
@@ -51,7 +59,7 @@ pnpm --filter @agentpager/cli test           # against local workerd, through th
 ```
 
 `cli.test.ts` drives every command and the MCP server over stdio; `binary.test.ts` runs the compiled binary (skipped
-until it is built); `setup.test.ts` writes only into a throwaway home.
+until it is built); `setup.test.ts` writes only into a throwaway home, with stand-ins for `claude` and `pi` on its PATH (`test/stand-ins/`).
 
 The review list's regression set is the 10 cards of 28–29 Oct: `scripts/regression-cards.mjs` rebuilds them from
 `test/regression/cards-2026-10-28.txt`, `agentpager review` prints each, and a fresh subagent grades it.

@@ -14,6 +14,8 @@ import { Token } from '../../contract/exchange.ts';
 //                          where it stands, for the adapters that wake an agent (below)
 //   claude-code/<id>.<decision>/   the Claude Code plugin's claim on handing one answer over, an empty folder, kept
 //                          until the decision leaves the record (packages/claude-code-plugin/hooks/wake.ts)
+//   adapters/              the Claude Code plugin's and the pi extension's files, as setup wrote them for those apps to
+//                          load (adapters.ts)
 export const DEFAULT_SERVER = 'https://agentpager.me';
 export const home = () => process.env.AGENTPAGER_HOME || path.join(homedir(), '.agentpager');
 

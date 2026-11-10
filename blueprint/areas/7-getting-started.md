@@ -25,7 +25,7 @@
 
 ### B29 · @M3 · Set up the command in agent apps
 
-1. `agentpager setup` adds the command's local MCP server to each agent app it finds on the machine: Claude Code, Codex, Claude Desktop and Cursor.
+1. `agentpager setup` adds the command to each agent app it finds on the machine: Claude Code and pi with AgentPager's plugin and extension, Codex, Claude Desktop and Cursor.
 <!-- B29.2 and B29.3 dropped in Sam's review, 6 Nov 2026; ids are never reused -->
 4. A config file that setup can't read whole is left alone, and setup says what to add to it by hand.
 <!-- B29.5 dropped in Sam's review, 6 Nov 2026; ids are never reused -->
@@ -34,6 +34,7 @@
 8. The built command is one file. Where it runs, it needs neither Bun, Node nor the AgentPager repository.
 
 - Setup finds Claude Desktop's config only where macOS keeps it.
+- Claude Code and pi: verified on 9 Nov 2026 with Claude Code 2.1.322 and pi 1.4.0, in real runs of the built command, copied to a folder with no repository beside it, with every app's configuration in throwaway homes. Setup gave Claude Code the plugin through Claude Code's own plugin commands, from a marketplace that is a folder under AgentPager's home, and pi the extension through `pi install`; each app loads it from that folder, with no prompt of its own. A decision asked in each app came back as a turn through what setup installed, within a tenth of a second of Send. A second setup changed nothing. An older command's files left in the folder ran until setup replaced them, and the next session ran the new ones. Where an app couldn't read its own settings, it left them as they were, and setup said what to run by hand. Neither app is signed in under a throwaway home, so a local stand-in answered as the model. pi counts a folder by its path, so after AgentPager's home moves pi lists the extension twice: setup says so and removes neither. Re-tested at every release.
 
 ## Limits
 

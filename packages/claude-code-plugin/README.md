@@ -16,4 +16,4 @@ claude plugin validate packages/claude-code-plugin   # what the mod hooks and ca
 
 Claude Code writes its own type declarations into `.claude-plugin/types/` when it loads the plugin from this folder; after that, `npx tsc -p packages/claude-code-plugin` type-checks the hooks module. The repository's `pnpm check` type-checks `wake.ts` and the tests, not `register.ts`.
 
-Publishing it through a plugin marketplace is INSTALL's.
+`agentpager setup` installs it from the files the command carries, through a marketplace in a folder under `~/.agentpager/adapters/` ([setup.ts](../cli/src/setup.ts)): `.claude-plugin/plugin.json` and `hooks/`, nothing else. Publishing it through a public plugin marketplace is INSTALL's.

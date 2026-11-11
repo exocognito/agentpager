@@ -15,7 +15,7 @@ Start here. [PRODUCT.md](PRODUCT.md) says what AgentPager is for, as Sam approve
 | ✅ | [M5 · ENCRYPT](milestones/M5-encrypt.md) | Decisions the service can't read |
 | ✅ | [M6 · TIDY](milestones/M6-tidy.md) | Tidy state: one store per pager, lighter polls and the agent's lifecycle |
 | ✅ | [M7 · CLIENTS](milestones/M7-clients.md) | The agent apps AgentPager supports |
-| ⏳ | [INSTALL](milestones/next/INSTALL.md) | AgentPager installs in a minute |
+| 🔨 | [M8 · INSTALL](milestones/M8-install.md) | AgentPager installs in a minute |
 | ⏳ | [SITE](milestones/next/SITE.md) | A front page for AgentPager as it is now |
 | ⏳ | [OPEN](milestones/next/OPEN.md) | AgentPager in the open |
 | ⏳ | [FRIENDS](milestones/next/FRIENDS.md) | AgentPager for people I invite |

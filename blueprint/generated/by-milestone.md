@@ -127,3 +127,7 @@ Added to earlier entries:
 - **B33.4**, in [B33 · Each supported agent app wakes its agent](../areas/2-agents.md#b33--m3--each-supported-agent-app-wakes-its-agent): Codex, in a terminal or the ChatGPT app, gets a note that its answer is in, in the thread that asked: within a second when the thread is idle, as its next turn when busy, and when it is resumed if Codex was closed. The note never holds the answer. A `codex exec` run isn't woken.
 - **B33.5**, in [B33 · Each supported agent app wakes its agent](../areas/2-agents.md#b33--m3--each-supported-agent-app-wakes-its-agent): pi, with AgentPager's extension, gets the answer as a follow-up turn once it settles. A run in print or JSON mode isn't woken.
 - **B33.6**, in [B33 · Each supported agent app wakes its agent](../areas/2-agents.md#b33--m3--each-supported-agent-app-wakes-its-agent): Only the agentpager command holds an agent's keys and opens what is encrypted. AgentPager's plugin and extension hand on the command's reply and hold no key.
+
+## [M8 · INSTALL](../milestones/M8-install.md)
+
+0 entries with 0 clauses, and 0 clauses added to earlier entries.
